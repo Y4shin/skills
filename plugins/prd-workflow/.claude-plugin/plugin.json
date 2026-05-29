@@ -1,0 +1,7 @@
+{
+  "name": "prd-workflow",
+  "description": "PRD → issues → TDD implement → finalize workflow. Feature & capability PRD authoring, vertical-slice issue breakdown (GitHub/Forgejo), test-plan grilling, and knowledge harvest.",
+  "version": "0.1.0",
+  "author": { "name": "Patric Plattner" },
+  "keywords": ["prd", "workflow", "issues", "tdd", "github", "forgejo"]
+}
