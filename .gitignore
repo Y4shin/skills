@@ -1,0 +1,8 @@
+# Python build/dev artifacts — the shipped artifact is plugins/prd-workflow/scripts/prd_tool.pyz
+/.venv/
+__pycache__/
+*.pyc
+
+# Editor / Nix
+/.vscode/
+/result

@@ -1,6 +1,7 @@
 ---
 name: implement-issue
 description: Phase 2 — implement a slice issue via strict TDD against the test plan from /prd-workflow:analyse-issue. Creates the branch, runs red→green→refactor, opens a PR (Closes #n), sets issue state, then garbage-collects the slice doc and notes the decision on the PRD. Use after /prd-workflow:analyse-issue, or when the user says "now implement #n". Don't use it before a test plan exists (run analyse-issue first) or to finalize a completed PRD (use finalize-prd). Provider-aware (gh/fgj).
+allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
 # Implement Issue
@@ -13,6 +14,12 @@ Per-provider commands come from `${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh <
 uses them. The artifact-lifecycle reference is injected below.
 
 !`cat "${CLAUDE_PLUGIN_ROOT}/references/artifacts.md"`
+
+`prd_tool.pyz` is the bundled helper that reads/writes this frontmatter — invoke it as
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full
+surface). The current planning-tree inventory is injected here:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
 
 ## Step 1 — Set state
 
@@ -90,8 +97,9 @@ criteria and `Closes #<n>` (PR form for the detected provider):
 
 !`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_create_pr`
 
-Then set the issue label `status:in-progress` → `status:needs-review` and tick the slice
-off the PRD issue's task list (`- [x] #<n> …`). Label-edit form:
+Then set the issue label `status:in-progress` → `status:needs-review`. (No task list to tick —
+the slice is wired as a native dependency of its PRD; merging the PR `Closes #<n>`, which
+auto-resolves that dependency.) Label-edit form:
 
 !`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_edit_labels`
 
@@ -104,6 +112,11 @@ Report the PR URL.
    is what `/prd-workflow:finalize-prd` harvests.
 2. **Delete the slice doc** `docs/prd/<slug>/slices/<n>-<slug>.md` and commit (with the PRD
    note). A surviving slice doc now reliably signals unfinished work.
+3. Report whether this was the PRD's last slice — if the gate now passes, point the user at
+   `/prd-workflow:finalize-prd <slug>`:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" prd-finalizable <slug>
+   ```
 
 ## Error handling
 

@@ -1,6 +1,7 @@
 ---
 name: analyse-issue
 description: Fetch a slice issue (#n), present a structured summary, then run a focused grilling session to decide the test strategy before any code. Appends a confirmed Test plan to the issue's committed slice doc and hands off to /prd-workflow:implement-issue. Use when starting work on an issue, or when the user says "analyse"/"start on" #n. Don't use it to write code or open a PR (use implement-issue once the test plan is agreed). Provider-aware (gh/fgj).
+allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
 # Analyse Issue
@@ -15,16 +16,29 @@ reference is injected below.
 
 !`cat "${CLAUDE_PLUGIN_ROOT}/references/artifacts.md"`
 
+`prd_tool.pyz` is the bundled helper that reads this frontmatter — invoke it as
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full
+surface). The current planning-tree inventory is injected here:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
+
 ## Step 1 — Fetch + present
 
 Fetch the issue (form for the detected provider):
 
 !`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_get_issue`
 
-Read its `kind:` label and `Part of #<prd>` to locate the PRD (`docs/prd/<slug>/prd.md`) and
-the committed slice doc (`docs/prd/<slug>/slices/<n>-<slug>.md`); read both in full. Load
-conventions: `docs/design/`, `docs/impl/README.md`, `docs/plugin-authoring-guide.md`,
-`clippy.toml`.
+Read its `kind:` label and `Part of #<prd>` to locate the PRD and slice doc. The PRD issue # in
+`Part of #<prd>` maps to its dir, and `slices` lists this PRD's surviving slice docs (the one for
+`#<n>` is among them):
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" resolve <prd#> --kind prd   # → docs/prd/<slug>/prd.md
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" slices <slug>               # → the <n>-<slug>.md path
+```
+
+Read both the `prd.md` and `docs/prd/<slug>/slices/<n>-<slug>.md` in full. Load conventions:
+`docs/design/`, `docs/impl/README.md`, `docs/plugin-authoring-guide.md`, `clippy.toml`.
 
 Present:
 

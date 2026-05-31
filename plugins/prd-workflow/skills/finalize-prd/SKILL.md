@@ -1,6 +1,7 @@
 ---
 name: finalize-prd
-description: Close the loop once all of a PRD's slices are merged — harvest the enriched PRD + the merged code changes, fold durable knowledge into permanent repo docs (docs/design/, docs/impl/), close the PRD tracking issue, then delete the spent PRD. Use when a PRD's work is complete, or the user says "finalize"/"wrap up" a PRD. Don't use it while any slice is still open or unmerged (finish implement-issue first). Provider-aware (gh/fgj).
+description: Close the loop once all of a PRD's slices are merged — harvest the enriched PRD + the merged code changes, fold durable knowledge into permanent repo docs (docs/design/, docs/impl/), close the PRD issue (and tick its epic if any), then delete the spent PRD. Use when a PRD's work is complete, or the user says "finalize"/"wrap up" a PRD. Don't use it while any slice is still open or unmerged (finish implement-issue first). Provider-aware (gh/fgj).
+allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
 # Finalize PRD
@@ -14,14 +15,25 @@ reference is injected below.
 
 !`cat "${CLAUDE_PLUGIN_ROOT}/references/artifacts.md"`
 
+`prd_tool.pyz` is the bundled helper that reads/writes this frontmatter — invoke it as
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full
+surface). The current planning-tree inventory is injected here:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
+
 ## Step 1 — Preconditions
 
-Resolve `docs/prd/<slug>/` (from the slug or by mapping the PRD issue # via `prd.md`
-`prd_issue:`). Confirm:
-- `docs/prd/<slug>/slices/` is **empty** (every slice implemented + its doc GC'd by
-  `/prd-workflow:implement-issue`);
-- the slice issues are **closed** (on GitHub, the PRD issue's sub-issue progress reads
-  complete; on Forgejo, every task-list item is ticked).
+Resolve the PRD (accepts the slug **or** the `prd_issue:` number) and gate on its slices:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" resolve <slug|prd-issue#> --kind prd
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" prd-finalizable <slug|prd-issue#>
+```
+
+`prd-finalizable` exits **0** only when `docs/prd/<slug>/slices/` holds no surviving slice docs
+(every slice implemented + its doc GC'd by `/prd-workflow:implement-issue`); a non-zero exit
+lists the still-open slices. Also confirm the slice issues are **closed** — equivalently, the
+PRD issue's native `blocked_by` dependencies are all resolved (it is no longer blocked).
 
 If anything is outstanding, list it and **stop** — do not finalize partial work.
 
@@ -58,10 +70,23 @@ narrative.
 
   !`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_close_issue`
 
+- **If `prd.md` carries `epic: <epic-slug>`** (check with
+  `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" get <slug> epic`): mark this PRD's
+  `prds[]` entry done in `docs/prd/epics/<epic-slug>/epic.md` and tick its checklist item on the
+  epic issue:
+
+  ```bash
+  python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" epic tick <epic-slug> <prd-slug>
+  ```
+
+  (When it's the last child — `epic finalizable <epic-slug>` now exits 0 — the user can
+  `/prd-workflow:finalize-epic <epic-slug>`.)
+
 - **Confirm with the user**, then delete the entire `docs/prd/<slug>/` and commit alongside
   the doc updates (the PRD has served its purpose and would only drift from here).
 
-Report: docs touched, PRD issue closed, PRD dir removed.
+Report: docs touched, PRD issue closed, PRD dir removed, and (if under an epic) the epic
+checklist updated.
 
 ## Error handling
 

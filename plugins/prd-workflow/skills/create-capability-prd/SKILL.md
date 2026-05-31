@@ -1,6 +1,7 @@
 ---
 name: create-capability-prd
 description: Interview the user to produce a capability PRD (foundational SDK/macro/host work with no UI) committed to docs/prd/<slug>/prd.md with `kind: capability` frontmatter. Use when introducing an API surface into junius-sdk, a new macro, a host capability, or infra primitive. Don't use it for user-facing plugin behaviour (use create-feature-prd), or to break an existing PRD into issues (use capability-prd-to-issues). Hands off to /prd-workflow:capability-prd-to-issues.
+allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
 # Create Capability PRD
@@ -15,6 +16,13 @@ The PRD/artifact reference below is loaded via **dynamic context injection** (fr
 schema + `docs/prd/<slug>/` layout + lifecycle):
 
 !`cat "${CLAUDE_PLUGIN_ROOT}/references/artifacts.md"`
+
+`prd_tool.pyz` is the bundled helper that reads/writes this frontmatter — invoke it as
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full
+surface). The existing planning-tree inventory is injected here — **check it before choosing
+`<slug>`** (avoid collisions) and, in epic context, to confirm the parent epic exists:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
 
 ## Step 1 — Load context
 
@@ -44,7 +52,9 @@ If a question is answerable from the code/docs, answer it yourself and move on.
 ## Step 3 — Write the PRD
 
 Write to `docs/prd/<slug>/prd.md` (`<slug>` = 3–5 word kebab of the title). Frontmatter per
-`references/artifacts.md` with `kind: capability` and `status: draft`. Body:
+`references/artifacts.md` with `kind: capability` and `status: draft`. **If you were invoked
+with epic context** (e.g. handed off from `/prd-workflow:epic-to-prds` with an `epic: <epic-slug>`),
+set the `epic:` field to that slug; otherwise omit it (standalone PRD). Body:
 
 ```markdown
 # <title>
@@ -62,6 +72,11 @@ Write to `docs/prd/<slug>/prd.md` (`<slug>` = 3–5 word kebab of the title). Fr
 ```
 
 Leave `prd_issue:` / `slices:` empty — `/prd-workflow:capability-prd-to-issues` fills them.
+Sanity-check the written frontmatter (it must parse and read `kind: capability`):
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" show <slug>
+```
 
 ## Step 4 — Hand off
 
