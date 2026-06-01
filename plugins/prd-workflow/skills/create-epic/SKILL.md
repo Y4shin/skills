@@ -1,7 +1,7 @@
 ---
 name: create-epic
 description: Interview the user to produce an epic — a coordinated outcome spanning several PRDs ("a set of plugins that do X") — committed to docs/prd/epics/<slug>/epic.md with `kind: epic` frontmatter. Use when the goal is bigger than one plugin/capability and needs to fan out into multiple PRDs. Don't use it for a single plugin feature (use create-feature-prd) or one foundational capability (use create-capability-prd). Hands off to /prd-workflow:epic-to-prds.
-allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
 # Create Epic

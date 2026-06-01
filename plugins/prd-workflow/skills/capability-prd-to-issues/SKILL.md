@@ -1,7 +1,7 @@
 ---
 name: capability-prd-to-issues
 description: Break a capability PRD (kind:capability) into independently-grabbable enabling slices (SDK/macro/host surface, each with a first consumer), wire the PRD issue + slices with native dependencies (and sub-issues under an epic), and write committed slice docs. Use after /prd-workflow:create-capability-prd. Don't use it on a feature PRD (use feature-prd-to-issues) or to author the PRD itself (use create-capability-prd). Provider-aware (gh/fgj).
-allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
 # Capability PRD → Issues

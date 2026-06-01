@@ -1,7 +1,7 @@
 ---
 name: implement-issue
 description: Phase 2 — implement a slice issue via strict TDD against the test plan from /prd-workflow:analyse-issue. Creates the branch, runs red→green→refactor, opens a PR (Closes #n), sets issue state, then garbage-collects the slice doc and notes the decision on the PRD. Use after /prd-workflow:analyse-issue, or when the user says "now implement #n". Don't use it before a test plan exists (run analyse-issue first) or to finalize a completed PRD (use finalize-prd). Provider-aware (gh/fgj).
-allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
 # Implement Issue

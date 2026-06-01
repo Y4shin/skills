@@ -1,7 +1,7 @@
 ---
 name: create-capability-prd
 description: Interview the user to produce a capability PRD (foundational SDK/macro/host work with no UI) committed to docs/prd/<slug>/prd.md with `kind: capability` frontmatter. Use when introducing an API surface into junius-sdk, a new macro, a host capability, or infra primitive. Don't use it for user-facing plugin behaviour (use create-feature-prd), or to break an existing PRD into issues (use capability-prd-to-issues). Hands off to /prd-workflow:capability-prd-to-issues.
-allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
 # Create Capability PRD

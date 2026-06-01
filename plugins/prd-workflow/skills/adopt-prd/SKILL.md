@@ -1,7 +1,7 @@
 ---
 name: adopt-prd
 description: Backfill the prd-workflow YAML frontmatter onto one or many existing PRD docs that predate this workflow (or were hand-written without it). Lints the docs/prd tree with prd_tool list-bad-files / show-violations to find every non-conforming artifact, then for each infers kind (feature|capability), title, slug and status from the prose, writes the frontmatter block, relocates the file to docs/prd/<slug>/prd.md, and trims body text that merely duplicates those fields. Use to bring a single legacy PRD — or a whole directory of them — under management. Don't use it to author a brand-new PRD (use create-feature-prd / create-capability-prd) or to slice one into issues (use *-prd-to-issues). Hands off to the matching /prd-workflow:*-prd-to-issues.
-allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*), Bash(mkdir:*), Bash(git mv:*), Bash(mv:*)
+allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*), Bash(mkdir:*), Bash(git mv:*), Bash(mv:*)
 ---
 
 # Adopt PRD
