@@ -10,8 +10,8 @@ Phase 1: understand the issue, then challenge the developer to decide the right 
 strategy *before* writing a line of code. The fastest honest feedback loop is the goal — a
 slice must be testable, not just "covered".
 
-Detected forge: **!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" git_type`**.
-Per-provider commands come from `${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh <key>`. The slice-doc/lifecycle
+Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`**.
+Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`. The slice-doc/lifecycle
 reference is injected below.
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" reference`
@@ -26,7 +26,7 @@ surface). The current planning-tree inventory is injected here:
 
 Fetch the issue (form for the detected provider):
 
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_get_issue`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_get_issue`
 
 Read its `kind:` label and `Part of #<prd>` to locate the PRD and slice doc. The PRD issue # in
 `Part of #<prd>` maps to its dir, and `slices` lists this PRD's surviving slice docs (the one for
@@ -117,7 +117,7 @@ Invoke `/prd-workflow:implement-issue <n>`. The spec + test plan live in
 
 ## Error handling
 
-- If `${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh` exits non-zero or emits no command, the repo
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` exits non-zero or emits no command, the repo
   has no recognised GitHub/Forgejo remote — surface its stderr and stop; don't invent CLI calls.
 - If `cmd_get_issue` fails (auth, wrong number), tell the user to authenticate or recheck `#n`; stop.
 - If the slice doc `docs/prd/<slug>/slices/<n>-<slug>.md` is missing, the issue wasn't produced by

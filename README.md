@@ -9,9 +9,11 @@ plus the build environment for its bundled Python helper.
 frontmatter of its planning artifacts (epics + PRDs), implementing the operations
 the skills rely on: resolving slugs/issue numbers to files, asserting an artifact's
 `kind` before slicing, filling issue numbers and slice lists, ticking an epic's
-child PRDs, the `finalize-*` lifecycle gates, and linting the tree for
+child PRDs, the `finalize-*` lifecycle gates, linting the tree for
 non-conforming frontmatter (`list-bad-files` / `show-violations`, used by the
-`adopt-prd` skill to backfill legacy PRDs, epics, and slice docs). See [references/artifacts.md](plugins/prd-workflow/references/artifacts.md)
+`adopt-prd` skill to backfill legacy PRDs, epics, and slice docs), and emitting
+the provider-correct git-host command snippets (`forge <key>`, detecting GitHub
+vs Forgejo/Gitea from `origin`). See [references/artifacts.md](plugins/prd-workflow/references/artifacts.md)
 for the schema.
 
 The plugin ships it as **one** self-contained zipapp: `plugins/prd-workflow/scripts/prd_tool.pyz`.

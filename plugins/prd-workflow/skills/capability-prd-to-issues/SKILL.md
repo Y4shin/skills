@@ -12,9 +12,9 @@ is `blocked_by` its slices; under an epic, the PRD and every slice attach as nat
 of that epic. Capabilities are foundational (no UI to demo), so acceptance is a **consumer
 test**, not a demoable screen.
 
-Detected forge: **!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" git_type`** — !`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" ownership_note`
+Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`** — !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge ownership_note`
 
-Per-provider commands come from `${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh <key>`, injected at the step that
+Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`, injected at the step that
 uses them. The PRD/artifact reference (frontmatter + `docs/prd/<slug>/` layout + lifecycle)
 is injected below.
 
@@ -35,11 +35,11 @@ the helper exits non-zero (and points at `/prd-workflow:feature-prd-to-issues`) 
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" assert-kind <slug> capability
 ```
 
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" auth_check`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge auth_check`
 
 Ensure the label scheme exists (idempotent):
 
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" ensure_labels`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge ensure_labels`
 
 ## Step 1 — Explore (if needed)
 
@@ -80,15 +80,15 @@ to an epic; absent ⇒ standalone.
 
 Create-issue form for the detected provider:
 
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_create_issue`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_create_issue`
 
 Add a native dependency (make `<issue#>` blocked-by `<blocker#>`):
 
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_add_dependency`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_add_dependency`
 
 Attach a child as a sub-issue of the **epic** (only used when `epic:` is set):
 
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_attach_subissue`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_attach_subissue`
 
 1. **Create the PRD issue** (labels `prd`, `kind:capability`): body = PRD summary. It is a
    regular issue — it does **not** own the slices as sub-issues. Record its number as
@@ -143,7 +143,7 @@ checklist.
 
 ## Error handling
 
-- If `${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh` exits non-zero or emits no command, the
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` exits non-zero or emits no command, the
   repo has no recognised GitHub/Forgejo remote — surface its stderr and stop; don't invent CLI calls.
 - If `auth_check` reports unauthenticated, tell the user to authenticate (`gh auth login` /
   `fgj login`) and stop before creating anything.

@@ -16,6 +16,7 @@ from pathlib import Path
 
 import click
 
+from . import forge as forge_mod
 from . import model, validate
 from .frontmatter import FrontmatterError
 from .model import ResolutionError
@@ -77,6 +78,21 @@ def reference() -> None:
     + lifecycle the skills inject as context). Replaces a plain `cat` of the
     file, which the host blocks for paths outside the working directory."""
     click.echo(_reference_text(), nl=False)
+
+
+@cli.command(name="forge")
+@click.argument("key")
+def forge_cmd(key: str) -> None:
+    """Emit the provider-correct git-host command snippet for KEY.
+
+    Detects GitHub (gh) vs Forgejo/Codeberg/Gitea (fgj) from the `origin`
+    remote and prints the one snippet the calling skill needs. Run
+    `forge keys` for the full list. (Folds in the old forge_detect.sh.)
+    """
+    text, code = forge_mod.render(key)
+    if code:
+        raise _fail(text, code=code)
+    click.echo(text)
 
 
 @cli.command(name="list")

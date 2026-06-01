@@ -10,8 +10,8 @@ The tier above `/prd-workflow:finalize-prd`: once **every** child PRD of an epic
 finalized, migrate the epic-level durable knowledge into the repo's permanent docs and retire
 the epic. Invoked as `/prd-workflow:finalize-epic <slug | epic-issue#>`.
 
-Detected forge: **!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" git_type`**.
-Per-provider commands come from `${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh <key>`. The
+Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`**.
+Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`. The
 artifact-lifecycle reference is injected below.
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" reference`
@@ -66,7 +66,7 @@ finalized docs.
 - Close the **epic issue** with a comment linking the doc updates (commit SHA / PR).
   Close form for the detected provider:
 
-  !`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_close_issue`
+  !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_close_issue`
 
 - **Confirm with the user**, then delete the entire `docs/prd/epics/<epic-slug>/` and commit
   alongside the doc updates.
@@ -77,7 +77,7 @@ Report: docs touched, epic issue closed, epic dir removed.
 
 - If any child PRD dir survives under `docs/prd/` or any child PRD issue is open, **stop** (Step 1
   gate) — list what's outstanding; never finalize a partial epic.
-- If `${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh` exits non-zero or emits no command, the repo
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` exits non-zero or emits no command, the repo
   has no recognised GitHub/Forgejo remote — surface its stderr and stop; don't invent CLI calls.
 - The epic-dir deletion is irreversible — only delete after the user confirms (Step 4) and the doc
   updates are committed.

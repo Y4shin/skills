@@ -9,8 +9,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 Phase 2: execute the agreed test plan with full repo automation. Requires the slice doc
 `docs/prd/<slug>/slices/<n>-<slug>.md` (spec + `## Test plan`) written by `/prd-workflow:analyse-issue`.
 
-Detected forge: **!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" git_type`**.
-Per-provider commands come from `${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh <key>`, injected at the step that
+Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`**.
+Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`, injected at the step that
 uses them. The artifact-lifecycle reference is injected below.
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" reference`
@@ -26,8 +26,8 @@ surface). The current planning-tree inventory is injected here:
 Swap the issue's label `status:todo` → `status:in-progress` and add a starting comment
 ("Starting implementation. Branch: `feature/<n>-<slug>`."). Label-edit + comment form:
 
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_edit_labels`
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_comment`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_edit_labels`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_comment`
 
 ## Step 2 — Sync + branch
 
@@ -95,13 +95,13 @@ git push -u origin feature/<n>-<slug>
 Open a PR with `--base main`, title `<issue title>`, body listing the met acceptance
 criteria and `Closes #<n>` (PR form for the detected provider):
 
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_create_pr`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_create_pr`
 
 Then set the issue label `status:in-progress` → `status:needs-review`. (No task list to tick —
 the slice is wired as a native dependency of its PRD; merging the PR `Closes #<n>`, which
 auto-resolves that dependency.) Label-edit form:
 
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_edit_labels`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_edit_labels`
 
 Report the PR URL.
 
@@ -122,7 +122,7 @@ Report the PR URL.
 
 - If the slice doc `docs/prd/<slug>/slices/<n>-<slug>.md` or its `## Test plan` is missing, stop —
   run `/prd-workflow:analyse-issue <n>` first; do not improvise a test strategy here.
-- If `${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh` exits non-zero or emits no command, the repo
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` exits non-zero or emits no command, the repo
   has no recognised GitHub/Forgejo remote — surface its stderr and stop; don't invent CLI calls.
 - If `task ci` / `task sqlx:check` fails, fix forward (or report the blocker) — never open the PR
   with a red suite or skipped checks.

@@ -11,9 +11,9 @@ Convert a `kind: epic` artifact into an **ordered decomposition plan** of child 
 child PRD bodies (each child gets its own deep `/prd-workflow:create-*-prd` grilling so the
 specs stay sharp).
 
-Detected forge: **!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" git_type`** — !`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" ownership_note`
+Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`** — !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge ownership_note`
 
-Per-provider commands come from `${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh <key>`, injected at
+Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`, injected at
 the step that uses them. The PRD/artifact reference (three tiers + frontmatter + tracker shape +
 lifecycle) is injected below.
 
@@ -34,11 +34,11 @@ the helper exits non-zero (and names the right skill) on a mismatch:
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" assert-kind <slug> epic
 ```
 
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" auth_check`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge auth_check`
 
 Ensure the label scheme exists (idempotent — provisions the `epic` label too):
 
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" ensure_labels`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge ensure_labels`
 
 ## Step 1 — Draft the child-PRD decomposition
 
@@ -65,7 +65,7 @@ work correctly front-loaded? dependency order correct? merge/split any? Iterate 
 
 Create-issue form for the detected provider:
 
-!`"${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh" cmd_create_issue`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_create_issue`
 
 1. **Create the epic issue** (label `epic`): body = the outcome summary + a checklist of the
    planned child PRDs (`- [ ] <slug> (<kind>)`). Record its number as `epic_issue:`:
@@ -103,7 +103,7 @@ After publishing, report: the epic issue number, and `<slug> · feature|capabili
 
 ## Error handling
 
-- If `${CLAUDE_PLUGIN_ROOT}/scripts/forge_detect.sh` exits non-zero or emits no command, the
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` exits non-zero or emits no command, the
   repo has no recognised GitHub/Forgejo remote — surface its stderr and stop; don't invent CLI calls.
 - If `auth_check` reports unauthenticated, tell the user to authenticate (`gh auth login` /
   `fgj login`) and stop before creating anything.
