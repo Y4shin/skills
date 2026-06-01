@@ -222,8 +222,8 @@ def show_violations(root: Path, selector, as_json, strict) -> None:
         target = (p / ("epic.md" if (p / "epic.md").exists() else "prd.md")) if p.is_dir() else p
         if not target.exists():
             raise _fail(f"{selector!r}: no such file")
-        family = "epic" if target.name == "epic.md" or target.parent.parent.name == "epics" else "prd"
-        reports = [validate.validate_file(target.resolve(), family)]
+        target = target.resolve()
+        reports = [validate.validate_file(target, validate.family_for(target))]
     else:
         reports = validate.scan(root)
 

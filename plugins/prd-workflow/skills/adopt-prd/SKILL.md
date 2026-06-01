@@ -1,18 +1,20 @@
 ---
 name: adopt-prd
-description: Backfill the prd-workflow YAML frontmatter onto one or many existing PRD docs that predate this workflow (or were hand-written without it). Lints the docs/prd tree with prd_tool list-bad-files / show-violations to find every non-conforming artifact, then for each infers kind (feature|capability), title, slug and status from the prose, writes the frontmatter block, relocates the file to docs/prd/<slug>/prd.md, and trims body text that merely duplicates those fields. Use to bring a single legacy PRD — or a whole directory of them — under management. Don't use it to author a brand-new PRD (use create-feature-prd / create-capability-prd) or to slice one into issues (use *-prd-to-issues). Hands off to the matching /prd-workflow:*-prd-to-issues.
+description: Backfill the prd-workflow YAML frontmatter onto one or many existing planning docs (PRDs, epics, and slice docs) that predate this workflow or carry an old inline-metadata format. Lints the docs/prd tree with prd_tool list-bad-files / show-violations to find every non-conforming artifact, then for each infers its fields (PRD fields kind/title/slug/status; slice fields kind/title/slug/issue/prd/mode) from the prose, writes the frontmatter block, relocates/renames the file to its canonical path, and trims body text (incl. old `**PRD:** … · **kind:** …` metadata lines) that merely duplicates those fields. Use to bring a single legacy doc — or a whole directory of them — under management. Don't use it to author a brand-new PRD (use create-feature-prd / create-capability-prd) or to slice one into issues (use *-prd-to-issues). Hands off to the matching /prd-workflow:*-prd-to-issues.
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*), Bash(mkdir:*), Bash(git mv:*), Bash(mv:*)
 ---
 
 # Adopt PRD
 
-Bring **existing** PRD documents — written before this workflow, or by hand without the
-structured header — under prd-workflow management, **one doc or a whole directory at once**. You
-do **not** interview the user or invent scope here: the specs already exist. Your job is to *read*
-each one, **infer** the frontmatter the workflow expects, write that header, file the doc at its
-canonical path, and **trim prose that now merely restates the frontmatter**. For authoring a PRD
-from scratch, use `/prd-workflow:create-feature-prd` or `/prd-workflow:create-capability-prd`
-instead.
+Bring **existing** planning documents — written before this workflow, or in an older inline-metadata
+format — under prd-workflow management, **one doc or a whole directory at once**. The worklist may
+mix all three artifact types: **PRDs** (`prd.md`), **epics** (`epic.md`), and **slice docs**
+(`slices/<n>-<slug>.md`); Steps 1–6 below cover the PRD case, and the "Adopting an epic" / "Adopting
+a slice doc" branches cover the other two. You do **not** interview the user or invent scope here:
+the specs already exist. Your job is to *read* each one, **infer** the frontmatter the workflow
+expects, write that header, file the doc at its canonical path, and **trim prose that now merely
+restates the frontmatter**. For authoring a PRD from scratch, use `/prd-workflow:create-feature-prd`
+or `/prd-workflow:create-capability-prd` instead.
 
 The PRD/artifact reference below is loaded via **dynamic context injection** (the frontmatter
 schema you must produce, the `docs/prd/<slug>/` layout, and the lifecycle / status values):
@@ -41,11 +43,13 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list-bad-files     # the fi
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" show-violations    # what's wrong with each
 ```
 
-A file already absent from `list-bad-files` conforms — leave it untouched. Then run **Steps 1–5
-once per flagged file**; do the whole batch before the single hand-off in Step 6. Note
-`list-bad-files` only sees docs already under `docs/prd/<slug>/prd.md` or
-`docs/prd/epics/<slug>/epic.md`; a legacy doc sitting elsewhere won't appear until you relocate it
-(Step 3), so also handle any out-of-tree path the user explicitly points you at.
+A file already absent from `list-bad-files` conforms — leave it untouched. For each flagged file,
+**route by where it lives**: a `prd.md` → Steps 1–6; an `epic.md` → "Adopting an epic"; a file under
+a `slices/` dir → "Adopting a slice doc". The `[family]` tag in `show-violations` output names the
+type for you. Process the whole batch before the single hand-off in Step 6. Note `list-bad-files`
+only sees docs already under `docs/prd/<slug>/prd.md`, `docs/prd/epics/<slug>/epic.md`, or
+`docs/prd/<slug>/slices/<n>-<slug>.md`; a legacy doc sitting elsewhere won't appear until you
+relocate it, so also handle any out-of-tree path the user explicitly points you at.
 
 ## Step 1 — Read the source doc
 
@@ -134,6 +138,39 @@ If the source doc is actually an **epic** (it coordinates several PRDs rather th
 feature/capability), infer `kind: epic` and the epic schema from `artifacts.md`, file it at
 `docs/prd/epics/<slug>/epic.md`, and hand off to `/prd-workflow:epic-to-prds`. Leave
 `epic_issue:` / `prds:` for that step unless the prose already enumerates them.
+
+## Adopting a slice doc
+
+A flagged file under a `slices/` directory is a **slice doc**. It lives in its parent PRD's
+`slices/` dir — **don't relocate it out of there**. Older slices carry their metadata inline in the
+body instead of frontmatter, e.g.:
+
+```markdown
+# Slice #7 — Job-run inspector
+
+**PRD:** ../prd.md · **kind:** feature · **mode:** hitl
+```
+
+Infer the slice schema (`kind`, `title`, `slug`, `issue`, `prd`, `mode` — see `artifacts.md`) from
+that line, the H1, and the filename:
+
+1. **`issue`** — the number in the `# Slice #<n> — …` H1 (and it must equal the `<n>` in the
+   `<issue>-<slug>.md` filename).
+2. **`title`** — the text after the em-dash in the H1 (`Job-run inspector`).
+3. **`slug`** — the `<slug>` part of the filename; else a kebab of the title.
+4. **`kind`** — from the inline `**kind:**`, or **inherit the parent PRD's** kind
+   (`prd_tool.pyz get <prd-slug> kind`); the two must agree.
+5. **`prd`** — the relative path to the parent PRD, normally `../prd.md` (from the inline
+   `**PRD:**` or the layout).
+6. **`mode`** — from the inline `**mode:**`; default `hitl` if absent.
+
+Then write the frontmatter and **de-duplicate the body**: keep the `# Slice #<n> — <title>` H1 and
+the substantive sections (`## What to build`, `## Acceptance criteria`, `## Blocked by`,
+`## Test plan`), but **delete the inline `**PRD:** … · **kind:** … · **mode:** …` metadata line**
+now carried by the frontmatter. If the filename isn't `<issue>-<slug>.md`, `git mv` it to that name.
+Verify with `show-violations <slice-file>` (expect clean) — `show`/`resolve` don't address slices,
+so don't use them here. Slices need no hand-off; once clean they're ready for
+`/prd-workflow:analyse-issue` / `implement-issue` as before.
 
 ## Error handling
 
