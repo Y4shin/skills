@@ -15,7 +15,7 @@ Rust → frontend → test). For foundational SDK/macro/host work with no UI, us
 The PRD/artifact reference below is loaded via **dynamic context injection** (frontmatter
 schema + `docs/prd/<slug>/` layout + lifecycle):
 
-!`cat "${CLAUDE_PLUGIN_ROOT}/references/artifacts.md"`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" reference`
 
 `prd_tool.pyz` is the bundled helper that reads/writes this frontmatter — invoke it as
 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full

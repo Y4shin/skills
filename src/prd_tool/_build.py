@@ -26,6 +26,10 @@ from pathlib import Path
 # src/prd_tool/_build.py → repo root is three levels up.
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "plugins" / "prd-workflow" / "scripts" / "prd_tool.pyz"
+# The frontmatter reference is bundled into the package so `prd-tool reference`
+# can print it — the skills inject it that way instead of `cat`-ing a file
+# outside the consuming repo's working directory (which the host blocks).
+REFERENCE = ROOT / "plugins" / "prd-workflow" / "references" / "artifacts.md"
 INTERPRETER = "/usr/bin/env python3"
 
 # Cruft that can't run from inside a zip (extensions) or just bloats it.
@@ -55,6 +59,12 @@ def prune(staging: Path) -> None:
         (staging / name).unlink(missing_ok=True)
 
 
+def bundle_reference(staging: Path) -> None:
+    # Drop the frontmatter reference next to the package so importlib.resources
+    # can read it from inside the zipapp.
+    shutil.copyfile(REFERENCE, staging / "prd_tool" / "artifacts.md")
+
+
 def write_shim(staging: Path) -> None:
     (staging / "__main__.py").write_text(
         "import sys\n"
@@ -70,6 +80,7 @@ def build() -> None:
         staging = Path(tmp)
         stage(staging)
         prune(staging)
+        bundle_reference(staging)
         write_shim(staging)
         OUTPUT.parent.mkdir(parents=True, exist_ok=True)
         if OUTPUT.exists():

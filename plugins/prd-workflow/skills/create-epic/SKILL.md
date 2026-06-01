@@ -16,7 +16,7 @@ work delivering one outcome ("a set of plugins that do X"). For a single plugin 
 The PRD/artifact reference below is loaded via **dynamic context injection** (the three tiers,
 frontmatter schema, `docs/prd/<slug>/` layout, tracker shape, lifecycle):
 
-!`cat "${CLAUDE_PLUGIN_ROOT}/references/artifacts.md"`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" reference`
 
 `prd_tool.pyz` is the bundled helper that reads/writes this frontmatter — invoke it as
 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full

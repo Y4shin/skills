@@ -9,6 +9,7 @@ child PRDs, and checking the lifecycle gates that drive the self-cleaning
 
 from __future__ import annotations
 
+import importlib.resources
 import json
 import sys
 from pathlib import Path
@@ -55,7 +56,28 @@ def cli(ctx: click.Context, root: Path | None) -> None:
     ctx.obj = model.find_root(root or Path.cwd())
 
 
+def _reference_text() -> str:
+    """The bundled PRD/artifact frontmatter reference (references/artifacts.md).
+
+    Read from the packaged copy when running as the zipapp; fall back to the
+    canonical file under the plugin tree when running from a source checkout.
+    """
+    res = importlib.resources.files(__package__).joinpath("artifacts.md")
+    if res.is_file():
+        return res.read_text(encoding="utf-8")
+    src = Path(__file__).resolve().parents[2] / "plugins" / "prd-workflow" / "references" / "artifacts.md"
+    return src.read_text(encoding="utf-8")
+
+
 # ---------------------------------------------------------------- read / query
+
+@cli.command()
+def reference() -> None:
+    """Print the bundled PRD/artifact frontmatter reference (the schema + layout
+    + lifecycle the skills inject as context). Replaces a plain `cat` of the
+    file, which the host blocks for paths outside the working directory."""
+    click.echo(_reference_text(), nl=False)
+
 
 @cli.command(name="list")
 @click.option("--kind", type=click.Choice(("epic", "feature", "capability")), default=None)

@@ -17,7 +17,7 @@ instead.
 The PRD/artifact reference below is loaded via **dynamic context injection** (the frontmatter
 schema you must produce, the `docs/prd/<slug>/` layout, and the lifecycle / status values):
 
-!`cat "${CLAUDE_PLUGIN_ROOT}/references/artifacts.md"`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" reference`
 
 `prd_tool.pyz` is the bundled helper that reads/writes this frontmatter — invoke it as
 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full
