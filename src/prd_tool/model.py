@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from .frontmatter import Document, parse
+from .frontmatter import Document, FrontmatterError, parse
 
 EPIC_KIND = "epic"
 PRD_KINDS = ("feature", "capability")
@@ -94,7 +94,10 @@ def discover_epics(root: Path) -> list[Artifact]:
         return []
     out = []
     for f in sorted(base.glob("*/epic.md")):
-        doc = parse(f)
+        try:
+            doc = parse(f)
+        except FrontmatterError:
+            continue  # unstructured/legacy doc — surfaced by the validate.* linter, not here
         out.append(Artifact(path=f, kind=doc.data.get("kind", EPIC_KIND), doc=doc))
     return out
 
@@ -107,7 +110,10 @@ def discover_prds(root: Path) -> list[Artifact]:
     for f in sorted(base.glob("*/prd.md")):
         if f.parent.parent.name == "epics":  # belt-and-braces; epics have epic.md
             continue
-        doc = parse(f)
+        try:
+            doc = parse(f)
+        except FrontmatterError:
+            continue  # unstructured/legacy doc — surfaced by the validate.* linter, not here
         out.append(Artifact(path=f, kind=doc.data.get("kind", "feature"), doc=doc))
     return out
 

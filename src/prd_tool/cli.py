@@ -15,7 +15,7 @@ from pathlib import Path
 
 import click
 
-from . import model
+from . import model, validate
 from .frontmatter import FrontmatterError
 from .model import ResolutionError
 
@@ -153,6 +153,74 @@ def assert_kind(root: Path, selector: str, kind: str) -> None:
         }.get(actual, "the matching skill")
         raise _fail(f"{a.path}: kind is {actual!r}, expected {kind!r} — use {hint} instead.", code=2)
     click.echo(f"ok: {a.slug} is kind:{kind}")
+
+
+# ----------------------------------------------------------------- lint
+
+@cli.command(name="list-bad-files")
+@click.option("--json", "as_json", is_flag=True, help="Emit JSON instead of bare paths.")
+@click.option("--strict", is_flag=True, help="Exit 1 if any artifact has violations.")
+@pass_root
+def list_bad_files(root: Path, as_json, strict) -> None:
+    """List the artifact files whose frontmatter violates the schema (one path per line).
+
+    Surfaces legacy/hand-written epic.md and prd.md docs that are missing the
+    fence or required fields — the fix-up worklist for the adopt-prd skill.
+    """
+    bad = [r for r in validate.scan(root) if not r.ok]
+    if as_json:
+        rows = [
+            {"path": str(r.path.relative_to(root)), "family": r.family, "violations": r.violations}
+            for r in bad
+        ]
+        click.echo(json.dumps(rows, indent=2))
+    elif not bad:
+        click.echo("(no frontmatter violations)")
+    else:
+        for r in bad:
+            click.echo(r.path.relative_to(root))
+    if strict and bad:
+        raise _fail(f"{len(bad)} artifact(s) with frontmatter violations", code=1)
+
+
+@cli.command(name="show-violations")
+@click.argument("selector", required=False)
+@click.option("--json", "as_json", is_flag=True)
+@click.option("--strict", is_flag=True, help="Exit 1 if any artifact has violations.")
+@pass_root
+def show_violations(root: Path, selector, as_json, strict) -> None:
+    """Show each artifact's frontmatter violations with a clear description.
+
+    With no SELECTOR, scans the whole docs/prd tree; with a path SELECTOR (to a
+    prd.md/epic.md or its directory), reports just that file. Only files with at
+    least one violation are listed.
+    """
+    if selector:
+        p = Path(selector)
+        target = (p / ("epic.md" if (p / "epic.md").exists() else "prd.md")) if p.is_dir() else p
+        if not target.exists():
+            raise _fail(f"{selector!r}: no such file")
+        family = "epic" if target.name == "epic.md" or target.parent.parent.name == "epics" else "prd"
+        reports = [validate.validate_file(target.resolve(), family)]
+    else:
+        reports = validate.scan(root)
+
+    bad = [r for r in reports if not r.ok]
+    if as_json:
+        rows = [
+            {"path": str(r.path.relative_to(root)), "family": r.family, "violations": r.violations}
+            for r in bad
+        ]
+        click.echo(json.dumps(rows, indent=2))
+    elif not bad:
+        click.echo("(no frontmatter violations)")
+    else:
+        for r in bad:
+            click.echo(f"{r.path.relative_to(root)}  [{r.family}]")
+            for v in r.violations:
+                click.echo(f"  - {v}")
+    if strict and bad:
+        raise _fail(f"{len(bad)} artifact(s) with frontmatter violations", code=1)
 
 
 # ----------------------------------------------------------------- mutate
