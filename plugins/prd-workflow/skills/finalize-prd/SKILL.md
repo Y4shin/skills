@@ -1,6 +1,6 @@
 ---
 name: finalize-prd
-description: Close the loop once all of a PRD's slices are merged — harvest the enriched PRD + the merged code changes, fold durable knowledge into permanent repo docs (docs/design/, docs/impl/), close the PRD issue (and tick its epic if any), then delete the spent PRD. Use when a PRD's work is complete, or the user says "finalize"/"wrap up" a PRD. Don't use it while any slice is still open or unmerged (finish implement-issue first). Provider-aware (gh/fgj).
+description: Close the loop once all of a PRD's slices are merged — harvest the enriched PRD + the merged code changes, fold durable knowledge into the project's permanent docs (design docs, milestone/changelog), close the PRD issue (and tick its epic if any), then delete the spent PRD. Use when a PRD's work is complete, or the user says "finalize"/"wrap up" a PRD. Don't use it while any slice is still open or unmerged (finish implement-issue first). Provider-aware (gh/fgj/local).
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -20,6 +20,12 @@ reference is injected below.
 surface). The current planning-tree inventory is injected here:
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
+
+The project profile (knowledge destinations) is injected below when available — its
+"Knowledge destinations" section is where Step 3 folds durable knowledge. If empty, find the
+project's permanent docs (design docs, decision log, changelog) and fold knowledge there:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
 
 ## Step 1 — Preconditions
 
@@ -53,15 +59,15 @@ PRD's intent and the implementation.
 
 ## Step 3 — Fold into permanent docs
 
-Match the existing doc voice/structure:
-- **Design** — add/update the relevant `docs/design/*` (architecture, plugin/SDK interface)
-  and append a dated entry to `docs/design/14-decision-log.md` for any decision made during
-  implementation.
-- **Milestone** — when the PRD maps to a milestone, add/update `docs/impl/NN-M<NN>-*.md` and
-  the `docs/impl/README.md` index/status legend.
+Fold durable knowledge into the destinations the project profile's "Knowledge destinations"
+section names, matching each doc's existing voice/structure. Typically that means:
+- **Design / architecture docs** — add/update the relevant doc, and append a dated entry to
+  the project's decision log for any decision made during implementation.
+- **Milestone / changelog** — when the PRD maps to one, update the relevant milestone doc and
+  its index.
 
-Capture *durable* knowledge only — what a future contributor needs — not the slice-by-slice
-narrative.
+If no profile exists, locate these destinations in the repo yourself. Capture *durable*
+knowledge only — what a future contributor needs — not the slice-by-slice narrative.
 
 ## Step 4 — Close out + delete
 
@@ -92,8 +98,10 @@ checklist updated.
 
 - If `docs/prd/<slug>/slices/` still has docs or any slice issue is open, **stop** (Step 1 gate) —
   list what's outstanding; never finalize partial work.
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` exits non-zero or emits no command, the repo
-  has no recognised GitHub/Forgejo remote — surface its stderr and stop; don't invent CLI calls.
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `UNKNOWN_FORGE`, the repo has a
+  remote this workflow doesn't recognise (not GitHub/Forgejo) — surface it and stop; don't invent CLI
+  calls. A repo with no remote (or no git at all) instead resolves to the built-in `local` tracker —
+  that's expected, not an error; its snippets drive `prd_tool tracker` against `docs/prd/tracker.json`.
 - The PRD-dir deletion is irreversible — only delete after the user confirms (Step 4) and the doc
   updates are committed.
 

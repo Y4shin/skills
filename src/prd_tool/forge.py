@@ -1,5 +1,15 @@
-"""Forge (git host) helper: detect GitHub vs Forgejo/Gitea from ``origin`` and
-emit the provider-correct command snippet for a requested key.
+"""Forge helper: detect the issue/PR provider and emit the provider-correct
+command snippet for a requested key.
+
+Three providers are supported:
+
+* ``gh``    — GitHub (``origin`` points at github.com).
+* ``fgj``   — Forgejo / Codeberg / Gitea.
+* ``local`` — **no recognised git host**: the repo has no ``origin`` remote, or
+  it isn't a git repo at all. The snippets then drive the built-in local issue
+  tracker (``prd_tool tracker ...`` → ``docs/prd/tracker.json``) so the whole
+  workflow runs without any git host. A *non-empty but unrecognised* remote is
+  still an error (``UNKNOWN_FORGE``) — we don't guess at an unknown host's CLI.
 
 Ported from the old ``scripts/forge_detect.sh`` so the skills can reach it
 through the bundled ``prd_tool.pyz`` (one allowlisted entry point) instead of a
@@ -35,8 +45,14 @@ LABELS = (
 )
 
 
+# How a skill invokes the bundled tool from its bash context. Used verbatim in
+# the `local` provider's snippets; ${CLAUDE_PLUGIN_ROOT} expands when the agent
+# runs the command (prd_tool only prints this string literally).
+PRD_TOOL = 'python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz"'
+
+
 class UnknownForge(Exception):
-    """The ``origin`` remote doesn't map to a supported provider."""
+    """The ``origin`` remote is non-empty but doesn't map to a supported host."""
 
     def __init__(self, remote: str) -> None:
         super().__init__(remote)
@@ -56,7 +72,7 @@ def _remote_url() -> str:
 
 @dataclass
 class Forge:
-    provider: str   # "gh" (GitHub) | "fgj" (Forgejo/Codeberg/Gitea)
+    provider: str   # "gh" (GitHub) | "fgj" (Forgejo/Codeberg/Gitea) | "local"
     owner: str
     repo: str
 
@@ -65,8 +81,14 @@ class Forge:
 
 
 def detect(remote: str | None = None) -> Forge:
-    """Resolve provider + owner/repo from the ``origin`` remote (or *remote*)."""
+    """Resolve the provider + owner/repo from the ``origin`` remote (or *remote*).
+
+    An empty remote (no git, or git with no ``origin``) resolves to the built-in
+    ``local`` tracker. A non-empty remote we don't recognise raises ``UnknownForge``.
+    """
     remote = _remote_url() if remote is None else remote
+    if not remote.strip():
+        return Forge(provider="local", owner="-", repo="-")
     low = remote.lower()
     if "github.com" in low:
         provider = "gh"
@@ -132,7 +154,45 @@ def _add_dependency(f: Forge) -> str:
     ))
 
 
+def _local_snippet(key: str) -> str:
+    # Non-git provider: every issue/PR op maps to the built-in `tracker` subcommands
+    # (docs/prd/tracker.json). There is no branch/PR — work lands on the working tree.
+    t = PRD_TOOL
+    table = {
+        "git_type": "local",
+        "owner": "-",
+        "repo": "-",
+        "auth_check": "# local tracker (docs/prd/tracker.json) — no host auth needed",
+        "cmd_get_issue": f"{t} tracker view <n> --json",
+        "cmd_create_issue": (
+            f'{t} tracker create --title "<t>" --body-file <f> --label <l>'
+            "   # prints the new #number to record"
+        ),
+        "cmd_list_issues": f"{t} tracker list --label <l> --json",
+        "cmd_comment": f'{t} tracker comment <n> --body "<text>"',
+        "cmd_close_issue": f'{t} tracker close <n> --comment "<text>"',
+        "cmd_edit_labels": f"{t} tracker edit <n> --add-label <a> --remove-label <r>",
+        "cmd_create_pr": (
+            "# No git host — there is no PR. The work is already on the working tree; skip the\n"
+            "# push/PR step and go straight to recording completion on the issue (next: set its\n"
+            "# status to needs-review, then close it on finalize)."
+        ),
+        "ensure_labels": f"{t} tracker ensure-labels   # labels are freeform; just initialises the store",
+        "cmd_attach_subissue": f"{t} tracker attach <epic#> <child#>",
+        "cmd_detach_subissue": f"{t} tracker detach <epic#> <child#>",
+        "cmd_add_dependency": f"{t} tracker dep <issue#> --blocked-by <blocker#>",
+        "ownership_note": (
+            "Local tracker (docs/prd/tracker.json): epic→child via parent links (tracker attach); "
+            "PRD<-slice / slice<-slice / PRD<-PRD ordering via native blocked_by edges (tracker dep). "
+            "No git host, no PRs."
+        ),
+    }
+    return table[key]
+
+
 def _snippet(f: Forge, key: str) -> str:
+    if f.provider == "local":
+        return _local_snippet(key)
     p = f.pick
     if key == "git_type":
         return f.provider

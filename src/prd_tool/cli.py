@@ -17,9 +17,10 @@ from pathlib import Path
 import click
 
 from . import forge as forge_mod
-from . import model, validate
+from . import model, tracker as tracker_mod, validate
 from .frontmatter import FrontmatterError
 from .model import ResolutionError
+from .tracker import TrackerError
 
 
 def _fail(msg: str, code: int = 1) -> "click.ClickException":
@@ -421,11 +422,173 @@ def epic_finalizable(root: Path, selector: str) -> None:
     click.echo(f"ok: every child PRD of {a.slug} is finalized — ready to finalize epic")
 
 
+# ----------------------------------------------------------------- tracker subgroup
+#
+# The built-in local issue tracker for non-git projects. When `forge` resolves the
+# `local` provider (no recognised git remote), its command snippets call these
+# subcommands in place of `gh`/`fgj`, so the PRD→issues→implement→finalize workflow
+# runs without a git host. Issues live in docs/prd/tracker.json.
+
+
+def _num(value: str) -> int:
+    """Parse an issue selector like ``42`` or ``#42`` into an int."""
+    try:
+        return int(value.lstrip("#"))
+    except ValueError:
+        raise _fail(f"{value!r}: not an issue number")
+
+
+@cli.group()
+def tracker() -> None:
+    """Local issue tracker for non-git projects (docs/prd/tracker.json).
+
+    Drives the same PRD→issues workflow as gh/fgj when a repo has no recognised
+    git host; the `forge` local provider emits these as its command snippets.
+    """
+
+
+@tracker.command(name="ensure-labels")
+@pass_root
+def tracker_ensure_labels(root: Path) -> None:
+    """Initialise the local store (labels are freeform — this is the no-op analogue
+    of the git-host `ensure_labels`)."""
+    p = tracker_mod.ensure(root)
+    click.echo(f"ok: local tracker ready at {p.relative_to(root)}")
+
+
+@tracker.command(name="create")
+@click.option("--title", required=True, help="Issue title.")
+@click.option("--body", default=None, help="Issue body text.")
+@click.option("--body-file", type=click.Path(dir_okay=False, path_type=Path), default=None,
+              help="Read the body from this file (mirrors gh --body-file).")
+@click.option("--label", "labels", multiple=True, help="Label to add (repeatable).")
+@pass_root
+def tracker_create(root: Path, title, body, body_file, labels) -> None:
+    """Create an issue; prints the new #number (which the skill records)."""
+    if body_file is not None:
+        body = body_file.read_text(encoding="utf-8")
+    number = tracker_mod.create(root, title, body or "", labels)
+    click.echo(f"#{number}")
+
+
+@tracker.command(name="view")
+@click.argument("number")
+@click.option("--json", "as_json", is_flag=True, help="Emit gh-shaped JSON.")
+@pass_root
+def tracker_view(root: Path, number: str, as_json) -> None:
+    """Show one issue (with --json, the number/title/body/labels/state gh shape)."""
+    issue = tracker_mod.view(root, _num(number))
+    if as_json:
+        click.echo(json.dumps(
+            {
+                "number": issue["number"],
+                "title": issue["title"],
+                "body": issue["body"],
+                "state": issue["state"].upper(),
+                "labels": [{"name": label} for label in issue["labels"]],
+            },
+            indent=2,
+        ))
+        return
+    click.echo(f"#{issue['number']} {issue['title']}  [{issue['state']}]")
+    click.echo(f"labels: {', '.join(issue['labels']) or '-'}")
+    if issue["blocked_by"]:
+        click.echo("blocked_by: " + ", ".join(f"#{b}" for b in issue["blocked_by"]))
+    if issue.get("parent"):
+        click.echo(f"parent: #{issue['parent']}")
+    click.echo("")
+    click.echo(issue["body"])
+    for c in issue["comments"]:
+        click.echo(f"\n--- comment ---\n{c}")
+
+
+@tracker.command(name="list")
+@click.option("--label", default=None, help="Only issues carrying this label.")
+@click.option("--state", type=click.Choice(("open", "closed")), default=None)
+@click.option("--json", "as_json", is_flag=True)
+@pass_root
+def tracker_list(root: Path, label, state, as_json) -> None:
+    """List issues, optionally filtered by label/state."""
+    issues = tracker_mod.list_issues(root, label=label, state=state)
+    if as_json:
+        click.echo(json.dumps(
+            [{"number": i["number"], "title": i["title"], "state": i["state"].upper()} for i in issues],
+            indent=2,
+        ))
+        return
+    if not issues:
+        click.echo("(no matching issues)")
+        return
+    for i in issues:
+        click.echo(f"#{i['number']:<5} {i['state']:<7} {i['title']}")
+
+
+@tracker.command(name="comment")
+@click.argument("number")
+@click.option("--body", required=True, help="Comment text.")
+@pass_root
+def tracker_comment(root: Path, number: str, body: str) -> None:
+    """Add a comment to an issue."""
+    tracker_mod.comment(root, _num(number), body)
+    click.echo(f"#{_num(number)}: commented")
+
+
+@tracker.command(name="close")
+@click.argument("number")
+@click.option("--comment", "comment_text", default=None, help="Optional closing comment.")
+@pass_root
+def tracker_close(root: Path, number: str, comment_text) -> None:
+    """Close an issue (optionally with a comment)."""
+    tracker_mod.close(root, _num(number), comment_text)
+    click.echo(f"#{_num(number)}: closed")
+
+
+@tracker.command(name="edit")
+@click.argument("number")
+@click.option("--add-label", "add", multiple=True, help="Label to add (repeatable).")
+@click.option("--remove-label", "remove", multiple=True, help="Label to remove (repeatable).")
+@pass_root
+def tracker_edit(root: Path, number: str, add, remove) -> None:
+    """Add/remove labels on an issue (mirrors the git-host label edit)."""
+    labels = tracker_mod.edit_labels(root, _num(number), add=add, remove=remove)
+    click.echo(f"#{_num(number)}: labels = {labels}")
+
+
+@tracker.command(name="dep")
+@click.argument("number")
+@click.option("--blocked-by", "blocker", required=True, help="The blocker issue number.")
+@pass_root
+def tracker_dep(root: Path, number: str, blocker: str) -> None:
+    """Record that NUMBER is blocked by another issue (native dependency)."""
+    tracker_mod.add_dependency(root, _num(number), _num(blocker))
+    click.echo(f"#{_num(number)}: blocked_by #{_num(blocker)}")
+
+
+@tracker.command(name="attach")
+@click.argument("epic")
+@click.argument("child")
+@pass_root
+def tracker_attach(root: Path, epic: str, child: str) -> None:
+    """Attach CHILD as a sub-issue of epic EPIC (the only parent relationship)."""
+    tracker_mod.attach(root, _num(epic), _num(child))
+    click.echo(f"#{_num(child)}: parent = #{_num(epic)}")
+
+
+@tracker.command(name="detach")
+@click.argument("epic")
+@click.argument("child")
+@pass_root
+def tracker_detach(root: Path, epic: str, child: str) -> None:
+    """Detach CHILD from epic EPIC."""
+    tracker_mod.detach(root, _num(epic), _num(child))
+    click.echo(f"#{_num(child)}: detached from #{_num(epic)}")
+
+
 def main(argv: list[str] | None = None) -> int:
     try:
         cli.main(args=argv, standalone_mode=False)
         return 0
-    except (ResolutionError, FrontmatterError) as e:
+    except (ResolutionError, FrontmatterError, TrackerError) as e:
         click.echo(f"error: {e}", err=True)
         return 1
     except click.ClickException as e:

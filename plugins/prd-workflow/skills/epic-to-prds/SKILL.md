@@ -1,6 +1,6 @@
 ---
 name: epic-to-prds
-description: Decompose an epic (kind:epic) into an ordered set of child PRDs, create the epic tracking issue (label epic), and hand off to /prd-workflow:create-feature-prd or /prd-workflow:create-capability-prd per child with seeded context. Use after /prd-workflow:create-epic. Don't use it on a feature/capability PRD (use the matching prd-to-issues skill). Provider-aware (gh/fgj).
+description: Decompose an epic (kind:epic) into an ordered set of child PRDs, create the epic tracking issue (label epic), and hand off to /prd-workflow:create-feature-prd or /prd-workflow:create-capability-prd per child with seeded context. Use after /prd-workflow:create-epic. Don't use it on a feature/capability PRD (use the matching prd-to-issues skill). Provider-aware (gh/fgj/local).
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -25,6 +25,12 @@ surface). The current planning-tree inventory is injected here:
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
 
+The project profile (architecture layers) is injected below when available — its "Architecture
+layers" section grounds the feature-vs-capability split in Step 1. If empty, infer the split
+from what each child delivers and the codebase:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+
 ## Step 0 — Provider + epic
 
 Verify auth, then locate the epic at `docs/prd/epics/<slug>/epic.md` and **assert `kind: epic`** —
@@ -46,8 +52,9 @@ Break the epic into the **fewest coherent PRDs** that each stand alone as a feat
 capability:
 
 <decomposition-rules>
-- Each child is exactly one PRD: a `kind: feature` (one plugin's user-facing behaviour) or a
-  `kind: capability` (one foundational SDK/macro/host unit, named with its first consumer).
+- Each child is exactly one PRD: a `kind: feature` (one component's user-facing behaviour) or
+  a `kind: capability` (one foundational unit — see the project profile's "Architecture layers
+  → Capability" — named with its first consumer).
 - Put the **shared / foundational work** into capability PRD(s) that land **before** the
   feature PRDs that consume them.
 - Give each child a slug, a one-line scope, and its `blocked_by` (other child slugs).
@@ -103,8 +110,10 @@ After publishing, report: the epic issue number, and `<slug> · feature|capabili
 
 ## Error handling
 
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` exits non-zero or emits no command, the
-  repo has no recognised GitHub/Forgejo remote — surface its stderr and stop; don't invent CLI calls.
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `UNKNOWN_FORGE`, the repo has a
+  remote this workflow doesn't recognise (not GitHub/Forgejo) — surface it and stop; don't invent CLI
+  calls. A repo with no remote (or no git at all) instead resolves to the built-in `local` tracker —
+  that's expected, not an error; its snippets drive `prd_tool tracker` against `docs/prd/tracker.json`.
 - If `auth_check` reports unauthenticated, tell the user to authenticate (`gh auth login` /
   `fgj login`) and stop before creating anything.
 - If the injected `references/artifacts.md` is empty/missing, the repo isn't set up for this

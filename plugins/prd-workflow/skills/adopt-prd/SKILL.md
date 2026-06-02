@@ -33,6 +33,12 @@ collisions) and to spot the parent epic if a doc belongs to one:
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
 
+The project profile (architecture layers) is injected below when available — its "Architecture
+layers" section is what the `kind` inference in Step 2 leans on. If empty, infer `kind` from
+what the doc delivers and the codebase:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+
 ## Step 0 — Scope the worklist
 
 If the user named a single doc, that's your worklist. If they pointed at a **directory** (or said
@@ -58,7 +64,7 @@ which fields are missing or wrong). Note:
 
 - any **partial/non-conforming frontmatter** already present (reconcile it — don't discard data);
 - the **H1 / title**, and any leading metadata block, table, or `Key: value` lines;
-- references to **issue numbers**, a **milestone** (`docs/impl/MNN`), or a parent **epic**;
+- references to **issue numbers**, a **milestone** (e.g. an `M07`-style identifier), or a parent **epic**;
 - whether a sibling `slices/` directory already exists next to the doc.
 
 ## Step 2 — Infer the frontmatter
@@ -66,17 +72,17 @@ which fields are missing or wrong). Note:
 Produce the fields `references/artifacts.md` defines for a PRD. Infer from evidence; never
 fabricate scope to fill a field — omit an optional field rather than guess.
 
-1. **`kind`** — the one real decision. **`feature`** = user-facing plugin behaviour that cuts
-   through the stack (proto/RPC → migration → plugin → frontend → test). **`capability`** =
-   foundational SDK/macro/host/infra work with no UI to demo. Decide from what the doc *delivers*.
-   If the prose is genuinely ambiguous, ask the user — this drives which `*-prd-to-issues`
-   consumes it.
+1. **`kind`** — the one real decision. **`feature`** = user-facing behaviour that cuts
+   end-to-end through the stack (the project profile's "Architecture layers → Feature").
+   **`capability`** = foundational work with no UI to demo (the profile's "Architecture layers
+   → Capability"). Decide from what the doc *delivers*. If the prose is genuinely ambiguous,
+   ask the user — this drives which `*-prd-to-issues` consumes it.
 2. **`title`** — the short human title (from the H1, cleaned up).
 3. **`slug`** — 3–5 word kebab of the title. If the doc already lives under `docs/prd/<dir>/`,
    prefer that dir name unless it's poor. Cross-check the injected `list` for collisions.
 4. **`epic`** *(optional)* — set **only** if the prose clearly ties it to an epic that exists in
    the injected `list`; otherwise omit (standalone PRD).
-5. **`milestone`** *(optional)* — set only if the doc references a real `docs/impl/` milestone.
+5. **`milestone`** *(optional)* — set only if the doc references a real project milestone.
 6. **`status`** — infer from lifecycle evidence, per the lifecycle in `artifacts.md`:
    - no issue numbers referenced and no `slices/` dir ⇒ `draft`;
    - it already references a PRD issue and/or slice issues ⇒ `issues-created`, and capture

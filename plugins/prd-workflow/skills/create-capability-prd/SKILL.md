@@ -1,6 +1,6 @@
 ---
 name: create-capability-prd
-description: Interview the user to produce a capability PRD (foundational SDK/macro/host work with no UI) committed to docs/prd/<slug>/prd.md with `kind: capability` frontmatter. Use when introducing an API surface into junius-sdk, a new macro, a host capability, or infra primitive. Don't use it for user-facing plugin behaviour (use create-feature-prd), or to break an existing PRD into issues (use capability-prd-to-issues). Hands off to /prd-workflow:capability-prd-to-issues.
+description: Interview the user to produce a capability PRD (foundational work with no UI) committed to docs/prd/<slug>/prd.md with `kind: capability` frontmatter. Use when introducing a foundational capability, API surface, or infra primitive. Don't use it for user-facing behaviour (use create-feature-prd), or to break an existing PRD into issues (use capability-prd-to-issues). Hands off to /prd-workflow:capability-prd-to-issues.
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -8,9 +8,10 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 Phase 0 of the **capability** track. Run the relentless `grill-me` interview, then
 crystallise it into a committed PRD that `/prd-workflow:capability-prd-to-issues` will slice. A
-*capability* is foundational work others build on — a `junius-sdk` API surface, a
-derive/attribute macro, a host capability, an infra primitive — with no UI to demo. For
-user-facing plugin behaviour, use `/prd-workflow:create-feature-prd` instead.
+*capability* is foundational work others build on — an API surface, a shared library/macro, a
+host or platform capability, an infra primitive — with no UI to demo (see the project profile's
+"Architecture layers → Capability"). For user-facing behaviour, use
+`/prd-workflow:create-feature-prd` instead.
 
 The PRD/artifact reference below is loaded via **dynamic context injection** (frontmatter
 schema + `docs/prd/<slug>/` layout + lifecycle):
@@ -24,28 +25,34 @@ surface). The existing planning-tree inventory is injected here — **check it b
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
 
+The project profile (project description, orientation docs, architecture layers) is injected
+below when available — if empty, explore the codebase for project-specific context:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+
 ## Step 1 — Load context
 
-Read `docs/design/11-backend-plugin-interface.md`, `docs/design/12-frontend-plugin-interface.md`,
-`docs/design/08-cross-plugin-composition.md`, `crates/junius-sdk/` (and `crates/junius-sdk-macros/`
-for macro work), and `clippy.toml`. Explore the codebase to answer your own questions
-before asking the user.
+Read the project profile's "Orientation docs" (especially anything describing the interfaces
+and layering this capability sits in) and the existing surface this capability extends — the
+library, host module, or shared package it lives in. If no profile exists, explore the
+codebase to find those yourself. Answer your own questions from the code/docs before asking
+the user.
 
 ## Step 2 — Grill (one question at a time)
 
 Use the `grill-me` discipline. Always give your recommended answer + reasoning first, then
 ask. Drive toward, in dependency order:
 
-1. **API surface** — the exact shape (types, traits, fns, macro input/output). What does a
-   consumer write?
-2. **First real consumer** — which plugin or host code uses it first? (an unconsumed
-   capability is speculative).
-3. **Encapsulation** — what must NOT leak to plugins; what stays in the host
-   (`platform/`) per the layering rules.
-4. **Compatibility / versioning** — is this additive? Does it break existing plugins? Migration path?
+1. **API surface** — the exact shape (types, functions, interfaces, macro input/output). What
+   does a consumer write?
+2. **First real consumer** — which downstream code (a consumer module/service) uses it first?
+   (an unconsumed capability is speculative).
+3. **Encapsulation** — what must NOT leak to consumers; what stays internal, per the project
+   profile's layering rules.
+4. **Compatibility / versioning** — is this additive? Does it break existing consumers? Migration path?
 5. **Boundaries** — out of scope; future extension points deliberately deferred.
-6. **Acceptance** — how is each unit proven? (doctest + consumer integration test; for
-   macros, `trybuild`/compile-fail).
+6. **Acceptance** — how is each unit proven? (a test in the owning module/package plus a
+   downstream consumer exercising it — see the profile's test infrastructure).
 
 If a question is answerable from the code/docs, answer it yourself and move on.
 

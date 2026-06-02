@@ -1,6 +1,6 @@
 ---
 name: finalize-epic
-description: Close the loop on an epic once all its child PRDs are finalized — fold epic-level durable knowledge into permanent repo docs (docs/design/, docs/impl/), close the epic tracking issue, then delete the spent epic dir. Use when every child PRD of an epic is done, or the user says "finalize"/"wrap up" an epic. Don't use it while any child PRD is unfinished (finish finalize-prd first). Provider-aware (gh/fgj).
+description: Close the loop on an epic once all its child PRDs are finalized — fold epic-level durable knowledge into the project's permanent docs (design docs, milestone/changelog), close the epic tracking issue, then delete the spent epic dir. Use when every child PRD of an epic is done, or the user says "finalize"/"wrap up" an epic. Don't use it while any child PRD is unfinished (finish finalize-prd first). Provider-aware (gh/fgj/local).
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -22,6 +22,12 @@ surface). The current planning-tree inventory is injected here:
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
 
+The project profile (knowledge destinations) is injected below when available — its
+"Knowledge destinations" section is where Step 3 folds epic-level durable knowledge. If empty,
+find the project's permanent docs (design docs, decision log, changelog) and fold knowledge there:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+
 ## Step 1 — Preconditions (hard gate)
 
 Resolve the epic (accepts the slug **or** the `epic_issue:` number) and gate on its children:
@@ -42,24 +48,25 @@ If any child is outstanding, list it and **stop** — finalize the remaining chi
 
 ## Step 2 — Harvest
 
-Read `epic.md` in full. The per-PRD durable knowledge already landed in `docs/design/` +
-`docs/impl/` via each `/prd-workflow:finalize-prd`; your job here is the **cross-cutting** story
-the individual PRDs couldn't tell on their own:
-- how the plugins compose to deliver the outcome (the seams, the shared tables/components,
-  the navigation/permission wiring);
+Read `epic.md` in full. The per-PRD durable knowledge already landed in the project's
+permanent docs via each `/prd-workflow:finalize-prd`; your job here is the **cross-cutting**
+story the individual PRDs couldn't tell on their own:
+- how the components compose to deliver the outcome (the seams, the shared
+  data/components, the cross-cutting wiring);
 - any epic-level decision not captured by a single child.
 
 ## Step 3 — Fold into permanent docs
 
-Match the existing doc voice/structure:
-- **Design** — add/update the relevant `docs/design/*` (especially
-  `08-cross-plugin-composition.md` for how the set fits together) and append a dated entry to
-  `docs/design/14-decision-log.md` for any epic-level decision.
-- **Milestone** — when the epic maps to a milestone (or a band of them), add/update the
-  `docs/impl/NN-M<NN>-*.md` doc(s) and the `docs/impl/README.md` index.
+Fold cross-cutting knowledge into the destinations the project profile's "Knowledge
+destinations" section names, matching each doc's existing voice/structure. Typically that means:
+- **Design / architecture docs** — add/update the relevant doc (especially whatever describes
+  how components compose) and append a dated entry to the project's decision log for any
+  epic-level decision.
+- **Milestone / changelog** — when the epic maps to a milestone (or a band of them),
+  add/update the relevant milestone doc(s) and their index.
 
-Capture *durable, cross-cutting* knowledge only — not what already lives in the child PRDs'
-finalized docs.
+If no profile exists, locate these destinations in the repo yourself. Capture *durable,
+cross-cutting* knowledge only — not what already lives in the child PRDs' finalized docs.
 
 ## Step 4 — Close out + delete
 
@@ -77,8 +84,10 @@ Report: docs touched, epic issue closed, epic dir removed.
 
 - If any child PRD dir survives under `docs/prd/` or any child PRD issue is open, **stop** (Step 1
   gate) — list what's outstanding; never finalize a partial epic.
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` exits non-zero or emits no command, the repo
-  has no recognised GitHub/Forgejo remote — surface its stderr and stop; don't invent CLI calls.
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `UNKNOWN_FORGE`, the repo has a
+  remote this workflow doesn't recognise (not GitHub/Forgejo) — surface it and stop; don't invent CLI
+  calls. A repo with no remote (or no git at all) instead resolves to the built-in `local` tracker —
+  that's expected, not an error; its snippets drive `prd_tool tracker` against `docs/prd/tracker.json`.
 - The epic-dir deletion is irreversible — only delete after the user confirms (Step 4) and the doc
   updates are committed.
 

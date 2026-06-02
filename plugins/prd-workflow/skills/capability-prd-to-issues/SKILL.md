@@ -1,6 +1,6 @@
 ---
 name: capability-prd-to-issues
-description: Break a capability PRD (kind:capability) into independently-grabbable enabling slices (SDK/macro/host surface, each with a first consumer), wire the PRD issue + slices with native dependencies (and sub-issues under an epic), and write committed slice docs. Use after /prd-workflow:create-capability-prd. Don't use it on a feature PRD (use feature-prd-to-issues) or to author the PRD itself (use create-capability-prd). Provider-aware (gh/fgj).
+description: Break a capability PRD (kind:capability) into independently-grabbable enabling slices (foundational surface, each with a first consumer), wire the PRD issue + slices with native dependencies (and sub-issues under an epic), and write committed slice docs. Use after /prd-workflow:create-capability-prd. Don't use it on a feature PRD (use feature-prd-to-issues) or to author the PRD itself (use create-capability-prd). Provider-aware (gh/fgj/local).
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -26,6 +26,12 @@ surface). The current planning-tree inventory is injected here:
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
 
+The project profile (architecture layers, orientation docs) is injected below when available
+— its "Architecture layers → Capability" section defines what an enabling slice means here.
+If empty, explore the codebase to learn the layering and the libraries/host this work extends:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+
 ## Step 0 — Provider + PRD
 
 Verify auth, then locate the PRD at `docs/prd/<slug>/prd.md` and **assert `kind: capability`** —
@@ -43,23 +49,23 @@ Ensure the label scheme exists (idempotent):
 
 ## Step 1 — Explore (if needed)
 
-Explore `crates/junius-sdk/` (+ `crates/junius-sdk-macros/` for macros), the host
-`platform/`, and `docs/design/11-backend-plugin-interface.md` /
-`12-frontend-plugin-interface.md`. Slice descriptions must respect the layering (host owns
-auth/RBAC; plugins consume the SDK) and the `plugin.toml` manifest contract.
+Explore the surface this capability extends — the library/package, host module, or shared
+component named in the project profile's "Architecture layers → Capability" (and its orientation
+docs). Slice descriptions must respect that layering and any manifest/contract the profile
+calls out. If no profile exists, explore the codebase to learn the layering and the owning
+modules yourself.
 
 ## Step 2 — Draft enabling slices
 
-Break the PRD into **enabling slices**. Each slice is a thin unit of new API surface /
-macro / host capability that **names its first real consumer**.
+Break the PRD into **enabling slices**. Each slice is a thin unit of new foundational surface
+(API / shared library / macro / host capability) that **names its first real consumer**.
 
 <enabling-slice-rules>
 - Each slice ships a thin, coherent piece of the surface — prefer many thin slices.
-- Each slice names a concrete first consumer (a plugin or host call site) so it isn't a
+- Each slice names a concrete first consumer (a downstream call site) so it isn't a
   speculative layer.
-- Acceptance = a **consumer test**: a doctest / `#[cfg(test)]` unit in the crate **plus** a
-  downstream consumer exercising it in an integration test; for macros, a
-  `trybuild`/compile-fail test.
+- Acceptance = a **consumer test**: a test in the owning module/package **plus** a downstream
+  consumer exercising it (the forms come from the project profile's test infrastructure).
 - A completed slice is independently mergeable.
 </enabling-slice-rules>
 
@@ -124,14 +130,14 @@ Attach a child as a sub-issue of the **epic** (only used when `epic:` is set):
 #<prd> (PRD: `docs/prd/<slug>/prd.md`)
 
 ## What to build
-The API surface this slice adds (types / traits / fns / macro shape) **and its first
-consumer**. Describe the surface precisely; inline a type/signature snippet when it encodes
-the decision better than prose.
+The surface this slice adds (types, functions, interfaces — whatever forms the surface) **and
+its first consumer**. Describe the surface precisely; inline a type/signature snippet when it
+encodes the decision better than prose.
 
 ## Acceptance criteria
-- [ ] surface compiles + doctest/unit passes
-- [ ] first consumer (<plugin/host>) exercises it in a test
-- [ ] (macros) trybuild/compile-fail cases pass
+- [ ] surface builds + its own unit test passes
+- [ ] first consumer (<downstream call site>) exercises it in a test
+- [ ] any compile-time / type-level guarantees have their own checks (if applicable)
 
 ## Blocked by
 - #<n> — <reason>   (or "None — can start immediately")
@@ -143,8 +149,10 @@ checklist.
 
 ## Error handling
 
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` exits non-zero or emits no command, the
-  repo has no recognised GitHub/Forgejo remote — surface its stderr and stop; don't invent CLI calls.
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `UNKNOWN_FORGE`, the repo has a
+  remote this workflow doesn't recognise (not GitHub/Forgejo) — surface it and stop; don't invent CLI
+  calls. A repo with no remote (or no git at all) instead resolves to the built-in `local` tracker —
+  that's expected, not an error; its snippets drive `prd_tool tracker` against `docs/prd/tracker.json`.
 - If `auth_check` reports unauthenticated, tell the user to authenticate (`gh auth login` /
   `fgj login`) and stop before creating anything.
 - If the injected `references/artifacts.md` is empty/missing, the repo isn't set up for this

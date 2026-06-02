@@ -1,6 +1,6 @@
 ---
 name: feature-prd-to-issues
-description: Break a feature PRD (kind:feature) into independently-grabbable issues as tracer-bullet vertical slices, wire the PRD issue + slices with native dependencies (and sub-issues under an epic), and write committed slice docs. Use after /prd-workflow:create-feature-prd, or when converting a feature spec into work issues. Don't use it on a capability PRD (use capability-prd-to-issues) or to author the PRD itself (use create-feature-prd). Provider-aware (gh/fgj).
+description: Break a feature PRD (kind:feature) into independently-grabbable issues as tracer-bullet vertical slices, wire the PRD issue + slices with native dependencies (and sub-issues under an epic), and write committed slice docs. Use after /prd-workflow:create-feature-prd, or when converting a feature spec into work issues. Don't use it on a capability PRD (use capability-prd-to-issues) or to author the PRD itself (use create-feature-prd). Provider-aware (gh/fgj/local).
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -25,6 +25,12 @@ surface). The current planning-tree inventory is injected here:
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
 
+The project profile (architecture layers, orientation docs) is injected below when available
+— its "Architecture layers → Feature" section defines what a vertical slice means here. If
+empty, explore the codebase to learn the layering and domain glossary:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+
 ## Step 0 — Provider + PRD
 
 Verify auth, then locate the PRD at `docs/prd/<slug>/prd.md` and **assert `kind: feature`** —
@@ -44,9 +50,9 @@ Ensure the label scheme exists (idempotent):
 ## Step 1 — Explore (if needed)
 
 If you haven't already explored the area, do so. Slice titles/descriptions must use the
-project's domain glossary and layering (proto/RPC under `proto/`, migrations under
-`migrations/`, plugin Rust in `plugins/<name>/src/`, frontend in `plugins/<name>/frontend/`),
-respecting `docs/design/` and the `plugin.toml` manifest.
+project's domain glossary and layering as described in the project profile's "Architecture
+layers" (and its orientation docs). If no profile exists, explore the codebase to learn the
+layers, their on-disk locations, and any manifest/contract the work must respect.
 
 ## Step 2 — Draft vertical slices
 
@@ -54,8 +60,8 @@ Break the PRD into **tracer bullet** issues. Each slice cuts a narrow but COMPLE
 through every relevant layer end-to-end — NOT a horizontal slice of one layer.
 
 <vertical-slice-rules>
-- Each slice delivers a complete path: proto/RPC (Connect) → migration → plugin Rust →
-  frontend route/component → test.
+- Each slice delivers a complete path through the project profile's "Architecture layers →
+  Feature" — every relevant layer, end-to-end, plus a test.
 - A completed slice is demoable / verifiable on its own.
 - Prefer many thin slices over few thick ones.
 - Each slice has a concrete, single-test acceptance — pairs with `/prd-workflow:analyse-issue` →
@@ -138,8 +144,10 @@ number, and (if under an epic) the epic issue number with its updated checklist.
 
 ## Error handling
 
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` exits non-zero or emits no command, the
-  repo has no recognised GitHub/Forgejo remote — surface its stderr and stop; don't invent CLI calls.
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `UNKNOWN_FORGE`, the repo has a
+  remote this workflow doesn't recognise (not GitHub/Forgejo) — surface it and stop; don't invent CLI
+  calls. A repo with no remote (or no git at all) instead resolves to the built-in `local` tracker —
+  that's expected, not an error; its snippets drive `prd_tool tracker` against `docs/prd/tracker.json`.
 - If `auth_check` reports unauthenticated, tell the user to authenticate (`gh auth login` /
   `fgj login`) and stop before creating anything.
 - If the injected `references/artifacts.md` is empty/missing, the repo isn't set up for this

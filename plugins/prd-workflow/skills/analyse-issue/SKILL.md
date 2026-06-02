@@ -1,6 +1,6 @@
 ---
 name: analyse-issue
-description: Fetch a slice issue (#n), present a structured summary, then run a focused grilling session to decide the test strategy before any code. Appends a confirmed Test plan to the issue's committed slice doc and hands off to /prd-workflow:implement-issue. Use when starting work on an issue, or when the user says "analyse"/"start on" #n. Don't use it to write code or open a PR (use implement-issue once the test plan is agreed). Provider-aware (gh/fgj).
+description: Fetch a slice issue (#n), present a structured summary, then run a focused grilling session to decide the test strategy before any code. Appends a confirmed Test plan to the issue's committed slice doc and hands off to /prd-workflow:implement-issue. Use when starting work on an issue, or when the user says "analyse"/"start on" #n. Don't use it to write code or open a PR (use implement-issue once the test plan is agreed). Provider-aware (gh/fgj/local).
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -22,6 +22,13 @@ surface). The current planning-tree inventory is injected here:
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
 
+The project profile (architecture layers, test infrastructure, orientation docs) is injected
+below when available — its "Test infrastructure" section is the source for test types, file
+patterns, and run commands used in Steps 2–3. If empty, explore the codebase to identify the
+available test frameworks and their run commands:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+
 ## Step 1 — Fetch + present
 
 Fetch the issue (form for the detected provider):
@@ -37,8 +44,9 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" resolve <prd#> --kind prd  
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" slices <slug>               # → the <n>-<slug>.md path
 ```
 
-Read both the `prd.md` and `docs/prd/<slug>/slices/<n>-<slug>.md` in full. Load conventions:
-`docs/design/`, `docs/impl/README.md`, `docs/plugin-authoring-guide.md`, `clippy.toml`.
+Read both the `prd.md` and `docs/prd/<slug>/slices/<n>-<slug>.md` in full. Load conventions
+from the project profile's "Orientation docs"; if no profile exists, find and read the
+relevant design/convention docs in the codebase yourself.
 
 Present:
 
@@ -52,7 +60,7 @@ What needs to be built:
 <2–4 sentences>
 
 Touches:
-- feature   → DB schema · proto/RPC · plugin Rust · frontend · job
+- feature    → the architecture layers it cuts through (per the profile)
 - capability → API surface: <…> · first consumer: <…>
 ```
 
@@ -67,23 +75,21 @@ if a prior answer settles it:
    just in isolation?"
 3. "If you run that test every few minutes while coding, is the feedback fast enough?"
 4. "Walk me through the two most likely failure modes — does the test type catch both?"
-5. "Do we need a real DB (testcontainers), real HTTP, or a real browser here? Is that cost
-   worth it for this slice?"
+5. "Do we need a real dependency (real DB, real HTTP, a real browser) here, or can it be
+   faked? Is that cost worth it for this slice?"
 6. "Is any part already tested elsewhere? What's the exact gap we're filling?"
 
-**Test-type vocabulary** (pick the most confidence per minute):
-- **e2e** — Playwright (`plugins/*/frontend/e2e/**/*.spec.ts`, `e2e/cross/**`) → `task test:e2e`
-- **rust-integration** — testcontainers, `tests/*.rs`, `#[tokio::test]` → `task test:rust`
-- **consumer-integration** — a plugin/host exercising a new SDK surface → `task test:rust`
-- **rust-unit / doctest** — `#[cfg(test)]`, `///` examples → `task test:rust:unit`
-- **macro compile-test** — `trybuild` / compile-fail → `task test:rust`
-- **frontend-unit** — vitest `*.test.tsx` (jsdom) → `task test:js`
-- **none** — only if truly trivial or fully covered elsewhere
+**Test-type vocabulary:** use the test types, file patterns, and run commands from the
+project profile's "Test infrastructure" section — pick the one giving the most confidence per
+minute. If no profile exists, explore the codebase to identify the available test frameworks
+(unit, integration, end-to-end) and their run commands, and use those. `none` is a valid
+choice only if the slice is truly trivial or fully covered elsewhere.
 
-**Push back when:** dev picks unit but the slice crosses DB/HTTP (→ integration/e2e is more
-honest); dev picks e2e but the logic is pure (→ unit/doctest is faster); dev says "no test"
-(→ drill in, accept only if trivial/covered); dev proposes several types (→ keep the one
-with most confidence per minute unless they test genuinely different things).
+**Push back when:** dev picks an isolated unit test but the slice crosses a real boundary
+(DB/HTTP/UI) (→ an integration/e2e test is more honest); dev picks a heavyweight e2e test but
+the logic is pure (→ a unit test is faster); dev says "no test" (→ drill in, accept only if
+trivial/covered); dev proposes several types (→ keep the one with most confidence per minute
+unless they test genuinely different things).
 
 ## Step 3 — Persist the test plan to the slice doc
 
@@ -93,22 +99,23 @@ Once confirmed, **append** a `## Test plan` section to
 ```markdown
 ## Test plan
 
-**Test type:** [e2e | rust-integration | consumer-integration | rust-unit/doctest | macro compile-test | frontend-unit | none]
+**Test type:** <one of the types from the project profile's "Test infrastructure" (or those you found in the codebase); `none` only if trivial/covered>
 **Reasoning:** <one sentence>
 
 ### Assertions
 - <key assertion 1>
 - <key assertion 2>
-- <error cases: 400/401/403/404 or Err variants, if applicable>
+- <error cases: status codes or error variants, if applicable>
 
 ### Test file
-`<path, e.g. plugins/<name>/tests/<x>.rs or plugins/<name>/frontend/e2e/<x>.spec.ts>`
+`<path following the profile's file pattern for the chosen test type>`
 
 ### Run command
-`task test:rust` | `task test:rust:unit` | `task test:js` | `task test:e2e`
+`<the run command the profile maps to that test type>`
 ```
 
-Commit the slice doc. Confirm the path to the developer.
+Commit the slice doc (on a git project; on a non-git project it's just saved in place).
+Confirm the path to the developer.
 
 ## Hand-off
 
@@ -117,8 +124,10 @@ Invoke `/prd-workflow:implement-issue <n>`. The spec + test plan live in
 
 ## Error handling
 
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` exits non-zero or emits no command, the repo
-  has no recognised GitHub/Forgejo remote — surface its stderr and stop; don't invent CLI calls.
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `UNKNOWN_FORGE`, the repo has a
+  remote this workflow doesn't recognise (not GitHub/Forgejo) — surface it and stop; don't invent CLI
+  calls. A repo with no remote (or no git at all) instead resolves to the built-in `local` tracker —
+  that's expected, not an error; its snippets drive `prd_tool tracker` against `docs/prd/tracker.json`.
 - If `cmd_get_issue` fails (auth, wrong number), tell the user to authenticate or recheck `#n`; stop.
 - If the slice doc `docs/prd/<slug>/slices/<n>-<slug>.md` is missing, the issue wasn't produced by
   this workflow — confirm the PRD/slug with the user before appending a test plan.

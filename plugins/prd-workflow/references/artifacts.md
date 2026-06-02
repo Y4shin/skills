@@ -92,9 +92,11 @@ follows the template at the bottom of this file.
 
 ## Tracker shape (flat, native primitives)
 
-The tracker uses GitHub's **native sub-issues** and **native issue dependencies** (run
-`prd_tool.pyz forge <key>` — `forge keys` for the list — for the exact per-provider commands).
-One rule splits the two mechanisms:
+The tracker uses **native sub-issues** and **native issue dependencies** — on a git host
+(GitHub `gh` / Forgejo `fgj`), or the built-in **local tracker** (`docs/prd/tracker.json`) when
+the repo has no recognised git host (a non-git project, or git with no `origin`). The flat
+model is identical across all three; run `prd_tool.pyz forge <key>` — `forge keys` for the
+list — for the exact per-provider commands. One rule splits the two mechanisms:
 
 - **Sub-issue (parent/child)** is used for **exactly one** relationship: an **epic** is the
   sub-issue parent of its child PRD issues *and* their slice issues — all flat siblings under

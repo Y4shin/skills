@@ -1,6 +1,6 @@
 ---
 name: create-epic
-description: Interview the user to produce an epic — a coordinated outcome spanning several PRDs ("a set of plugins that do X") — committed to docs/prd/epics/<slug>/epic.md with `kind: epic` frontmatter. Use when the goal is bigger than one plugin/capability and needs to fan out into multiple PRDs. Don't use it for a single plugin feature (use create-feature-prd) or one foundational capability (use create-capability-prd). Hands off to /prd-workflow:epic-to-prds.
+description: Interview the user to produce an epic — a coordinated outcome spanning several PRDs ("a set of components that together do X") — committed to docs/prd/epics/<slug>/epic.md with `kind: epic` frontmatter. Use when the goal is bigger than one feature/capability and needs to fan out into multiple PRDs. Don't use it for a single feature (use create-feature-prd) or one foundational capability (use create-capability-prd). Hands off to /prd-workflow:epic-to-prds.
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -8,8 +8,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 Phase −1 of the workflow: the tier **above** a PRD. Run the relentless `grill-me` interview,
 then crystallise a higher-level outcome into a committed `epic.md` that `/prd-workflow:epic-to-prds`
-will decompose into ordered child PRDs. An *epic* is a coordinated set of plugins / cross-cutting
-work delivering one outcome ("a set of plugins that do X"). For a single plugin feature use
+will decompose into ordered child PRDs. An *epic* is a coordinated set of components / cross-cutting
+work delivering one outcome ("a set of components that together do X"). For a single feature use
 `/prd-workflow:create-feature-prd`; for one foundational capability use
 `/prd-workflow:create-capability-prd`.
 
@@ -25,12 +25,17 @@ surface). The existing planning-tree inventory is injected here — **check it b
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
 
+The project profile (project description, orientation docs, architecture layers) is injected
+below when available — if empty, explore the codebase for project-specific context:
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+
 ## Step 1 — Load context
 
-Read `docs/design/02-architecture.md`, `docs/design/06-plugin-shape.md`,
-`docs/design/08-cross-plugin-composition.md`, the `plugins/` trees that already exist, and any
-related `docs/impl/` milestones. An epic almost always spans plugin boundaries and shared host
-/ SDK work — understand the existing composition seams before asking the user.
+Read the project profile's "Orientation docs" (architecture and composition docs especially)
+and the parts of the codebase the epic spans. An epic almost always crosses module/component
+boundaries and shared foundational work — understand the existing composition seams before
+asking the user. If no profile exists, explore the codebase to map those seams yourself.
 
 ## Step 2 — Grill (one question at a time)
 
@@ -38,13 +43,14 @@ Use the `grill-me` discipline. Always give your recommended answer + reasoning f
 Drive toward, in dependency order:
 
 1. **Outcome** — the one-sentence result the whole epic delivers; who benefits.
-2. **Constituent plugins & surfaces** — which plugins (new or extended) and host/SDK surfaces
-   participate? Name each and its role in the outcome.
-3. **Shared / foundational work** — what cross-cutting capability work (SDK, macro, host,
-   manifest, navigation) must land **first** so the per-plugin features can build on it?
-4. **Per-plugin features** — the user-facing behaviour each plugin contributes.
+2. **Constituent components & surfaces** — which components (new or extended) and shared
+   surfaces participate? Name each and its role in the outcome.
+3. **Shared / foundational work** — what cross-cutting capability work (per the project
+   profile's "Architecture layers → Capability") must land **first** so the per-component
+   features can build on it?
+4. **Per-component features** — the user-facing behaviour each component contributes.
 5. **Dependency ordering** — which pieces block which (capabilities before their consumers;
-   plugin B depends on plugin A's exposed table/component).
+   component B depends on a surface component A exposes).
 6. **Boundaries** — what's explicitly out of scope; what must NOT change.
 
 If a question is answerable from the code/docs, answer it yourself and move on.
@@ -58,9 +64,9 @@ Write to `docs/prd/epics/<slug>/epic.md` (`<slug>` = 3–5 word kebab of the tit
 # <title>
 
 ## Problem / outcome
-## Constituent plugins & surfaces
+## Constituent components & surfaces
 ## Shared / foundational work
-## Per-plugin features
+## Per-component features
 ## Dependency ordering
 ## Out of scope
 ## Open questions
