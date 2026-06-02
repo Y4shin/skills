@@ -111,6 +111,22 @@ sub-issue parent; the PRD issue is `blocked_by` its slices; slices ordered by de
 PRD↔slice membership is recoverable from the committed `slices/<n>-<slug>.md` docs and from the
 `PRD blocked_by slice` dependency edges.
 
+## Branching model (git projects)
+
+A PRD is one feature; its slices are tracer-bullets of it. They share **one integration
+branch**, `prd/<prd-slug>`, cut from `main` at the first slice:
+
+- Each slice is built on a short-lived branch off `prd/<prd-slug>` and **merged back into it —
+  no per-slice PR**. A slice runs only **its own** test before merging; it never waits on the
+  whole-suite CI gate. Merging a slice closes its issue, resolving that `PRD blocked_by slice`
+  edge.
+- `finalize-prd` opens the **only** PR — `prd/<prd-slug>` → `main`, `Closes #<prd-issue>` —
+  carrying every slice plus the harvested docs and the PRD-dir cleanup. The **full CI gate runs
+  once, on that PR**.
+
+A `local`/non-git project has no branches or PRs: slices land on the working tree and finalize
+closes out in place. The tracker model above is identical either way.
+
 ## Lifecycle / garbage collection
 
 Artifacts are **deleted as their work lands**, so the presence of a file is itself state:
@@ -124,11 +140,15 @@ Artifacts are **deleted as their work lands**, so the presence of a file is itse
    dependencies (and, under an epic, the sub-issue parenting), writes one
    `slices/<n>-<slug>.md` per slice, fills `prd_issue:` + `slices:`, status `issues-created`.
 5. `analyse-issue <n>` → appends a `## Test plan` section to that slice's doc.
-6. `implement-issue <n>` → on completion appends a note to `prd.md` `## Implementation notes`,
-   then **deletes `slices/<n>-<slug>.md`**. A surviving slice doc ⇒ unfinished work.
-7. `finalize-prd <slug>` → once `slices/` is empty, migrates durable knowledge into
-   `docs/design/` + `docs/impl/`, ticks the epic's `prds[]` entry if any, closes the PRD issue,
-   then **deletes `docs/prd/<prd-slug>/`**.
+6. `implement-issue <n>` → merges the slice into the PRD branch (no per-slice PR), closes the
+   slice issue, appends a note to `prd.md` `## Implementation notes`, then **deletes
+   `slices/<n>-<slug>.md`**. A surviving slice doc ⇒ unfinished work. Only the slice's own test
+   runs here — the full CI gate is deferred to step 7.
+7. `finalize-prd <slug>` → once `slices/` is empty, migrates durable knowledge into the
+   project's permanent docs, ticks the epic's `prds[]` entry if any, **deletes
+   `docs/prd/<prd-slug>/`**, then opens the **single PRD PR** (`prd/<prd-slug>` → `main`) where
+   the **full CI gate** runs; merging it closes the PRD issue (on `local`, finalize closes it
+   directly). This is the one PR and one gate for the whole PRD.
 8. *(optional)* `finalize-epic <slug>` → once every child PRD is finalized, migrates
    epic-level knowledge into `docs/design/` + `docs/impl/`, closes the epic issue, then
    **deletes `docs/prd/epics/<epic-slug>/`**.

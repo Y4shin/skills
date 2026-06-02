@@ -1,13 +1,21 @@
 ---
 name: finalize-prd
-description: Close the loop once all of a PRD's slices are merged — harvest the enriched PRD + the merged code changes, fold durable knowledge into the project's permanent docs (design docs, milestone/changelog), close the PRD issue (and tick its epic if any), then delete the spent PRD. Use when a PRD's work is complete, or the user says "finalize"/"wrap up" a PRD. Don't use it while any slice is still open or unmerged (finish implement-issue first). Provider-aware (gh/fgj/local).
+description: Close the loop once all of a PRD's slices are merged into its integration branch — harvest the enriched PRD + the branch diff, fold durable knowledge into the project's permanent docs (design docs, milestone/changelog), tick its epic if any, delete the spent PRD dir, then open the single PRD PR (Closes #prd-issue) into main where the full CI gate runs. This is the one PR and the one gate for the whole PRD. Use when a PRD's slices are all done, or the user says "finalize"/"wrap up" a PRD. Don't use it while any slice is still open or unmerged (finish implement-issue first). Provider-aware (gh/fgj/local — non-git projects have no PR; finalize closes out directly).
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
 # Finalize PRD
 
-Phase 3: once every slice of a PRD is implemented and merged, migrate the durable knowledge
-into the repo's permanent docs and retire the PRD. Invoked as `/prd-workflow:finalize-prd <slug | prd-issue#>`.
+Phase 3 — **the PRD's single integration point.** Every slice has merged into the PRD branch
+`prd/<prd-slug>` with no PR of its own; finalize migrates durable knowledge into the repo's
+permanent docs, retires the spent PRD dir, and opens the **one** PR (`prd/<prd-slug>` → `main`)
+where the **full CI gate** runs for everything the PRD's slices produced. Invoked as
+`/prd-workflow:finalize-prd <slug | prd-issue#>`.
+
+All of finalize's doc work (knowledge harvest, epic tick, PRD-dir deletion) is committed
+**onto the PRD branch** so it rides to `main` inside that single PR — code, docs, and cleanup
+land together. (On a `local`/non-git project there's no branch or PR — finalize closes out in
+place.)
 
 Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`**.
 Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`. The artifact-lifecycle
@@ -29,7 +37,16 @@ project's permanent docs (design docs, decision log, changelog) and fold knowled
 
 ## Step 1 — Preconditions
 
-Resolve the PRD (accepts the slug **or** the `prd_issue:` number) and gate on its slices:
+On a **git project**, check out the PRD integration branch first — the slice docs are GC'd on
+*that* branch (not on `main`), so the gate only reads clean there:
+
+```bash
+git fetch origin
+git checkout prd/<prd-slug>
+git merge origin/main          # fold in any main that landed since; resolve conflicts, keep tests green
+```
+
+Resolve the PRD and gate on its slices:
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" resolve <slug|prd-issue#> --kind prd
@@ -46,16 +63,16 @@ If anything is outstanding, list it and **stop** — do not finalize partial wor
 ## Step 2 — Harvest
 
 Read the enriched `docs/prd/<slug>/prd.md` in full, especially `## Implementation notes`.
-Then review what actually shipped vs what the PRD proposed:
+Then review what the PRD branch actually produced vs what the PRD proposed:
 
 ```bash
-git fetch origin
-git log --oneline --no-merges origin/main ^<prd-branch-point>   # commits since the PRD started
-git diff <prd-branch-point>...origin/main -- <relevant paths>
+git log --oneline --no-merges main..prd/<prd-slug>     # the PRD's slice commits
+git diff main...prd/<prd-slug> -- <relevant paths>     # the full PRD change set
 ```
 
-(Use the merged slice PRs / closed issues to bound the range.) Note divergences between the
-PRD's intent and the implementation.
+That diff **is** the upcoming PRD PR. Note divergences between the PRD's intent and the
+implementation. (On a `local`/non-git project there's no branch — review the working-tree
+changes the slices produced instead.)
 
 ## Step 3 — Fold into permanent docs
 
@@ -67,14 +84,10 @@ section names, matching each doc's existing voice/structure. Typically that mean
   its index.
 
 If no profile exists, locate these destinations in the repo yourself. Capture *durable*
-knowledge only — what a future contributor needs — not the slice-by-slice narrative.
+knowledge only — what a future contributor needs — not the slice-by-slice narrative. On a git
+project, **commit these doc updates onto the PRD branch** — they ride to `main` in the PRD PR.
 
-## Step 4 — Close out + delete
-
-- Close the **PRD issue** with a comment linking the doc updates (commit SHA / PR).
-  Close form for the detected provider:
-
-  !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_close_issue`
+## Step 4 — Tick the epic + delete the spent PRD dir
 
 - **If `prd.md` carries `epic: <epic-slug>`** (check with
   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" get <slug> epic`): mark this PRD's
@@ -88,11 +101,38 @@ knowledge only — what a future contributor needs — not the slice-by-slice na
   (When it's the last child — `epic finalizable <epic-slug>` now exits 0 — the user can
   `/prd-workflow:finalize-epic <epic-slug>`.)
 
-- **Confirm with the user**, then delete the entire `docs/prd/<slug>/` and commit alongside
-  the doc updates (the PRD has served its purpose and would only drift from here).
+- **Confirm with the user**, then delete the entire `docs/prd/<slug>/` (the PRD has served its
+  purpose and would only drift from here).
 
-Report: docs touched, PRD issue closed, PRD dir removed, and (if under an epic) the epic
-checklist updated.
+On a git project, commit the epic tick and the dir deletion onto the PRD branch too — every
+finalize change belongs in the one PR.
+
+## Step 5 — Open the single PRD PR + run the full CI gate
+
+**Git project** — this is the one PR and the one gate for the whole PRD:
+
+1. Run the project's **full CI gate** (the profile's "CI" command — lint, format, whole suite,
+   type-check, generated-artifact checks) on the PRD branch. This is the gate every slice
+   skipped; **fix forward until it's green** (re-run after each fix). Never open the PR red.
+2. Push the PRD branch and open **one** PR with `--base main`, head `prd/<prd-slug>`, title =
+   the PRD title, body = a summary of the slices + the met acceptance criteria + `Closes
+   #<prd-issue>`. PR form for the detected provider:
+
+   !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_create_pr`
+
+3. The host re-runs CI on the PR. A human reviews and merges it — this is the PRD's single
+   review gate. **On merge**, all the slice work + the doc updates + the PRD-dir deletion land
+   on `main`, and `Closes #<prd-issue>` closes the PRD issue. Don't auto-merge; report the PR
+   and let the user merge.
+
+**Non-git project (`local`)** — there's no branch or PR. Run the project's gate if it has one,
+then close the PRD issue directly (the doc updates + dir deletion are already saved in place):
+
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_close_issue`
+
+Report: docs touched, the PRD PR URL (git) or that the PRD issue is closed (local), that the
+PRD dir is removed (staged in the PR on git; deleted in place on local), and — if under an
+epic — the updated epic checklist.
 
 ## Error handling
 
@@ -102,11 +142,15 @@ checklist updated.
   remote this workflow doesn't recognise (not GitHub/Forgejo) — surface it and stop; don't invent CLI
   calls. A repo with no remote (or no git at all) instead resolves to the built-in `local` tracker —
   that's expected, not an error; its snippets drive `prd_tool tracker` against `docs/prd/tracker.json`.
-- The PRD-dir deletion is irreversible — only delete after the user confirms (Step 4) and the doc
-  updates are committed.
+- If the full CI gate fails (Step 5), **fix forward on the PRD branch** (or report the blocker) —
+  never open the PRD PR with a red suite or skipped checks. This gate covers all the slices at once.
+- The PRD-dir deletion is irreversible — only delete after the user confirms (Step 4); on a git
+  project it lands only when the PRD PR merges, so it's recoverable until then.
 
 ## Constraints
 
 - **Never finalize partial work** — Step 1 is a hard gate.
+- **One PR per PRD** — finalize opens the only PR the PRD ever gets; the full CI gate runs here,
+  not per slice. Don't open per-slice PRs.
 - Durable knowledge migrates to `docs/`; transient planning detail is discarded with the PRD.
 - Doc edits in **English**, matching the surrounding style.
