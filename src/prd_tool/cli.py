@@ -70,6 +70,14 @@ def _reference_text() -> str:
     return src.read_text(encoding="utf-8")
 
 
+def _profile_text(root: Path) -> str:
+    """Read `docs/prd/profile.md` from the repo root. Returns empty string if missing."""
+    p = root / "docs" / "prd" / "profile.md"
+    if p.is_file():
+        return p.read_text(encoding="utf-8")
+    return ""
+
+
 # ---------------------------------------------------------------- read / query
 
 @cli.command()
@@ -78,6 +86,21 @@ def reference() -> None:
     + lifecycle the skills inject as context). Replaces a plain `cat` of the
     file, which the host blocks for paths outside the working directory."""
     click.echo(_reference_text(), nl=False)
+
+
+@cli.command()
+@pass_root
+def profile(root: Path) -> None:
+    """Print the project profile (docs/prd/profile.md) if it exists.
+
+    The profile provides project-specific context (architecture layers, test
+    infrastructure, code conventions, knowledge destinations) that the skills
+    use to tailor their behaviour. If the file is absent, prints nothing —
+    skills degrade gracefully.
+    """
+    text = _profile_text(root)
+    if text:
+        click.echo(text, nl=False)
 
 
 @cli.command(name="forge")
