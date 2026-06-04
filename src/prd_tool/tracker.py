@@ -1,11 +1,13 @@
-"""Local file-based issue tracker for non-git projects.
+"""Local file-based issue tracker for git repos without a remote.
 
-When a repo has no recognised git host — no ``origin`` remote, or it isn't a git
-repo at all — the prd-workflow ``forge`` selects the ``local`` provider, whose
-command snippets drive this tracker instead of ``gh``/``fgj``. Issues, their
-labels, dependencies, and epic parent-links live in a single JSON ledger in the
-consuming repo at ``docs/prd/tracker.json``, so the whole
-PRD → issues → implement → finalize workflow runs without any git host.
+When a git repo has no recognised git host — no ``origin`` remote — the
+prd-workflow ``forge`` selects the ``local`` provider, whose command snippets
+drive this tracker instead of ``gh``/``fgj``. Issues, their labels,
+dependencies, and epic parent-links live in a single JSON ledger in the
+consuming repo at ``docs/prd/tracker.json``. The branch workflow
+(``prd/<slug>``, ``slice/<n>-<slug>``) works identically to hosted forges —
+only remote operations (fetch, push, PRs) are skipped; the PRD branch merges
+into ``main`` locally at finalize.
 
 The shape deliberately mirrors what the skills already read from ``gh``/``fgj``:
 issues carry a ``number``, ``title``, ``body``, ``labels``, ``state``

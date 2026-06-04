@@ -94,7 +94,7 @@ follows the template at the bottom of this file.
 
 The tracker uses **native sub-issues** and **native issue dependencies** — on a git host
 (GitHub `gh` / Forgejo `fgj`), or the built-in **local tracker** (`docs/prd/tracker.json`) when
-the repo has no recognised git host (a non-git project, or git with no `origin`). The flat
+the repo has no recognised git host (a git repo with no `origin` remote). The flat
 model is identical across all three; run `prd_tool.pyz forge <key>` — `forge keys` for the
 list — for the exact per-provider commands. One rule splits the two mechanisms:
 
@@ -111,7 +111,7 @@ sub-issue parent; the PRD issue is `blocked_by` its slices; slices ordered by de
 PRD↔slice membership is recoverable from the committed `slices/<n>-<slug>.md` docs and from the
 `PRD blocked_by slice` dependency edges.
 
-## Branching model (git projects)
+## Branching model
 
 A PRD is one feature; its slices are tracer-bullets of it. They share **one integration
 branch**, `prd/<prd-slug>`, cut from `main` at the first slice:
@@ -124,8 +124,9 @@ branch**, `prd/<prd-slug>`, cut from `main` at the first slice:
   carrying every slice plus the harvested docs and the PRD-dir cleanup. The **full CI gate runs
   once, on that PR**.
 
-A `local`/non-git project has no branches or PRs: slices land on the working tree and finalize
-closes out in place. The tracker model above is identical either way.
+On a `local` forge (git with no remote), the branch workflow is identical — only remote
+operations (fetch, push) are skipped. At finalize, the PRD branch merges into `main` locally
+instead of via a PR. The tracker model above is identical across all providers.
 
 ## Lifecycle / garbage collection
 

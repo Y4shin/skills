@@ -5,11 +5,17 @@ Three providers are supported:
 
 * ``gh``    — GitHub (``origin`` points at github.com).
 * ``fgj``   — Forgejo / Codeberg / Gitea.
-* ``local`` — **no recognised git host**: the repo has no ``origin`` remote, or
-  it isn't a git repo at all. The snippets then drive the built-in local issue
-  tracker (``prd_tool tracker ...`` → ``docs/prd/tracker.json``) so the whole
-  workflow runs without any git host. A *non-empty but unrecognised* remote is
-  still an error (``UNKNOWN_FORGE``) — we don't guess at an unknown host's CLI.
+* ``local`` — **no recognised git host**: the repo is a local git repo with no
+  ``origin`` remote (or an empty one). The snippets drive the built-in local
+  issue tracker (``prd_tool tracker ...`` → ``docs/prd/tracker.json``) and
+  **use the same branch workflow** (``prd/<slug>``, ``slice/<n>-<slug>``) as the
+  hosted forges — just without remote operations (no fetch/push/PRs). The PRD
+  branch is merged into ``main`` locally at finalize.
+
+  Git must be initialised (``git rev-parse`` must succeed); a directory that
+  isn't a git repo at all raises ``NotAGitRepo``. A *non-empty but unrecognised*
+  remote is still an error (``UNKNOWN_FORGE``) — we don't guess at an unknown
+  host's CLI.
 
 Ported from the old ``scripts/forge_detect.sh`` so the skills can reach it
 through the bundled ``prd_tool.pyz`` (one allowlisted entry point) instead of a
@@ -59,6 +65,21 @@ class UnknownForge(Exception):
         self.remote = remote
 
 
+class NotAGitRepo(Exception):
+    """The working directory is not inside a git repository."""
+
+
+def _is_git_repo() -> bool:
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True,
+        )
+        return out.returncode == 0
+    except FileNotFoundError:
+        return False
+
+
 def _remote_url() -> str:
     try:
         out = subprocess.run(
@@ -83,10 +104,15 @@ class Forge:
 def detect(remote: str | None = None) -> Forge:
     """Resolve the provider + owner/repo from the ``origin`` remote (or *remote*).
 
-    An empty remote (no git, or git with no ``origin``) resolves to the built-in
-    ``local`` tracker. A non-empty remote we don't recognise raises ``UnknownForge``.
+    Git must be initialised — ``NotAGitRepo`` is raised otherwise. An empty
+    remote (git with no ``origin``) resolves to the built-in ``local`` tracker
+    with full local branching. A non-empty remote we don't recognise raises
+    ``UnknownForge``.
     """
-    remote = _remote_url() if remote is None else remote
+    if remote is None:
+        if not _is_git_repo():
+            raise NotAGitRepo
+        remote = _remote_url()
     if not remote.strip():
         return Forge(provider="local", owner="-", repo="-")
     low = remote.lower()
@@ -155,8 +181,9 @@ def _add_dependency(f: Forge) -> str:
 
 
 def _local_snippet(key: str) -> str:
-    # Non-git provider: every issue/PR op maps to the built-in `tracker` subcommands
-    # (docs/prd/tracker.json). There is no branch/PR — work lands on the working tree.
+    # Local git repo without a remote: issue ops map to the built-in `tracker`
+    # (docs/prd/tracker.json); branches follow the same prd/<slug> + slice/<n>-<slug>
+    # model as hosted forges — just without fetch/push/PRs.
     t = PRD_TOOL
     table = {
         "git_type": "local",
@@ -173,9 +200,10 @@ def _local_snippet(key: str) -> str:
         "cmd_close_issue": f'{t} tracker close <n> --comment "<text>"',
         "cmd_edit_labels": f"{t} tracker edit <n> --add-label <a> --remove-label <r>",
         "cmd_create_pr": (
-            "# No git host — there is no PR. The work is already on the working tree; skip the\n"
-            "# push/PR step and go straight to recording completion on the issue (next: set its\n"
-            "# status to needs-review, then close it on finalize)."
+            "# No git host — there is no PR. Merge the PRD branch into main locally:\n"
+            "git checkout main\n"
+            "git merge --no-ff prd/<prd-slug> -m \"Merge PRD <prd-slug> — Closes #<prd-issue>\"\n"
+            "git branch -d prd/<prd-slug>"
         ),
         "ensure_labels": f"{t} tracker ensure-labels   # labels are freeform; just initialises the store",
         "cmd_attach_subissue": f"{t} tracker attach <epic#> <child#>",
@@ -184,7 +212,8 @@ def _local_snippet(key: str) -> str:
         "ownership_note": (
             "Local tracker (docs/prd/tracker.json): epic→child via parent links (tracker attach); "
             "PRD<-slice / slice<-slice / PRD<-PRD ordering via native blocked_by edges (tracker dep). "
-            "No git host, no PRs."
+            "Same branch workflow (prd/<slug>, slice/<n>-<slug>), no remote — PRD branch merges into "
+            "main locally at finalize."
         ),
     }
     return table[key]
@@ -258,6 +287,12 @@ def render(key: str) -> tuple[str, int]:
         return f"unknown key {key!r} — run 'forge keys' for the list", 65
     try:
         f = detect()
+    except NotAGitRepo:
+        return (
+            "NOT_A_GIT_REPO: this directory is not a git repository. "
+            "Initialise one with `git init` before running the prd-workflow.",
+            1,
+        )
     except UnknownForge as e:
         return (
             f"UNKNOWN_FORGE: cannot tell provider from remote {e.remote!r} — "

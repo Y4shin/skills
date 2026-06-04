@@ -1,6 +1,6 @@
 ---
 name: finalize-prd
-description: Close the loop once all of a PRD's slices are merged into its integration branch — harvest the enriched PRD + the branch diff, fold durable knowledge into the project's permanent docs (design docs, milestone/changelog), tick its epic if any, delete the spent PRD dir, then open the single PRD PR (Closes #prd-issue) into main where the full CI gate runs. This is the one PR and the one gate for the whole PRD. Use when a PRD's slices are all done, or the user says "finalize"/"wrap up" a PRD. Don't use it while any slice is still open or unmerged (finish implement-issue first). Provider-aware (gh/fgj/local — non-git projects have no PR; finalize closes out directly).
+description: Close the loop once all of a PRD's slices are merged into its integration branch — harvest the enriched PRD + the branch diff, fold durable knowledge into the project's permanent docs (design docs, milestone/changelog), tick its epic if any, delete the spent PRD dir, then open the single PRD PR (Closes #prd-issue) into main where the full CI gate runs. On a local forge, the PRD branch merges into main locally. This is the one integration point and the one gate for the whole PRD. Use when a PRD's slices are all done, or the user says "finalize"/"wrap up" a PRD. Don't use it while any slice is still open or unmerged (finish implement-issue first). Provider-aware (gh/fgj/local — local projects use the same branch workflow but merge locally instead of opening a PR).
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -8,14 +8,14 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 Phase 3 — **the PRD's single integration point.** Every slice has merged into the PRD branch
 `prd/<prd-slug>` with no PR of its own; finalize migrates durable knowledge into the repo's
-permanent docs, retires the spent PRD dir, and opens the **one** PR (`prd/<prd-slug>` → `main`)
-where the **full CI gate** runs for everything the PRD's slices produced. Invoked as
-`/prd-workflow:finalize-prd <slug | prd-issue#>`.
+permanent docs, retires the spent PRD dir, and either opens the **one** PR
+(`prd/<prd-slug>` → `main`) on hosted forges or **merges the PRD branch into `main` locally**
+on a local forge. The **full CI gate** runs here for everything the PRD's slices produced.
+Invoked as `/prd-workflow:finalize-prd <slug | prd-issue#>`.
 
 All of finalize's doc work (knowledge harvest, epic tick, PRD-dir deletion) is committed
-**onto the PRD branch** so it rides to `main` inside that single PR — code, docs, and cleanup
-land together. (On a `local`/non-git project there's no branch or PR — finalize closes out in
-place.)
+**onto the PRD branch** so it rides to `main` inside that single PR (hosted forges) or local
+merge (local forge) — code, docs, and cleanup land together.
 
 Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`**.
 Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`. The artifact-lifecycle
@@ -37,13 +37,22 @@ project's permanent docs (design docs, decision log, changelog) and fold knowled
 
 ## Step 1 — Preconditions
 
-On a **git project**, check out the PRD integration branch first — the slice docs are GC'd on
-*that* branch (not on `main`), so the gate only reads clean there:
+Check out the PRD integration branch first — the slice docs are GC'd on *that* branch (not on
+`main`), so the gate only reads clean there.
+
+**Remote forge** (`gh`/`fgj`) — sync with origin:
 
 ```bash
 git fetch origin
 git checkout prd/<prd-slug>
 git merge origin/main          # fold in any main that landed since; resolve conflicts, keep tests green
+```
+
+**Local forge** (`local`) — no remote to sync:
+
+```bash
+git checkout prd/<prd-slug>
+git merge main                 # fold in any main that landed since; resolve conflicts, keep tests green
 ```
 
 Resolve the PRD and gate on its slices:
@@ -70,9 +79,8 @@ git log --oneline --no-merges main..prd/<prd-slug>     # the PRD's slice commits
 git diff main...prd/<prd-slug> -- <relevant paths>     # the full PRD change set
 ```
 
-That diff **is** the upcoming PRD PR. Note divergences between the PRD's intent and the
-implementation. (On a `local`/non-git project there's no branch — review the working-tree
-changes the slices produced instead.)
+That diff **is** the upcoming PRD PR (hosted forges) or local merge (local forge). Note
+divergences between the PRD's intent and the implementation.
 
 ## Step 3 — Fold into permanent docs
 
@@ -84,8 +92,9 @@ section names, matching each doc's existing voice/structure. Typically that mean
   its index.
 
 If no profile exists, locate these destinations in the repo yourself. Capture *durable*
-knowledge only — what a future contributor needs — not the slice-by-slice narrative. On a git
-project, **commit these doc updates onto the PRD branch** — they ride to `main` in the PRD PR.
+knowledge only — what a future contributor needs — not the slice-by-slice narrative. **Commit
+these doc updates onto the PRD branch** — they ride to `main` in the PRD PR (hosted forges) or
+local merge (local forge).
 
 ## Step 4 — Tick the epic + delete the spent PRD dir
 
@@ -104,16 +113,17 @@ project, **commit these doc updates onto the PRD branch** — they ride to `main
 - **Confirm with the user**, then delete the entire `docs/prd/<slug>/` (the PRD has served its
   purpose and would only drift from here).
 
-On a git project, commit the epic tick and the dir deletion onto the PRD branch too — every
-finalize change belongs in the one PR.
+Commit the epic tick and the dir deletion onto the PRD branch too — every finalize change
+belongs in the single integration point (PR on hosted forges, local merge on local forge).
 
-## Step 5 — Open the single PRD PR + run the full CI gate
-
-**Git project** — this is the one PR and the one gate for the whole PRD:
+## Step 5 — Integrate the PRD branch + run the full CI gate
 
 1. Run the project's **full CI gate** (the profile's "CI" command — lint, format, whole suite,
    type-check, generated-artifact checks) on the PRD branch. This is the gate every slice
-   skipped; **fix forward until it's green** (re-run after each fix). Never open the PR red.
+   skipped; **fix forward until it's green** (re-run after each fix). Never integrate red.
+
+**Remote forge** (`gh`/`fgj`) — push and open the one PR:
+
 2. Push the PRD branch and open **one** PR with `--base main`, head `prd/<prd-slug>`, title =
    the PRD title, body = a summary of the slices + the met acceptance criteria + `Closes
    #<prd-issue>`. PR form for the detected provider:
@@ -125,27 +135,37 @@ finalize change belongs in the one PR.
    on `main`, and `Closes #<prd-issue>` closes the PRD issue. Don't auto-merge; report the PR
    and let the user merge.
 
-**Non-git project (`local`)** — there's no branch or PR. Run the project's gate if it has one,
-then close the PRD issue directly (the doc updates + dir deletion are already saved in place):
+**Local forge** (`local`) — no remote; merge the PRD branch into `main` locally and close the
+issue:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_close_issue`
+2. Merge form:
 
-Report: docs touched, the PRD PR URL (git) or that the PRD issue is closed (local), that the
-PRD dir is removed (staged in the PR on git; deleted in place on local), and — if under an
+   !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_create_pr`
+
+3. Close the PRD issue:
+
+   !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_close_issue`
+
+   All the slice work + the doc updates + the PRD-dir deletion are now on `main`.
+
+Report: docs touched, the PRD PR URL (hosted forges) or that the PRD branch is merged into
+`main` and the PRD issue is closed (local), that the PRD dir is removed, and — if under an
 epic — the updated epic checklist.
 
 ## Error handling
 
 - If `docs/prd/<slug>/slices/` still has docs or any slice issue is open, **stop** (Step 1 gate) —
   list what's outstanding; never finalize partial work.
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `UNKNOWN_FORGE`, the repo has a
-  remote this workflow doesn't recognise (not GitHub/Forgejo) — surface it and stop; don't invent CLI
-  calls. A repo with no remote (or no git at all) instead resolves to the built-in `local` tracker —
-  that's expected, not an error; its snippets drive `prd_tool tracker` against `docs/prd/tracker.json`.
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `NOT_A_GIT_REPO`, the
+  directory isn't a git repo — tell the user to run `git init` first and stop.
+- If it prints `UNKNOWN_FORGE`, the repo has a remote this workflow doesn't recognise (not
+  GitHub/Forgejo) — surface it and stop; don't invent CLI calls. A repo with no remote resolves
+  to the built-in `local` tracker — that's expected, not an error; it uses the same branch
+  workflow (no remotes/PRs) and drives `prd_tool tracker` for issues.
 - If the full CI gate fails (Step 5), **fix forward on the PRD branch** (or report the blocker) —
   never open the PRD PR with a red suite or skipped checks. This gate covers all the slices at once.
-- The PRD-dir deletion is irreversible — only delete after the user confirms (Step 4); on a git
-  project it lands only when the PRD PR merges, so it's recoverable until then.
+- The PRD-dir deletion is irreversible — only delete after the user confirms (Step 4); on a
+  hosted forge it lands only when the PRD PR merges, so it's recoverable until then.
 
 ## Constraints
 

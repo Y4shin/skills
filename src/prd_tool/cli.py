@@ -424,10 +424,10 @@ def epic_finalizable(root: Path, selector: str) -> None:
 
 # ----------------------------------------------------------------- tracker subgroup
 #
-# The built-in local issue tracker for non-git projects. When `forge` resolves the
-# `local` provider (no recognised git remote), its command snippets call these
-# subcommands in place of `gh`/`fgj`, so the PRD→issues→implement→finalize workflow
-# runs without a git host. Issues live in docs/prd/tracker.json.
+# The built-in local issue tracker for repos without a remote. When `forge`
+# resolves the `local` provider (no origin remote), its command snippets call
+# these subcommands in place of `gh`/`fgj`, so the PRD→issues→implement→finalize
+# workflow runs without a git host. Issues live in docs/prd/tracker.json.
 
 
 def _num(value: str) -> int:
@@ -440,7 +440,7 @@ def _num(value: str) -> int:
 
 @cli.group()
 def tracker() -> None:
-    """Local issue tracker for non-git projects (docs/prd/tracker.json).
+    """Local issue tracker for repos without a remote (docs/prd/tracker.json).
 
     Drives the same PRD→issues workflow as gh/fgj when a repo has no recognised
     git host; the `forge` local provider emits these as its command snippets.

@@ -1,6 +1,6 @@
 ---
 name: implement-issue
-description: Phase 2 — implement a slice issue via strict TDD against the test plan from /prd-workflow:analyse-issue. Cuts a slice branch off the PRD's integration branch, runs red→green→refactor, merges the slice back into the PRD branch (no per-slice PR — only the PRD gets one, at finalize), closes the slice issue, then garbage-collects the slice doc and notes the decision on the PRD. The full CI gate is deferred to finalize-prd; each slice only runs its own test. Use after /prd-workflow:analyse-issue, or when the user says "now implement #n". Don't use it before a test plan exists (run analyse-issue first) or to finalize a completed PRD (use finalize-prd). Provider-aware (gh/fgj/local — non-git projects skip branches/PRs and use the built-in tracker).
+description: Phase 2 — implement a slice issue via strict TDD against the test plan from /prd-workflow:analyse-issue. Cuts a slice branch off the PRD's integration branch, runs red→green→refactor, merges the slice back into the PRD branch (no per-slice PR — only the PRD gets one, at finalize), closes the slice issue, then garbage-collects the slice doc and notes the decision on the PRD. The full CI gate is deferred to finalize-prd; each slice only runs its own test. Use after /prd-workflow:analyse-issue, or when the user says "now implement #n". Don't use it before a test plan exists (run analyse-issue first) or to finalize a completed PRD (use finalize-prd). Provider-aware (gh/fgj/local — local projects use the same branch workflow but skip remotes/PRs and use the built-in tracker).
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -9,14 +9,15 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 Phase 2: execute the agreed test plan with full repo automation. Requires the slice doc
 `docs/prd/<slug>/slices/<n>-<slug>.md` (spec + `## Test plan`) written by `/prd-workflow:analyse-issue`.
 
-**Branching model (git projects).** Every slice of a PRD shares one **integration branch**,
+**Branching model.** Every slice of a PRD shares one **integration branch**,
 `prd/<prd-slug>`, branched from `main`. Each slice is built on its own short-lived branch off
 that integration branch and **merged back into it — no per-slice PR**. The PRD branch is the
-only thing that ever becomes a PR into `main`, and that single PR (opened by
+only thing that ever becomes a PR into `main` (on hosted forges) or gets merged into `main`
+locally (on a `local` forge), and that single integration point (opened by
 `/prd-workflow:finalize-prd`) is where the **full CI gate** runs. So a slice never waits on the
 whole-suite gate: it only writes and passes **its own** test, then merges into the PRD branch.
-(On a `local`/non-git project there are no branches or PRs — slices land directly on the
-working tree.)
+(On a `local` forge, the branch workflow is identical — only remote operations like fetch, push,
+and PRs are skipped.)
 
 Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`**.
 Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`, injected at the step that
@@ -47,8 +48,9 @@ comment form:
 
 ## Step 2 — Sync + branch
 
-**Git project** (forge `git_type` is `gh`/`fgj`) — ensure the PRD integration branch exists,
-then cut the slice branch off it:
+Ensure the PRD integration branch exists, then cut the slice branch off it.
+
+**Remote forge** (`gh`/`fgj`) — sync with origin first:
 
 ```bash
 git fetch origin
@@ -58,12 +60,18 @@ git checkout prd/<prd-slug> 2>/dev/null || git checkout -b prd/<prd-slug>
 git checkout -b slice/<n>-<slug>          # the slice branch, off prd/<prd-slug>
 ```
 
+**Local forge** (`local`) — no remote to sync; branch directly:
+
+```bash
+git checkout main
+git checkout prd/<prd-slug> 2>/dev/null || git checkout -b prd/<prd-slug>
+git checkout -b slice/<n>-<slug>
+```
+
 `<prd-slug>` = the PRD's slug (the `docs/prd/<prd-slug>/` dir name). The slice branch slug =
 the issue title, 3–5 words, lowercase, hyphens (matching the `<n>-<slug>.md` slice doc). The
-PRD branch accumulates every slice and is the **only** branch that becomes a PR (at finalize).
-
-**Non-git project** (forge `git_type` is `local`) — there are no branches; you implement
-directly on the working tree. Skip the git commands above and continue to Step 3.
+PRD branch accumulates every slice and is the **only** branch that becomes a PR (hosted forges)
+or merges into `main` locally (local forge) at finalize.
 
 ## Step 3 — Load context
 
@@ -118,9 +126,9 @@ slice's own test can't catch is caught by the deferred gate at finalize.
 
 ## Step 6 — Merge the slice into the PRD branch + state
 
-**Git project** — merge the finished slice branch back into the PRD integration branch (**no
-per-slice PR**; the work reaches `main` later via the single PRD PR that
-`/prd-workflow:finalize-prd` opens):
+Merge the finished slice branch back into the PRD integration branch (**no per-slice PR**; the
+work reaches `main` later via the single PRD PR on hosted forges, or a local merge on a local
+forge, both opened by `/prd-workflow:finalize-prd`):
 
 ```bash
 git checkout prd/<prd-slug>
@@ -132,9 +140,6 @@ The slice's own test went green in Step 5, so the PRD branch stays green for the
 Resolve any merge conflict in favour of keeping both slices working, then re-run the affected
 tests.
 
-**Non-git project (`local`)** — there is no branch or merge; the work is already on the
-working tree.
-
 Then mark the slice issue done and **close it** — it's integrated into the PRD branch, so its
 `blocked_by` edge on the PRD resolves (the PRD issue itself stays open until its PR lands).
 Label-edit (`status:in-progress` → `status:done`) + close forms:
@@ -142,19 +147,19 @@ Label-edit (`status:in-progress` → `status:done`) + close forms:
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_edit_labels`
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_close_issue`
 
-Report that the slice is integrated into `prd/<prd-slug>` (or, for a local project,
-implemented on the working tree) and its issue closed.
+Report that the slice is integrated into `prd/<prd-slug>` and its issue closed.
 
 ## Step 7 — Artifact GC + PRD note
 
 1. Append a 2–4 line decision/deviation note to the PRD's `## Implementation notes` in
    `docs/prd/<slug>/prd.md` (what shipped, any divergence from the spec, follow-ups) — this
    is what `/prd-workflow:finalize-prd` harvests.
-2. **Delete the slice doc** `docs/prd/<slug>/slices/<n>-<slug>.md`. On a git project, commit
-   this (with the PRD note) **onto the PRD branch** `prd/<prd-slug>` — it rides to `main` in the
-   PRD PR. A surviving slice doc now reliably signals unfinished work.
+2. **Delete the slice doc** `docs/prd/<slug>/slices/<n>-<slug>.md`. Commit this (with the PRD
+   note) **onto the PRD branch** `prd/<prd-slug>` — it rides to `main` in the PRD PR (hosted
+   forges) or local merge (local forge). A surviving slice doc now reliably signals unfinished
+   work.
 3. Report whether this was the PRD's last slice — if the gate now passes, point the user at
-   `/prd-workflow:finalize-prd <slug>` (which opens the single PRD PR and runs the full CI gate):
+   `/prd-workflow:finalize-prd <slug>` (which integrates the PRD branch and runs the full CI gate):
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" prd-finalizable <slug>
    ```
@@ -163,10 +168,12 @@ implemented on the working tree) and its issue closed.
 
 - If the slice doc `docs/prd/<slug>/slices/<n>-<slug>.md` or its `## Test plan` is missing, stop —
   run `/prd-workflow:analyse-issue <n>` first; do not improvise a test strategy here.
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `UNKNOWN_FORGE`, the repo has a
-  remote this workflow doesn't recognise (not GitHub/Forgejo) — surface it and stop; don't invent CLI
-  calls. A repo with no remote (or no git at all) instead resolves to the built-in `local` tracker —
-  that's expected, not an error; its snippets drive `prd_tool tracker` against `docs/prd/tracker.json`.
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `NOT_A_GIT_REPO`, the
+  directory isn't a git repo — tell the user to run `git init` first and stop.
+- If it prints `UNKNOWN_FORGE`, the repo has a remote this workflow doesn't recognise (not
+  GitHub/Forgejo) — surface it and stop; don't invent CLI calls. A repo with no remote resolves
+  to the built-in `local` tracker — that's expected, not an error; it uses the same branch
+  workflow (no remotes/PRs) and drives `prd_tool tracker` for issues.
 - If the slice's own test won't go green, fix forward (or report the blocker) — never merge a
   red slice into the PRD branch. (The whole-suite CI gate is finalize-prd's job, not this one.)
 - If merging the slice into `prd/<prd-slug>` conflicts, resolve it so both the new and the

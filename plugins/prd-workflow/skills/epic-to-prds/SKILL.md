@@ -110,10 +110,12 @@ After publishing, report: the epic issue number, and `<slug> · feature|capabili
 
 ## Error handling
 
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `UNKNOWN_FORGE`, the repo has a
-  remote this workflow doesn't recognise (not GitHub/Forgejo) — surface it and stop; don't invent CLI
-  calls. A repo with no remote (or no git at all) instead resolves to the built-in `local` tracker —
-  that's expected, not an error; its snippets drive `prd_tool tracker` against `docs/prd/tracker.json`.
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `NOT_A_GIT_REPO`, the
+  directory isn't a git repo — tell the user to run `git init` first and stop.
+- If it prints `UNKNOWN_FORGE`, the repo has a remote this workflow doesn't recognise (not
+  GitHub/Forgejo) — surface it and stop; don't invent CLI calls. A repo with no remote resolves
+  to the built-in `local` tracker — that's expected, not an error; it uses the same branch
+  workflow (no remotes/PRs) and drives `prd_tool tracker` for issues.
 - If `auth_check` reports unauthenticated, tell the user to authenticate (`gh auth login` /
   `fgj login`) and stop before creating anything.
 - If the injected `references/artifacts.md` is empty/missing, the repo isn't set up for this

@@ -114,7 +114,7 @@ Once confirmed, **append** a `## Test plan` section to
 `<the run command the profile maps to that test type>`
 ```
 
-Commit the slice doc (on a git project; on a non-git project it's just saved in place).
+Commit the slice doc.
 Confirm the path to the developer.
 
 ## Hand-off
@@ -124,10 +124,12 @@ Invoke `/prd-workflow:implement-issue <n>`. The spec + test plan live in
 
 ## Error handling
 
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `UNKNOWN_FORGE`, the repo has a
-  remote this workflow doesn't recognise (not GitHub/Forgejo) — surface it and stop; don't invent CLI
-  calls. A repo with no remote (or no git at all) instead resolves to the built-in `local` tracker —
-  that's expected, not an error; its snippets drive `prd_tool tracker` against `docs/prd/tracker.json`.
+- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `NOT_A_GIT_REPO`, the
+  directory isn't a git repo — tell the user to run `git init` first and stop.
+- If it prints `UNKNOWN_FORGE`, the repo has a remote this workflow doesn't recognise (not
+  GitHub/Forgejo) — surface it and stop; don't invent CLI calls. A repo with no remote resolves
+  to the built-in `local` tracker — that's expected, not an error; it uses the same branch
+  workflow (no remotes/PRs) and drives `prd_tool tracker` for issues.
 - If `cmd_get_issue` fails (auth, wrong number), tell the user to authenticate or recheck `#n`; stop.
 - If the slice doc `docs/prd/<slug>/slices/<n>-<slug>.md` is missing, the issue wasn't produced by
   this workflow — confirm the PRD/slug with the user before appending a test plan.
