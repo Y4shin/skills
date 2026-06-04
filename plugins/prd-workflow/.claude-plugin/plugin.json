@@ -1,7 +1,7 @@
 {
   "name": "prd-workflow",
   "description": "Epic → PRD → issues → TDD implement → finalize workflow. Epic decomposition, feature & capability PRD authoring, adopting legacy PRDs by backfilling frontmatter, vertical-slice issue breakdown with native sub-issues + dependencies (GitHub/Forgejo, or a built-in local tracker for repos without a remote), test-plan grilling, slices integrated on a shared PRD branch with one PR + CI gate per PRD (not per slice) — or local merge on repos without a remote — and knowledge harvest. Project-agnostic via an optional docs/prd/profile.md.",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "author": { "name": "Patric Plattner" },
   "keywords": ["prd", "epic", "workflow", "issues", "tdd", "github", "forgejo", "local"]
 }

@@ -157,8 +157,8 @@ body instead of frontmatter, e.g.:
 **PRD:** ../prd.md · **kind:** feature · **mode:** hitl
 ```
 
-Infer the slice schema (`kind`, `title`, `slug`, `issue`, `prd`, `mode` — see `artifacts.md`) from
-that line, the H1, and the filename:
+Infer the slice schema (`kind`, `title`, `slug`, `issue`, `prd`, `mode`, `analysed` — see
+`artifacts.md`) from that line, the H1, and the filename:
 
 1. **`issue`** — the number in the `# Slice #<n> — …` H1 (and it must equal the `<n>` in the
    `<issue>-<slug>.md` filename).
@@ -169,6 +169,7 @@ that line, the H1, and the filename:
 5. **`prd`** — the relative path to the parent PRD, normally `../prd.md` (from the inline
    `**PRD:**` or the layout).
 6. **`mode`** — from the inline `**mode:**`; default `hitl` if absent.
+7. **`analysed`** — `true` if the body contains a `## Test plan` section; `false` otherwise.
 
 Then write the frontmatter and **de-duplicate the body**: keep the `# Slice #<n> — <title>` H1 and
 the substantive sections (`## What to build`, `## Acceptance criteria`, `## Blocked by`,

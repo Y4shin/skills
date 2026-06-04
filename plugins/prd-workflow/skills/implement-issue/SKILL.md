@@ -166,8 +166,9 @@ Report that the slice is integrated into `prd/<prd-slug>` and its issue closed.
 
 ## Error handling
 
-- If the slice doc `docs/prd/<slug>/slices/<n>-<slug>.md` or its `## Test plan` is missing, stop —
-  run `/prd-workflow:analyse-issue <n>` first; do not improvise a test strategy here.
+- If the slice doc `docs/prd/<slug>/slices/<n>-<slug>.md` is missing, or its frontmatter has
+  `analysed: false` (or no `## Test plan` section), stop — run `/prd-workflow:analyse-issue <n>`
+  first; do not improvise a test strategy here.
 - If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `NOT_A_GIT_REPO`, the
   directory isn't a git repo — tell the user to run `git init` first and stop.
 - If it prints `UNKNOWN_FORGE`, the repo has a remote this workflow doesn't recognise (not

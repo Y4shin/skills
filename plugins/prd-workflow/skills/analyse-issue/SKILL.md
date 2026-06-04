@@ -78,6 +78,9 @@ if a prior answer settles it:
 5. "Do we need a real dependency (real DB, real HTTP, a real browser) here, or can it be
    faked? Is that cost worth it for this slice?"
 6. "Is any part already tested elsewhere? What's the exact gap we're filling?"
+7. *(ad-hoc)* If the slice raises a concern the six questions above didn't cover — an
+   unusual constraint, a subtle interaction, a risk specific to this slice — ask about it.
+   Stay within test strategy; don't expand into design or implementation.
 
 **Test-type vocabulary:** use the test types, file patterns, and run commands from the
 project profile's "Test infrastructure" section — pick the one giving the most confidence per
@@ -93,8 +96,8 @@ unless they test genuinely different things).
 
 ## Step 3 — Persist the test plan to the slice doc
 
-Once confirmed, **append** a `## Test plan` section to
-`docs/prd/<slug>/slices/<n>-<slug>.md`:
+Once confirmed, **set `analysed: true`** in the slice doc's frontmatter and **append** a
+`## Test plan` section to `docs/prd/<slug>/slices/<n>-<slug>.md`:
 
 ```markdown
 ## Test plan

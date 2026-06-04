@@ -83,12 +83,14 @@ slug: <kebab-slug>   # the slice slug; the file is <issue>-<slug>.md
 issue: <#n>          # this slice's own issue number
 prd: ../prd.md       # parent PRD, relative to the slice doc
 mode: hitl           # hitl | afk
+analysed: false      # true once analyse-issue has appended a ## Test plan
 ---
 ```
 
-`(feature|capability)-prd-to-issues` writes this when it creates the slice issue; `analyse-issue`
-and `implement-issue` read it (and `analyse-issue` appends `## Test plan` to the body). The body
-follows the template at the bottom of this file.
+`(feature|capability)-prd-to-issues` writes this when it creates the slice issue (with
+`analysed: false`); `analyse-issue` flips it to `true` and appends `## Test plan` to the body;
+`implement-issue` reads both the field and the plan. The body follows the template at the bottom
+of this file.
 
 ## Tracker shape (flat, native primitives)
 
@@ -140,7 +142,8 @@ Artifacts are **deleted as their work lands**, so the presence of a file is itse
 4. `(feature|capability)-prd-to-issues` → creates the PRD issue + slice issues, adds the native
    dependencies (and, under an epic, the sub-issue parenting), writes one
    `slices/<n>-<slug>.md` per slice, fills `prd_issue:` + `slices:`, status `issues-created`.
-5. `analyse-issue <n>` → appends a `## Test plan` section to that slice's doc.
+5. `analyse-issue <n>` → sets `analysed: true` in frontmatter and appends a `## Test plan`
+   section to that slice's doc.
 6. `implement-issue <n>` → merges the slice into the PRD branch (no per-slice PR), closes the
    slice issue, appends a note to `prd.md` `## Implementation notes`, then **deletes
    `slices/<n>-<slug>.md`**. A surviving slice doc ⇒ unfinished work. Only the slice's own test
@@ -164,6 +167,7 @@ slug: <kebab-slug>   # the slice slug; the file is <issue>-<slug>.md
 issue: <#n>          # this slice's own issue number
 prd: ../prd.md       # parent PRD, relative to the slice doc
 mode: hitl           # hitl | afk
+analysed: false      # true once analyse-issue has appended a ## Test plan
 ---
 
 # Slice #<n> — <title>
