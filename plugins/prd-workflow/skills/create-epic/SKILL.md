@@ -77,7 +77,7 @@ Write to `docs/prd/epics/<slug>/epic.md` (`<slug>` = 3–5 word kebab of the tit
 <!-- filled by epic-to-prds: the ordered child-PRD plan -->
 ```
 
-Leave `epic_issue:` / `prds:` empty — `/prd-workflow:epic-to-prds` fills them. Sanity-check the
+Leave `epic_milestone:` / `prds:` empty — `/prd-workflow:epic-to-prds` fills them. Sanity-check the
 written frontmatter (it must parse and read `kind: epic`):
 
 ```bash

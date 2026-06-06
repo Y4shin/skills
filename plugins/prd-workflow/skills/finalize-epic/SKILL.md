@@ -1,6 +1,6 @@
 ---
 name: finalize-epic
-description: Close the loop on an epic once all its child PRDs are finalized — fold epic-level durable knowledge into the project's permanent docs (design docs, milestone/changelog), close the epic tracking issue, then delete the spent epic dir. Use when every child PRD of an epic is done, or the user says "finalize"/"wrap up" an epic. Don't use it while any child PRD is unfinished (finish finalize-prd first). Provider-aware (gh/fgj/local).
+description: Close the loop on an epic once all its child PRDs are finalized — fold epic-level durable knowledge into the project's permanent docs (design docs, changelog), close the epic milestone (an epic is a milestone, not an issue), then delete the spent epic dir. Use when every child PRD of an epic is done, or the user says "finalize"/"wrap up" an epic. Don't use it while any child PRD is unfinished (finish finalize-prd first). Provider-aware (gh/fgj/local).
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -10,7 +10,7 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 The tier above `/prd-workflow:finalize-prd`: once **every** child PRD of an epic has been
 finalized, migrate the epic-level durable knowledge into the repo's permanent docs and retire
-the epic. Invoked as `/prd-workflow:finalize-epic <slug | epic-issue#>`.
+the epic. Invoked as `/prd-workflow:finalize-epic <slug | epic-milestone#>`.
 
 Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`**.
 Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`. The
@@ -32,10 +32,10 @@ find the project's permanent docs (design docs, decision log, changelog) and fol
 
 ## Step 1 — Preconditions (hard gate)
 
-Resolve the epic (accepts the slug **or** the `epic_issue:` number) and gate on its children:
+Resolve the epic (accepts the slug **or** the `epic_milestone:` number) and gate on its children:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" resolve <slug|epic-issue#> --kind epic
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" resolve <slug|epic-milestone#> --kind epic
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" epic prds <slug>          # per-child issue/done state
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" epic finalizable <slug>   # the gate
 ```
@@ -43,7 +43,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" epic finalizable <slug>   #
 `epic finalizable` exits **0** only when **every** child in `prds:` is ticked done (each
 `/prd-workflow:finalize-prd` ticks its entry); a non-zero exit names the unfinished children.
 Cross-check that each child's `docs/prd/<child-slug>/` directory is **gone** and each child PRD
-issue is **closed** (the epic issue's sub-issue progress reads complete).
+issue is **closed** (the epic milestone shows all its issues closed).
 
 If any child is outstanding, list it and **stop** — finalize the remaining child PRDs first
 (`/prd-workflow:finalize-prd <child-slug>`). Never finalize a partial epic.
@@ -72,15 +72,14 @@ cross-cutting* knowledge only — not what already lives in the child PRDs' fina
 
 ## Step 4 — Close out + delete
 
-- Close the **epic issue** with a comment linking the doc updates (commit SHA / PR).
-  Close form for the detected provider:
+- Close the **epic milestone** (`epic_milestone:`). Close form for the detected provider:
 
-  !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_close_issue`
+  !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_close_milestone`
 
 - **Confirm with the user**, then delete the entire `docs/prd/epics/<epic-slug>/` and commit
   alongside the doc updates.
 
-Report: docs touched, epic issue closed, epic dir removed.
+Report: docs touched, epic milestone closed, epic dir removed.
 
 ## Error handling
 

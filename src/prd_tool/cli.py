@@ -463,12 +463,13 @@ def tracker_ensure_labels(root: Path) -> None:
 @click.option("--body-file", type=click.Path(dir_okay=False, path_type=Path), default=None,
               help="Read the body from this file (mirrors gh --body-file).")
 @click.option("--label", "labels", multiple=True, help="Label to add (repeatable).")
+@click.option("--milestone", default=None, help="Milestone title (the epic; created if absent).")
 @pass_root
-def tracker_create(root: Path, title, body, body_file, labels) -> None:
+def tracker_create(root: Path, title, body, body_file, labels, milestone) -> None:
     """Create an issue; prints the new #number (which the skill records)."""
     if body_file is not None:
         body = body_file.read_text(encoding="utf-8")
-    number = tracker_mod.create(root, title, body or "", labels)
+    number = tracker_mod.create(root, title, body or "", labels, milestone=milestone)
     click.echo(f"#{number}")
 
 
@@ -495,8 +496,8 @@ def tracker_view(root: Path, number: str, as_json) -> None:
     click.echo(f"labels: {', '.join(issue['labels']) or '-'}")
     if issue["blocked_by"]:
         click.echo("blocked_by: " + ", ".join(f"#{b}" for b in issue["blocked_by"]))
-    if issue.get("parent"):
-        click.echo(f"parent: #{issue['parent']}")
+    if issue.get("milestone"):
+        click.echo(f"milestone: #{issue['milestone']}")
     click.echo("")
     click.echo(issue["body"])
     for c in issue["comments"]:
@@ -565,24 +566,52 @@ def tracker_dep(root: Path, number: str, blocker: str) -> None:
     click.echo(f"#{_num(number)}: blocked_by #{_num(blocker)}")
 
 
-@tracker.command(name="attach")
-@click.argument("epic")
-@click.argument("child")
+@tracker.command(name="set-milestone")
+@click.argument("number")
+@click.argument("title")
 @pass_root
-def tracker_attach(root: Path, epic: str, child: str) -> None:
-    """Attach CHILD as a sub-issue of epic EPIC (the only parent relationship)."""
-    tracker_mod.attach(root, _num(epic), _num(child))
-    click.echo(f"#{_num(child)}: parent = #{_num(epic)}")
+def tracker_set_milestone(root: Path, number: str, title: str) -> None:
+    """Assign issue NUMBER to the milestone TITLE (the epic; created if absent)."""
+    ms = tracker_mod.set_milestone(root, _num(number), title)
+    click.echo(f"#{_num(number)}: milestone = #{ms} ({title})")
 
 
-@tracker.command(name="detach")
-@click.argument("epic")
-@click.argument("child")
+@tracker.group(name="milestone")
+def tracker_milestone() -> None:
+    """Local-tracker milestones — an epic is a milestone."""
+
+
+@tracker_milestone.command(name="create")
+@click.argument("title")
 @pass_root
-def tracker_detach(root: Path, epic: str, child: str) -> None:
-    """Detach CHILD from epic EPIC."""
-    tracker_mod.detach(root, _num(epic), _num(child))
-    click.echo(f"#{_num(child)}: detached from #{_num(epic)}")
+def tracker_milestone_create(root: Path, title: str) -> None:
+    """Create the epic milestone (idempotent); prints its number."""
+    click.echo(tracker_mod.create_milestone(root, title))
+
+
+@tracker_milestone.command(name="close")
+@click.argument("number")
+@pass_root
+def tracker_milestone_close(root: Path, number: str) -> None:
+    """Close the milestone NUMBER."""
+    tracker_mod.close_milestone(root, _num(number))
+    click.echo(f"milestone #{_num(number)}: closed")
+
+
+@tracker_milestone.command(name="list")
+@click.option("--json", "as_json", is_flag=True)
+@pass_root
+def tracker_milestone_list(root: Path, as_json) -> None:
+    """List milestones."""
+    ms = tracker_mod.list_milestones(root)
+    if as_json:
+        click.echo(json.dumps(ms, indent=2))
+        return
+    if not ms:
+        click.echo("(no milestones)")
+        return
+    for m in ms:
+        click.echo(f"#{m['number']:<5} {m['state']:<7} {m['title']}")
 
 
 # ----------------------------------------------------------------- workflow versioning
@@ -772,22 +801,46 @@ def forgejo_dep(number: str, blocker: str) -> None:
     click.echo(f"#{_num(number)}: blocked_by #{_num(blocker)}")
 
 
-@forgejo.command(name="attach")
-@click.argument("epic")
-@click.argument("child")
-def forgejo_attach(epic: str, child: str) -> None:
-    """Attach CHILD under epic EPIC (body task-list convention — no REST sub-issue API)."""
-    forgejo_api.Client.from_repo().attach_subissue(_num(epic), _num(child))
-    click.echo(f"#{_num(child)}: part of #{_num(epic)}")
+@forgejo.command(name="set-milestone")
+@click.argument("number")
+@click.argument("title")
+def forgejo_set_milestone(number: str, title: str) -> None:
+    """Assign issue NUMBER to milestone TITLE (the epic; created if absent)."""
+    mid = forgejo_api.Client.from_repo().set_milestone(_num(number), title)
+    click.echo(f"#{_num(number)}: milestone = {title} (id {mid})")
 
 
-@forgejo.command(name="detach")
-@click.argument("epic")
-@click.argument("child")
-def forgejo_detach(epic: str, child: str) -> None:
-    """Detach CHILD from epic EPIC (removes the convention markers)."""
-    forgejo_api.Client.from_repo().detach_subissue(_num(epic), _num(child))
-    click.echo(f"#{_num(child)}: detached from #{_num(epic)}")
+@forgejo.group(name="milestone")
+def forgejo_milestone() -> None:
+    """Forgejo milestones — an epic is a milestone."""
+
+
+@forgejo_milestone.command(name="create")
+@click.argument("title")
+def forgejo_milestone_create(title: str) -> None:
+    """Create the epic milestone (idempotent by title); prints its id."""
+    click.echo(forgejo_api.Client.from_repo().ensure_milestone(title))
+
+
+@forgejo_milestone.command(name="close")
+@click.argument("mid")
+def forgejo_milestone_close(mid: str) -> None:
+    """Close the milestone with id MID."""
+    forgejo_api.Client.from_repo().close_milestone(_num(mid))
+    click.echo(f"milestone {_num(mid)}: closed")
+
+
+@forgejo_milestone.command(name="list")
+@click.option("--json", "as_json", is_flag=True)
+def forgejo_milestone_list(as_json) -> None:
+    """List milestones (title → id)."""
+    ms = forgejo_api.Client.from_repo().list_milestones()
+    if as_json:
+        click.echo(json.dumps([{"id": m["id"], "title": m["title"],
+                                "state": m.get("state")} for m in ms], indent=2))
+        return
+    for m in ms:
+        click.echo(f"{m['id']}\t{m.get('state', ''):<7} {m['title']}")
 
 
 @forgejo.command(name="create-pr")

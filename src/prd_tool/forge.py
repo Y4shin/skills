@@ -3,12 +3,16 @@ command snippet for a requested key.
 
 Three providers are supported:
 
+An **epic is a milestone** (not an issue): a child PRD issue joins its epic by being
+assigned that milestone, and slices block their PRD issue via native dependencies.
+There are no epic issues and no sub-issues.
+
 * ``gh``    — GitHub (``origin`` points at github.com). Uses the ``gh`` CLI.
 * ``fgj``   — Forgejo / Codeberg / Gitea. **All operations route through the
   bundled native REST client** (``prd_tool forgejo ...`` → ``forgejo_api.py``),
   not the ``fgj`` CLI; the only ``fgj`` touch is fetching the auth token, done
   inside the client. This sidesteps the CLI's gaps (no ``api`` passthrough, no
-  ``--milestone``) and unlocks native milestones.
+  ``--milestone``) and gives native milestones for epics.
 * ``local`` — **no recognised git host**: the repo is a local git repo with no
   ``origin`` remote (or an empty one). The snippets drive the built-in local
   issue tracker (``prd_tool tracker ...`` → ``docs/prd/tracker.json``) and
@@ -41,13 +45,13 @@ KEY_GROUPS = (
     ("git_type", "owner", "repo", "auth_check"),
     ("cmd_get_issue", "cmd_create_issue", "cmd_list_issues", "cmd_comment", "cmd_close_issue"),
     ("cmd_edit_labels", "cmd_create_pr", "ensure_labels"),
-    ("cmd_attach_subissue", "cmd_detach_subissue", "cmd_add_dependency", "ownership_note"),
+    ("cmd_create_milestone", "cmd_close_milestone", "cmd_add_dependency", "ownership_note"),
 )
 KEYS = frozenset(k for group in KEY_GROUPS for k in group)
 
 # Tracker labels provisioned idempotently by `ensure_labels` (name, hex colour).
+# An epic is a *milestone*, not an issue, so there is no `epic` label.
 LABELS = (
-    ("epic", "b60205"),
     ("kind:feature", "1d76db"), ("kind:capability", "0e8a16"), ("prd", "5319e7"),
     ("mode:hitl", "fbca04"), ("mode:afk", "c2e0c6"),
     ("status:todo", "ededed"), ("status:in-progress", "0052cc"),
@@ -141,29 +145,22 @@ def _ensure_labels(f: Forge) -> str:
     )
 
 
-def _attach_subissue(f: Forge) -> str:
-    # The ONLY relationship that uses sub-issue parenting: epic -> {child PRD, child slice}.
-    # Everything else (PRD<-slice, slice<-slice, PRD<-PRD) is a dependency — see cmd_add_dependency.
+def _create_milestone(f: Forge) -> str:
+    # An epic IS a milestone. Create it from the epic's title; record the number
+    # it prints as `epic_milestone:`. Child PRD issues join it via cmd_create_issue's
+    # --milestone "<epic-title>".
     if f.provider == "gh":
-        return "\n".join((
-            "# GitHub native sub-issue. child id != issue number — resolve it first.",
-            f'child_id=$(gh api "repos/{f.owner}/{f.repo}/issues/<child#>" --jq .id)',
-            f'gh api --method POST "repos/{f.owner}/{f.repo}/issues/<epic#>/sub_issues" -F sub_issue_id="$child_id"',
-        ))
-    # Forgejo's REST API has NO sub-issue/parent endpoint (verified against the live
-    # spec), so the helper realises epic->child via the task-list convention (a
-    # "- [ ] #<child>" line in the epic + a "Part of #<epic>" line in the child).
-    return f"{PRD_TOOL} forgejo attach <epic#> <child#>"
+        return (
+            f'gh api --method POST "repos/{f.owner}/{f.repo}/milestones" '
+            '-f title="<epic-title>" --jq .number   # prints the milestone number to record'
+        )
+    return f'{PRD_TOOL} forgejo milestone create "<epic-title>"   # prints the milestone number to record'
 
 
-def _detach_subissue(f: Forge) -> str:
+def _close_milestone(f: Forge) -> str:
     if f.provider == "gh":
-        return "\n".join((
-            "# GitHub: detach <child#> from <epic#>. Uses the child's internal id.",
-            f'child_id=$(gh api "repos/{f.owner}/{f.repo}/issues/<child#>" --jq .id)',
-            f'gh api --method DELETE "repos/{f.owner}/{f.repo}/issues/<epic#>/sub_issue" -F sub_issue_id="$child_id"',
-        ))
-    return f"{PRD_TOOL} forgejo detach <epic#> <child#>"
+        return f'gh api --method PATCH "repos/{f.owner}/{f.repo}/milestones/<ms#>" -f state=closed'
+    return f"{PRD_TOOL} forgejo milestone close <ms#>"
 
 
 def _add_dependency(f: Forge) -> str:
@@ -189,8 +186,8 @@ def _local_snippet(key: str) -> str:
         "auth_check": "# local tracker (docs/prd/tracker.json) — no host auth needed",
         "cmd_get_issue": f"{t} tracker view <n> --json",
         "cmd_create_issue": (
-            f'{t} tracker create --title "<t>" --body-file <f> --label <l>'
-            "   # prints the new #number to record"
+            f'{t} tracker create --title "<t>" --body-file <f> --label <l> --milestone "<M>"'
+            "   # --milestone (the epic) optional; prints the new #number to record"
         ),
         "cmd_list_issues": f"{t} tracker list --label <l> --json",
         "cmd_comment": f'{t} tracker comment <n> --body "<text>"',
@@ -203,14 +200,14 @@ def _local_snippet(key: str) -> str:
             "git branch -d prd/<prd-slug>"
         ),
         "ensure_labels": f"{t} tracker ensure-labels   # labels are freeform; just initialises the store",
-        "cmd_attach_subissue": f"{t} tracker attach <epic#> <child#>",
-        "cmd_detach_subissue": f"{t} tracker detach <epic#> <child#>",
+        "cmd_create_milestone": f'{t} tracker milestone create "<epic-title>"   # prints the milestone number to record',
+        "cmd_close_milestone": f"{t} tracker milestone close <ms#>",
         "cmd_add_dependency": f"{t} tracker dep <issue#> --blocked-by <blocker#>",
         "ownership_note": (
-            "Local tracker (docs/prd/tracker.json): epic→child via parent links (tracker attach); "
-            "PRD<-slice / slice<-slice / PRD<-PRD ordering via native blocked_by edges (tracker dep). "
-            "Same branch workflow (prd/<slug>, slice/<n>-<slug>), no remote — PRD branch merges into "
-            "main locally at finalize."
+            "Local tracker (docs/prd/tracker.json): an epic is a milestone (tracker milestone); a PRD "
+            "issue joins it via `tracker create --milestone`; slices block the PRD via blocked_by edges "
+            "(tracker dep). Same branch workflow (prd/<slug>, slice/<n>-<slug>), no remote — PRD branch "
+            "merges into main locally at finalize."
         ),
     }
     return table[key]
@@ -253,19 +250,21 @@ def _snippet(f: Forge, key: str) -> str:
         )
     if key == "ensure_labels":
         return _ensure_labels(f)
-    if key == "cmd_attach_subissue":
-        return _attach_subissue(f)
-    if key == "cmd_detach_subissue":
-        return _detach_subissue(f)
+    if key == "cmd_create_milestone":
+        return _create_milestone(f)
+    if key == "cmd_close_milestone":
+        return _close_milestone(f)
     if key == "cmd_add_dependency":
         return _add_dependency(f)
     if key == "ownership_note":
         return p(
-            "GitHub: epics own children via native sub-issues; PRD<-slice / slice<-slice / PRD<-PRD "
-            "order via native issue dependencies (gh api).",
-            "Forgejo: epic->child via a body task-list convention (no REST sub-issue endpoint); "
-            "PRD<-slice / slice<-slice / PRD<-PRD order via native issue dependencies; milestones are "
-            "native. All Forgejo ops go through `prd_tool forgejo` (REST API) — the fgj CLI isn't used.",
+            "GitHub: an epic is a milestone; each child PRD issue joins it via "
+            "`gh issue create --milestone`; slices block their PRD issue via native dependencies "
+            "(gh api). No epic issue, no sub-issues.",
+            "Forgejo: an epic is a native milestone; each child PRD issue joins it via "
+            "`forgejo create --milestone`; slices block their PRD issue via native dependencies. "
+            "No epic issue, no sub-issues. All ops go through `prd_tool forgejo` (REST API) — the "
+            "fgj CLI isn't used.",
         )
     raise KeyError(key)
 

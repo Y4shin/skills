@@ -3,7 +3,7 @@
 When a git repo has no recognised git host — no ``origin`` remote — the
 prd-workflow ``forge`` selects the ``local`` provider, whose command snippets
 drive this tracker instead of ``gh``/``fgj``. Issues, their labels,
-dependencies, and epic parent-links live in a single JSON ledger in the
+dependencies, and epic milestones live in a single JSON ledger in the
 consuming repo at ``docs/prd/tracker.json``. The branch workflow
 (``prd/<slug>``, ``slice/<n>-<slug>``) works identically to hosted forges —
 only remote operations (fetch, push, PRs) are skipped; the PRD branch merges
@@ -12,8 +12,9 @@ into ``main`` locally at finalize.
 The shape deliberately mirrors what the skills already read from ``gh``/``fgj``:
 issues carry a ``number``, ``title``, ``body``, ``labels``, ``state``
 (``open``/``closed``), free-text ``comments``, native ``blocked_by`` dependency
-edges, and an optional ``parent`` (the epic that owns it — the sole sub-issue
-relationship, matching the git-host model).
+edges, and an optional ``milestone`` number (the epic it belongs to). Milestones
+live in a parallel ``milestones`` list — an **epic is a milestone**, matching the
+git-host model; there are no epic issues or sub-issues.
 """
 
 from __future__ import annotations
@@ -33,10 +34,12 @@ def store_path(root: Path) -> Path:
 def _load(root: Path) -> dict:
     p = store_path(root)
     if not p.is_file():
-        return {"next": 1, "issues": []}
+        return {"next": 1, "issues": [], "next_milestone": 1, "milestones": []}
     data = json.loads(p.read_text(encoding="utf-8"))
     data.setdefault("next", 1)
     data.setdefault("issues", [])
+    data.setdefault("next_milestone", 1)
+    data.setdefault("milestones", [])
     return data
 
 
@@ -59,10 +62,11 @@ def ensure(root: Path) -> Path:
     return store_path(root)
 
 
-def create(root: Path, title: str, body: str, labels) -> int:
+def create(root: Path, title: str, body: str, labels, milestone: str | None = None) -> int:
     data = _load(root)
     number = int(data["next"])
     data["next"] = number + 1
+    ms_number = _ensure_milestone(data, milestone) if milestone else None
     data["issues"].append(
         {
             "number": number,
@@ -72,7 +76,7 @@ def create(root: Path, title: str, body: str, labels) -> int:
             "state": "open",
             "comments": [],
             "blocked_by": [],
-            "parent": None,
+            "milestone": ms_number,
         }
     )
     _save(root, data)
@@ -131,17 +135,47 @@ def add_dependency(root: Path, number: int, blocker: int) -> None:
     _save(root, data)
 
 
-def attach(root: Path, parent: int, child: int) -> None:
-    """Make *child* a sub-issue of epic *parent* (the only parent relationship)."""
+def _find_milestone(data: dict, number: int) -> dict:
+    for m in data["milestones"]:
+        if m["number"] == number:
+            return m
+    raise TrackerError(f"no milestone #{number} in the local tracker (docs/prd/tracker.json)")
+
+
+def _ensure_milestone(data: dict, title: str) -> int:
+    """Return the number of the milestone titled *title*, creating it if absent."""
+    for m in data["milestones"]:
+        if m["title"] == title:
+            return m["number"]
+    number = int(data["next_milestone"])
+    data["next_milestone"] = number + 1
+    data["milestones"].append({"number": number, "title": title, "state": "open"})
+    return number
+
+
+def create_milestone(root: Path, title: str) -> int:
+    """Create the epic milestone (idempotent by title); returns its number."""
     data = _load(root)
-    _find(data, parent)
-    _find(data, child)["parent"] = parent
+    number = _ensure_milestone(data, title)
+    _save(root, data)
+    return number
+
+
+def close_milestone(root: Path, number: int) -> None:
+    data = _load(root)
+    _find_milestone(data, number)["state"] = "closed"
     _save(root, data)
 
 
-def detach(root: Path, parent: int, child: int) -> None:
+def list_milestones(root: Path) -> list[dict]:
+    return _load(root)["milestones"]
+
+
+def set_milestone(root: Path, number: int, title: str) -> int:
+    """Assign issue *number* to the milestone titled *title* (created if absent)."""
     data = _load(root)
-    issue = _find(data, child)
-    if issue.get("parent") == parent:
-        issue["parent"] = None
+    issue = _find(data, number)
+    ms_number = _ensure_milestone(data, title)
+    issue["milestone"] = ms_number
     _save(root, data)
+    return ms_number

@@ -106,37 +106,35 @@ def test_add_dependency_body_shape():
     assert dep["body"] == {"index": 3, "owner": "o", "repo": "r"}
 
 
-def test_attach_subissue_edits_both_bodies():
-    bodies = {1: "Epic intro", 2: "Child intro"}
-
+def test_ensure_milestone_returns_existing_without_post():
     def router(method, path, body, query):
-        if method == "GET" and path == "/repos/o/r/issues/1":
-            return {"body": bodies[1]}
-        if method == "GET" and path == "/repos/o/r/issues/2":
-            return {"body": bodies[2]}
-        if method == "PATCH":
-            return None
+        if method == "GET" and path.endswith("/milestones"):
+            return [{"title": "Auth epic", "id": 7}]
         raise AssertionError(f"unexpected {method} {path}")
 
     c, calls = _client_with_router(router)
-    c.attach_subissue(1, 2)
-    epic_patch = next(x for x in calls if x["method"] == "PATCH" and x["path"] == "/repos/o/r/issues/1")
-    child_patch = next(x for x in calls if x["method"] == "PATCH" and x["path"] == "/repos/o/r/issues/2")
-    assert "- [ ] #2" in epic_patch["body"]["body"]
-    assert "Part of #1" in child_patch["body"]["body"]
+    assert c.ensure_milestone("Auth epic") == 7
+    assert not any(x["method"] == "POST" for x in calls)
 
 
-def test_attach_subissue_idempotent():
+def test_close_milestone_patches_state():
+    c, calls = _client_with_router(lambda *a: None)
+    c.close_milestone(7)
+    patch = calls[-1]
+    assert patch["method"] == "PATCH" and patch["path"] == "/repos/o/r/milestones/7"
+    assert patch["body"] == {"state": "closed"}
+
+
+def test_set_milestone_resolves_then_assigns():
     def router(method, path, body, query):
-        if path == "/repos/o/r/issues/1":
-            return {"body": "Epic\n- [ ] #2\n"}
-        if path == "/repos/o/r/issues/2":
-            return {"body": "Part of #1\n\nChild"}
-        raise AssertionError(f"unexpected {method} {path}")
+        if method == "GET" and path.endswith("/milestones"):
+            return [{"title": "Auth epic", "id": 7}]
+        return None
 
     c, calls = _client_with_router(router)
-    c.attach_subissue(1, 2)
-    assert not any(x["method"] == "PATCH" for x in calls)
+    assert c.set_milestone(42, "Auth epic") == 7
+    patch = next(x for x in calls if x["method"] == "PATCH" and x["path"] == "/repos/o/r/issues/42")
+    assert patch["body"] == {"milestone": 7}
 
 
 def test_token_env_fallback(monkeypatch):

@@ -104,19 +104,20 @@ def test_migrate_without_file_assumes_v0(tmp_path):
     assert f"workflow-version set {workflow.CURRENT_VERSION}" in out
 
 
-def test_migrate_v0_to_v1_fgj_has_milestone_steps(tmp_path):
+def test_migrate_v0_to_v1_fgj_converts_epics_to_milestones(tmp_path):
     _prd(tmp_path)
     workflow.write_version(tmp_path, 0)
     out = workflow.migrate_instructions(tmp_path, "fgj")
     assert "milestone" in out.lower()
-    assert "forgejo edit" in out
+    assert "forgejo set-milestone" in out
+    assert "epic_milestone" in out
     assert f"workflow-version set {workflow.CURRENT_VERSION}" in out
 
 
-def test_migrate_v0_to_v1_local_is_structural_noop(tmp_path):
+def test_migrate_v0_to_v1_local_uses_tracker_commands(tmp_path):
     _prd(tmp_path)
     workflow.write_version(tmp_path, 0)
     out = workflow.migrate_instructions(tmp_path, "local")
-    assert "no-op" in out.lower()
-    # still records the new version
+    assert "tracker milestone create" in out
+    assert "tracker set-milestone" in out
     assert f"workflow-version set {workflow.CURRENT_VERSION}" in out

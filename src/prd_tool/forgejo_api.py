@@ -178,12 +178,22 @@ class Client:
         return None
 
     def ensure_milestone(self, title: str) -> int:
-        """Resolve a milestone title to its id, creating it if absent."""
+        """Resolve a milestone title to its id, creating it if absent.
+
+        A milestone is how an **epic** is represented; child PRD issues join it.
+        """
         mid = self.find_milestone(title)
         if mid is not None:
             return mid
         row = self._request("POST", self._repo_path("/milestones"), body={"title": title})
         return row["id"]
+
+    def close_milestone(self, mid: int) -> None:
+        self._request("PATCH", self._repo_path(f"/milestones/{mid}"), body={"state": "closed"})
+
+    def list_milestones(self) -> list:
+        return self._request("GET", self._repo_path("/milestones"),
+                             query={"state": "all", "limit": 100}) or []
 
     # ---------------------------------------------------------------- issues
 
@@ -226,44 +236,17 @@ class Client:
             if name in table:
                 self._request("DELETE", self._repo_path(f"/issues/{index}/labels/{table[name]}"))
 
-    def _set_body(self, index: int, body: str) -> None:
-        self._request("PATCH", self._repo_path(f"/issues/{index}"), body={"body": body})
-
     # ---------------------------------------------------------------- relationships
 
     def add_dependency(self, index: int, blocker: int) -> None:
-        """Make issue *index* blocked-by *blocker* (native dependency)."""
+        """Make issue *index* blocked-by *blocker* (native dependency).
+
+        This is the only relationship primitive: slices block their PRD issue, and
+        PRDs can be ordered within an epic. Epic membership is the milestone, not a
+        dependency.
+        """
         self._request("POST", self._repo_path(f"/issues/{index}/dependencies"),
                      body={"index": blocker, "owner": self.owner, "repo": self.repo})
-
-    # The REST API has no sub-issue/parent endpoint, so epic→child parenting is a
-    # body convention: a checklist entry in the epic + a back-reference in the child.
-
-    def attach_subissue(self, epic: int, child: int) -> None:
-        item = f"- [ ] #{child}"
-        epic_issue = self.get_issue(epic)
-        body = epic_issue.get("body") or ""
-        if re.search(rf"^- \[[ x]\] #{child}\b", body, re.MULTILINE) is None:
-            body = (body.rstrip() + f"\n{item}\n") if body.strip() else f"{item}\n"
-            self._set_body(epic, body)
-        ref = f"Part of #{epic}"
-        child_issue = self.get_issue(child)
-        cbody = child_issue.get("body") or ""
-        if ref not in cbody:
-            cbody = f"{ref}\n\n{cbody}" if cbody.strip() else f"{ref}\n"
-            self._set_body(child, cbody)
-
-    def detach_subissue(self, epic: int, child: int) -> None:
-        epic_issue = self.get_issue(epic)
-        body = epic_issue.get("body") or ""
-        new = re.sub(rf"^- \[[ x]\] #{child}\b.*\n?", "", body, flags=re.MULTILINE)
-        if new != body:
-            self._set_body(epic, new)
-        child_issue = self.get_issue(child)
-        cbody = child_issue.get("body") or ""
-        cnew = re.sub(rf"^Part of #{epic}\b.*\n?\n?", "", cbody, flags=re.MULTILINE)
-        if cnew != cbody:
-            self._set_body(child, cnew)
 
     # ---------------------------------------------------------------- pulls
 

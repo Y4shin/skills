@@ -145,7 +145,7 @@ can correct it before slicing.
 If the source doc is actually an **epic** (it coordinates several PRDs rather than describing one
 feature/capability), infer `kind: epic` and the epic schema from `artifacts.md`, file it at
 `docs/prd/epics/<slug>/epic.md`, and hand off to `/prd-workflow:epic-to-prds`. Leave
-`epic_issue:` / `prds:` for that step unless the prose already enumerates them.
+`epic_milestone:` / `prds:` for that step unless the prose already enumerates them.
 
 ## Adopting a slice doc
 

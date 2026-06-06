@@ -1,6 +1,6 @@
 ---
 name: feature-prd-to-issues
-description: Break a feature PRD (kind:feature) into independently-grabbable issues as tracer-bullet vertical slices, wire the PRD issue + slices with native dependencies (and sub-issues under an epic), and write committed slice docs. Use after /prd-workflow:create-feature-prd, or when converting a feature spec into work issues. Don't use it on a capability PRD (use capability-prd-to-issues) or to author the PRD itself (use create-feature-prd). Provider-aware (gh/fgj/local).
+description: Break a feature PRD (kind:feature) into independently-grabbable issues as tracer-bullet vertical slices, wire the PRD issue + slices with native dependencies (and assign the PRD issue to the epic's milestone when under an epic), and write committed slice docs. Use after /prd-workflow:create-feature-prd, or when converting a feature spec into work issues. Don't use it on a capability PRD (use capability-prd-to-issues) or to author the PRD itself (use create-feature-prd). Provider-aware (gh/fgj/local).
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -11,7 +11,7 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 Convert a `kind: feature` PRD into a set of independently-grabbable issues using
 **tracer-bullet vertical slices**, wired with the flat native tracker model (see the injected
 reference): the PRD issue is `blocked_by` its slices; if the PRD belongs to an epic, the PRD
-and every slice attach as native sub-issues of that epic.
+issue is assigned that epic's milestone.
 
 Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`** — !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge ownership_note`
 
@@ -81,11 +81,12 @@ merge/split any? HITL vs AFK correct? Iterate until approved.
 
 ## Step 4 — Publish (flat native model)
 
-Read the injected reference for the tracker rule: **sub-issue = epic-only; dependencies =
-everything else.** Check `prd.md` frontmatter for an `epic:` field — present ⇒ this PRD belongs
-to an epic; absent ⇒ standalone.
+Read the injected reference for the tracker rule: **an epic is a milestone (a PRD issue joins it
+via `--milestone`); native dependencies express all ordering.** Check `prd.md` frontmatter for an
+`epic:` field — present ⇒ this PRD belongs to an epic; absent ⇒ standalone (no milestone).
 
-Create-issue form for the detected provider:
+Create-issue form for the detected provider (its `--milestone` takes the **epic's title** when
+this PRD belongs to an epic; omit it when standalone):
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_create_issue`
 
@@ -93,33 +94,26 @@ Add a native dependency (make `<issue#>` blocked-by `<blocker#>`):
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_add_dependency`
 
-Attach a child as a sub-issue of the **epic** (only used when `epic:` is set):
-
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_attach_subissue`
-
-1. **Create the PRD issue** (labels `prd`, `kind:feature`): body = PRD summary. It is a regular
-   issue — it does **not** own the slices as sub-issues. Record its number as `prd_issue:`:
+1. **Create the PRD issue** (labels `prd`, `kind:feature`): body = PRD summary. If `epic:` is set
+   (`prd_tool.pyz get <slug> epic`), pass `--milestone "<epic-title>"` — the epic's `title:` from
+   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" get <epic-slug> title` — so the PRD issue
+   joins the epic milestone. Record its number as `prd_issue:`:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" set <slug> prd_issue <prd#>
    ```
-2. For each slice, in dependency order:
-   - Create the issue with labels `kind:feature`, `mode:hitl|afk`, `status:todo`, and — if the
-     PRD has a `milestone:` — set it via the create command's `--milestone M<NN>` (a native
-     milestone on gh/fgj; the local tracker has no milestones, so it's omitted there). Body uses
-     the template below (`Part of #<prd>` + blockers).
+2. For each slice, in dependency order (slices carry **no** milestone):
+   - Create the issue with labels `kind:feature`, `mode:hitl|afk`, `status:todo`. Body uses the
+     template below (`Part of #<prd>` + blockers).
    - Add **PRD `blocked_by` this slice** (the PRD can't close until its slices land).
    - For each blocker in the slice's `## Blocked by`, add **slice `blocked_by` blocker**.
    - Write `docs/prd/<slug>/slices/<n>-<slug>.md` from the template in `references/artifacts.md`.
-3. **If `epic:` is set** (`prd_tool.pyz get <slug> epic`)**:** attach the PRD issue **and every
-   slice issue** as native sub-issues of the epic (`epic_issue:` from
-   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" get <epic-slug> epic_issue`). Add any
-   **PRD `blocked_by` PRD** edges the epic's `prds[].blocked_by` calls for. Then record the link
+3. **If `epic:` is set:** add any **PRD `blocked_by` PRD** edges the epic's `prds[].blocked_by`
+   calls for (the PRD issue already carries the epic milestone from step 1). Then record the link
    on the epic and set its status:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" epic set-prd-issue <epic-slug> <slug> <prd#>
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" set <epic-slug> status in-progress
    ```
-   (also tick its checklist item on the epic issue).
 4. Record the slices + status on the PRD, then commit the `docs/prd/` changes (PRD dir, and the
    epic dir if touched):
    ```bash
@@ -144,7 +138,7 @@ machine, schema, type shape).
 </issue-template>
 
 After publishing, report: `#<n> · <title> · HITL|AFK · blocked-by: …` per slice, the PRD issue
-number, and (if under an epic) the epic issue number with its updated checklist.
+number, and (if under an epic) the epic milestone it was assigned to.
 
 ## Error handling
 
@@ -163,6 +157,6 @@ number, and (if under an epic) the epic issue number with its updated checklist.
 
 - **kind:feature only** — abort on a capability PRD.
 - **English**; **no speculative scope** — surface gaps as questions, don't invent slices.
-- **Tracker rule:** sub-issue parenting is epic-only; PRD↔slice and all ordering are native
-  dependencies. The PRD issue never owns slices as sub-issues.
+- **Tracker rule:** an epic is a milestone (the PRD issue joins it via `--milestone`); PRD↔slice
+  and all ordering are native dependencies. There are no epic issues or sub-issues.
 - Do not modify unrelated issues.

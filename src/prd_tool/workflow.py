@@ -140,22 +140,33 @@ class Migration:
 
 
 def _migration_0_to_1(provider: str) -> str:
-    if provider == "fgj":
-        return (
-            "Native Forgejo milestones now replace the old `milestone:M<NN>` label "
-            "workaround. Migrate any existing milestone labels to native milestones:\n\n"
-            "1. Discover milestone labels still in use:\n"
-            f"       {_TOOL} forgejo labels\n"
-            "2. For each issue carrying a `milestone:M<NN>` label, set the native "
-            "milestone (auto-created if absent) and drop the label:\n"
-            f"       {_TOOL} forgejo edit <n> --milestone M<NN> --remove-label milestone:M<NN>\n"
-            f"   (list the issues per label with `{_TOOL} forgejo list --label milestone:M<NN>`).\n"
-            "3. Optionally delete the now-unused `milestone:M<NN>` labels.\n\n"
-            "This is data-only; if you never used milestone labels it is a no-op."
-        )
+    if provider == "gh":
+        list_epics = "gh issue list --label epic"
+        make_ms = 'gh api --method POST "repos/<owner>/<repo>/milestones" -f title="<epic-title>"'
+        assign = 'gh issue edit <prd#> --milestone "<epic-title>"'
+        close_epic = 'gh issue close <epic#> --comment "Converted to milestone."'
+    elif provider == "fgj":
+        list_epics = f"{_TOOL} forgejo list --label epic"
+        make_ms = f'{_TOOL} forgejo milestone create "<epic-title>"'
+        assign = f'{_TOOL} forgejo set-milestone <prd#> "<epic-title>"'
+        close_epic = f'{_TOOL} forgejo close <epic#> --comment "Converted to milestone."'
+    else:  # local
+        list_epics = f"{_TOOL} tracker list --label epic"
+        make_ms = f'{_TOOL} tracker milestone create "<epic-title>"'
+        assign = f'{_TOOL} tracker set-milestone <prd#> "<epic-title>"'
+        close_epic = f'{_TOOL} tracker close <epic#> --comment "Converted to milestone."'
     return (
-        f"No structural changes for the `{provider}` provider — this is a no-op. "
-        "Just stamp the new version below."
+        "An epic is now a **milestone**, not an issue. If this repo has epic *issues* from the "
+        "old model, convert each one (slices already block their PRD via dependencies — no change "
+        "there):\n\n"
+        f"1. Find epic issues:\n       {list_epics}\n"
+        "   (No epics ⇒ nothing to do; this is a no-op.)\n"
+        f"2. Create a milestone from the epic's title:\n       {make_ms}\n"
+        "3. Reassign every child PRD issue of that epic to the milestone (read the children from "
+        f"`prds[].issue` in epic.md):\n       {assign}\n"
+        "4. In each `docs/prd/epics/<slug>/epic.md`, replace `epic_issue: <#n>` with "
+        "`epic_milestone: <milestone-id>`.\n"
+        f"5. Close the obsolete epic issue:\n       {close_epic}"
     )
 
 
@@ -165,7 +176,7 @@ def _migrations(provider: str) -> dict[int, Migration]:
     return {
         1: Migration(
             target=1,
-            summary="native Forgejo milestones replace the milestone:M<NN> label workaround",
+            summary="an epic is a milestone (not an issue); PRD issues join it, slices block the PRD",
             body=_migration_0_to_1(provider),
         ),
     }

@@ -1,6 +1,6 @@
 ---
 name: epic-to-prds
-description: Decompose an epic (kind:epic) into an ordered set of child PRDs, create the epic tracking issue (label epic), and hand off to /prd-workflow:create-feature-prd or /prd-workflow:create-capability-prd per child with seeded context. Use after /prd-workflow:create-epic. Don't use it on a feature/capability PRD (use the matching prd-to-issues skill). Provider-aware (gh/fgj/local).
+description: Decompose an epic (kind:epic) into an ordered set of child PRDs, create the epic milestone (an epic is a milestone, not an issue), and hand off to /prd-workflow:create-feature-prd or /prd-workflow:create-capability-prd per child with seeded context. Use after /prd-workflow:create-epic. Don't use it on a feature/capability PRD (use the matching prd-to-issues skill). Provider-aware (gh/fgj/local).
 allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
 ---
 
@@ -9,7 +9,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
 
 Convert a `kind: epic` artifact into an **ordered decomposition plan** of child PRDs and an
-**epic issue** that will own them. This skill plans + hands off — it does **not** write the
+**epic milestone** that will group them (an epic is a milestone, not an issue — child PRD issues
+join it). This skill plans + hands off — it does **not** write the
 child PRD bodies (each child gets its own deep `/prd-workflow:create-*-prd` grilling so the
 specs stay sharp).
 
@@ -44,9 +45,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" assert-kind <slug> epic
 
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge auth_check`
 
-Ensure the label scheme exists (idempotent — provisions the `epic` label too):
-
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge ensure_labels`
+(No labels are provisioned here — this skill creates a milestone, not an issue. The PRD/slice
+label scheme is ensured later by the per-child `*-prd-to-issues` runs.)
 
 ## Step 1 — Draft the child-PRD decomposition
 
@@ -70,16 +70,16 @@ Present the decomposition as a numbered list; per child: **slug**, **kind (featu
 **one-line scope**, **blocked-by**. Ask: right split into feature vs capability? foundational
 work correctly front-loaded? dependency order correct? merge/split any? Iterate until approved.
 
-## Step 3 — Create the epic issue + record the plan
+## Step 3 — Create the epic milestone + record the plan
 
-Create-issue form for the detected provider:
+Create-milestone form for the detected provider (an epic is a milestone, not an issue):
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_create_issue`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_create_milestone`
 
-1. **Create the epic issue** (label `epic`): body = the outcome summary + a checklist of the
-   planned child PRDs (`- [ ] <slug> (<kind>)`). Record its number as `epic_issue:`:
+1. **Create the epic milestone**, titled the epic's `title:` (child PRD issues will join it by
+   that title). Record the number it prints as `epic_milestone:`:
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" set <slug> epic_issue <epic#>
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" set <slug> epic_milestone <ms#>
    ```
 2. Fill `prds:` in `epic.md` with the ordered plan (`slug`, `kind`, `issue: null`, `blocked_by`)
    by editing the file directly (it's a structured block), then write the `## Decomposition`
@@ -91,8 +91,8 @@ Create-issue form for the detected provider:
    ```
 
 The child PRD issues do **not** exist yet — they're created by the per-child
-`/prd-workflow:create-*-prd` → `/prd-workflow:*-prd-to-issues` runs, which attach themselves
-under this epic (see those skills).
+`/prd-workflow:create-*-prd` → `/prd-workflow:*-prd-to-issues` runs, which assign each PRD issue
+to this epic's milestone (see those skills).
 
 ## Step 4 — Hand off (dependency order, unblocked children first)
 
@@ -104,11 +104,11 @@ For each child, in dependency order, print the command to run, seeding the epic 
   frontmatter.
 
 Tell the user to start with the unblocked children. As each child finishes
-`/prd-workflow:*-prd-to-issues`, its PRD issue + slices attach under the epic and its
+`/prd-workflow:*-prd-to-issues`, its PRD issue is assigned this epic's milestone and its
 `prds[].issue` is filled.
 
-After publishing, report: the epic issue number, and `<slug> · feature|capability · blocked-by:
-…` per child.
+After publishing, report: the epic milestone number, and `<slug> · feature|capability ·
+blocked-by: …` per child.
 
 ## Error handling
 

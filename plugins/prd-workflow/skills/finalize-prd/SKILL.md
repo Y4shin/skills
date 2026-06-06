@@ -102,8 +102,8 @@ local merge (local forge).
 
 - **If `prd.md` carries `epic: <epic-slug>`** (check with
   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" get <slug> epic`): mark this PRD's
-  `prds[]` entry done in `docs/prd/epics/<epic-slug>/epic.md` and tick its checklist item on the
-  epic issue:
+  `prds[]` entry done in `docs/prd/epics/<epic-slug>/epic.md` (the epic is a milestone, so this
+  is the only place the child is ticked — there is no epic issue):
 
   ```bash
   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" epic tick <epic-slug> <prd-slug>

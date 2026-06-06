@@ -1,7 +1,7 @@
 {
   "name": "prd-workflow",
-  "description": "Epic → PRD → issues → TDD implement → finalize workflow. Epic decomposition, feature & capability PRD authoring, adopting legacy PRDs by backfilling frontmatter, vertical-slice issue breakdown with sub-issues + dependencies + native milestones (GitHub via gh; Forgejo/Codeberg via a bundled native REST client — no fgj CLI; or a built-in local tracker for repos without a remote), test-plan grilling, slices integrated on a shared PRD branch with one PR + CI gate per PRD (not per slice) — or local merge on repos without a remote — and knowledge harvest. Versioned conventions with init-prd-workflow / update-prd-workflow migration skills. Project-agnostic via an optional docs/prd/profile.md.",
-  "version": "0.8.1",
+  "description": "Epic → PRD → issues → TDD implement → finalize workflow. Epic decomposition (an epic is a milestone; PRD issues join it, slices block the PRD via native dependencies), feature & capability PRD authoring, adopting legacy PRDs by backfilling frontmatter, vertical-slice issue breakdown (GitHub via gh; Forgejo/Codeberg via a bundled native REST client — no fgj CLI; or a built-in local tracker for repos without a remote), test-plan grilling, slices integrated on a shared PRD branch with one PR + CI gate per PRD (not per slice) — or local merge on repos without a remote — and knowledge harvest. Versioned conventions with init-prd-workflow / update-prd-workflow migration skills. Project-agnostic via an optional docs/prd/profile.md.",
+  "version": "0.9.0",
   "author": { "name": "Patric Plattner" },
   "keywords": ["prd", "epic", "workflow", "issues", "tdd", "github", "forgejo", "local"]
 }
