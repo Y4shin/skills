@@ -6,6 +6,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 # Create Feature PRD
 
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+
 Phase 0 of the **feature** track. Run the relentless `grill-me` interview, then crystallise
 it into a committed PRD that `/prd-workflow:feature-prd-to-issues` will slice. A *feature* is
 user-facing behaviour that cuts end-to-end through every relevant layer of the stack (see the

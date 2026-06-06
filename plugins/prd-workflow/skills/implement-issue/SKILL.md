@@ -6,6 +6,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 # Implement Issue
 
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+
 Phase 2: execute the agreed test plan with full repo automation. Requires the slice doc
 `docs/prd/<slug>/slices/<n>-<slug>.md` (spec + `## Test plan`) written by `/prd-workflow:analyse-issue`.
 

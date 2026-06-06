@@ -3,8 +3,12 @@ command snippet for a requested key.
 
 Three providers are supported:
 
-* ``gh``    — GitHub (``origin`` points at github.com).
-* ``fgj``   — Forgejo / Codeberg / Gitea.
+* ``gh``    — GitHub (``origin`` points at github.com). Uses the ``gh`` CLI.
+* ``fgj``   — Forgejo / Codeberg / Gitea. **All operations route through the
+  bundled native REST client** (``prd_tool forgejo ...`` → ``forgejo_api.py``),
+  not the ``fgj`` CLI; the only ``fgj`` touch is fetching the auth token, done
+  inside the client. This sidesteps the CLI's gaps (no ``api`` passthrough, no
+  ``--milestone``) and unlocks native milestones.
 * ``local`` — **no recognised git host**: the repo is a local git repo with no
   ``origin`` remote (or an empty one). The snippets drive the built-in local
   issue tracker (``prd_tool tracker ...`` → ``docs/prd/tracker.json``) and
@@ -130,13 +134,11 @@ def detect(remote: str | None = None) -> Forge:
 
 
 def _ensure_labels(f: Forge) -> str:
-    lines = []
-    for name, color in LABELS:
-        if f.provider == "gh":
-            lines.append(f"gh label create '{name}' --color {color} --force")
-        else:
-            lines.append(f"fgj label create '{name}' --color '#{color}' || true")
-    return "\n".join(lines)
+    if f.provider == "fgj":
+        return f"{PRD_TOOL} forgejo ensure-labels"
+    return "\n".join(
+        f"gh label create '{name}' --color {color} --force" for name, color in LABELS
+    )
 
 
 def _attach_subissue(f: Forge) -> str:
@@ -148,11 +150,10 @@ def _attach_subissue(f: Forge) -> str:
             f'child_id=$(gh api "repos/{f.owner}/{f.repo}/issues/<child#>" --jq .id)',
             f'gh api --method POST "repos/{f.owner}/{f.repo}/issues/<epic#>/sub_issues" -F sub_issue_id="$child_id"',
         ))
-    return "\n".join((
-        "# Forgejo/Gitea: sub-issue support varies by version. If the build exposes it, set the child's",
-        '# parent ref to the epic; otherwise emulate by convention (epic task list "- [ ] #<child>" +',
-        '# a "Part of #<epic>" line in the child). Confirm the API against your fgj version first.',
-    ))
+    # Forgejo's REST API has NO sub-issue/parent endpoint (verified against the live
+    # spec), so the helper realises epic->child via the task-list convention (a
+    # "- [ ] #<child>" line in the epic + a "Part of #<epic>" line in the child).
+    return f"{PRD_TOOL} forgejo attach <epic#> <child#>"
 
 
 def _detach_subissue(f: Forge) -> str:
@@ -162,7 +163,7 @@ def _detach_subissue(f: Forge) -> str:
             f'child_id=$(gh api "repos/{f.owner}/{f.repo}/issues/<child#>" --jq .id)',
             f'gh api --method DELETE "repos/{f.owner}/{f.repo}/issues/<epic#>/sub_issue" -F sub_issue_id="$child_id"',
         ))
-    return "# Forgejo: clear the child's parent ref (PATCH /issues/<child#> with empty parent)."
+    return f"{PRD_TOOL} forgejo detach <epic#> <child#>"
 
 
 def _add_dependency(f: Forge) -> str:
@@ -173,11 +174,7 @@ def _add_dependency(f: Forge) -> str:
             f'gh api --method POST "repos/{f.owner}/{f.repo}/issues/<issue#>/dependencies/blocked_by" \\',
             '  -H "X-GitHub-Api-Version: 2026-03-10" -F issue_id="$blocker_id"',
         ))
-    return "\n".join((
-        "# Forgejo/Gitea native dependency: <issue#> depends on (is blocked by) <blocker#>.",
-        f'fgj api --method POST "repos/{f.owner}/{f.repo}/issues/<issue#>/dependencies" \\',
-        '  --field "index=<blocker#>"',
-    ))
+    return f"{PRD_TOOL} forgejo dep <issue#> --blocked-by <blocker#>"
 
 
 def _local_snippet(key: str) -> str:
@@ -230,26 +227,29 @@ def _snippet(f: Forge, key: str) -> str:
     if key == "repo":
         return f.repo
     if key == "auth_check":
-        return p("gh auth status", "fgj auth status")
+        return p("gh auth status", f"{PRD_TOOL} forgejo auth-check")
     if key == "cmd_get_issue":
-        return p("gh issue view <n> --json number,title,body,labels,state", "fgj issue view <n>")
+        return p("gh issue view <n> --json number,title,body,labels,state", f"{PRD_TOOL} forgejo view <n> --json")
     if key == "cmd_create_issue":
         return p(
             'gh issue create --title "<t>" --body-file <f> --label <l> --milestone "<M>"',
-            'fgj issue create --title "<t>" --body "<b>" --label <l>   # no --milestone: use a milestone:M<NN> label',
+            f'{PRD_TOOL} forgejo create --title "<t>" --body-file <f> --label <l> --milestone "<M>"',
         )
     if key == "cmd_list_issues":
-        return p("gh issue list --label <l> --json number,title,state", "fgj issue list --label <l>")
+        return p("gh issue list --label <l> --json number,title,state", f"{PRD_TOOL} forgejo list --label <l> --json")
     if key == "cmd_comment":
-        return p('gh issue comment <n> --body "<text>"', 'fgj issue comment <n> --body "<text>"')
+        return p('gh issue comment <n> --body "<text>"', f'{PRD_TOOL} forgejo comment <n> --body "<text>"')
     if key == "cmd_close_issue":
-        return p('gh issue close <n> --comment "<text>"', "fgj issue close <n>")
+        return p('gh issue close <n> --comment "<text>"', f'{PRD_TOOL} forgejo close <n> --comment "<text>"')
     if key == "cmd_edit_labels":
-        return p("gh issue edit <n> --add-label <a> --remove-label <r>", "fgj issue edit <n> --label <a>")
+        return p(
+            "gh issue edit <n> --add-label <a> --remove-label <r>",
+            f"{PRD_TOOL} forgejo edit <n> --add-label <a> --remove-label <r>",
+        )
     if key == "cmd_create_pr":
         return p(
             'gh pr create --base main --head <branch> --title "<t>" --body-file <f>',
-            'fgj pr create --base main --head <branch> --title "<t>" --body "<b>"',
+            f'{PRD_TOOL} forgejo create-pr --base main --head <branch> --title "<t>" --body-file <f>',
         )
     if key == "ensure_labels":
         return _ensure_labels(f)
@@ -263,8 +263,9 @@ def _snippet(f: Forge, key: str) -> str:
         return p(
             "GitHub: epics own children via native sub-issues; PRD<-slice / slice<-slice / PRD<-PRD "
             "order via native issue dependencies (gh api).",
-            "Forgejo: native sub-issues (parent ref) for epic->child; native issue dependencies for "
-            "ordering (fgj api).",
+            "Forgejo: epic->child via a body task-list convention (no REST sub-issue endpoint); "
+            "PRD<-slice / slice<-slice / PRD<-PRD order via native issue dependencies; milestones are "
+            "native. All Forgejo ops go through `prd_tool forgejo` (REST API) — the fgj CLI isn't used.",
         )
     raise KeyError(key)
 

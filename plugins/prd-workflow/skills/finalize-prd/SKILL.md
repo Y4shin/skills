@@ -6,6 +6,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 # Finalize PRD
 
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+
 Phase 3 — **the PRD's single integration point.** Every slice has merged into the PRD branch
 `prd/<prd-slug>` with no PR of its own; finalize migrates durable knowledge into the repo's
 permanent docs, retires the spent PRD dir, and either opens the **one** PR

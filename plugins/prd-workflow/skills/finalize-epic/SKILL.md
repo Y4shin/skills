@@ -6,6 +6,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 # Finalize Epic
 
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+
 The tier above `/prd-workflow:finalize-prd`: once **every** child PRD of an epic has been
 finalized, migrate the epic-level durable knowledge into the repo's permanent docs and retire
 the epic. Invoked as `/prd-workflow:finalize-epic <slug | epic-issue#>`.

@@ -35,6 +35,23 @@ are linked by the PRD's `epic:` field, **not** by nesting — the epic outlives 
 so keeping their directories independent keeps the self-cleaning rules unambiguous). `<slug>` is
 the artifact's `slug:`. `<n>` is the slice's issue number once it exists.
 
+## Workflow versioning
+
+The prd-workflow's set of conventions is versioned. The repo's version is stored in the dotfile
+`docs/prd/.workflow-version` (a bare integer; **absent ⇒ version 0**, the pre-versioning
+baseline). The bundled tool targets a current version and every operational skill injects
+`prd_tool.pyz workflow-gate`, which **refuses to run** (and points at the remedy) unless the
+stored version matches:
+
+- no version file ⇒ run **`/prd-workflow:init-prd-workflow`** (creates the file);
+- stored version behind the tool ⇒ run **`/prd-workflow:update-prd-workflow`** (migrates forward,
+  running each version's provider-aware migration steps, then stamps the new version).
+
+When the repo is current the gate emits nothing — zero added context. The init/update skills are
+thin shells whose actual instructions come from the tool on demand, so an up-to-date repo never
+pays for migration text. `.workflow-version` lives alongside the artifacts but is **not** garbage-
+collected with them.
+
 ## Frontmatter
 
 ### Epic (`epic.md`)
@@ -94,15 +111,18 @@ of this file.
 
 ## Tracker shape (flat, native primitives)
 
-The tracker uses **native sub-issues** and **native issue dependencies** — on a git host
-(GitHub `gh` / Forgejo `fgj`), or the built-in **local tracker** (`docs/prd/tracker.json`) when
-the repo has no recognised git host (a git repo with no `origin` remote). The flat
-model is identical across all three; run `prd_tool.pyz forge <key>` — `forge keys` for the
-list — for the exact per-provider commands. One rule splits the two mechanisms:
+The tracker uses **sub-issues** (epic→child parenting) and **native issue dependencies** — on a
+git host (GitHub via `gh`; Forgejo/Codeberg via the bundled native REST client `prd_tool forgejo`,
+**not** the `fgj` CLI), or the built-in **local tracker** (`docs/prd/tracker.json`) when the repo
+has no recognised git host (a git repo with no `origin` remote). The flat model is identical
+across all three; run `prd_tool.pyz forge <key>` — `forge keys` for the list — for the exact
+per-provider commands. One rule splits the two mechanisms:
 
 - **Sub-issue (parent/child)** is used for **exactly one** relationship: an **epic** is the
-  sub-issue parent of its child PRD issues *and* their slice issues — all flat siblings under
-  the epic. The epic is the only parent.
+  parent of its child PRD issues *and* their slice issues — all flat siblings under the epic. The
+  epic is the only parent. GitHub uses native sub-issues; **Forgejo has no REST sub-issue
+  endpoint, so the epic→child link is a body convention** (a `- [ ] #<child>` checklist line in
+  the epic + a `Part of #<epic>` line in the child), applied by `prd_tool forgejo attach`.
 - **Dependency (`blocked_by`)** expresses **everything else**: a PRD issue is `blocked_by` its
   slice issues (it can't close until its slices land); slice `blocked_by` slice for ordering;
   PRD `blocked_by` PRD for cross-PRD order within an epic.

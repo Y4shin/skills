@@ -13,6 +13,13 @@ dependencies = [
 prd-tool = "prd_tool.cli:main"
 prd-tool-build = "prd_tool._build:main"
 
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

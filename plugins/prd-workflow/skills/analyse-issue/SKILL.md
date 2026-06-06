@@ -6,6 +6,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 # Analyse Issue
 
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+
 Phase 1: understand the issue, then challenge the developer to decide the right test
 strategy *before* writing a line of code. The fastest honest feedback loop is the goal — a
 slice must be testable, not just "covered".

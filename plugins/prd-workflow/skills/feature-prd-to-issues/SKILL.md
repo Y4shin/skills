@@ -6,6 +6,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 # Feature PRD → Issues
 
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+
 Convert a `kind: feature` PRD into a set of independently-grabbable issues using
 **tracer-bullet vertical slices**, wired with the flat native tracker model (see the injected
 reference): the PRD issue is `blocked_by` its slices; if the PRD belongs to an epic, the PRD
@@ -101,8 +103,10 @@ Attach a child as a sub-issue of the **epic** (only used when `epic:` is set):
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" set <slug> prd_issue <prd#>
    ```
 2. For each slice, in dependency order:
-   - Create the issue with labels `kind:feature`, `mode:hitl|afk`, `status:todo` (+
-     `milestone:M<NN>`). Body uses the template below (`Part of #<prd>` + blockers).
+   - Create the issue with labels `kind:feature`, `mode:hitl|afk`, `status:todo`, and — if the
+     PRD has a `milestone:` — set it via the create command's `--milestone M<NN>` (a native
+     milestone on gh/fgj; the local tracker has no milestones, so it's omitted there). Body uses
+     the template below (`Part of #<prd>` + blockers).
    - Add **PRD `blocked_by` this slice** (the PRD can't close until its slices land).
    - For each blocker in the slice's `## Blocked by`, add **slice `blocked_by` blocker**.
    - Write `docs/prd/<slug>/slices/<n>-<slug>.md` from the template in `references/artifacts.md`.

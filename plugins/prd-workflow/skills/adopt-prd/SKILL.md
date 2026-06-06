@@ -6,6 +6,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 # Adopt PRD
 
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+
 Bring **existing** planning documents — written before this workflow, or in an older inline-metadata
 format — under prd-workflow management, **one doc or a whole directory at once**. The worklist may
 mix all three artifact types: **PRDs** (`prd.md`), **epics** (`epic.md`), and **slice docs**

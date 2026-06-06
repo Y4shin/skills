@@ -6,6 +6,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 # Create Capability PRD
 
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+
 Phase 0 of the **capability** track. Run the relentless `grill-me` interview, then
 crystallise it into a committed PRD that `/prd-workflow:capability-prd-to-issues` will slice. A
 *capability* is foundational work others build on — an API surface, a shared library/macro, a

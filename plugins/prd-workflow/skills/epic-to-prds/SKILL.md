@@ -6,6 +6,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 # Epic → PRDs
 
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+
 Convert a `kind: epic` artifact into an **ordered decomposition plan** of child PRDs and an
 **epic issue** that will own them. This skill plans + hands off — it does **not** write the
 child PRD bodies (each child gets its own deep `/prd-workflow:create-*-prd` grilling so the

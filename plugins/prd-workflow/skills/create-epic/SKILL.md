@@ -6,6 +6,8 @@ allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bas
 
 # Create Epic
 
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+
 Phase −1 of the workflow: the tier **above** a PRD. Run the relentless `grill-me` interview,
 then crystallise a higher-level outcome into a committed `epic.md` that `/prd-workflow:epic-to-prds`
 will decompose into ordered child PRDs. An *epic* is a coordinated set of components / cross-cutting
