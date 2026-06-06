@@ -43,7 +43,10 @@ baseline). The bundled tool targets a current version and every operational skil
 `prd_tool.pyz workflow-gate`, which **refuses to run** (and points at the remedy) unless the
 stored version matches:
 
-- no version file ⇒ run **`/prd-workflow:init-prd-workflow`** (creates the file);
+- no version file ⇒ run **`/prd-workflow:init-prd-workflow`** if the workflow has never been used
+  here (stamps the **current** version directly, assuming a fresh start), or
+  **`/prd-workflow:update-prd-workflow`** if there's prior prd-workflow data to carry forward
+  (a missing file is treated as **v0** and migrated forward);
 - stored version behind the tool ⇒ run **`/prd-workflow:update-prd-workflow`** (migrates forward,
   running each version's provider-aware migration steps, then stamps the new version).
 

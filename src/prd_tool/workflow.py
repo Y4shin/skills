@@ -61,18 +61,6 @@ def write_version(root: Path, n: int) -> Path:
     return p
 
 
-def has_artifacts(root: Path) -> bool:
-    """True if docs/prd already holds prd-workflow artifacts (legacy or not).
-
-    Used by init to tell a fresh tree (stamp current) from a pre-versioning tree
-    (stamp the v0 baseline, then hand off to the migration).
-    """
-    prd = root / "docs" / "prd"
-    if not prd.is_dir():
-        return False
-    return next(prd.rglob("prd.md"), None) is not None or next(prd.rglob("epic.md"), None) is not None
-
-
 # --------------------------------------------------------------------- gate
 
 def _refuse(reason: str, remedy: str) -> str:
@@ -87,7 +75,10 @@ def gate(root: Path) -> str:
     if not has_version_file(root):
         return _refuse(
             "this repo has no docs/prd/.workflow-version file (uninitialized).",
-            "Tell the user to run `/prd-workflow:init-prd-workflow` first, then retry.",
+            "If the prd-workflow has never been used here, tell the user to run "
+            "`/prd-workflow:init-prd-workflow` (starts at the current version); if it has prior "
+            "data to carry forward, `/prd-workflow:update-prd-workflow` (migrates from v0). "
+            "Then retry.",
         )
     v = read_version(root)
     if v < CURRENT_VERSION:
@@ -116,27 +107,20 @@ def _noop(state: str) -> str:
 # --------------------------------------------------------------------- init
 
 def init_instructions(root: Path) -> str:
-    """Body injected by the init-prd-workflow skill."""
+    """Body injected by the init-prd-workflow skill.
+
+    Init assumes the prd-workflow has never been used in this repo, so it stamps
+    the **current** version directly. (A repo with prior data to carry forward
+    should use update-prd-workflow, which assumes v0 when there's no file.)
+    """
     if has_version_file(root):
         v = read_version(root)
         if v == CURRENT_VERSION:
             return _noop(f"is already initialized at v{v}.")
-        if v < CURRENT_VERSION:
-            return (
-                f"This repo already has a version file (v{v}); initialization is done. "
-                f"To move to v{CURRENT_VERSION}, tell the user to run "
-                "`/prd-workflow:update-prd-workflow` instead. **Do nothing else here.**"
-            )
-        return _noop(f"is at v{v}, newer than this tool (v{CURRENT_VERSION}).")
-
-    if has_artifacts(root):
         return (
-            f"This repo has existing prd-workflow artifacts but no version file, so it "
-            f"predates versioning (baseline v0). Stamp the baseline, then hand off to the "
-            f"migration — run exactly:\n\n"
-            f"    {_TOOL} workflow-version set 0\n\n"
-            f"Then tell the user to run `/prd-workflow:update-prd-workflow` to migrate "
-            f"v0 → v{CURRENT_VERSION}. **Do not migrate anything yourself in this skill.**"
+            f"This repo already has a version file (v{v}) — it has been used before, so init "
+            f"does not apply. To move to v{CURRENT_VERSION}, tell the user to run "
+            "`/prd-workflow:update-prd-workflow` instead. **Do nothing else here.**"
         )
     return (
         f"Initialize the prd-workflow at the current version — run exactly:\n\n"
@@ -188,14 +172,14 @@ def _migrations(provider: str) -> dict[int, Migration]:
 
 
 def migrate_instructions(root: Path, provider: str) -> str:
-    """Body injected by the update-prd-workflow skill."""
-    if not has_version_file(root):
-        return (
-            "No docs/prd/.workflow-version file — the workflow is not initialized. "
-            "Tell the user to run `/prd-workflow:init-prd-workflow` first. "
-            "**This is a no-op; change nothing.**"
-        )
-    v = read_version(root)
+    """Body injected by the update-prd-workflow skill.
+
+    A missing version file is treated as **v0** (the pre-versioning baseline), so
+    update migrates forward from there rather than refusing — that's the path for
+    a repo with prior prd-workflow data. (A genuinely fresh repo should use
+    init-prd-workflow, which stamps the current version directly.)
+    """
+    v = read_version(root)  # 0 when no file exists
     if v == CURRENT_VERSION:
         return _noop(f"is already at v{v}.")
     if v > CURRENT_VERSION:

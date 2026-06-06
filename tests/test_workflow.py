@@ -57,14 +57,6 @@ def test_gate_refuses_when_ahead(tmp_path):
     assert "STOP" in out and "out of date" in out
 
 
-def test_has_artifacts(tmp_path):
-    prd = _prd(tmp_path)
-    assert not workflow.has_artifacts(tmp_path)
-    (prd / "foo").mkdir()
-    (prd / "foo" / "prd.md").write_text("---\nkind: feature\n---\n")
-    assert workflow.has_artifacts(tmp_path)
-
-
 def test_init_fresh_stamps_current(tmp_path):
     _prd(tmp_path)
     out = workflow.init_instructions(tmp_path)
@@ -72,12 +64,21 @@ def test_init_fresh_stamps_current(tmp_path):
     assert "update-prd-workflow" not in out
 
 
-def test_init_legacy_stamps_baseline_then_update(tmp_path):
+def test_init_stamps_current_even_with_existing_artifacts(tmp_path):
+    # Init assumes a never-used repo: it stamps the current version regardless of
+    # any pre-existing artifacts (the user picks update if they have prior data).
     prd = _prd(tmp_path)
     (prd / "foo").mkdir()
     (prd / "foo" / "prd.md").write_text("---\nkind: feature\n---\n")
     out = workflow.init_instructions(tmp_path)
-    assert "workflow-version set 0" in out
+    assert f"workflow-version set {workflow.CURRENT_VERSION}" in out
+    assert "update-prd-workflow" not in out
+
+
+def test_init_existing_file_points_to_update(tmp_path):
+    _prd(tmp_path)
+    workflow.write_version(tmp_path, workflow.CURRENT_VERSION - 1)
+    out = workflow.init_instructions(tmp_path)
     assert "update-prd-workflow" in out
 
 
@@ -95,9 +96,12 @@ def test_migrate_noop_at_current(tmp_path):
     assert "no-op" in out.lower()
 
 
-def test_migrate_without_file_points_to_init(tmp_path):
+def test_migrate_without_file_assumes_v0(tmp_path):
+    # No version file ⇒ treat as v0 and migrate forward (not a redirect to init).
     out = workflow.migrate_instructions(tmp_path, "fgj")
-    assert "init-prd-workflow" in out
+    assert "v0 → v1" in out
+    assert "init-prd-workflow" not in out
+    assert f"workflow-version set {workflow.CURRENT_VERSION}" in out
 
 
 def test_migrate_v0_to_v1_fgj_has_milestone_steps(tmp_path):
