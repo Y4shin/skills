@@ -41,3 +41,14 @@ def test_close_milestone(tmp_path):
 def test_no_milestone_when_unset(tmp_path):
     n = tracker.create(tmp_path, "Standalone PRD", "b", ["prd"])
     assert tracker.view(tmp_path, n)["milestone"] is None
+
+
+def test_edit_title_and_body_fills_placeholder(tmp_path):
+    # The v2 flow: a placeholder PRD issue is created, then edited in place.
+    n = tracker.create(tmp_path, "PRD: foo", "placeholder", ["prd"], milestone="Auth epic")
+    tracker.edit(tmp_path, n, title="Real login PRD", body="the real summary")
+    issue = tracker.view(tmp_path, n)
+    assert issue["title"] == "Real login PRD"
+    assert issue["body"] == "the real summary"
+    # editing title/body must not drop the milestone link
+    assert issue["milestone"] is not None

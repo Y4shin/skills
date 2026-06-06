@@ -111,6 +111,17 @@ def close(root: Path, number: int, comment_text: str | None = None) -> None:
     _save(root, data)
 
 
+def edit(root: Path, number: int, title: str | None = None, body: str | None = None) -> None:
+    """Edit an issue's title and/or body (used to fill a placeholder PRD issue)."""
+    data = _load(root)
+    issue = _find(data, number)
+    if title is not None:
+        issue["title"] = title
+    if body is not None:
+        issue["body"] = body
+    _save(root, data)
+
+
 def edit_labels(root: Path, number: int, add=(), remove=()) -> list[str]:
     data = _load(root)
     issue = _find(data, number)

@@ -70,7 +70,8 @@ epic_milestone: <#n>       # filled by epic-to-prds: the epic's milestone number
 prds:                      # filled by epic-to-prds: the ordered decomposition
   - slug: <prd-slug>
     kind: feature | capability
-    issue: <#n>            # the child PRD's issue once created (null until then)
+    issue: <#n>            # the child PRD's issue — epic-to-prds pre-creates one placeholder
+                           #   issue per child, so this is filled up front (not null)
     blocked_by: [<prd-slug>, ...]
 status: draft              # draft | prds-planned | in-progress | done
 ---
@@ -126,8 +127,11 @@ remote). The model is identical across all three; run `prd_tool.pyz forge <key>`
 for the list — for the exact per-provider commands. Two mechanisms, each with one job:
 
 - **Milestone (the epic)** — an **epic is a milestone**, never an issue. Each child PRD issue
-  *joins* the epic by being assigned that milestone (at create, via `--milestone "<epic-title>"`).
-  Slices carry no milestone. There are **no epic issues and no sub-issues** of any kind.
+  *joins* the epic by being assigned that milestone. `epic-to-prds` **pre-creates a placeholder
+  PRD issue for every planned child** (assigned the milestone) so the milestone's progress bar
+  reflects the whole epic from the start; each `*-prd-to-issues` run then **edits** its placeholder
+  rather than creating a new issue. Slices carry no milestone. There are **no epic issues and no
+  sub-issues** of any kind.
 - **Dependency (`blocked_by`)** expresses **all ordering**: a PRD issue is `blocked_by` its slice
   issues (it can't close until its slices land); slice `blocked_by` slice for intra-PRD ordering;
   PRD `blocked_by` PRD for cross-PRD order within an epic.
@@ -161,14 +165,15 @@ Artifacts are **deleted as their work lands**, so the presence of a file is itse
 
 1. *(optional)* `create-epic` → writes `epic.md` (status `draft`).
 2. *(optional)* `epic-to-prds` → creates the epic **milestone**, records `epic_milestone:`, writes
-   the ordered `prds:` plan + `## Decomposition`, status `prds-planned`. Hands off to the per-child
-   `create-*-prd`.
+   the ordered `prds:` plan + `## Decomposition`, **pre-creates one placeholder PRD issue per child**
+   (assigned the milestone, numbers recorded in `prds[].issue`) and wires the PRD↔PRD `blocked_by`
+   order, status `prds-planned`. Hands off to the per-child `create-*-prd`.
 3. `create-(feature|capability)-prd` → writes `prd.md` (status `draft`); carries `epic:` when
    created in an epic context.
-4. `(feature|capability)-prd-to-issues` → creates the PRD issue (assigned the epic's milestone
-   when under an epic) + slice issues, adds the native dependencies (PRD `blocked_by` each slice),
-   writes one `slices/<n>-<slug>.md` per slice, fills `prd_issue:` + `slices:`, status
-   `issues-created`.
+4. `(feature|capability)-prd-to-issues` → **edits** the pre-created placeholder PRD issue (under an
+   epic) or **creates** one (standalone), then creates the slice issues with native dependencies
+   (PRD `blocked_by` each slice), writes one `slices/<n>-<slug>.md` per slice, fills `prd_issue:` +
+   `slices:`, status `issues-created`.
 5. `analyse-issue <n>` → sets `analysed: true` in frontmatter and appends a `## Test plan`
    section to that slice's doc.
 6. `implement-issue <n>` → merges the slice into the PRD branch (no per-slice PR), closes the

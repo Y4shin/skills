@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # Bump this when a new set of conventions ships, and add a Migration below.
-CURRENT_VERSION = 1
+CURRENT_VERSION = 2
 
 # How the skills invoke the bundled tool (matches forge.PRD_TOOL); used in the
 # emitted instruction text so the agent can copy/paste the next command.
@@ -170,6 +170,31 @@ def _migration_0_to_1(provider: str) -> str:
     )
 
 
+def _migration_1_to_2(provider: str) -> str:
+    if provider == "gh":
+        create = ('gh issue create --title "PRD: <prd-slug>" --body "<placeholder>" '
+                  '--label prd --label kind:<kind> --label status:todo --milestone "<epic-title>"')
+    elif provider == "fgj":
+        create = (f'{_TOOL} forgejo create --title "PRD: <prd-slug>" --body "<placeholder>" '
+                  '--label prd --label kind:<kind> --label status:todo --milestone "<epic-title>"')
+    else:
+        create = (f'{_TOOL} tracker create --title "PRD: <prd-slug>" --body "<placeholder>" '
+                  '--label prd --label kind:<kind> --label status:todo --milestone "<epic-title>"')
+    return (
+        "PRD issues are now pre-created for the whole epic up front, so the milestone's progress "
+        "reflects every planned PRD — not only the ones already built (which made an epic read "
+        "100% done while PRD issues were still missing). For each epic "
+        "(`docs/prd/epics/<slug>/epic.md`) that has an `epic_milestone:` and a `prds:` plan:\n\n"
+        "1. List its planned children and their issue state:\n"
+        f"       {_TOOL} epic prds <epic-slug>\n"
+        "2. For every child whose `issue` is still null, create a placeholder PRD issue assigned "
+        f"to the epic milestone (title = the epic's `title:`, kind from the plan):\n       {create}\n"
+        "3. Record each new number:\n"
+        f"       {_TOOL} epic set-prd-issue <epic-slug> <prd-slug> <#>\n\n"
+        "Children that already have an issue are left untouched. Repos with no epics are a no-op."
+    )
+
+
 # Keyed by target version. Append future versions here; migrate_instructions
 # walks stored+1 .. CURRENT_VERSION in order.
 def _migrations(provider: str) -> dict[int, Migration]:
@@ -178,6 +203,11 @@ def _migrations(provider: str) -> dict[int, Migration]:
             target=1,
             summary="an epic is a milestone (not an issue); PRD issues join it, slices block the PRD",
             body=_migration_0_to_1(provider),
+        ),
+        2: Migration(
+            target=2,
+            summary="pre-create all PRD issues per epic (placeholders) so milestone progress is accurate",
+            body=_migration_1_to_2(provider),
         ),
     }
 

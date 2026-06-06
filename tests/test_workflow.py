@@ -121,3 +121,20 @@ def test_migrate_v0_to_v1_local_uses_tracker_commands(tmp_path):
     assert "tracker milestone create" in out
     assert "tracker set-milestone" in out
     assert f"workflow-version set {workflow.CURRENT_VERSION}" in out
+
+
+def test_migrate_v1_to_v2_precreates_prd_issues(tmp_path):
+    _prd(tmp_path)
+    workflow.write_version(tmp_path, 1)
+    out = workflow.migrate_instructions(tmp_path, "fgj")
+    assert "v1 → v2" in out
+    assert "set-prd-issue" in out
+    assert "placeholder" in out.lower()
+    assert f"workflow-version set {workflow.CURRENT_VERSION}" in out
+
+
+def test_migrate_from_v0_walks_both_steps(tmp_path):
+    _prd(tmp_path)
+    workflow.write_version(tmp_path, 0)
+    out = workflow.migrate_instructions(tmp_path, "fgj")
+    assert "v0 → v1" in out and "v1 → v2" in out

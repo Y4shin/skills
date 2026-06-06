@@ -117,6 +117,20 @@ def test_ensure_milestone_returns_existing_without_post():
     assert not any(x["method"] == "POST" for x in calls)
 
 
+def test_update_issue_patches_title_and_body():
+    c, calls = _client_with_router(lambda *a: None)
+    c.update_issue(5, title="Real PRD", body="real")
+    patch = calls[-1]
+    assert patch["method"] == "PATCH" and patch["path"] == "/repos/o/r/issues/5"
+    assert patch["body"] == {"title": "Real PRD", "body": "real"}
+
+
+def test_update_issue_noop_when_nothing_given():
+    c, calls = _client_with_router(lambda *a: None)
+    c.update_issue(5)
+    assert not calls
+
+
 def test_close_milestone_patches_state():
     c, calls = _client_with_router(lambda *a: None)
     c.close_milestone(7)

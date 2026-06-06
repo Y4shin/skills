@@ -85,33 +85,36 @@ Read the injected reference for the tracker rule: **an epic is a milestone (a PR
 via `--milestone`); native dependencies express all ordering.** Check `prd.md` frontmatter for an
 `epic:` field — present ⇒ this PRD belongs to an epic; absent ⇒ standalone (no milestone).
 
-Create-issue form for the detected provider (its `--milestone` takes the **epic's title** when
-this PRD belongs to an epic; omit it when standalone):
+When this PRD belongs to an epic, its PRD issue **already exists** as a placeholder created by
+`/prd-workflow:epic-to-prds` (assigned the epic milestone) — you **edit** it in place; do **not**
+create a second issue. Only a standalone PRD creates a fresh issue. Forms for the detected
+provider (edit fills a placeholder; create is standalone-only; dependency wires slices):
 
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_edit_issue`
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_create_issue`
-
-Add a native dependency (make `<issue#>` blocked-by `<blocker#>`):
-
 !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_add_dependency`
 
-1. **Create the PRD issue** (labels `prd`, `kind:feature`): body = PRD summary. If `epic:` is set
-   (`prd_tool.pyz get <slug> epic`), pass `--milestone "<epic-title>"` — the epic's `title:` from
-   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" get <epic-slug> title` — so the PRD issue
-   joins the epic milestone. Record its number as `prd_issue:`:
-   ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" set <slug> prd_issue <prd#>
-   ```
+1. **The PRD issue** (body = PRD summary):
+   - **If `epic:` is set** (`prd_tool.pyz get <slug> epic`): find the placeholder and **edit** it
+     — set the real title + body and ensure labels `prd`, `kind:feature` (keep its milestone). Get
+     the number with:
+     ```bash
+     python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" epic prd-issue <epic-slug> <slug>
+     ```
+   - **Else (standalone):** create a new PRD issue (labels `prd`, `kind:feature`; no milestone).
+   - Record the number as `prd_issue:`:
+     ```bash
+     python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" set <slug> prd_issue <prd#>
+     ```
 2. For each slice, in dependency order (slices carry **no** milestone):
    - Create the issue with labels `kind:feature`, `mode:hitl|afk`, `status:todo`. Body uses the
      template below (`Part of #<prd>` + blockers).
    - Add **PRD `blocked_by` this slice** (the PRD can't close until its slices land).
    - For each blocker in the slice's `## Blocked by`, add **slice `blocked_by` blocker**.
    - Write `docs/prd/<slug>/slices/<n>-<slug>.md` from the template in `references/artifacts.md`.
-3. **If `epic:` is set:** add any **PRD `blocked_by` PRD** edges the epic's `prds[].blocked_by`
-   calls for (the PRD issue already carries the epic milestone from step 1). Then record the link
-   on the epic and set its status:
+3. **If `epic:` is set:** the epic already recorded this PRD's issue and the PRD↔PRD order (wired
+   by `/prd-workflow:epic-to-prds`). Just move the epic to in-progress:
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" epic set-prd-issue <epic-slug> <slug> <prd#>
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" set <epic-slug> status in-progress
    ```
 4. Record the slices + status on the PRD, then commit the `docs/prd/` changes (PRD dir, and the

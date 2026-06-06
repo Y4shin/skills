@@ -44,7 +44,7 @@ from dataclasses import dataclass
 KEY_GROUPS = (
     ("git_type", "owner", "repo", "auth_check"),
     ("cmd_get_issue", "cmd_create_issue", "cmd_list_issues", "cmd_comment", "cmd_close_issue"),
-    ("cmd_edit_labels", "cmd_create_pr", "ensure_labels"),
+    ("cmd_edit_labels", "cmd_edit_issue", "cmd_create_pr", "ensure_labels"),
     ("cmd_create_milestone", "cmd_close_milestone", "cmd_add_dependency", "ownership_note"),
 )
 KEYS = frozenset(k for group in KEY_GROUPS for k in group)
@@ -193,6 +193,7 @@ def _local_snippet(key: str) -> str:
         "cmd_comment": f'{t} tracker comment <n> --body "<text>"',
         "cmd_close_issue": f'{t} tracker close <n> --comment "<text>"',
         "cmd_edit_labels": f"{t} tracker edit <n> --add-label <a> --remove-label <r>",
+        "cmd_edit_issue": f'{t} tracker edit <n> --title "<t>" --body-file <f> --add-label <a> --remove-label <r>',
         "cmd_create_pr": (
             "# No git host — there is no PR. Merge the PRD branch into main locally:\n"
             "git checkout main\n"
@@ -242,6 +243,11 @@ def _snippet(f: Forge, key: str) -> str:
         return p(
             "gh issue edit <n> --add-label <a> --remove-label <r>",
             f"{PRD_TOOL} forgejo edit <n> --add-label <a> --remove-label <r>",
+        )
+    if key == "cmd_edit_issue":
+        return p(
+            'gh issue edit <n> --title "<t>" --body-file <f> --add-label <a> --remove-label <r>',
+            f'{PRD_TOOL} forgejo edit <n> --title "<t>" --body-file <f> --add-label <a> --remove-label <r>',
         )
     if key == "cmd_create_pr":
         return p(

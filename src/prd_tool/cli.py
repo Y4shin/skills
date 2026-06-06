@@ -395,6 +395,26 @@ def epic_set_prd_issue(root: Path, selector: str, prd_slug: str, issue: str) -> 
     raise _fail(f"{a.slug}: no child PRD {prd_slug!r} in prds:")
 
 
+@epic.command(name="prd-issue")
+@click.argument("selector")
+@click.argument("prd_slug")
+@pass_root
+def epic_prd_issue(root: Path, selector: str, prd_slug: str) -> None:
+    """Print the (placeholder) issue number of an epic's child PRD entry.
+
+    Used by *-prd-to-issues to find the pre-created placeholder issue to edit
+    instead of creating a new one.
+    """
+    a = model.resolve(root, selector, want="epic")
+    for p in _epic_prds(a):
+        if p.get("slug") == prd_slug:
+            if not p.get("issue"):
+                raise _fail(f"{a.slug}: child PRD {prd_slug!r} has no issue yet")
+            click.echo(p["issue"])
+            return
+    raise _fail(f"{a.slug}: no child PRD {prd_slug!r} in prds:")
+
+
 @epic.command(name="tick")
 @click.argument("selector")
 @click.argument("prd_slug")
@@ -547,13 +567,22 @@ def tracker_close(root: Path, number: str, comment_text) -> None:
 
 @tracker.command(name="edit")
 @click.argument("number")
+@click.option("--title", default=None, help="New title.")
+@click.option("--body", default=None, help="New body text.")
+@click.option("--body-file", type=click.Path(dir_okay=False, path_type=Path), default=None,
+              help="Read the new body from this file.")
 @click.option("--add-label", "add", multiple=True, help="Label to add (repeatable).")
 @click.option("--remove-label", "remove", multiple=True, help="Label to remove (repeatable).")
 @pass_root
-def tracker_edit(root: Path, number: str, add, remove) -> None:
-    """Add/remove labels on an issue (mirrors the git-host label edit)."""
-    labels = tracker_mod.edit_labels(root, _num(number), add=add, remove=remove)
-    click.echo(f"#{_num(number)}: labels = {labels}")
+def tracker_edit(root: Path, number: str, title, body, body_file, add, remove) -> None:
+    """Edit an issue's title/body and/or labels (e.g. fill a placeholder PRD issue)."""
+    if body_file is not None:
+        body = body_file.read_text(encoding="utf-8")
+    if title is not None or body is not None:
+        tracker_mod.edit(root, _num(number), title=title, body=body)
+    if add or remove:
+        tracker_mod.edit_labels(root, _num(number), add=add, remove=remove)
+    click.echo(f"#{_num(number)}: updated")
 
 
 @tracker.command(name="dep")
@@ -779,12 +808,20 @@ def forgejo_close(number: str, comment_text) -> None:
 
 @forgejo.command(name="edit")
 @click.argument("number")
+@click.option("--title", default=None, help="New title.")
+@click.option("--body", default=None, help="New body text.")
+@click.option("--body-file", type=click.Path(dir_okay=False, path_type=Path), default=None,
+              help="Read the new body from this file.")
 @click.option("--add-label", "add", multiple=True)
 @click.option("--remove-label", "remove", multiple=True)
 @click.option("--milestone", default=None, help="Set the native milestone (title; auto-created).")
-def forgejo_edit(number: str, add, remove, milestone) -> None:
-    """Add/remove labels and/or set the native milestone on an issue."""
+def forgejo_edit(number: str, title, body, body_file, add, remove, milestone) -> None:
+    """Edit an issue's title/body, labels, and/or milestone (e.g. fill a placeholder PRD issue)."""
+    if body_file is not None:
+        body = body_file.read_text(encoding="utf-8")
     c = forgejo_api.Client.from_repo()
+    if title is not None or body is not None:
+        c.update_issue(_num(number), title=title, body=body)
     if add or remove:
         c.edit_labels(_num(number), add=add, remove=remove)
     if milestone:

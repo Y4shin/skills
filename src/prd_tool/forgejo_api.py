@@ -227,6 +227,16 @@ class Client:
         self._request("PATCH", self._repo_path(f"/issues/{index}"), body={"milestone": mid})
         return mid
 
+    def update_issue(self, index: int, title: str | None = None, body: str | None = None) -> None:
+        """Edit an issue's title and/or body (used to fill a placeholder PRD issue)."""
+        payload = {}
+        if title is not None:
+            payload["title"] = title
+        if body is not None:
+            payload["body"] = body
+        if payload:
+            self._request("PATCH", self._repo_path(f"/issues/{index}"), body=payload)
+
     def edit_labels(self, index: int, add=(), remove=()) -> None:
         if add:
             self._request("POST", self._repo_path(f"/issues/{index}/labels"),
