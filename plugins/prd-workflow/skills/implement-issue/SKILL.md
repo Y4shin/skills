@@ -1,7 +1,7 @@
 ---
 name: implement-issue
 description: Phase 2 — implement a slice issue via strict TDD against the test plan from /prd-workflow:analyse-issue. Cuts a slice branch off the PRD's integration branch, runs red→green→refactor, merges the slice back into the PRD branch (no per-slice PR — only the PRD gets one, at finalize), closes the slice issue, then garbage-collects the slice doc and notes the decision on the PRD. The full CI gate is deferred to finalize-prd; each slice only runs its own test. Use after /prd-workflow:analyse-issue, or when the user says "now implement #n". Don't use it before a test plan exists (run analyse-issue first) or to finalize a completed PRD (use finalize-prd). Provider-aware (gh/fgj/local — local projects use the same branch workflow but skip remotes/PRs and use the built-in tracker).
-allowed-tools: Bash(python3 "*/scripts/prd_tool.pyz":*), Bash(python3 */scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 *)
 ---
 
 # Implement Issue

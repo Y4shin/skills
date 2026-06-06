@@ -1,7 +1,7 @@
 ---
 name: finalize-epic
 description: Close the loop on an epic once all its child PRDs are finalized — fold epic-level durable knowledge into the project's permanent docs (design docs, changelog), close the epic milestone (an epic is a milestone, not an issue), then delete the spent epic dir. Use when every child PRD of an epic is done, or the user says "finalize"/"wrap up" an epic. Don't use it while any child PRD is unfinished (finish finalize-prd first). Provider-aware (gh/fgj/local).
-allowed-tools: Bash(python3 "*/scripts/prd_tool.pyz":*), Bash(python3 */scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 *)
 ---
 
 # Finalize Epic

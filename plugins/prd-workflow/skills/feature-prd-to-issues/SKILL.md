@@ -1,7 +1,7 @@
 ---
 name: feature-prd-to-issues
 description: Break a feature PRD (kind:feature) into independently-grabbable issues as tracer-bullet vertical slices, wire the PRD issue + slices with native dependencies (and assign the PRD issue to the epic's milestone when under an epic), and write committed slice docs. Use after /prd-workflow:create-feature-prd, or when converting a feature spec into work issues. Don't use it on a capability PRD (use capability-prd-to-issues) or to author the PRD itself (use create-feature-prd). Provider-aware (gh/fgj/local).
-allowed-tools: Bash(python3 "*/scripts/prd_tool.pyz":*), Bash(python3 */scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 *)
 ---
 
 # Feature PRD → Issues

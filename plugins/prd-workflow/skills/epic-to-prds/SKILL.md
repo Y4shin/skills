@@ -1,7 +1,7 @@
 ---
 name: epic-to-prds
 description: Decompose an epic (kind:epic) into an ordered set of child PRDs, create the epic milestone (an epic is a milestone, not an issue), and hand off to /prd-workflow:create-feature-prd or /prd-workflow:create-capability-prd per child with seeded context. Use after /prd-workflow:create-epic. Don't use it on a feature/capability PRD (use the matching prd-to-issues skill). Provider-aware (gh/fgj/local).
-allowed-tools: Bash(python3 "*/scripts/prd_tool.pyz":*), Bash(python3 */scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 *)
 ---
 
 # Epic → PRDs

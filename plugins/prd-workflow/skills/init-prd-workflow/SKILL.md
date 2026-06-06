@@ -1,7 +1,7 @@
 ---
 name: init-prd-workflow
 description: Initialize the prd-workflow in this repo by creating the version file (docs/prd/.workflow-version). Every other prd-workflow skill refuses to run until this exists, so run this once first. Use when starting the prd-workflow in a repo for the first time, or when another skill reports the workflow is uninitialized. For a repo with pre-versioning artifacts it stamps the v0 baseline and points you at update-prd-workflow. If already initialized it's a no-op.
-allowed-tools: Bash(python3 "*/scripts/prd_tool.pyz":*), Bash(python3 */scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 *)
 ---
 
 # Initialize the prd-workflow

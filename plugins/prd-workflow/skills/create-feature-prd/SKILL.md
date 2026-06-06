@@ -1,7 +1,7 @@
 ---
 name: create-feature-prd
 description: Interview the user to produce a feature PRD (user-facing behaviour) committed to docs/prd/<slug>/prd.md with `kind: feature` frontmatter. Use when starting a new user-facing feature, turning an idea into a spec, or when the user says "let's spec a feature" / "write a PRD for this feature". Don't use it for foundational capability work with no UI (use create-capability-prd), or to break an existing PRD into issues (use feature-prd-to-issues). Hands off to /prd-workflow:feature-prd-to-issues.
-allowed-tools: Bash(python3 "*/scripts/prd_tool.pyz":*), Bash(python3 */scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 *)
 ---
 
 # Create Feature PRD

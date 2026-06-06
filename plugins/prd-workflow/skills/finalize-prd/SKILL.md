@@ -1,7 +1,7 @@
 ---
 name: finalize-prd
 description: Close the loop once all of a PRD's slices are merged into its integration branch — harvest the enriched PRD + the branch diff, fold durable knowledge into the project's permanent docs (design docs, milestone/changelog), tick its epic if any, delete the spent PRD dir, then open the single PRD PR (Closes #prd-issue) into main where the full CI gate runs. On a local forge, the PRD branch merges into main locally. This is the one integration point and the one gate for the whole PRD. Use when a PRD's slices are all done, or the user says "finalize"/"wrap up" a PRD. Don't use it while any slice is still open or unmerged (finish implement-issue first). Provider-aware (gh/fgj/local — local projects use the same branch workflow but merge locally instead of opening a PR).
-allowed-tools: Bash(python3 "*/scripts/prd_tool.pyz":*), Bash(python3 */scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 *)
 ---
 
 # Finalize PRD
