@@ -1,12 +1,17 @@
 ---
 name: finalize-prd
 description: Close the loop once all of a PRD's slices are merged into its integration branch — harvest the enriched PRD + the branch diff, fold durable knowledge into the project's permanent docs (design docs, milestone/changelog), tick its epic if any, delete the spent PRD dir, then open the single PRD PR (Closes #prd-issue) into main where the full CI gate runs. On a local forge, the PRD branch merges into main locally. This is the one integration point and the one gate for the whole PRD. Use when a PRD's slices are all done, or the user says "finalize"/"wrap up" a PRD. Don't use it while any slice is still open or unmerged (finish implement-issue first). Provider-aware (gh/fgj/local — local projects use the same branch workflow but merge locally instead of opening a PR).
-allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 "*/scripts/prd_tool.pyz":*), Bash(python3 */scripts/prd_tool.pyz:*)
 ---
 
 # Finalize PRD
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+Wherever a command below is written as `prd_tool`, run it as the absolute command printed
+here (the bundled CLI) — `prd_tool` is shorthand, not a binary on your PATH:
+
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" toolpath`
+
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" workflow-gate`
 
 Phase 3 — **the PRD's single integration point.** Every slice has merged into the PRD branch
 `prd/<prd-slug>` with no PR of its own; finalize migrates durable knowledge into the repo's
@@ -19,23 +24,23 @@ All of finalize's doc work (knowledge harvest, epic tick, PRD-dir deletion) is c
 **onto the PRD branch** so it rides to `main` inside that single PR (hosted forges) or local
 merge (local forge) — code, docs, and cleanup land together.
 
-Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`**.
-Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`. The artifact-lifecycle
+Detected forge: **!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge git_type`**.
+Per-provider commands come from `prd_tool forge <key>`. The artifact-lifecycle
 reference is injected below.
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" reference`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" reference`
 
-`prd_tool.pyz` is the bundled helper that reads/writes this frontmatter — invoke it as
-`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full
+`prd_tool` is the bundled helper that reads/writes this frontmatter — invoke it as
+`prd_tool <subcommand>` (`--help` for the full
 surface). The current planning-tree inventory is injected here:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" list`
 
 The project profile (knowledge destinations) is injected below when available — its
 "Knowledge destinations" section is where Step 3 folds durable knowledge. If empty, find the
 project's permanent docs (design docs, decision log, changelog) and fold knowledge there:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" profile`
 
 ## Step 1 — Preconditions
 
@@ -60,8 +65,8 @@ git merge main                 # fold in any main that landed since; resolve con
 Resolve the PRD and gate on its slices:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" resolve <slug|prd-issue#> --kind prd
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" prd-finalizable <slug|prd-issue#>
+prd_tool resolve <slug|prd-issue#> --kind prd
+prd_tool prd-finalizable <slug|prd-issue#>
 ```
 
 `prd-finalizable` exits **0** only when `docs/prd/<slug>/slices/` holds no surviving slice docs
@@ -101,12 +106,12 @@ local merge (local forge).
 ## Step 4 — Tick the epic + delete the spent PRD dir
 
 - **If `prd.md` carries `epic: <epic-slug>`** (check with
-  `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" get <slug> epic`): mark this PRD's
+  `prd_tool get <slug> epic`): mark this PRD's
   `prds[]` entry done in `docs/prd/epics/<epic-slug>/epic.md` (the epic is a milestone, so this
   is the only place the child is ticked — there is no epic issue):
 
   ```bash
-  python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" epic tick <epic-slug> <prd-slug>
+  prd_tool epic tick <epic-slug> <prd-slug>
   ```
 
   (When it's the last child — `epic finalizable <epic-slug>` now exits 0 — the user can
@@ -130,7 +135,7 @@ belongs in the single integration point (PR on hosted forges, local merge on loc
    the PRD title, body = a summary of the slices + the met acceptance criteria + `Closes
    #<prd-issue>`. PR form for the detected provider:
 
-   !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_create_pr`
+   !`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge cmd_create_pr`
 
 3. The host re-runs CI on the PR. A human reviews and merges it — this is the PRD's single
    review gate. **On merge**, all the slice work + the doc updates + the PRD-dir deletion land
@@ -142,11 +147,11 @@ issue:
 
 2. Merge form:
 
-   !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_create_pr`
+   !`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge cmd_create_pr`
 
 3. Close the PRD issue:
 
-   !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_close_issue`
+   !`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge cmd_close_issue`
 
    All the slice work + the doc updates + the PRD-dir deletion are now on `main`.
 
@@ -158,7 +163,7 @@ epic — the updated epic checklist.
 
 - If `docs/prd/<slug>/slices/` still has docs or any slice issue is open, **stop** (Step 1 gate) —
   list what's outstanding; never finalize partial work.
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `NOT_A_GIT_REPO`, the
+- If `prd_tool forge` prints `NOT_A_GIT_REPO`, the
   directory isn't a git repo — tell the user to run `git init` first and stop.
 - If it prints `UNKNOWN_FORGE`, the repo has a remote this workflow doesn't recognise (not
   GitHub/Forgejo) — surface it and stop; don't invent CLI calls. A repo with no remote resolves

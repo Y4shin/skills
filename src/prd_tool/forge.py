@@ -36,8 +36,10 @@ Placeholders in emitted commands use ``<angle-brackets>``; fill them in.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 
 # Keys grouped exactly as the old `forge_detect.sh keys` printed them.
@@ -59,10 +61,14 @@ LABELS = (
 )
 
 
-# How a skill invokes the bundled tool from its bash context. Used verbatim in
-# the `local` provider's snippets; ${CLAUDE_PLUGIN_ROOT} expands when the agent
-# runs the command (prd_tool only prints this string literally).
-PRD_TOOL = 'python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz"'
+# Absolute command to re-invoke this very tool, computed from the running
+# artifact's own path. The CLI embeds this in every command snippet it prints, so
+# the model runs an absolute path in the Bash tool — no ${CLAUDE_PLUGIN_ROOT} /
+# ${CLAUDE_SKILL_DIR} needed (neither is set in the Bash tool's runtime env; they
+# only expand during a skill's `!` preprocessing). Recomputed each run, so it
+# survives plugin updates. realpath() normalises any `..` from a CLAUDE_SKILL_DIR
+# -relative invocation down to the real plugin-root path.
+PRD_TOOL = f'python3 "{os.path.realpath(sys.argv[0])}"'
 
 
 class UnknownForge(Exception):

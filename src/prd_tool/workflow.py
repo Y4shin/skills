@@ -27,12 +27,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from .forge import PRD_TOOL as _TOOL  # absolute, self-located invocation
+
 # Bump this when a new set of conventions ships, and add a Migration below.
 CURRENT_VERSION = 2
-
-# How the skills invoke the bundled tool (matches forge.PRD_TOOL); used in the
-# emitted instruction text so the agent can copy/paste the next command.
-_TOOL = 'python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz"'
 
 
 def version_file(root: Path) -> Path:

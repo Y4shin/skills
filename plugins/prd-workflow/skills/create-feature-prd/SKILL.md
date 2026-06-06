@@ -1,12 +1,17 @@
 ---
 name: create-feature-prd
 description: Interview the user to produce a feature PRD (user-facing behaviour) committed to docs/prd/<slug>/prd.md with `kind: feature` frontmatter. Use when starting a new user-facing feature, turning an idea into a spec, or when the user says "let's spec a feature" / "write a PRD for this feature". Don't use it for foundational capability work with no UI (use create-capability-prd), or to break an existing PRD into issues (use feature-prd-to-issues). Hands off to /prd-workflow:feature-prd-to-issues.
-allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 "*/scripts/prd_tool.pyz":*), Bash(python3 */scripts/prd_tool.pyz:*)
 ---
 
 # Create Feature PRD
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+Wherever a command below is written as `prd_tool`, run it as the absolute command printed
+here (the bundled CLI) — `prd_tool` is shorthand, not a binary on your PATH:
+
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" toolpath`
+
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" workflow-gate`
 
 Phase 0 of the **feature** track. Run the relentless `grill-me` interview, then crystallise
 it into a committed PRD that `/prd-workflow:feature-prd-to-issues` will slice. A *feature* is
@@ -17,19 +22,19 @@ foundational work with no UI, use `/prd-workflow:create-capability-prd` instead.
 The PRD/artifact reference below is loaded via **dynamic context injection** (frontmatter
 schema + `docs/prd/<slug>/` layout + lifecycle):
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" reference`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" reference`
 
-`prd_tool.pyz` is the bundled helper that reads/writes this frontmatter — invoke it as
-`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full
+`prd_tool` is the bundled helper that reads/writes this frontmatter — invoke it as
+`prd_tool <subcommand>` (`--help` for the full
 surface). The existing planning-tree inventory is injected here — **check it before choosing
 `<slug>`** (avoid collisions) and, in epic context, to confirm the parent epic exists:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" list`
 
 The project profile (project description, orientation docs, architecture layers) is injected
 below when available — if empty, explore the codebase for project-specific context:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" profile`
 
 ## Step 1 — Load context
 
@@ -78,7 +83,7 @@ Leave `prd_issue:` / `slices:` empty — `/prd-workflow:feature-prd-to-issues` f
 Sanity-check the written frontmatter (it must parse and read `kind: feature`):
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" show <slug>
+prd_tool show <slug>
 ```
 
 ## Step 4 — Hand off

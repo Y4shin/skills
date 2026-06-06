@@ -120,6 +120,17 @@ def forge_cmd(key: str) -> None:
     click.echo(text)
 
 
+@cli.command(name="toolpath")
+def toolpath_cmd() -> None:
+    """Print the absolute command to invoke this tool: python3 "<path-to-pyz>".
+
+    Skills inject this once (their `prd_tool` shorthand) so the commands the model
+    runs in the Bash tool carry a real absolute path — ${CLAUDE_SKILL_DIR} /
+    ${CLAUDE_PLUGIN_ROOT} are not present in the Bash tool's runtime environment.
+    """
+    click.echo(forge_mod.PRD_TOOL)
+
+
 @cli.command(name="list")
 @click.option("--kind", type=click.Choice(("epic", "feature", "capability")), default=None)
 @click.option("--status", default=None, help="Filter by frontmatter status:.")

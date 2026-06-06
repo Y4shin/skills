@@ -1,12 +1,17 @@
 ---
 name: adopt-prd
 description: Backfill the prd-workflow YAML frontmatter onto one or many existing planning docs (PRDs, epics, and slice docs) that predate this workflow or carry an old inline-metadata format. Lints the docs/prd tree with prd_tool list-bad-files / show-violations to find every non-conforming artifact, then for each infers its fields (PRD fields kind/title/slug/status; slice fields kind/title/slug/issue/prd/mode) from the prose, writes the frontmatter block, relocates/renames the file to its canonical path, and trims body text (incl. old `**PRD:** … · **kind:** …` metadata lines) that merely duplicates those fields. Use to bring a single legacy doc — or a whole directory of them — under management. Don't use it to author a brand-new PRD (use create-feature-prd / create-capability-prd) or to slice one into issues (use *-prd-to-issues). Hands off to the matching /prd-workflow:*-prd-to-issues.
-allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*), Bash(mkdir:*), Bash(git mv:*), Bash(mv:*)
+allowed-tools: Bash(python3 "*/scripts/prd_tool.pyz":*), Bash(python3 */scripts/prd_tool.pyz:*), Bash(mkdir:*), Bash(git mv:*), Bash(mv:*)
 ---
 
 # Adopt PRD
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+Wherever a command below is written as `prd_tool`, run it as the absolute command printed
+here (the bundled CLI) — `prd_tool` is shorthand, not a binary on your PATH:
+
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" toolpath`
+
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" workflow-gate`
 
 Bring **existing** planning documents — written before this workflow, or in an older inline-metadata
 format — under prd-workflow management, **one doc or a whole directory at once**. The worklist may
@@ -21,10 +26,10 @@ or `/prd-workflow:create-capability-prd` instead.
 The PRD/artifact reference below is loaded via **dynamic context injection** (the frontmatter
 schema you must produce, the `docs/prd/<slug>/` layout, and the lifecycle / status values):
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" reference`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" reference`
 
-`prd_tool.pyz` is the bundled helper that reads/writes this frontmatter — invoke it as
-`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full
+`prd_tool` is the bundled helper that reads/writes this frontmatter — invoke it as
+`prd_tool <subcommand>` (`--help` for the full
 surface). Two subcommands drive the batch worklist: **`list-bad-files`** prints the path of every
 artifact whose frontmatter violates the schema, and **`show-violations [path]`** prints, per file,
 a concise list of exactly what's missing or wrong (both take `--json`). Note `prd_tool` can only
@@ -33,13 +38,13 @@ file tools first, and use `show-violations` to confirm the result at the end. Th
 planning-tree inventory is injected here — **check it before choosing each `<slug>`** (avoid
 collisions) and to spot the parent epic if a doc belongs to one:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" list`
 
 The project profile (architecture layers) is injected below when available — its "Architecture
 layers" section is what the `kind` inference in Step 2 leans on. If empty, infer `kind` from
 what the doc delivers and the codebase:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" profile`
 
 ## Step 0 — Scope the worklist
 
@@ -47,8 +52,8 @@ If the user named a single doc, that's your worklist. If they pointed at a **dir
 "fix up `docs/prd`"), enumerate the non-conforming artifacts and read the specifics:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list-bad-files     # the files to fix
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" show-violations    # what's wrong with each
+prd_tool list-bad-files     # the files to fix
+prd_tool show-violations    # what's wrong with each
 ```
 
 A file already absent from `list-bad-files` conforms — leave it untouched. For each flagged file,
@@ -124,8 +129,8 @@ Confirm the rewritten doc now conforms — it should report no violations and `s
 kind:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" show-violations <slug-dir>   # expect clean
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" show <slug>                  # kind: feature|capability
+prd_tool show-violations <slug-dir>   # expect clean
+prd_tool show <slug>                  # kind: feature|capability
 ```
 
 When working a directory, after the last file run `list-bad-files` once more — it should print
@@ -167,7 +172,7 @@ Infer the slice schema (`kind`, `title`, `slug`, `issue`, `prd`, `mode`, `analys
 2. **`title`** — the text after the em-dash in the H1 (`Job-run inspector`).
 3. **`slug`** — the `<slug>` part of the filename; else a kebab of the title.
 4. **`kind`** — from the inline `**kind:**`, or **inherit the parent PRD's** kind
-   (`prd_tool.pyz get <prd-slug> kind`); the two must agree.
+   (`prd_tool get <prd-slug> kind`); the two must agree.
 5. **`prd`** — the relative path to the parent PRD, normally `../prd.md` (from the inline
    `**PRD:**` or the layout).
 6. **`mode`** — from the inline `**mode:**`; default `hitl` if absent.

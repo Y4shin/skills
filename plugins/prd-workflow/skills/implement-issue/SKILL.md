@@ -1,12 +1,17 @@
 ---
 name: implement-issue
 description: Phase 2 — implement a slice issue via strict TDD against the test plan from /prd-workflow:analyse-issue. Cuts a slice branch off the PRD's integration branch, runs red→green→refactor, merges the slice back into the PRD branch (no per-slice PR — only the PRD gets one, at finalize), closes the slice issue, then garbage-collects the slice doc and notes the decision on the PRD. The full CI gate is deferred to finalize-prd; each slice only runs its own test. Use after /prd-workflow:analyse-issue, or when the user says "now implement #n". Don't use it before a test plan exists (run analyse-issue first) or to finalize a completed PRD (use finalize-prd). Provider-aware (gh/fgj/local — local projects use the same branch workflow but skip remotes/PRs and use the built-in tracker).
-allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 "*/scripts/prd_tool.pyz":*), Bash(python3 */scripts/prd_tool.pyz:*)
 ---
 
 # Implement Issue
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" workflow-gate`
+Wherever a command below is written as `prd_tool`, run it as the absolute command printed
+here (the bundled CLI) — `prd_tool` is shorthand, not a binary on your PATH:
+
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" toolpath`
+
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" workflow-gate`
 
 Phase 2: execute the agreed test plan with full repo automation. Requires the slice doc
 `docs/prd/<slug>/slices/<n>-<slug>.md` (spec + `## Test plan`) written by `/prd-workflow:analyse-issue`.
@@ -21,23 +26,23 @@ whole-suite gate: it only writes and passes **its own** test, then merges into t
 (On a `local` forge, the branch workflow is identical — only remote operations like fetch, push,
 and PRs are skipped.)
 
-Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`**.
-Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`, injected at the step that
+Detected forge: **!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge git_type`**.
+Per-provider commands come from `prd_tool forge <key>`, injected at the step that
 uses them. The artifact-lifecycle reference is injected below.
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" reference`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" reference`
 
-`prd_tool.pyz` is the bundled helper that reads/writes this frontmatter — invoke it as
-`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full
+`prd_tool` is the bundled helper that reads/writes this frontmatter — invoke it as
+`prd_tool <subcommand>` (`--help` for the full
 surface). The current planning-tree inventory is injected here:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" list`
 
 The project profile (code conventions, CI command, orientation docs) is injected below when
 available — its "Code conventions" and "CI" sections drive Steps 3 and 5. If empty, explore
 the codebase for the lint/format config and CI command yourself:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" profile`
 
 ## Step 1 — Set state
 
@@ -45,8 +50,8 @@ Swap the issue's label `status:todo` → `status:in-progress` and add a starting
 ("Starting implementation. Branch: `slice/<n>-<slug>` off `prd/<prd-slug>`."). Label-edit +
 comment form:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_edit_labels`
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_comment`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge cmd_edit_labels`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge cmd_comment`
 
 ## Step 2 — Sync + branch
 
@@ -146,8 +151,8 @@ Then mark the slice issue done and **close it** — it's integrated into the PRD
 `blocked_by` edge on the PRD resolves (the PRD issue itself stays open until its PR lands).
 Label-edit (`status:in-progress` → `status:done`) + close forms:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_edit_labels`
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_close_issue`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge cmd_edit_labels`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge cmd_close_issue`
 
 Report that the slice is integrated into `prd/<prd-slug>` and its issue closed.
 
@@ -163,7 +168,7 @@ Report that the slice is integrated into `prd/<prd-slug>` and its issue closed.
 3. Report whether this was the PRD's last slice — if the gate now passes, point the user at
    `/prd-workflow:finalize-prd <slug>` (which integrates the PRD branch and runs the full CI gate):
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" prd-finalizable <slug>
+   prd_tool prd-finalizable <slug>
    ```
 
 ## Error handling
@@ -171,7 +176,7 @@ Report that the slice is integrated into `prd/<prd-slug>` and its issue closed.
 - If the slice doc `docs/prd/<slug>/slices/<n>-<slug>.md` is missing, or its frontmatter has
   `analysed: false` (or no `## Test plan` section), stop — run `/prd-workflow:analyse-issue <n>`
   first; do not improvise a test strategy here.
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `NOT_A_GIT_REPO`, the
+- If `prd_tool forge` prints `NOT_A_GIT_REPO`, the
   directory isn't a git repo — tell the user to run `git init` first and stop.
 - If it prints `UNKNOWN_FORGE`, the repo has a remote this workflow doesn't recognise (not
   GitHub/Forgejo) — surface it and stop; don't invent CLI calls. A repo with no remote resolves
