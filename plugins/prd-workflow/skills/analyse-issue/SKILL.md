@@ -1,47 +1,54 @@
 ---
 name: analyse-issue
 description: Fetch a slice issue (#n), present a structured summary, then run a focused grilling session to decide the test strategy before any code. Appends a confirmed Test plan to the issue's committed slice doc and hands off to /prd-workflow:implement-issue. Use when starting work on an issue, or when the user says "analyse"/"start on" #n. Don't use it to write code or open a PR (use implement-issue once the test plan is agreed). Provider-aware (gh/fgj/local).
-allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
+allowed-tools: Bash(python3 *)
 ---
 
 # Analyse Issue
+
+Wherever a command below is written as `prd_tool`, run it as the absolute command printed
+here (the bundled CLI) — `prd_tool` is shorthand, not a binary on your PATH:
+
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" toolpath`
+
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" workflow-gate`
 
 Phase 1: understand the issue, then challenge the developer to decide the right test
 strategy *before* writing a line of code. The fastest honest feedback loop is the goal — a
 slice must be testable, not just "covered".
 
-Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`**.
-Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`. The slice-doc/lifecycle
+Detected forge: **!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge git_type`**.
+Per-provider commands come from `prd_tool forge <key>`. The slice-doc/lifecycle
 reference is injected below.
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" reference`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" reference`
 
-`prd_tool.pyz` is the bundled helper that reads this frontmatter — invoke it as
-`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full
+`prd_tool` is the bundled helper that reads this frontmatter — invoke it as
+`prd_tool <subcommand>` (`--help` for the full
 surface). The current planning-tree inventory is injected here:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" list`
 
 The project profile (architecture layers, test infrastructure, orientation docs) is injected
 below when available — its "Test infrastructure" section is the source for test types, file
 patterns, and run commands used in Steps 2–3. If empty, explore the codebase to identify the
 available test frameworks and their run commands:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" profile`
 
 ## Step 1 — Fetch + present
 
 Fetch the issue (form for the detected provider):
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_get_issue`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge cmd_get_issue`
 
 Read its `kind:` label and `Part of #<prd>` to locate the PRD and slice doc. The PRD issue # in
 `Part of #<prd>` maps to its dir, and `slices` lists this PRD's surviving slice docs (the one for
 `#<n>` is among them):
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" resolve <prd#> --kind prd   # → docs/prd/<slug>/prd.md
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" slices <slug>               # → the <n>-<slug>.md path
+prd_tool resolve <prd#> --kind prd   # → docs/prd/<slug>/prd.md
+prd_tool slices <slug>               # → the <n>-<slug>.md path
 ```
 
 Read both the `prd.md` and `docs/prd/<slug>/slices/<n>-<slug>.md` in full. Load conventions
@@ -128,7 +135,7 @@ Invoke `/prd-workflow:implement-issue <n>`. The spec + test plan live in
 
 ## Error handling
 
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `NOT_A_GIT_REPO`, the
+- If `prd_tool forge` prints `NOT_A_GIT_REPO`, the
   directory isn't a git repo — tell the user to run `git init` first and stop.
 - If it prints `UNKNOWN_FORGE`, the repo has a remote this workflow doesn't recognise (not
   GitHub/Forgejo) — surface it and stop; don't invent CLI calls. A repo with no remote resolves

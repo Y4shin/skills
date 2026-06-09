@@ -1,36 +1,43 @@
 ---
 name: capability-prd-to-issues
-description: Break a capability PRD (kind:capability) into independently-grabbable enabling slices (foundational surface, each with a first consumer), wire the PRD issue + slices with native dependencies (and sub-issues under an epic), and write committed slice docs. Use after /prd-workflow:create-capability-prd. Don't use it on a feature PRD (use feature-prd-to-issues) or to author the PRD itself (use create-capability-prd). Provider-aware (gh/fgj/local).
-allowed-tools: Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz":*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz:*)
+description: Break a capability PRD (kind:capability) into independently-grabbable enabling slices (foundational surface, each with a first consumer), wire the PRD issue + slices with native dependencies (and assign the PRD issue to the epic's milestone when under an epic), and write committed slice docs. Use after /prd-workflow:create-capability-prd. Don't use it on a feature PRD (use feature-prd-to-issues) or to author the PRD itself (use create-capability-prd). Provider-aware (gh/fgj/local).
+allowed-tools: Bash(python3 *)
 ---
 
 # Capability PRD → Issues
 
+Wherever a command below is written as `prd_tool`, run it as the absolute command printed
+here (the bundled CLI) — `prd_tool` is shorthand, not a binary on your PATH:
+
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" toolpath`
+
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" workflow-gate`
+
 Convert a `kind: capability` PRD into independently-grabbable issues using **enabling
 slices**, wired with the flat native tracker model (see the injected reference): the PRD issue
-is `blocked_by` its slices; under an epic, the PRD and every slice attach as native sub-issues
-of that epic. Capabilities are foundational (no UI to demo), so acceptance is a **consumer
-test**, not a demoable screen.
+is `blocked_by` its slices; under an epic, the PRD issue is assigned that epic's milestone.
+Capabilities are foundational (no UI to demo), so acceptance is a **consumer test**, not a
+demoable screen.
 
-Detected forge: **!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge git_type`** — !`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge ownership_note`
+Detected forge: **!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge git_type`** — !`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge ownership_note`
 
-Per-provider commands come from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge <key>`, injected at the step that
+Per-provider commands come from `prd_tool forge <key>`, injected at the step that
 uses them. The PRD/artifact reference (frontmatter + `docs/prd/<slug>/` layout + lifecycle)
 is injected below.
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" reference`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" reference`
 
-`prd_tool.pyz` is the bundled helper that reads/writes this frontmatter — invoke it as
-`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" <subcommand>` (`--help` for the full
+`prd_tool` is the bundled helper that reads/writes this frontmatter — invoke it as
+`prd_tool <subcommand>` (`--help` for the full
 surface). The current planning-tree inventory is injected here:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" list`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" list`
 
 The project profile (architecture layers, orientation docs) is injected below when available
 — its "Architecture layers → Capability" section defines what an enabling slice means here.
 If empty, explore the codebase to learn the layering and the libraries/host this work extends:
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" profile`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" profile`
 
 ## Step 0 — Provider + PRD
 
@@ -38,14 +45,14 @@ Verify auth, then locate the PRD at `docs/prd/<slug>/prd.md` and **assert `kind:
 the helper exits non-zero (and points at `/prd-workflow:feature-prd-to-issues`) on a mismatch:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" assert-kind <slug> capability
+prd_tool assert-kind <slug> capability
 ```
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge auth_check`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge auth_check`
 
 Ensure the label scheme exists (idempotent):
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge ensure_labels`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge ensure_labels`
 
 ## Step 1 — Explore (if needed)
 
@@ -80,49 +87,47 @@ approved.
 
 ## Step 4 — Publish (flat native model, dependency order, blockers first)
 
-Read the injected reference for the tracker rule: **sub-issue = epic-only; dependencies =
-everything else.** Check `prd.md` frontmatter for an `epic:` field — present ⇒ this PRD belongs
-to an epic; absent ⇒ standalone.
+Read the injected reference for the tracker rule: **an epic is a milestone (a PRD issue joins it
+via `--milestone`); native dependencies express all ordering.** Check `prd.md` frontmatter for an
+`epic:` field — present ⇒ this PRD belongs to an epic; absent ⇒ standalone (no milestone).
 
-Create-issue form for the detected provider:
+When this PRD belongs to an epic, its PRD issue **already exists** as a placeholder created by
+`/prd-workflow:epic-to-prds` (assigned the epic milestone) — you **edit** it in place; do **not**
+create a second issue. Only a standalone PRD creates a fresh issue. Forms for the detected
+provider (edit fills a placeholder; create is standalone-only; dependency wires slices):
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_create_issue`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge cmd_edit_issue`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge cmd_create_issue`
+!`python3 "${CLAUDE_SKILL_DIR}/../../scripts/prd_tool.pyz" forge cmd_add_dependency`
 
-Add a native dependency (make `<issue#>` blocked-by `<blocker#>`):
-
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_add_dependency`
-
-Attach a child as a sub-issue of the **epic** (only used when `epic:` is set):
-
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge cmd_attach_subissue`
-
-1. **Create the PRD issue** (labels `prd`, `kind:capability`): body = PRD summary. It is a
-   regular issue — it does **not** own the slices as sub-issues. Record its number as
-   `prd_issue:`:
-   ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" set <slug> prd_issue <prd#>
-   ```
-2. For each slice, in dependency order:
-   - Create the issue with labels `kind:capability`, `mode:hitl|afk`, `status:todo` (+
-     `milestone:M<NN>`). Body uses the template below (`Part of #<prd>` + blockers).
+1. **The PRD issue** (body = PRD summary):
+   - **If `epic:` is set** (`prd_tool get <slug> epic`): find the placeholder and **edit** it
+     — set the real title + body and ensure labels `prd`, `kind:capability` (keep its milestone).
+     Get the number with:
+     ```bash
+     prd_tool epic prd-issue <epic-slug> <slug>
+     ```
+   - **Else (standalone):** create a new PRD issue (labels `prd`, `kind:capability`; no milestone).
+   - Record the number as `prd_issue:`:
+     ```bash
+     prd_tool set <slug> prd_issue <prd#>
+     ```
+2. For each slice, in dependency order (slices carry **no** milestone):
+   - Create the issue with labels `kind:capability`, `mode:hitl|afk`, `status:todo`. Body uses
+     the template below (`Part of #<prd>` + blockers).
    - Add **PRD `blocked_by` this slice**.
    - For each blocker in the slice's `## Blocked by`, add **slice `blocked_by` blocker**.
    - Write `docs/prd/<slug>/slices/<n>-<slug>.md` from the template in `references/artifacts.md`.
-3. **If `epic:` is set** (`prd_tool.pyz get <slug> epic`)**:** attach the PRD issue **and every
-   slice issue** as native sub-issues of the epic (`epic_issue:` from
-   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" get <epic-slug> epic_issue`). Add any
-   **PRD `blocked_by` PRD** edges the epic's `prds[].blocked_by` calls for. Then record the link
-   on the epic and set its status:
+3. **If `epic:` is set:** the epic already recorded this PRD's issue and the PRD↔PRD order (wired
+   by `/prd-workflow:epic-to-prds`). Just move the epic to in-progress:
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" epic set-prd-issue <epic-slug> <slug> <prd#>
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" set <epic-slug> status in-progress
+   prd_tool set <epic-slug> status in-progress
    ```
-   (also tick its checklist item on the epic issue).
 4. Record the slices + status on the PRD, then commit the `docs/prd/` changes (PRD dir, and the
    epic dir if touched):
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" set-slices <slug> <#a> <#b> ...
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" set <slug> status issues-created
+   prd_tool set-slices <slug> <#a> <#b> ...
+   prd_tool set <slug> status issues-created
    ```
 
 <issue-template>
@@ -144,12 +149,11 @@ encodes the decision better than prose.
 </issue-template>
 
 After publishing, report: `#<n> · <title> · HITL|AFK · consumer: <x> · blocked-by: …` per
-slice, the PRD issue number, and (if under an epic) the epic issue number with its updated
-checklist.
+slice, the PRD issue number, and (if under an epic) the epic milestone it was assigned to.
 
 ## Error handling
 
-- If `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prd_tool.pyz" forge` prints `NOT_A_GIT_REPO`, the
+- If `prd_tool forge` prints `NOT_A_GIT_REPO`, the
   directory isn't a git repo — tell the user to run `git init` first and stop.
 - If it prints `UNKNOWN_FORGE`, the repo has a remote this workflow doesn't recognise (not
   GitHub/Forgejo) — surface it and stop; don't invent CLI calls. A repo with no remote resolves
@@ -164,6 +168,6 @@ checklist.
 
 - **kind:capability only** — abort on a feature PRD.
 - **English**; **no speculative scope** — every surface names a consumer or it's deferred.
-- **Tracker rule:** sub-issue parenting is epic-only; PRD↔slice and all ordering are native
-  dependencies. The PRD issue never owns slices as sub-issues.
+- **Tracker rule:** an epic is a milestone (the PRD issue joins it via `--milestone`); PRD↔slice
+  and all ordering are native dependencies. There are no epic issues or sub-issues.
 - Do not modify unrelated issues.

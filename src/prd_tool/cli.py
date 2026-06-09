@@ -17,7 +17,8 @@ from pathlib import Path
 import click
 
 from . import forge as forge_mod
-from . import model, tracker as tracker_mod, validate
+from . import forgejo_api, model, tracker as tracker_mod, validate, workflow as workflow_mod
+from .forgejo_api import ForgejoError
 from .frontmatter import FrontmatterError
 from .model import ResolutionError
 from .tracker import TrackerError
@@ -117,6 +118,17 @@ def forge_cmd(key: str) -> None:
     if code:
         raise _fail(text, code=code)
     click.echo(text)
+
+
+@cli.command(name="toolpath")
+def toolpath_cmd() -> None:
+    """Print the absolute command to invoke this tool: python3 "<path-to-pyz>".
+
+    Skills inject this once (their `prd_tool` shorthand) so the commands the model
+    runs in the Bash tool carry a real absolute path — ${CLAUDE_SKILL_DIR} /
+    ${CLAUDE_PLUGIN_ROOT} are not present in the Bash tool's runtime environment.
+    """
+    click.echo(forge_mod.PRD_TOOL)
 
 
 @cli.command(name="list")
@@ -394,6 +406,26 @@ def epic_set_prd_issue(root: Path, selector: str, prd_slug: str, issue: str) -> 
     raise _fail(f"{a.slug}: no child PRD {prd_slug!r} in prds:")
 
 
+@epic.command(name="prd-issue")
+@click.argument("selector")
+@click.argument("prd_slug")
+@pass_root
+def epic_prd_issue(root: Path, selector: str, prd_slug: str) -> None:
+    """Print the (placeholder) issue number of an epic's child PRD entry.
+
+    Used by *-prd-to-issues to find the pre-created placeholder issue to edit
+    instead of creating a new one.
+    """
+    a = model.resolve(root, selector, want="epic")
+    for p in _epic_prds(a):
+        if p.get("slug") == prd_slug:
+            if not p.get("issue"):
+                raise _fail(f"{a.slug}: child PRD {prd_slug!r} has no issue yet")
+            click.echo(p["issue"])
+            return
+    raise _fail(f"{a.slug}: no child PRD {prd_slug!r} in prds:")
+
+
 @epic.command(name="tick")
 @click.argument("selector")
 @click.argument("prd_slug")
@@ -462,12 +494,13 @@ def tracker_ensure_labels(root: Path) -> None:
 @click.option("--body-file", type=click.Path(dir_okay=False, path_type=Path), default=None,
               help="Read the body from this file (mirrors gh --body-file).")
 @click.option("--label", "labels", multiple=True, help="Label to add (repeatable).")
+@click.option("--milestone", default=None, help="Milestone title (the epic; created if absent).")
 @pass_root
-def tracker_create(root: Path, title, body, body_file, labels) -> None:
+def tracker_create(root: Path, title, body, body_file, labels, milestone) -> None:
     """Create an issue; prints the new #number (which the skill records)."""
     if body_file is not None:
         body = body_file.read_text(encoding="utf-8")
-    number = tracker_mod.create(root, title, body or "", labels)
+    number = tracker_mod.create(root, title, body or "", labels, milestone=milestone)
     click.echo(f"#{number}")
 
 
@@ -494,8 +527,8 @@ def tracker_view(root: Path, number: str, as_json) -> None:
     click.echo(f"labels: {', '.join(issue['labels']) or '-'}")
     if issue["blocked_by"]:
         click.echo("blocked_by: " + ", ".join(f"#{b}" for b in issue["blocked_by"]))
-    if issue.get("parent"):
-        click.echo(f"parent: #{issue['parent']}")
+    if issue.get("milestone"):
+        click.echo(f"milestone: #{issue['milestone']}")
     click.echo("")
     click.echo(issue["body"])
     for c in issue["comments"]:
@@ -545,13 +578,22 @@ def tracker_close(root: Path, number: str, comment_text) -> None:
 
 @tracker.command(name="edit")
 @click.argument("number")
+@click.option("--title", default=None, help="New title.")
+@click.option("--body", default=None, help="New body text.")
+@click.option("--body-file", type=click.Path(dir_okay=False, path_type=Path), default=None,
+              help="Read the new body from this file.")
 @click.option("--add-label", "add", multiple=True, help="Label to add (repeatable).")
 @click.option("--remove-label", "remove", multiple=True, help="Label to remove (repeatable).")
 @pass_root
-def tracker_edit(root: Path, number: str, add, remove) -> None:
-    """Add/remove labels on an issue (mirrors the git-host label edit)."""
-    labels = tracker_mod.edit_labels(root, _num(number), add=add, remove=remove)
-    click.echo(f"#{_num(number)}: labels = {labels}")
+def tracker_edit(root: Path, number: str, title, body, body_file, add, remove) -> None:
+    """Edit an issue's title/body and/or labels (e.g. fill a placeholder PRD issue)."""
+    if body_file is not None:
+        body = body_file.read_text(encoding="utf-8")
+    if title is not None or body is not None:
+        tracker_mod.edit(root, _num(number), title=title, body=body)
+    if add or remove:
+        tracker_mod.edit_labels(root, _num(number), add=add, remove=remove)
+    click.echo(f"#{_num(number)}: updated")
 
 
 @tracker.command(name="dep")
@@ -564,31 +606,310 @@ def tracker_dep(root: Path, number: str, blocker: str) -> None:
     click.echo(f"#{_num(number)}: blocked_by #{_num(blocker)}")
 
 
-@tracker.command(name="attach")
-@click.argument("epic")
-@click.argument("child")
+@tracker.command(name="set-milestone")
+@click.argument("number")
+@click.argument("title")
 @pass_root
-def tracker_attach(root: Path, epic: str, child: str) -> None:
-    """Attach CHILD as a sub-issue of epic EPIC (the only parent relationship)."""
-    tracker_mod.attach(root, _num(epic), _num(child))
-    click.echo(f"#{_num(child)}: parent = #{_num(epic)}")
+def tracker_set_milestone(root: Path, number: str, title: str) -> None:
+    """Assign issue NUMBER to the milestone TITLE (the epic; created if absent)."""
+    ms = tracker_mod.set_milestone(root, _num(number), title)
+    click.echo(f"#{_num(number)}: milestone = #{ms} ({title})")
 
 
-@tracker.command(name="detach")
-@click.argument("epic")
-@click.argument("child")
+@tracker.group(name="milestone")
+def tracker_milestone() -> None:
+    """Local-tracker milestones — an epic is a milestone."""
+
+
+@tracker_milestone.command(name="create")
+@click.argument("title")
 @pass_root
-def tracker_detach(root: Path, epic: str, child: str) -> None:
-    """Detach CHILD from epic EPIC."""
-    tracker_mod.detach(root, _num(epic), _num(child))
-    click.echo(f"#{_num(child)}: detached from #{_num(epic)}")
+def tracker_milestone_create(root: Path, title: str) -> None:
+    """Create the epic milestone (idempotent); prints its number."""
+    click.echo(tracker_mod.create_milestone(root, title))
+
+
+@tracker_milestone.command(name="close")
+@click.argument("number")
+@pass_root
+def tracker_milestone_close(root: Path, number: str) -> None:
+    """Close the milestone NUMBER."""
+    tracker_mod.close_milestone(root, _num(number))
+    click.echo(f"milestone #{_num(number)}: closed")
+
+
+@tracker_milestone.command(name="list")
+@click.option("--json", "as_json", is_flag=True)
+@pass_root
+def tracker_milestone_list(root: Path, as_json) -> None:
+    """List milestones."""
+    ms = tracker_mod.list_milestones(root)
+    if as_json:
+        click.echo(json.dumps(ms, indent=2))
+        return
+    if not ms:
+        click.echo("(no milestones)")
+        return
+    for m in ms:
+        click.echo(f"#{m['number']:<5} {m['state']:<7} {m['title']}")
+
+
+# ----------------------------------------------------------------- workflow versioning
+#
+# The prd-workflow's convention version lives in docs/prd/.workflow-version.
+# `workflow-gate` is injected (via the SKILL `!` syntax) into every operational
+# skill and prints nothing when current / a REFUSE block otherwise. The init and
+# update skills are thin shells that inject `workflow-init-instructions` /
+# `workflow-migrate-instructions`, so an up-to-date repo costs zero context.
+
+
+@cli.group(name="workflow-version", invoke_without_command=True)
+@click.pass_context
+def workflow_version(ctx: click.Context) -> None:
+    """Print the repo's stored workflow version (0 if uninitialized)."""
+    if ctx.invoked_subcommand is None:
+        click.echo(workflow_mod.read_version(ctx.obj))
+
+
+@workflow_version.command(name="set")
+@click.argument("number", type=int)
+@pass_root
+def workflow_version_set(root: Path, number: int) -> None:
+    """Write the workflow version dotfile to NUMBER."""
+    p = workflow_mod.write_version(root, number)
+    click.echo(f"{p}: workflow version = {number}")
+
+
+@cli.command(name="workflow-gate")
+@pass_root
+def workflow_gate(root: Path) -> None:
+    """Emit a REFUSE block if the repo's workflow version isn't current (else nothing).
+
+    Operational skills inject this; an empty result means "proceed".
+    """
+    text = workflow_mod.gate(root)
+    if text:
+        click.echo(text)
+
+
+@cli.command(name="workflow-init-instructions")
+@pass_root
+def workflow_init_instructions(root: Path) -> None:
+    """Emit the situation-specific instructions for the init-prd-workflow skill."""
+    click.echo(workflow_mod.init_instructions(root))
+
+
+@cli.command(name="workflow-migrate-instructions")
+@pass_root
+def workflow_migrate_instructions(root: Path) -> None:
+    """Emit the ordered, provider-aware migration steps for update-prd-workflow."""
+    try:
+        provider = forge_mod.detect().provider
+    except (forge_mod.NotAGitRepo, forge_mod.UnknownForge):
+        provider = "local"
+    click.echo(workflow_mod.migrate_instructions(root, provider))
+
+
+# ----------------------------------------------------------------- forgejo subgroup
+#
+# Native Forgejo/Codeberg API client (src/prd_tool/forgejo_api.py). The `forge`
+# fgj provider emits these subcommands in place of the `fgj` CLI, so the only
+# remaining `fgj` touch is `fgj auth token` (called inside the client).
+
+
+@cli.group()
+def forgejo() -> None:
+    """Forgejo/Codeberg issue operations over the REST API (no fgj CLI needed)."""
+
+
+@forgejo.command(name="auth-check")
+def forgejo_auth_check() -> None:
+    """Verify an API token can be obtained for the instance."""
+    c = forgejo_api.Client.from_repo()
+    c.token()  # raises ForgejoError if unavailable
+    click.echo(f"ok: authenticated to {c.host} as {c.owner}/{c.repo}")
+
+
+@forgejo.command(name="ensure-labels")
+def forgejo_ensure_labels() -> None:
+    """Create the prd-workflow label scheme (idempotent)."""
+    created = forgejo_api.Client.from_repo().ensure_labels(forge_mod.LABELS)
+    click.echo(f"ok: labels ready ({len(created)} created)" if created else "ok: labels already present")
+
+
+@forgejo.command(name="labels")
+def forgejo_labels() -> None:
+    """List the repo's labels (name → id)."""
+    for name, lid in forgejo_api.Client.from_repo().list_labels().items():
+        click.echo(f"{lid}\t{name}")
+
+
+@forgejo.command(name="create")
+@click.option("--title", required=True)
+@click.option("--body", default=None)
+@click.option("--body-file", type=click.Path(dir_okay=False, path_type=Path), default=None,
+              help="Read the body from this file.")
+@click.option("--label", "labels", multiple=True, help="Label name to add (repeatable).")
+@click.option("--milestone", default=None, help="Milestone title (native; auto-created if absent).")
+def forgejo_create(title, body, body_file, labels, milestone) -> None:
+    """Create an issue; prints the new #number."""
+    if body_file is not None:
+        body = body_file.read_text(encoding="utf-8")
+    issue = forgejo_api.Client.from_repo().create_issue(title, body or "", labels, milestone)
+    click.echo(f"#{issue['number']}")
+
+
+@forgejo.command(name="view")
+@click.argument("number")
+@click.option("--json", "as_json", is_flag=True, help="Emit gh-shaped JSON.")
+def forgejo_view(number: str, as_json) -> None:
+    """Show one issue (with --json, the number/title/body/labels/state shape)."""
+    issue = forgejo_api.Client.from_repo().get_issue(_num(number))
+    if as_json:
+        click.echo(json.dumps({
+            "number": issue["number"],
+            "title": issue["title"],
+            "body": issue.get("body") or "",
+            "state": str(issue.get("state", "")).upper(),
+            "labels": [{"name": l["name"]} for l in issue.get("labels") or []],
+        }, indent=2))
+        return
+    click.echo(f"#{issue['number']} {issue['title']}  [{issue.get('state')}]")
+    click.echo(f"labels: {', '.join(l['name'] for l in issue.get('labels') or []) or '-'}")
+    click.echo("")
+    click.echo(issue.get("body") or "")
+
+
+@forgejo.command(name="list")
+@click.option("--label", default=None)
+@click.option("--state", type=click.Choice(("open", "closed", "all")), default=None)
+@click.option("--json", "as_json", is_flag=True)
+def forgejo_list(label, state, as_json) -> None:
+    """List issues, optionally filtered by label/state."""
+    issues = forgejo_api.Client.from_repo().list_issues(label=label, state=state)
+    if as_json:
+        click.echo(json.dumps(
+            [{"number": i["number"], "title": i["title"], "state": str(i.get("state", "")).upper()}
+             for i in issues], indent=2))
+        return
+    if not issues:
+        click.echo("(no matching issues)")
+        return
+    for i in issues:
+        click.echo(f"#{i['number']:<5} {str(i.get('state', '')):<7} {i['title']}")
+
+
+@forgejo.command(name="comment")
+@click.argument("number")
+@click.option("--body", required=True)
+def forgejo_comment(number: str, body: str) -> None:
+    """Add a comment to an issue."""
+    forgejo_api.Client.from_repo().comment(_num(number), body)
+    click.echo(f"#{_num(number)}: commented")
+
+
+@forgejo.command(name="close")
+@click.argument("number")
+@click.option("--comment", "comment_text", default=None)
+def forgejo_close(number: str, comment_text) -> None:
+    """Close an issue (optionally with a comment)."""
+    forgejo_api.Client.from_repo().close(_num(number), comment_text)
+    click.echo(f"#{_num(number)}: closed")
+
+
+@forgejo.command(name="edit")
+@click.argument("number")
+@click.option("--title", default=None, help="New title.")
+@click.option("--body", default=None, help="New body text.")
+@click.option("--body-file", type=click.Path(dir_okay=False, path_type=Path), default=None,
+              help="Read the new body from this file.")
+@click.option("--add-label", "add", multiple=True)
+@click.option("--remove-label", "remove", multiple=True)
+@click.option("--milestone", default=None, help="Set the native milestone (title; auto-created).")
+def forgejo_edit(number: str, title, body, body_file, add, remove, milestone) -> None:
+    """Edit an issue's title/body, labels, and/or milestone (e.g. fill a placeholder PRD issue)."""
+    if body_file is not None:
+        body = body_file.read_text(encoding="utf-8")
+    c = forgejo_api.Client.from_repo()
+    if title is not None or body is not None:
+        c.update_issue(_num(number), title=title, body=body)
+    if add or remove:
+        c.edit_labels(_num(number), add=add, remove=remove)
+    if milestone:
+        c.set_milestone(_num(number), milestone)
+    click.echo(f"#{_num(number)}: updated")
+
+
+@forgejo.command(name="dep")
+@click.argument("number")
+@click.option("--blocked-by", "blocker", required=True)
+def forgejo_dep(number: str, blocker: str) -> None:
+    """Record that NUMBER is blocked by another issue (native dependency)."""
+    forgejo_api.Client.from_repo().add_dependency(_num(number), _num(blocker))
+    click.echo(f"#{_num(number)}: blocked_by #{_num(blocker)}")
+
+
+@forgejo.command(name="set-milestone")
+@click.argument("number")
+@click.argument("title")
+def forgejo_set_milestone(number: str, title: str) -> None:
+    """Assign issue NUMBER to milestone TITLE (the epic; created if absent)."""
+    mid = forgejo_api.Client.from_repo().set_milestone(_num(number), title)
+    click.echo(f"#{_num(number)}: milestone = {title} (id {mid})")
+
+
+@forgejo.group(name="milestone")
+def forgejo_milestone() -> None:
+    """Forgejo milestones — an epic is a milestone."""
+
+
+@forgejo_milestone.command(name="create")
+@click.argument("title")
+def forgejo_milestone_create(title: str) -> None:
+    """Create the epic milestone (idempotent by title); prints its id."""
+    click.echo(forgejo_api.Client.from_repo().ensure_milestone(title))
+
+
+@forgejo_milestone.command(name="close")
+@click.argument("mid")
+def forgejo_milestone_close(mid: str) -> None:
+    """Close the milestone with id MID."""
+    forgejo_api.Client.from_repo().close_milestone(_num(mid))
+    click.echo(f"milestone {_num(mid)}: closed")
+
+
+@forgejo_milestone.command(name="list")
+@click.option("--json", "as_json", is_flag=True)
+def forgejo_milestone_list(as_json) -> None:
+    """List milestones (title → id)."""
+    ms = forgejo_api.Client.from_repo().list_milestones()
+    if as_json:
+        click.echo(json.dumps([{"id": m["id"], "title": m["title"],
+                                "state": m.get("state")} for m in ms], indent=2))
+        return
+    for m in ms:
+        click.echo(f"{m['id']}\t{m.get('state', ''):<7} {m['title']}")
+
+
+@forgejo.command(name="create-pr")
+@click.option("--head", required=True)
+@click.option("--base", default="main")
+@click.option("--title", required=True)
+@click.option("--body", default=None)
+@click.option("--body-file", type=click.Path(dir_okay=False, path_type=Path), default=None)
+def forgejo_create_pr(head, base, title, body, body_file) -> None:
+    """Open a pull request; prints the new PR number."""
+    if body_file is not None:
+        body = body_file.read_text(encoding="utf-8")
+    pr = forgejo_api.Client.from_repo().create_pr(head, base, title, body or "")
+    click.echo(f"#{pr['number']}")
 
 
 def main(argv: list[str] | None = None) -> int:
     try:
         cli.main(args=argv, standalone_mode=False)
         return 0
-    except (ResolutionError, FrontmatterError, TrackerError) as e:
+    except (ResolutionError, FrontmatterError, TrackerError, ForgejoError) as e:
         click.echo(f"error: {e}", err=True)
         return 1
     except click.ClickException as e:

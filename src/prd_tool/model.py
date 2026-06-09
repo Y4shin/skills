@@ -62,8 +62,13 @@ class Artifact:
 
     @property
     def issue(self) -> int | None:
-        # epics key it as epic_issue, PRDs as prd_issue
-        return self.doc.data.get("epic_issue") or self.doc.data.get("prd_issue")
+        # PRDs carry prd_issue; an epic is a milestone, not an issue (see `milestone`).
+        return self.doc.data.get("prd_issue")
+
+    @property
+    def milestone(self) -> int | None:
+        # An epic is represented by a milestone (epic_milestone); PRDs have none.
+        return self.doc.data.get("epic_milestone")
 
     @property
     def slices_dir(self) -> Path:
@@ -150,10 +155,10 @@ def resolve(root: Path, selector: str, *, want: str | None = None) -> Artifact:
                 return a
         raise ResolutionError(f"{selector!r} is not a recognised artifact under {prd_root(root)}")
 
-    # 2) issue number
+    # 2) issue number (PRD issue) or milestone number (epic)
     n = _as_issue(selector)
     if n is not None:
-        hits = [a for a in candidates if a.issue == n]
+        hits = [a for a in candidates if a.issue == n or a.milestone == n]
     else:
         # 3) slug (frontmatter slug or directory name)
         hits = [a for a in candidates if a.slug == selector or a.dir.name == selector]
