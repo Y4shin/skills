@@ -40,7 +40,9 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass
+from pathlib import Path
 
 # Keys grouped exactly as the old `forge_detect.sh keys` printed them.
 KEY_GROUPS = (
@@ -105,6 +107,53 @@ def _remote_url() -> str:
     return out.stdout.strip()
 
 
+def _repo_root() -> Path | None:
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True,
+        )
+    except FileNotFoundError:
+        return None
+    if out.returncode != 0:
+        return None
+    return Path(out.stdout.strip())
+
+
+VALID_PROVIDERS = frozenset(("gh", "fgj", "local"))
+
+
+def _read_prdrc() -> dict[str, str] | None:
+    """Read ``[forge]`` overrides from ``.prdrc`` at the repo root.
+
+    Returns ``None`` if the file doesn't exist or has no ``[forge]`` section.
+    """
+    root = _repo_root()
+    if root is None:
+        return None
+    rc = root / ".prdrc"
+    if not rc.is_file():
+        return None
+    try:
+        data = tomllib.loads(rc.read_text())
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    forge_section = data.get("forge")
+    if not isinstance(forge_section, dict):
+        return None
+    provider = forge_section.get("provider")
+    if provider is None:
+        return None
+    if provider not in VALID_PROVIDERS:
+        return None
+    result: dict[str, str] = {"provider": provider}
+    for key in ("owner", "repo"):
+        val = forge_section.get(key)
+        if isinstance(val, str) and val:
+            result[key] = val
+    return result
+
+
 @dataclass
 class Forge:
     provider: str   # "gh" (GitHub) | "fgj" (Forgejo/Codeberg/Gitea) | "local"
@@ -118,15 +167,38 @@ class Forge:
 def detect(remote: str | None = None) -> Forge:
     """Resolve the provider + owner/repo from the ``origin`` remote (or *remote*).
 
+    If a ``.prdrc`` file exists at the repo root with a ``[forge]`` section
+    containing ``provider``, that value takes precedence over URL-based
+    detection. ``owner`` and ``repo`` may also be set there; if omitted they
+    are inferred from the remote as usual (or default to ``"-"``).
+
     Git must be initialised — ``NotAGitRepo`` is raised otherwise. An empty
     remote (git with no ``origin``) resolves to the built-in ``local`` tracker
     with full local branching. A non-empty remote we don't recognise raises
-    ``UnknownForge``.
+    ``UnknownForge`` — unless ``.prdrc`` overrides the provider.
     """
+    rc = _read_prdrc() if remote is None else None
+
     if remote is None:
         if not _is_git_repo():
             raise NotAGitRepo
         remote = _remote_url()
+
+    owner_from_remote: str | None = None
+    repo_from_remote: str | None = None
+    if remote.strip():
+        path = remote[:-4] if remote.endswith(".git") else remote
+        repo_from_remote = path.rsplit("/", 1)[-1]
+        rest = path.rsplit("/", 1)[0] if "/" in path else path
+        owner_from_remote = re.split(r"[:/]", rest)[-1]
+
+    if rc is not None:
+        return Forge(
+            provider=rc["provider"],
+            owner=rc.get("owner") or owner_from_remote or "-",
+            repo=rc.get("repo") or repo_from_remote or "-",
+        )
+
     if not remote.strip():
         return Forge(provider="local", owner="-", repo="-")
     low = remote.lower()
@@ -136,11 +208,7 @@ def detect(remote: str | None = None) -> Forge:
         provider = "fgj"
     else:
         raise UnknownForge(remote)
-    path = remote[:-4] if remote.endswith(".git") else remote
-    repo = path.rsplit("/", 1)[-1]
-    rest = path.rsplit("/", 1)[0] if "/" in path else path
-    owner = re.split(r"[:/]", rest)[-1]   # last segment after the final '/' or ':'
-    return Forge(provider=provider, owner=owner, repo=repo)
+    return Forge(provider=provider, owner=owner_from_remote or "-", repo=repo_from_remote or "-")
 
 
 def _ensure_labels(f: Forge) -> str:
