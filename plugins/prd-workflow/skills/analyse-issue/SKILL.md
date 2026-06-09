@@ -74,7 +74,8 @@ if a prior answer settles it:
 2. "What's the simplest test that gives honest confidence this works in *production*, not
    just in isolation?"
 3. "If you run that test every few minutes while coding, is the feedback fast enough?"
-4. "Walk me through the two most likely failure modes — does the test type catch both?"
+4. "Walk me through the failure modes — at least two, but as many as you think
+   matter. Does the test type catch each one?"
 5. "Do we need a real dependency (real DB, real HTTP, a real browser) here, or can it be
    faked? Is that cost worth it for this slice?"
 6. "Is any part already tested elsewhere? What's the exact gap we're filling?"
