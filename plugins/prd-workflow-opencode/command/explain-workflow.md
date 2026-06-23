@@ -1,20 +1,31 @@
 ---
-name: explain-workflow
-description: Explain the full prd-workflow lifecycle — every phase, every skill, how they connect, and when to use each one. Use when the user asks "how does this workflow work", "explain the PRD process", "what skills are available", or wants an overview before starting. Don't use it to actually run any workflow step — point the user at the right skill instead.
-allowed-tools: Bash(node *)
+description: Explain the full prd-workflow lifecycle — every phase, every skill,
+  how they connect, and when to use each one. Use when the user asks "how does
+  this workflow work", "explain the PRD process", "what skills are available",
+  or wants an overview before starting. Don't use it to actually run any
+  workflow step — point the user at the right skill instead.
 ---
+
+> **opencode native tools.** This build exposes the artifact-frontmatter operations as
+> native tools — **prefer them** over shelling out to the CLI for these: `prd_show`,
+> `prd_get`, `prd_set`, `prd_set_slices`, `prd_resolve`, `prd_assert_kind`, `prd_list`,
+> `prd_slices`, `prd_finalizable`, `prd_lint`, `prd_epic_prds`, `prd_epic_set_prd_issue`,
+> `prd_epic_prd_issue`, `prd_epic_tick`, `prd_epic_finalizable`. The !`…` header
+> injections below (workflow-gate, reference, list, profile, forge snippets) still run
+> via the bundled CLI — that is by design (a command can't call a tool).
+
 
 # Explain the PRD Workflow
 
 Present the full prd-workflow lifecycle to the user. Inject the current planning-tree
 inventory so the explanation is grounded in the repo's actual state:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" list`
+!`node ".opencode/scripts/prd-tool.js" list`
 
 Also inject the project profile when available — it tells the user what architecture layers,
 test infrastructure, and orientation docs their project has configured:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" profile`
+!`node ".opencode/scripts/prd-tool.js" profile`
 
 ## What to present
 
@@ -27,8 +38,8 @@ they want the full picture, cover everything.
 
 | Skill | Purpose |
 |---|---|
-| `/prd-workflow:init-prd-workflow` | Stamps `docs/prd/.workflow-version`. Every other skill refuses to run until this exists. Run once. |
-| `/prd-workflow:update-prd-workflow` | Migrates the workflow version forward after plugin updates. No-op if already current. |
+| `/init-prd-workflow` | Stamps `docs/prd/.workflow-version`. Every other skill refuses to run until this exists. Run once. |
+| `/update-prd-workflow` | Migrates the workflow version forward after plugin updates. No-op if already current. |
 
 ### Phase 1 — Planning
 
@@ -36,23 +47,23 @@ Three entry points depending on scope:
 
 | Scope | Skill | Produces |
 |---|---|---|
-| **Epic** (multi-PRD outcome) | `/prd-workflow:create-epic` | `docs/prd/epics/<slug>/epic.md` with `kind: epic` frontmatter |
-| **Feature** (user-facing behaviour) | `/prd-workflow:create-feature-prd` | `docs/prd/<slug>/prd.md` with `kind: feature` |
-| **Capability** (foundational/infra, no UI) | `/prd-workflow:create-capability-prd` | `docs/prd/<slug>/prd.md` with `kind: capability` |
+| **Epic** (multi-PRD outcome) | `/create-epic` | `docs/prd/epics/<slug>/epic.md` with `kind: epic` frontmatter |
+| **Feature** (user-facing behaviour) | `/create-feature-prd` | `docs/prd/<slug>/prd.md` with `kind: feature` |
+| **Capability** (foundational/infra, no UI) | `/create-capability-prd` | `docs/prd/<slug>/prd.md` with `kind: capability` |
 
 Each runs a relentless interview (the `grill-me` discipline), then crystallises answers into
-a committed spec. The epic skill hands off to `/prd-workflow:epic-to-prds` which decomposes
+a committed spec. The epic skill hands off to `/epic-to-prds` which decomposes
 the epic into child PRDs and invokes the matching create skill for each.
 
-`/prd-workflow:grill-me` is available standalone for stress-testing any plan without
+`/grill-me` is available standalone for stress-testing any plan without
 producing an artifact.
 
 ### Phase 2 — Slicing (PRD → issues)
 
 | PRD kind | Skill | What it does |
 |---|---|---|
-| Feature | `/prd-workflow:feature-prd-to-issues` | Breaks the PRD into tracer-bullet vertical slices as issues, wires dependencies, writes slice docs |
-| Capability | `/prd-workflow:capability-prd-to-issues` | Same, but slices are enabling surfaces with a first consumer each |
+| Feature | `/feature-prd-to-issues` | Breaks the PRD into tracer-bullet vertical slices as issues, wires dependencies, writes slice docs |
+| Capability | `/capability-prd-to-issues` | Same, but slices are enabling surfaces with a first consumer each |
 
 Each slice gets its own doc at `docs/prd/<slug>/slices/<n>-<slug>.md` and a tracked issue.
 The PRD issue itself is assigned to the epic's milestone when under an epic.
@@ -61,11 +72,11 @@ The PRD issue itself is assigned to the epic's milestone when under an epic.
 
 Two steps per slice, always in order:
 
-1. **`/prd-workflow:analyse-issue <n>`** — Fetches the issue, presents a structured summary,
+1. **`/analyse-issue <n>`** — Fetches the issue, presents a structured summary,
    then grills the developer on the test strategy (which layers, which test type, failure
    modes, real vs fake dependencies). Appends a confirmed `## Test plan` to the slice doc.
 
-2. **`/prd-workflow:implement-issue <n>`** — Strict TDD against the test plan. Cuts a slice
+2. **`/implement-issue <n>`** — Strict TDD against the test plan. Cuts a slice
    branch off the PRD integration branch, runs red→green→refactor, merges the slice back
    into the PRD branch, closes the issue, and garbage-collects the slice doc. No per-slice
    PR — the full CI gate is deferred to finalize.
@@ -74,15 +85,15 @@ Two steps per slice, always in order:
 
 | Skill | When | What it does |
 |---|---|---|
-| `/prd-workflow:finalize-prd` | All slices merged | Harvests durable knowledge into permanent docs (design docs, changelog), opens the single PRD PR into main |
-| `/prd-workflow:finalize-epic` | All child PRDs finalized | Closes the epic milestone, folds epic-level knowledge into permanent docs, deletes the spent epic dir |
+| `/finalize-prd` | All slices merged | Harvests durable knowledge into permanent docs (design docs, changelog), opens the single PRD PR into main |
+| `/finalize-epic` | All child PRDs finalized | Closes the epic milestone, folds epic-level knowledge into permanent docs, deletes the spent epic dir |
 
 ### Utilities
 
 | Skill | Purpose |
 |---|---|
-| `/prd-workflow:adopt-prd` | Backfills frontmatter onto legacy docs that predate the workflow or carry old inline metadata |
-| `/prd-workflow:grill-me` | Standalone stress-test interview — no artifact produced |
+| `/adopt-prd` | Backfills frontmatter onto legacy docs that predate the workflow or carry old inline metadata |
+| `/grill-me` | Standalone stress-test interview — no artifact produced |
 
 ### Key concepts
 
@@ -125,5 +136,5 @@ create-epic → epic-to-prds → [create + slice + implement per PRD] → finali
 
 If the injected planning-tree inventory shows existing PRDs, epics, or slices, point the
 user at where they are in the workflow and which skill to run next. If the inventory is empty,
-suggest starting with `/prd-workflow:init-prd-workflow` (if not yet initialized) or
-`/prd-workflow:create-feature-prd` / `/prd-workflow:create-epic` (if already initialized).
+suggest starting with `/init-prd-workflow` (if not yet initialized) or
+`/create-feature-prd` / `/create-epic` (if already initialized).

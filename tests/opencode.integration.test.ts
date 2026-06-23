@@ -41,6 +41,7 @@ const EXPECTED_COMMANDS = [
   "finalize-prd",
   "finalize-epic",
   "grill-me",
+  "explain-workflow",
 ];
 
 describe.skipIf(!hasOpencode)("opencode loads the generated overlay", () => {
@@ -94,7 +95,7 @@ describe.skipIf(!hasOpencode)("opencode loads the generated overlay", () => {
     proc?.kill("SIGTERM");
   });
 
-  test("registers all 14 prd-workflow commands", async () => {
+  test("registers all 15 prd-workflow commands", async () => {
     const j: any = await (await fetch(`${url}/command`)).json();
     const names: string[] = (Array.isArray(j) ? j : Object.values(j)).map(
       (c: any) => c?.name ?? c?.id ?? c,

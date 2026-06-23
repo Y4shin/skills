@@ -8,7 +8,7 @@ implementation of `prd-tool`.
 This directory is a ready-to-copy **`.opencode/` overlay**:
 
 ```
-command/<name>.md                       # 14 slash commands (/init-prd-workflow, /create-epic, …)
+command/<name>.md                       # 15 slash commands (/init-prd-workflow, /create-epic, …)
 skill/prd-workflow-overview/SKILL.md    # auto-invokable orientation skill (model picks it by description)
 plugin/prd-workflow.js                  # registers the native prd_* tools
 scripts/prd-tool.js                     # the bundled CLI the command headers inject
@@ -16,7 +16,7 @@ scripts/prd-tool.js                     # the bundled CLI the command headers in
 
 The orientation doc is a **skill**, not a command: opencode's model auto-invokes it
 (via the `skill` tool) when the user asks about PRDs — so the agent reaches for the
-`prd_*` tools instead of improvising. The 14 operational steps are **commands**
+`prd_*` tools instead of improvising. The 15 operational steps are **commands**
 (user-typed `/…`) because they rely on <code>!\`…\`</code> header injection.
 
 ## Why commands + a skill + tools

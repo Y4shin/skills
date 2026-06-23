@@ -3,10 +3,10 @@
 This repo hosts the `prd-workflow` plugin for **two** agent harnesses, both driven
 by a single TypeScript implementation of the `prd-tool` CLI:
 
-- **Claude Code** — [plugins/prd-workflow/](plugins/prd-workflow/): 15 skills whose
+- **Claude Code** — [plugins/prd-workflow/](plugins/prd-workflow/): 16 skills whose
   <code>!\`…\`</code> injections call the bundled CLI.
 - **opencode** — [plugins/prd-workflow-opencode/](plugins/prd-workflow-opencode/): a
-  ready-to-copy `.opencode/` overlay — 14 operational steps as `/…` commands, the
+  ready-to-copy `.opencode/` overlay — 15 operational steps as `/…` commands, the
   `prd-workflow-overview` orientation doc as an auto-invokable **skill**, and a plugin
   that registers the agent operations as native `prd_*` tools. Generated from the same
   `SKILL.md` sources.
