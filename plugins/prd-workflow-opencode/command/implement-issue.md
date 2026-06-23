@@ -1,48 +1,65 @@
 ---
-name: implement-issue
-description: Phase 2 — implement a slice issue via strict TDD against the test plan from /prd-workflow:analyse-issue. Cuts a slice branch off the PRD's integration branch, runs red→green→refactor, merges the slice back into the PRD branch (no per-slice PR — only the PRD gets one, at finalize), closes the slice issue, then garbage-collects the slice doc and notes the decision on the PRD. The full CI gate is deferred to finalize-prd; each slice only runs its own test. Use after /prd-workflow:analyse-issue, or when the user says "now implement #n". Don't use it before a test plan exists (run analyse-issue first) or to finalize a completed PRD (use finalize-prd). Provider-aware (gh/fgj/local — local projects use the same branch workflow but skip remotes/PRs and use the built-in tracker).
-allowed-tools: Bash(node *)
+description: "Phase 2 — implement a slice issue via strict TDD against the test
+  plan from /analyse-issue. Cuts a slice branch off the PRD's integration
+  branch, runs red→green→refactor, merges the slice back into the PRD branch (no
+  per-slice PR — only the PRD gets one, at finalize), closes the slice issue,
+  then garbage-collects the slice doc and notes the decision on the PRD. The
+  full CI gate is deferred to finalize-prd; each slice only runs its own test.
+  Use after /analyse-issue, or when the user says \"now implement #n\". Don't
+  use it before a test plan exists (run analyse-issue first) or to finalize a
+  completed PRD (use finalize-prd). Provider-aware (gh/fgj/local — local
+  projects use the same branch workflow but skip remotes/PRs and use the
+  built-in tracker)."
 ---
+
+> **opencode native tools.** This build exposes the artifact-frontmatter operations as
+> native tools — **prefer them** over shelling out to the CLI for these: `prd_show`,
+> `prd_get`, `prd_set`, `prd_set_slices`, `prd_resolve`, `prd_assert_kind`, `prd_list`,
+> `prd_slices`, `prd_finalizable`, `prd_lint`, `prd_epic_prds`, `prd_epic_set_prd_issue`,
+> `prd_epic_prd_issue`, `prd_epic_tick`, `prd_epic_finalizable`. The !`…` header
+> injections below (workflow-gate, reference, list, profile, forge snippets) still run
+> via the bundled CLI — that is by design (a command can't call a tool).
+
 
 # Implement Issue
 
 Wherever a command below is written as `prd_tool`, run it as the absolute command printed
 here (the bundled CLI) — `prd_tool` is shorthand, not a binary on your PATH:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" toolpath`
+!`node ".opencode/scripts/prd-tool.js" toolpath`
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" workflow-gate`
+!`node ".opencode/scripts/prd-tool.js" workflow-gate`
 
 Phase 2: execute the agreed test plan with full repo automation. Requires the slice doc
-`docs/prd/<slug>/slices/<n>-<slug>.md` (spec + `## Test plan`) written by `/prd-workflow:analyse-issue`.
+`docs/prd/<slug>/slices/<n>-<slug>.md` (spec + `## Test plan`) written by `/analyse-issue`.
 
 **Branching model.** Every slice of a PRD shares one **integration branch**,
 `prd/<prd-slug>`, branched from `main`. Each slice is built on its own short-lived branch off
 that integration branch and **merged back into it — no per-slice PR**. The PRD branch is the
 only thing that ever becomes a PR into `main` (on hosted forges) or gets merged into `main`
 locally (on a `local` forge), and that single integration point (opened by
-`/prd-workflow:finalize-prd`) is where the **full CI gate** runs. So a slice never waits on the
+`/finalize-prd`) is where the **full CI gate** runs. So a slice never waits on the
 whole-suite gate: it only writes and passes **its own** test, then merges into the PRD branch.
 (On a `local` forge, the branch workflow is identical — only remote operations like fetch, push,
 and PRs are skipped.)
 
-Detected forge: **!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge git_type`**.
+Detected forge: **!`node ".opencode/scripts/prd-tool.js" forge git_type`**.
 Per-provider commands come from `prd_tool forge <key>`, injected at the step that
 uses them. The artifact-lifecycle reference is injected below.
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" reference`
+!`node ".opencode/scripts/prd-tool.js" reference`
 
 `prd_tool` is the bundled helper that reads/writes this frontmatter — invoke it as
 `prd_tool <subcommand>` (`--help` for the full
 surface). The current planning-tree inventory is injected here:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" list`
+!`node ".opencode/scripts/prd-tool.js" list`
 
 The project profile (code conventions, CI command, orientation docs) is injected below when
 available — its "Code conventions" and "CI" sections drive Steps 3 and 5. If empty, explore
 the codebase for the lint/format config and CI command yourself:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" profile`
+!`node ".opencode/scripts/prd-tool.js" profile`
 
 ## Step 1 — Set state
 
@@ -50,8 +67,8 @@ Swap the issue's label `status:todo` → `status:in-progress` and add a starting
 ("Starting implementation. Branch: `slice/<n>-<slug>` off `prd/<prd-slug>`."). Label-edit +
 comment form:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_edit_labels`
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_comment`
+!`node ".opencode/scripts/prd-tool.js" forge cmd_edit_labels`
+!`node ".opencode/scripts/prd-tool.js" forge cmd_comment`
 
 ## Step 2 — Sync + branch
 
@@ -106,7 +123,7 @@ TDD Progress:
 - **RED** — write the test first; derive every assertion from the spec/acceptance criteria,
   never from the implementation. Run it; it **must fail**. (A test passing before code
   exists is wrong — rewrite it.) Use the test file path and run command recorded in the slice
-  doc's `## Test plan` (which `/prd-workflow:analyse-issue` derived from the project profile's
+  doc's `## Test plan` (which `/analyse-issue` derived from the project profile's
   test infrastructure).
 - **GREEN** — write only what makes the failing test pass; apply Step 3 conventions; re-run
   after each logical change.
@@ -116,7 +133,7 @@ TDD Progress:
 
 This is the **per-slice** bar — the slice's own test, not the whole-suite gate. The full CI
 gate (lint -D warnings, format, whole suite, type-check, generated-artifact checks) runs
-**once at `/prd-workflow:finalize-prd`**, on the PRD PR — do **not** run it here.
+**once at `/finalize-prd`**, on the PRD PR — do **not** run it here.
 
 ```
 - [ ] Test written before implementation, confirmed failing first (RED)
@@ -135,7 +152,7 @@ slice's own test can't catch is caught by the deferred gate at finalize.
 
 Merge the finished slice branch back into the PRD integration branch (**no per-slice PR**; the
 work reaches `main` later via the single PRD PR on hosted forges, or a local merge on a local
-forge, both opened by `/prd-workflow:finalize-prd`):
+forge, both opened by `/finalize-prd`):
 
 ```bash
 git checkout prd/<prd-slug>
@@ -151,8 +168,8 @@ Then mark the slice issue done and **close it** — it's integrated into the PRD
 `blocked_by` edge on the PRD resolves (the PRD issue itself stays open until its PR lands).
 Label-edit (`status:in-progress` → `status:done`) + close forms:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_edit_labels`
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_close_issue`
+!`node ".opencode/scripts/prd-tool.js" forge cmd_edit_labels`
+!`node ".opencode/scripts/prd-tool.js" forge cmd_close_issue`
 
 Report that the slice is integrated into `prd/<prd-slug>` and its issue closed.
 
@@ -160,13 +177,13 @@ Report that the slice is integrated into `prd/<prd-slug>` and its issue closed.
 
 1. Append a 2–4 line decision/deviation note to the PRD's `## Implementation notes` in
    `docs/prd/<slug>/prd.md` (what shipped, any divergence from the spec, follow-ups) — this
-   is what `/prd-workflow:finalize-prd` harvests.
+   is what `/finalize-prd` harvests.
 2. **Delete the slice doc** `docs/prd/<slug>/slices/<n>-<slug>.md`. Commit this (with the PRD
    note) **onto the PRD branch** `prd/<prd-slug>` — it rides to `main` in the PRD PR (hosted
    forges) or local merge (local forge). A surviving slice doc now reliably signals unfinished
    work.
 3. Report whether this was the PRD's last slice — if the gate now passes, point the user at
-   `/prd-workflow:finalize-prd <slug>` (which integrates the PRD branch and runs the full CI gate):
+   `/finalize-prd <slug>` (which integrates the PRD branch and runs the full CI gate):
    ```bash
    prd_tool prd-finalizable <slug>
    ```
@@ -174,7 +191,7 @@ Report that the slice is integrated into `prd/<prd-slug>` and its issue closed.
 ## Error handling
 
 - If the slice doc `docs/prd/<slug>/slices/<n>-<slug>.md` is missing, or its frontmatter has
-  `analysed: false` (or no `## Test plan` section), stop — run `/prd-workflow:analyse-issue <n>`
+  `analysed: false` (or no `## Test plan` section), stop — run `/analyse-issue <n>`
   first; do not improvise a test strategy here.
 - If `prd_tool forge` prints `NOT_A_GIT_REPO`, the
   directory isn't a git repo — tell the user to run `git init` first and stop.
@@ -191,6 +208,6 @@ Report that the slice is integrated into `prd/<prd-slug>` and its issue closed.
 
 - **Spec-first** — never write a test to match a wrong implementation.
 - **No speculative code** — implement only what the slice requires.
-- **No per-slice PR** — slices merge into the PRD branch; only `/prd-workflow:finalize-prd`
+- **No per-slice PR** — slices merge into the PRD branch; only `/finalize-prd`
   opens a PR (into `main`) and runs the full CI gate. Don't push slice branches to the host.
 - Issue/PR text in **English**.

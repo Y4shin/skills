@@ -1,46 +1,63 @@
 ---
-name: finalize-prd
-description: Close the loop once all of a PRD's slices are merged into its integration branch — harvest the enriched PRD + the branch diff, fold durable knowledge into the project's permanent docs (design docs, milestone/changelog), tick its epic if any, delete the spent PRD dir, then open the single PRD PR (Closes #prd-issue) into main where the full CI gate runs. On a local forge, the PRD branch merges into main locally. This is the one integration point and the one gate for the whole PRD. Use when a PRD's slices are all done, or the user says "finalize"/"wrap up" a PRD. Don't use it while any slice is still open or unmerged (finish implement-issue first). Provider-aware (gh/fgj/local — local projects use the same branch workflow but merge locally instead of opening a PR).
-allowed-tools: Bash(node *)
+description: "Close the loop once all of a PRD's slices are merged into its
+  integration branch — harvest the enriched PRD + the branch diff, fold durable
+  knowledge into the project's permanent docs (design docs,
+  milestone/changelog), tick its epic if any, delete the spent PRD dir, then
+  open the single PRD PR (Closes #prd-issue) into main where the full CI gate
+  runs. On a local forge, the PRD branch merges into main locally. This is the
+  one integration point and the one gate for the whole PRD. Use when a PRD's
+  slices are all done, or the user says \"finalize\"/\"wrap up\" a PRD. Don't
+  use it while any slice is still open or unmerged (finish implement-issue
+  first). Provider-aware (gh/fgj/local — local projects use the same branch
+  workflow but merge locally instead of opening a PR)."
 ---
+
+> **opencode native tools.** This build exposes the artifact-frontmatter operations as
+> native tools — **prefer them** over shelling out to the CLI for these: `prd_show`,
+> `prd_get`, `prd_set`, `prd_set_slices`, `prd_resolve`, `prd_assert_kind`, `prd_list`,
+> `prd_slices`, `prd_finalizable`, `prd_lint`, `prd_epic_prds`, `prd_epic_set_prd_issue`,
+> `prd_epic_prd_issue`, `prd_epic_tick`, `prd_epic_finalizable`. The !`…` header
+> injections below (workflow-gate, reference, list, profile, forge snippets) still run
+> via the bundled CLI — that is by design (a command can't call a tool).
+
 
 # Finalize PRD
 
 Wherever a command below is written as `prd_tool`, run it as the absolute command printed
 here (the bundled CLI) — `prd_tool` is shorthand, not a binary on your PATH:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" toolpath`
+!`node ".opencode/scripts/prd-tool.js" toolpath`
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" workflow-gate`
+!`node ".opencode/scripts/prd-tool.js" workflow-gate`
 
 Phase 3 — **the PRD's single integration point.** Every slice has merged into the PRD branch
 `prd/<prd-slug>` with no PR of its own; finalize migrates durable knowledge into the repo's
 permanent docs, retires the spent PRD dir, and either opens the **one** PR
 (`prd/<prd-slug>` → `main`) on hosted forges or **merges the PRD branch into `main` locally**
 on a local forge. The **full CI gate** runs here for everything the PRD's slices produced.
-Invoked as `/prd-workflow:finalize-prd <slug | prd-issue#>`.
+Invoked as `/finalize-prd <slug | prd-issue#>`.
 
 All of finalize's doc work (knowledge harvest, epic tick, PRD-dir deletion) is committed
 **onto the PRD branch** so it rides to `main` inside that single PR (hosted forges) or local
 merge (local forge) — code, docs, and cleanup land together.
 
-Detected forge: **!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge git_type`**.
+Detected forge: **!`node ".opencode/scripts/prd-tool.js" forge git_type`**.
 Per-provider commands come from `prd_tool forge <key>`. The artifact-lifecycle
 reference is injected below.
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" reference`
+!`node ".opencode/scripts/prd-tool.js" reference`
 
 `prd_tool` is the bundled helper that reads/writes this frontmatter — invoke it as
 `prd_tool <subcommand>` (`--help` for the full
 surface). The current planning-tree inventory is injected here:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" list`
+!`node ".opencode/scripts/prd-tool.js" list`
 
 The project profile (knowledge destinations) is injected below when available — its
 "Knowledge destinations" section is where Step 3 folds durable knowledge. If empty, find the
 project's permanent docs (design docs, decision log, changelog) and fold knowledge there:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" profile`
+!`node ".opencode/scripts/prd-tool.js" profile`
 
 ## Step 1 — Preconditions
 
@@ -70,7 +87,7 @@ prd_tool prd-finalizable <slug|prd-issue#>
 ```
 
 `prd-finalizable` exits **0** only when `docs/prd/<slug>/slices/` holds no surviving slice docs
-(every slice implemented + its doc GC'd by `/prd-workflow:implement-issue`); a non-zero exit
+(every slice implemented + its doc GC'd by `/implement-issue`); a non-zero exit
 lists the still-open slices. Also confirm the slice issues are **closed** — equivalently, the
 PRD issue's native `blocked_by` dependencies are all resolved (it is no longer blocked).
 
@@ -115,7 +132,7 @@ local merge (local forge).
   ```
 
   (When it's the last child — `epic finalizable <epic-slug>` now exits 0 — the user can
-  `/prd-workflow:finalize-epic <epic-slug>`.)
+  `/finalize-epic <epic-slug>`.)
 
 - **Confirm with the user**, then delete the entire `docs/prd/<slug>/` (the PRD has served its
   purpose and would only drift from here).
@@ -135,7 +152,7 @@ belongs in the single integration point (PR on hosted forges, local merge on loc
    the PRD title, body = a summary of the slices + the met acceptance criteria + `Closes
    #<prd-issue>`. PR form for the detected provider:
 
-   !`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_create_pr`
+   !`node ".opencode/scripts/prd-tool.js" forge cmd_create_pr`
 
 3. The host re-runs CI on the PR. A human reviews and merges it — this is the PRD's single
    review gate. **On merge**, all the slice work + the doc updates + the PRD-dir deletion land
@@ -147,11 +164,11 @@ issue:
 
 2. Merge form:
 
-   !`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_create_pr`
+   !`node ".opencode/scripts/prd-tool.js" forge cmd_create_pr`
 
 3. Close the PRD issue:
 
-   !`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_close_issue`
+   !`node ".opencode/scripts/prd-tool.js" forge cmd_close_issue`
 
    All the slice work + the doc updates + the PRD-dir deletion are now on `main`.
 

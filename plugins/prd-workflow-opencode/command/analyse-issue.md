@@ -1,46 +1,58 @@
 ---
-name: analyse-issue
-description: Fetch a slice issue (#n), present a structured summary, then run a focused grilling session to decide the test strategy before any code. Appends a confirmed Test plan to the issue's committed slice doc and hands off to /prd-workflow:implement-issue. Use when starting work on an issue, or when the user says "analyse"/"start on" #n. Don't use it to write code or open a PR (use implement-issue once the test plan is agreed). Provider-aware (gh/fgj/local).
-allowed-tools: Bash(node *)
+description: "Fetch a slice issue (#n), present a structured summary, then run a
+  focused grilling session to decide the test strategy before any code. Appends
+  a confirmed Test plan to the issue's committed slice doc and hands off to
+  /implement-issue. Use when starting work on an issue, or when the user says
+  \"analyse\"/\"start on\" #n. Don't use it to write code or open a PR (use
+  implement-issue once the test plan is agreed). Provider-aware (gh/fgj/local)."
 ---
+
+> **opencode native tools.** This build exposes the artifact-frontmatter operations as
+> native tools — **prefer them** over shelling out to the CLI for these: `prd_show`,
+> `prd_get`, `prd_set`, `prd_set_slices`, `prd_resolve`, `prd_assert_kind`, `prd_list`,
+> `prd_slices`, `prd_finalizable`, `prd_lint`, `prd_epic_prds`, `prd_epic_set_prd_issue`,
+> `prd_epic_prd_issue`, `prd_epic_tick`, `prd_epic_finalizable`. The !`…` header
+> injections below (workflow-gate, reference, list, profile, forge snippets) still run
+> via the bundled CLI — that is by design (a command can't call a tool).
+
 
 # Analyse Issue
 
 Wherever a command below is written as `prd_tool`, run it as the absolute command printed
 here (the bundled CLI) — `prd_tool` is shorthand, not a binary on your PATH:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" toolpath`
+!`node ".opencode/scripts/prd-tool.js" toolpath`
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" workflow-gate`
+!`node ".opencode/scripts/prd-tool.js" workflow-gate`
 
 Phase 1: understand the issue, then challenge the developer to decide the right test
 strategy *before* writing a line of code. The fastest honest feedback loop is the goal — a
 slice must be testable, not just "covered".
 
-Detected forge: **!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge git_type`**.
+Detected forge: **!`node ".opencode/scripts/prd-tool.js" forge git_type`**.
 Per-provider commands come from `prd_tool forge <key>`. The slice-doc/lifecycle
 reference is injected below.
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" reference`
+!`node ".opencode/scripts/prd-tool.js" reference`
 
 `prd_tool` is the bundled helper that reads this frontmatter — invoke it as
 `prd_tool <subcommand>` (`--help` for the full
 surface). The current planning-tree inventory is injected here:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" list`
+!`node ".opencode/scripts/prd-tool.js" list`
 
 The project profile (architecture layers, test infrastructure, orientation docs) is injected
 below when available — its "Test infrastructure" section is the source for test types, file
 patterns, and run commands used in Steps 2–3. If empty, explore the codebase to identify the
 available test frameworks and their run commands:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" profile`
+!`node ".opencode/scripts/prd-tool.js" profile`
 
 ## Step 1 — Fetch + present
 
 Fetch the issue (form for the detected provider):
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_get_issue`
+!`node ".opencode/scripts/prd-tool.js" forge cmd_get_issue`
 
 Read its `kind:` label and `Part of #<prd>` to locate the PRD and slice doc. The PRD issue # in
 `Part of #<prd>` maps to its dir, and `slices` lists this PRD's surviving slice docs (the one for
@@ -130,7 +142,7 @@ Confirm the path to the developer.
 
 ## Hand-off
 
-Invoke `/prd-workflow:implement-issue <n>`. The spec + test plan live in
+Invoke `/implement-issue <n>`. The spec + test plan live in
 `docs/prd/<slug>/slices/<n>-<slug>.md`.
 
 ## Error handling

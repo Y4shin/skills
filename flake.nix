@@ -1,5 +1,5 @@
 {
-  description = "Dev shell + build env for the prd-workflow plugin's bundled Python tool";
+  description = "Dev shell + build env for the prd-workflow plugins' bundled TypeScript tool";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -10,25 +10,19 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        python = pkgs.python313;
+        node = pkgs.nodejs_20;
       in
       {
         devShells.default = pkgs.mkShell {
           packages = [
-            python
-            pkgs.uv
+            node
           ];
 
-          # Make uv use the Nix-provided interpreter instead of downloading its
-          # own — we want one reproducible Python (3.13) across machines.
-          env = {
-            UV_PYTHON = python.interpreter;
-            UV_PYTHON_DOWNLOADS = "never";
-          };
-
           shellHook = ''
-            echo "prd-workflow build shell — python $(${python.interpreter} --version | cut -d' ' -f2), uv $(uv --version | cut -d' ' -f2)"
-            echo "build the bundled artifact with:  uv run prd-tool-build"
+            echo "prd-workflow build shell — node $(${node}/bin/node --version)"
+            echo "install deps:  npm install"
+            echo "build bundles + opencode overlay:  npm run build"
+            echo "run tests:  npm test"
           '';
         };
       });

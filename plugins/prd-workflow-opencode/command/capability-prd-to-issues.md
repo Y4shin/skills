@@ -1,17 +1,30 @@
 ---
-name: capability-prd-to-issues
-description: Break a capability PRD (kind:capability) into independently-grabbable enabling slices (foundational surface, each with a first consumer), wire the PRD issue + slices with native dependencies (and assign the PRD issue to the epic's milestone when under an epic), and write committed slice docs. Use after /prd-workflow:create-capability-prd. Don't use it on a feature PRD (use feature-prd-to-issues) or to author the PRD itself (use create-capability-prd). Provider-aware (gh/fgj/local).
-allowed-tools: Bash(node *)
+description: Break a capability PRD (kind:capability) into
+  independently-grabbable enabling slices (foundational surface, each with a
+  first consumer), wire the PRD issue + slices with native dependencies (and
+  assign the PRD issue to the epic's milestone when under an epic), and write
+  committed slice docs. Use after /create-capability-prd. Don't use it on a
+  feature PRD (use feature-prd-to-issues) or to author the PRD itself (use
+  create-capability-prd). Provider-aware (gh/fgj/local).
 ---
+
+> **opencode native tools.** This build exposes the artifact-frontmatter operations as
+> native tools — **prefer them** over shelling out to the CLI for these: `prd_show`,
+> `prd_get`, `prd_set`, `prd_set_slices`, `prd_resolve`, `prd_assert_kind`, `prd_list`,
+> `prd_slices`, `prd_finalizable`, `prd_lint`, `prd_epic_prds`, `prd_epic_set_prd_issue`,
+> `prd_epic_prd_issue`, `prd_epic_tick`, `prd_epic_finalizable`. The !`…` header
+> injections below (workflow-gate, reference, list, profile, forge snippets) still run
+> via the bundled CLI — that is by design (a command can't call a tool).
+
 
 # Capability PRD → Issues
 
 Wherever a command below is written as `prd_tool`, run it as the absolute command printed
 here (the bundled CLI) — `prd_tool` is shorthand, not a binary on your PATH:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" toolpath`
+!`node ".opencode/scripts/prd-tool.js" toolpath`
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" workflow-gate`
+!`node ".opencode/scripts/prd-tool.js" workflow-gate`
 
 Convert a `kind: capability` PRD into independently-grabbable issues using **enabling
 slices**, wired with the flat native tracker model (see the injected reference): the PRD issue
@@ -19,40 +32,40 @@ is `blocked_by` its slices; under an epic, the PRD issue is assigned that epic's
 Capabilities are foundational (no UI to demo), so acceptance is a **consumer test**, not a
 demoable screen.
 
-Detected forge: **!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge git_type`** — !`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge ownership_note`
+Detected forge: **!`node ".opencode/scripts/prd-tool.js" forge git_type`** — !`node ".opencode/scripts/prd-tool.js" forge ownership_note`
 
 Per-provider commands come from `prd_tool forge <key>`, injected at the step that
 uses them. The PRD/artifact reference (frontmatter + `docs/prd/<slug>/` layout + lifecycle)
 is injected below.
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" reference`
+!`node ".opencode/scripts/prd-tool.js" reference`
 
 `prd_tool` is the bundled helper that reads/writes this frontmatter — invoke it as
 `prd_tool <subcommand>` (`--help` for the full
 surface). The current planning-tree inventory is injected here:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" list`
+!`node ".opencode/scripts/prd-tool.js" list`
 
 The project profile (architecture layers, orientation docs) is injected below when available
 — its "Architecture layers → Capability" section defines what an enabling slice means here.
 If empty, explore the codebase to learn the layering and the libraries/host this work extends:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" profile`
+!`node ".opencode/scripts/prd-tool.js" profile`
 
 ## Step 0 — Provider + PRD
 
 Verify auth, then locate the PRD at `docs/prd/<slug>/prd.md` and **assert `kind: capability`** —
-the helper exits non-zero (and points at `/prd-workflow:feature-prd-to-issues`) on a mismatch:
+the helper exits non-zero (and points at `/feature-prd-to-issues`) on a mismatch:
 
 ```bash
 prd_tool assert-kind <slug> capability
 ```
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge auth_check`
+!`node ".opencode/scripts/prd-tool.js" forge auth_check`
 
 Ensure the label scheme exists (idempotent):
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge ensure_labels`
+!`node ".opencode/scripts/prd-tool.js" forge ensure_labels`
 
 ## Step 1 — Explore (if needed)
 
@@ -92,13 +105,13 @@ via `--milestone`); native dependencies express all ordering.** Check `prd.md` f
 `epic:` field — present ⇒ this PRD belongs to an epic; absent ⇒ standalone (no milestone).
 
 When this PRD belongs to an epic, its PRD issue **already exists** as a placeholder created by
-`/prd-workflow:epic-to-prds` (assigned the epic milestone) — you **edit** it in place; do **not**
+`/epic-to-prds` (assigned the epic milestone) — you **edit** it in place; do **not**
 create a second issue. Only a standalone PRD creates a fresh issue. Forms for the detected
 provider (edit fills a placeholder; create is standalone-only; dependency wires slices):
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_edit_issue`
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_create_issue`
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_add_dependency`
+!`node ".opencode/scripts/prd-tool.js" forge cmd_edit_issue`
+!`node ".opencode/scripts/prd-tool.js" forge cmd_create_issue`
+!`node ".opencode/scripts/prd-tool.js" forge cmd_add_dependency`
 
 1. **The PRD issue** (body = PRD summary):
    - **If `epic:` is set** (`prd_tool get <slug> epic`): find the placeholder and **edit** it
@@ -119,7 +132,7 @@ provider (edit fills a placeholder; create is standalone-only; dependency wires 
    - For each blocker in the slice's `## Blocked by`, add **slice `blocked_by` blocker**.
    - Write `docs/prd/<slug>/slices/<n>-<slug>.md` from the template in `references/artifacts.md`.
 3. **If `epic:` is set:** the epic already recorded this PRD's issue and the PRD↔PRD order (wired
-   by `/prd-workflow:epic-to-prds`). Just move the epic to in-progress:
+   by `/epic-to-prds`). Just move the epic to in-progress:
    ```bash
    prd_tool set <epic-slug> status in-progress
    ```

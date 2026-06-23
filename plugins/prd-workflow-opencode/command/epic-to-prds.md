@@ -1,43 +1,54 @@
 ---
-name: epic-to-prds
-description: Decompose an epic (kind:epic) into an ordered set of child PRDs, create the epic milestone (an epic is a milestone, not an issue), and hand off to /prd-workflow:create-feature-prd or /prd-workflow:create-capability-prd per child with seeded context. Use after /prd-workflow:create-epic. Don't use it on a feature/capability PRD (use the matching prd-to-issues skill). Provider-aware (gh/fgj/local).
-allowed-tools: Bash(node *)
+description: Decompose an epic (kind:epic) into an ordered set of child PRDs,
+  create the epic milestone (an epic is a milestone, not an issue), and hand off
+  to /create-feature-prd or /create-capability-prd per child with seeded
+  context. Use after /create-epic. Don't use it on a feature/capability PRD (use
+  the matching prd-to-issues skill). Provider-aware (gh/fgj/local).
 ---
+
+> **opencode native tools.** This build exposes the artifact-frontmatter operations as
+> native tools — **prefer them** over shelling out to the CLI for these: `prd_show`,
+> `prd_get`, `prd_set`, `prd_set_slices`, `prd_resolve`, `prd_assert_kind`, `prd_list`,
+> `prd_slices`, `prd_finalizable`, `prd_lint`, `prd_epic_prds`, `prd_epic_set_prd_issue`,
+> `prd_epic_prd_issue`, `prd_epic_tick`, `prd_epic_finalizable`. The !`…` header
+> injections below (workflow-gate, reference, list, profile, forge snippets) still run
+> via the bundled CLI — that is by design (a command can't call a tool).
+
 
 # Epic → PRDs
 
 Wherever a command below is written as `prd_tool`, run it as the absolute command printed
 here (the bundled CLI) — `prd_tool` is shorthand, not a binary on your PATH:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" toolpath`
+!`node ".opencode/scripts/prd-tool.js" toolpath`
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" workflow-gate`
+!`node ".opencode/scripts/prd-tool.js" workflow-gate`
 
 Convert a `kind: epic` artifact into an **ordered decomposition plan** of child PRDs and an
 **epic milestone** that will group them (an epic is a milestone, not an issue — child PRD issues
 join it). This skill plans + hands off — it does **not** write the
-child PRD bodies (each child gets its own deep `/prd-workflow:create-*-prd` grilling so the
+child PRD bodies (each child gets its own deep `/create-*-prd` grilling so the
 specs stay sharp).
 
-Detected forge: **!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge git_type`** — !`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge ownership_note`
+Detected forge: **!`node ".opencode/scripts/prd-tool.js" forge git_type`** — !`node ".opencode/scripts/prd-tool.js" forge ownership_note`
 
 Per-provider commands come from `prd_tool forge <key>`, injected at
 the step that uses them. The PRD/artifact reference (three tiers + frontmatter + tracker shape +
 lifecycle) is injected below.
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" reference`
+!`node ".opencode/scripts/prd-tool.js" reference`
 
 `prd_tool` is the bundled helper that reads/writes this frontmatter — invoke it as
 `prd_tool <subcommand>` (`--help` for the full
 surface). The current planning-tree inventory is injected here:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" list`
+!`node ".opencode/scripts/prd-tool.js" list`
 
 The project profile (architecture layers) is injected below when available — its "Architecture
 layers" section grounds the feature-vs-capability split in Step 1. If empty, infer the split
 from what each child delivers and the codebase:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" profile`
+!`node ".opencode/scripts/prd-tool.js" profile`
 
 ## Step 0 — Provider + epic
 
@@ -48,12 +59,12 @@ the helper exits non-zero (and names the right skill) on a mismatch:
 prd_tool assert-kind <slug> epic
 ```
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge auth_check`
+!`node ".opencode/scripts/prd-tool.js" forge auth_check`
 
 Ensure the label scheme exists (idempotent — the placeholder PRD issues created in Step 3 carry
 `prd` / `kind:*` / `status:todo`):
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge ensure_labels`
+!`node ".opencode/scripts/prd-tool.js" forge ensure_labels`
 
 ## Step 1 — Draft the child-PRD decomposition
 
@@ -81,13 +92,13 @@ work correctly front-loaded? dependency order correct? merge/split any? Iterate 
 
 All PRD issues are created **now, up front** (as placeholders), so the milestone's progress bar
 reflects the *whole* epic from the start — not just the PRDs already built. Each is filled in
-later (not recreated) by its `/prd-workflow:*-prd-to-issues` run.
+later (not recreated) by its `/*-prd-to-issues` run.
 
 Create-milestone form, create-issue form, and dependency form for the detected provider:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_create_milestone`
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_create_issue`
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" forge cmd_add_dependency`
+!`node ".opencode/scripts/prd-tool.js" forge cmd_create_milestone`
+!`node ".opencode/scripts/prd-tool.js" forge cmd_create_issue`
+!`node ".opencode/scripts/prd-tool.js" forge cmd_add_dependency`
 
 1. **Create the epic milestone**, titled the epic's `title:` (child PRD issues join it by that
    title). Record the number it prints as `epic_milestone:`:
@@ -101,7 +112,7 @@ Create-milestone form, create-issue form, and dependency form for the detected p
 3. **Create one placeholder PRD issue per child**, in plan order — labels `prd`, `kind:<kind>`,
    `status:todo`, assigned the epic milestone (`--milestone "<epic-title>"`), body a short
    placeholder (e.g. *"Placeholder — filled in when this PRD is built via
-   /prd-workflow:\<feature|capability\>-prd-to-issues."*). Record each number:
+   /\<feature|capability\>-prd-to-issues."*). Record each number:
    ```bash
    prd_tool epic set-prd-issue <slug> <prd-slug> <#>
    ```
@@ -113,20 +124,20 @@ Create-milestone form, create-issue form, and dependency form for the detected p
    ```
 
 Each child PRD issue now exists as a placeholder. The per-child
-`/prd-workflow:create-*-prd` → `/prd-workflow:*-prd-to-issues` runs **edit** their placeholder
+`/create-*-prd` → `/*-prd-to-issues` runs **edit** their placeholder
 (they do not create a second issue) and add the slice issues under it.
 
 ## Step 4 — Hand off (dependency order, unblocked children first)
 
 For each child, in dependency order, print the command to run, seeding the epic context:
 
-- capability → `/prd-workflow:create-capability-prd` for `<scope>` — set `epic: <epic-slug>` in
+- capability → `/create-capability-prd` for `<scope>` — set `epic: <epic-slug>` in
   its frontmatter.
-- feature → `/prd-workflow:create-feature-prd` for `<scope>` — set `epic: <epic-slug>` in its
+- feature → `/create-feature-prd` for `<scope>` — set `epic: <epic-slug>` in its
   frontmatter.
 
 Tell the user to start with the unblocked children. As each child finishes
-`/prd-workflow:*-prd-to-issues`, its PRD issue is assigned this epic's milestone and its
+`/*-prd-to-issues`, its PRD issue is assigned this epic's milestone and its
 `prds[].issue` is filled.
 
 After publishing, report: the epic milestone number, and `<slug> · feature|capability ·

@@ -1,17 +1,35 @@
 ---
-name: adopt-prd
-description: Backfill the prd-workflow YAML frontmatter onto one or many existing planning docs (PRDs, epics, and slice docs) that predate this workflow or carry an old inline-metadata format. Lints the docs/prd tree with prd_tool list-bad-files / show-violations to find every non-conforming artifact, then for each infers its fields (PRD fields kind/title/slug/status; slice fields kind/title/slug/issue/prd/mode) from the prose, writes the frontmatter block, relocates/renames the file to its canonical path, and trims body text (incl. old `**PRD:** … · **kind:** …` metadata lines) that merely duplicates those fields. Use to bring a single legacy doc — or a whole directory of them — under management. Don't use it to author a brand-new PRD (use create-feature-prd / create-capability-prd) or to slice one into issues (use *-prd-to-issues). Hands off to the matching /prd-workflow:*-prd-to-issues.
-allowed-tools: Bash(node *), Bash(mkdir:*), Bash(git mv:*), Bash(mv:*)
+description: Backfill the prd-workflow YAML frontmatter onto one or many
+  existing planning docs (PRDs, epics, and slice docs) that predate this
+  workflow or carry an old inline-metadata format. Lints the docs/prd tree with
+  prd_tool list-bad-files / show-violations to find every non-conforming
+  artifact, then for each infers its fields (PRD fields kind/title/slug/status;
+  slice fields kind/title/slug/issue/prd/mode) from the prose, writes the
+  frontmatter block, relocates/renames the file to its canonical path, and trims
+  body text (incl. old `**PRD:** … · **kind:** …` metadata lines) that merely
+  duplicates those fields. Use to bring a single legacy doc — or a whole
+  directory of them — under management. Don't use it to author a brand-new PRD
+  (use create-feature-prd / create-capability-prd) or to slice one into issues
+  (use *-prd-to-issues). Hands off to the matching /*-prd-to-issues.
 ---
+
+> **opencode native tools.** This build exposes the artifact-frontmatter operations as
+> native tools — **prefer them** over shelling out to the CLI for these: `prd_show`,
+> `prd_get`, `prd_set`, `prd_set_slices`, `prd_resolve`, `prd_assert_kind`, `prd_list`,
+> `prd_slices`, `prd_finalizable`, `prd_lint`, `prd_epic_prds`, `prd_epic_set_prd_issue`,
+> `prd_epic_prd_issue`, `prd_epic_tick`, `prd_epic_finalizable`. The !`…` header
+> injections below (workflow-gate, reference, list, profile, forge snippets) still run
+> via the bundled CLI — that is by design (a command can't call a tool).
+
 
 # Adopt PRD
 
 Wherever a command below is written as `prd_tool`, run it as the absolute command printed
 here (the bundled CLI) — `prd_tool` is shorthand, not a binary on your PATH:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" toolpath`
+!`node ".opencode/scripts/prd-tool.js" toolpath`
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" workflow-gate`
+!`node ".opencode/scripts/prd-tool.js" workflow-gate`
 
 Bring **existing** planning documents — written before this workflow, or in an older inline-metadata
 format — under prd-workflow management, **one doc or a whole directory at once**. The worklist may
@@ -20,13 +38,13 @@ mix all three artifact types: **PRDs** (`prd.md`), **epics** (`epic.md`), and **
 a slice doc" branches cover the other two. You do **not** interview the user or invent scope here:
 the specs already exist. Your job is to *read* each one, **infer** the frontmatter the workflow
 expects, write that header, file the doc at its canonical path, and **trim prose that now merely
-restates the frontmatter**. For authoring a PRD from scratch, use `/prd-workflow:create-feature-prd`
-or `/prd-workflow:create-capability-prd` instead.
+restates the frontmatter**. For authoring a PRD from scratch, use `/create-feature-prd`
+or `/create-capability-prd` instead.
 
 The PRD/artifact reference below is loaded via **dynamic context injection** (the frontmatter
 schema you must produce, the `docs/prd/<slug>/` layout, and the lifecycle / status values):
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" reference`
+!`node ".opencode/scripts/prd-tool.js" reference`
 
 `prd_tool` is the bundled helper that reads/writes this frontmatter — invoke it as
 `prd_tool <subcommand>` (`--help` for the full
@@ -38,13 +56,13 @@ file tools first, and use `show-violations` to confirm the result at the end. Th
 planning-tree inventory is injected here — **check it before choosing each `<slug>`** (avoid
 collisions) and to spot the parent epic if a doc belongs to one:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" list`
+!`node ".opencode/scripts/prd-tool.js" list`
 
 The project profile (architecture layers) is injected below when available — its "Architecture
 layers" section is what the `kind` inference in Step 2 leans on. If empty, infer `kind` from
 what the doc delivers and the codebase:
 
-!`node "${CLAUDE_SKILL_DIR}/../../scripts/prd-tool.js" profile`
+!`node ".opencode/scripts/prd-tool.js" profile`
 
 ## Step 0 — Scope the worklist
 
@@ -141,7 +159,7 @@ need to fix.
 
 Once the batch is clean, report a short summary: for each adopted doc its canonical path and the
 inferred `kind`/`status`, and that each is ready for the matching
-`/prd-workflow:feature-prd-to-issues` or `/prd-workflow:capability-prd-to-issues`. Don't create
+`/feature-prd-to-issues` or `/capability-prd-to-issues`. Don't create
 issues here. Wherever you had to guess on `kind`, `epic`, or scope gaps, call it out so the user
 can correct it before slicing.
 
@@ -149,7 +167,7 @@ can correct it before slicing.
 
 If the source doc is actually an **epic** (it coordinates several PRDs rather than describing one
 feature/capability), infer `kind: epic` and the epic schema from `artifacts.md`, file it at
-`docs/prd/epics/<slug>/epic.md`, and hand off to `/prd-workflow:epic-to-prds`. Leave
+`docs/prd/epics/<slug>/epic.md`, and hand off to `/epic-to-prds`. Leave
 `epic_milestone:` / `prds:` for that step unless the prose already enumerates them.
 
 ## Adopting a slice doc
@@ -184,7 +202,7 @@ the substantive sections (`## What to build`, `## Acceptance criteria`, `## Bloc
 now carried by the frontmatter. If the filename isn't `<issue>-<slug>.md`, `git mv` it to that name.
 Verify with `show-violations <slice-file>` (expect clean) — `show`/`resolve` don't address slices,
 so don't use them here. Slices need no hand-off; once clean they're ready for
-`/prd-workflow:analyse-issue` / `implement-issue` as before.
+`/analyse-issue` / `implement-issue` as before.
 
 ## Error handling
 

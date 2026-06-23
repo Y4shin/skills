@@ -42,7 +42,7 @@ the artifact's `slug:`. `<n>` is the slice's issue number once it exists.
 The prd-workflow's set of conventions is versioned. The repo's version is stored in the dotfile
 `docs/prd/.workflow-version` (a bare integer; **absent ⇒ version 0**, the pre-versioning
 baseline). The bundled tool targets a current version and every operational skill injects
-`prd_tool.pyz workflow-gate`, which **refuses to run** (and points at the remedy) unless the
+`prd_tool workflow-gate`, which **refuses to run** (and points at the remedy) unless the
 stored version matches:
 
 - no version file ⇒ run **`/prd-workflow:init-prd-workflow`** if the workflow has never been used
@@ -123,7 +123,7 @@ The tracker uses **milestones** (an epic *is* a milestone) and **native issue de
 on a git host (GitHub via `gh`; Forgejo/Codeberg via the bundled native REST client
 `prd_tool forgejo`, **not** the `fgj` CLI), or the built-in **local tracker**
 (`docs/prd/tracker.json`) when the repo has no recognised git host (a git repo with no `origin`
-remote). The model is identical across all three; run `prd_tool.pyz forge <key>` — `forge keys`
+remote). The model is identical across all three; run `prd_tool forge <key>` — `forge keys`
 for the list — for the exact per-provider commands. Two mechanisms, each with one job:
 
 - **Milestone (the epic)** — an **epic is a milestone**, never an issue. Each child PRD issue
