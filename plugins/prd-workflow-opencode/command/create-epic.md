@@ -6,6 +6,7 @@ description: "Interview the user to produce an epic — a coordinated outcome
   PRDs. Don't use it for a single feature (use create-feature-prd) or one
   foundational capability (use create-capability-prd). Hands off to
   /epic-to-prds."
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

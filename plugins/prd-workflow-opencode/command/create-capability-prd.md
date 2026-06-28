@@ -5,6 +5,7 @@ description: "Interview the user to produce a capability PRD (foundational work
   infra primitive. Don't use it for user-facing behaviour (use
   create-feature-prd), or to break an existing PRD into issues (use
   capability-prd-to-issues). Hands off to /capability-prd-to-issues."
+model: openrouter/deepseek/deepseek-v4-pro
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

@@ -99,6 +99,29 @@ function copyInto(dir, name, src) {
 const TOOL_RE = /\$\{CLAUDE_SKILL_DIR\}\/\.\.\/\.\.\/scripts\/prd-tool\.js/g;
 const OPENCODE_CLI = ".opencode/scripts/prd-tool.js";
 
+// Default model per command, by workflow tier. opencode reads `model` from a
+// command's frontmatter; commands left unlisted inherit the session model, so
+// the routine tier is the implicit default. Edit these to taste.
+const TIER_MODEL = {
+  heavy: "openrouter/deepseek/deepseek-v4-pro", // hardest reasoning / spec authoring / TDD coding
+  medium: "openrouter/deepseek/deepseek-v4-flash", // decomposition, slicing, analysis, finalize synthesis
+  routine: "openrouter/deepseek/deepseek-v4-flash", // mechanical, tool-driven bookkeeping
+};
+const COMMAND_TIER = {
+  "grill-me": "heavy",
+  "create-feature-prd": "heavy",
+  "create-capability-prd": "heavy",
+  "implement-issue": "heavy",
+  "create-epic": "medium",
+  "epic-to-prds": "medium",
+  "feature-prd-to-issues": "medium",
+  "capability-prd-to-issues": "medium",
+  "analyse-issue": "medium",
+  "finalize-prd": "medium",
+  // unlisted (adopt-prd, finalize-epic, init/update-prd-workflow, …) → routine
+};
+const modelForCommand = (name) => TIER_MODEL[COMMAND_TIER[name] ?? "routine"];
+
 // Non-destructive note prepended to each command: the artifact operations are
 // available as native opencode tools. We don't textually rewrite the inline
 // `prd_tool …` references (they sit inside fenced/inline code and still work via
@@ -113,7 +136,7 @@ const NATIVE_TOOLS_NOTE =
   "> via the bundled CLI — that is by design (a command can't call a tool).\n";
 
 /** Convert one SKILL.md into an opencode command markdown string. */
-function skillToCommand(text) {
+function skillToCommand(text, model) {
   // Split frontmatter.
   const m = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/.exec(text);
   if (!m) throw new Error("SKILL.md missing frontmatter");
@@ -132,7 +155,10 @@ function skillToCommand(text) {
 
   // Serialize the frontmatter via the YAML lib so descriptions containing ':' or
   // quotes are correctly quoted (opencode's YAML parser is strict).
-  const fmBlock = description ? YAML.stringify({ description }).replace(/\n+$/, "") : "";
+  const fmObj = {};
+  if (description) fmObj.description = description;
+  if (model) fmObj.model = model;
+  const fmBlock = Object.keys(fmObj).length ? YAML.stringify(fmObj).replace(/\n+$/, "") : "";
   const fmOut = `---\n${fmBlock ? fmBlock + "\n" : ""}---\n`;
   return `${fmOut}\n${NATIVE_TOOLS_NOTE}\n${body}`;
 }
@@ -153,7 +179,7 @@ function generateOverlay(cliBundle, pluginBundle) {
     if (SKILL_NOT_COMMAND.has(name)) continue;
     const skill = join(SKILLS_DIR, name, "SKILL.md");
     if (!existsSync(skill)) continue;
-    const cmd = skillToCommand(readFileSync(skill, "utf-8"));
+    const cmd = skillToCommand(readFileSync(skill, "utf-8"), modelForCommand(name));
     writeFileSync(join(cmdDir, `${name}.md`), cmd);
     n++;
   }

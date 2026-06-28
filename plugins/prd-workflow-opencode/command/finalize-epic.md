@@ -6,6 +6,7 @@ description: Close the loop on an epic once all its child PRDs are finalized —
   done, or the user says "finalize"/"wrap up" an epic. Don't use it while any
   child PRD is unfinished (finish finalize-prd first). Provider-aware
   (gh/fgj/local).
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

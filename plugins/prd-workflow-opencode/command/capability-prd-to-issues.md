@@ -6,6 +6,7 @@ description: Break a capability PRD (kind:capability) into
   committed slice docs. Use after /create-capability-prd. Don't use it on a
   feature PRD (use feature-prd-to-issues) or to author the PRD itself (use
   create-capability-prd). Provider-aware (gh/fgj/local).
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

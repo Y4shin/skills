@@ -6,6 +6,7 @@ description: Break a feature PRD (kind:feature) into independently-grabbable
   or when converting a feature spec into work issues. Don't use it on a
   capability PRD (use capability-prd-to-issues) or to author the PRD itself (use
   create-feature-prd). Provider-aware (gh/fgj/local).
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

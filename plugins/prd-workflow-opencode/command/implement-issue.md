@@ -10,6 +10,7 @@ description: "Phase 2 — implement a slice issue via strict TDD against the tes
   completed PRD (use finalize-prd). Provider-aware (gh/fgj/local — local
   projects use the same branch workflow but skip remotes/PRs and use the
   built-in tracker)."
+model: openrouter/deepseek/deepseek-v4-pro
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

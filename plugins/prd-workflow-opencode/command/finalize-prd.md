@@ -10,6 +10,7 @@ description: "Close the loop once all of a PRD's slices are merged into its
   use it while any slice is still open or unmerged (finish implement-issue
   first). Provider-aware (gh/fgj/local — local projects use the same branch
   workflow but merge locally instead of opening a PR)."
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

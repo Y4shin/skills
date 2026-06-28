@@ -4,6 +4,7 @@ description: Explain the full prd-workflow lifecycle — every phase, every skil
   this workflow work", "explain the PRD process", "what skills are available",
   or wants an overview before starting. Don't use it to actually run any
   workflow step — point the user at the right skill instead.
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

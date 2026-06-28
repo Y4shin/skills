@@ -4,6 +4,7 @@ description: Interview the user relentlessly about a plan or design until
   when the user wants to stress-test a plan, get grilled on their design, or
   mentions "grill me". Don't use it to produce a committed PRD or create issues
   — that's create-feature-prd / create-capability-prd.
+model: openrouter/deepseek/deepseek-v4-pro
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

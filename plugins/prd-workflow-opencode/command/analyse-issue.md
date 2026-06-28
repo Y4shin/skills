@@ -5,6 +5,7 @@ description: "Fetch a slice issue (#n), present a structured summary, then run a
   /implement-issue. Use when starting work on an issue, or when the user says
   \"analyse\"/\"start on\" #n. Don't use it to write code or open a PR (use
   implement-issue once the test plan is agreed). Provider-aware (gh/fgj/local)."
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

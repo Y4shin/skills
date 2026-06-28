@@ -6,6 +6,7 @@ description: Initialize the prd-workflow in this repo by creating the version
   workflow is uninitialized. For a repo with pre-versioning artifacts it stamps
   the v0 baseline and points you at update-prd-workflow. If already initialized
   it's a no-op.
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

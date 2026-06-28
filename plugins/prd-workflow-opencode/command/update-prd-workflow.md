@@ -6,6 +6,7 @@ description: Migrate this repo's prd-workflow up to the version this plugin
   v0→v1 converts epic issues into milestones and reassigns their PRD issues). If
   the repo is already current it's a no-op; if it has no version file it treats
   it as v0 and migrates forward.
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

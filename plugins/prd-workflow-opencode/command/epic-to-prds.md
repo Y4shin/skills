@@ -4,6 +4,7 @@ description: Decompose an epic (kind:epic) into an ordered set of child PRDs,
   to /create-feature-prd or /create-capability-prd per child with seeded
   context. Use after /create-epic. Don't use it on a feature/capability PRD (use
   the matching prd-to-issues skill). Provider-aware (gh/fgj/local).
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as

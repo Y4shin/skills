@@ -11,6 +11,7 @@ description: Backfill the prd-workflow YAML frontmatter onto one or many
   directory of them — under management. Don't use it to author a brand-new PRD
   (use create-feature-prd / create-capability-prd) or to slice one into issues
   (use *-prd-to-issues). Hands off to the matching /*-prd-to-issues.
+model: openrouter/deepseek/deepseek-v4-flash
 ---
 
 > **opencode native tools.** This build exposes the artifact-frontmatter operations as
