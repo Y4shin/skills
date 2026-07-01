@@ -74,7 +74,12 @@ async function buildPlugin() {
     format: "esm",
     target: "node18",
     outfile,
-    external: ["@opencode-ai/plugin"],
+    // NOTE: do NOT mark @opencode-ai/plugin external. Its `tool` export is just
+    // an identity function whose only dep is zod, so bundling it stays tiny —
+    // and it makes the plugin self-contained. When the plugin is installed as a
+    // symlink (e.g. Home Manager / Nix store), Node resolves bare imports from
+    // the file's REAL path, which has no node_modules, so an external import of
+    // @opencode-ai/plugin fails to load and none of the prd_* tools register.
     banner: { js: CREATE_REQUIRE },
     define: { __REFERENCE__: JSON.stringify(referenceText) },
     legalComments: "none",
