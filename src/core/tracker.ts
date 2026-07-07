@@ -1,16 +1,13 @@
 /**
  * Local file-based issue tracker for git repos without a remote.
  *
- * When `forge` selects the `local` provider, its command snippets drive this
- * tracker instead of `gh`/`fgj`. Issues, labels, dependencies, and epic
- * milestones live in a single JSON ledger at `docs/prd/tracker.json`. An epic is
- * a milestone, matching the git-host model.
+ * Issues, labels, dependencies, and epic milestones live in a single JSON ledger
+ * at `docs/prd/tracker.json`. An epic is a milestone.
  */
 
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-
-import { TrackerError } from "./errors";
+import { TrackerError } from "./errors.js";
 
 export { TrackerError };
 
@@ -80,7 +77,6 @@ function ensureMilestoneIn(data: Store, title: string): number {
   return number;
 }
 
-/** Initialise the store if absent (idempotent). Returns its path. */
 export function ensure(root: string): string {
   save(root, load(root));
   return storePath(root);
@@ -98,14 +94,8 @@ export function create(
   data.next = number + 1;
   const msNumber = milestone ? ensureMilestoneIn(data, milestone) : null;
   data.issues.push({
-    number,
-    title,
-    body,
-    labels: [...labels],
-    state: "open",
-    comments: [],
-    blocked_by: [],
-    milestone: msNumber,
+    number, title, body, labels: [...labels], state: "open", comments: [],
+    blocked_by: [], milestone: msNumber,
   });
   save(root, data);
   return number;
@@ -115,14 +105,10 @@ export function view(root: string, number: number): Issue {
   return find(load(root), number);
 }
 
-export function listIssues(
-  root: string,
-  label: string | null = null,
-  state: string | null = null,
-): Issue[] {
+export function listIssues(root: string, label?: string | null, state?: string | null): Issue[] {
   let issues = load(root).issues;
-  if (label) issues = issues.filter((i) => i.labels.includes(label));
-  if (state) issues = issues.filter((i) => i.state === state);
+  if (label) issues = issues.filter(i => i.labels.includes(label));
+  if (state) issues = issues.filter(i => i.state === state);
   return issues;
 }
 
@@ -132,37 +118,26 @@ export function comment(root: string, number: number, text: string): void {
   save(root, data);
 }
 
-export function close(root: string, number: number, commentText: string | null = null): void {
+export function close(root: string, number: number, commentText?: string | null): void {
   const data = load(root);
-  const issue = find(data, number);
-  issue.state = "closed";
-  if (commentText) issue.comments.push(commentText);
+  find(data, number).state = "closed";
+  if (commentText) find(data, number).comments.push(commentText);
   save(root, data);
 }
 
-export function edit(
-  root: string,
-  number: number,
-  title: string | null = null,
-  body: string | null = null,
-): void {
+export function edit(root: string, number: number, title?: string | null, body?: string | null): void {
   const data = load(root);
   const issue = find(data, number);
-  if (title !== null) issue.title = title;
-  if (body !== null) issue.body = body;
+  if (title !== null && title !== undefined) issue.title = title;
+  if (body !== null && body !== undefined) issue.body = body;
   save(root, data);
 }
 
-export function editLabels(
-  root: string,
-  number: number,
-  add: Iterable<string> = [],
-  remove: Iterable<string> = [],
-): string[] {
+export function editLabels(root: string, number: number, add: Iterable<string> = [], remove: Iterable<string> = []): string[] {
   const data = load(root);
   const issue = find(data, number);
   const removeSet = new Set(remove);
-  const labels = issue.labels.filter((l) => !removeSet.has(l));
+  const labels = issue.labels.filter(l => !removeSet.has(l));
   for (const label of add) if (!labels.includes(label)) labels.push(label);
   issue.labels = labels;
   save(root, data);
@@ -172,7 +147,7 @@ export function editLabels(
 export function addDependency(root: string, number: number, blocker: number): void {
   const data = load(root);
   const issue = find(data, number);
-  find(data, blocker); // the blocker must exist
+  find(data, blocker);
   if (blocker === number) throw new TrackerError(`issue #${number} cannot block itself`);
   if (!issue.blocked_by.includes(blocker)) issue.blocked_by.push(blocker);
   save(root, data);

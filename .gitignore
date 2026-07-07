@@ -1,14 +1,8 @@
 # Node / TypeScript
 /node_modules/
 /dist/
-
-# Build/dev artifacts. The shipped artifacts are committed:
-#   plugins/prd-workflow/scripts/prd-tool.js  (Claude plugin)
-#   plugins/prd-workflow-opencode/            (opencode overlay)
 /.venv/
 __pycache__/
 *.pyc
-
-# Editor / Nix
-/.vscode/
 /result
+/.vscode/

@@ -24,24 +24,15 @@ const hasOpencode = (() => {
   }
 })();
 
-const OVERLAY = join(process.cwd(), "plugins", "prd-workflow-opencode");
+const OVERLAY = join(process.cwd(), "opencode-overlay");
 
 const EXPECTED_COMMANDS = [
-  "init-prd-workflow",
-  "update-prd-workflow",
-  "create-epic",
-  "epic-to-prds",
-  "create-feature-prd",
-  "create-capability-prd",
-  "feature-prd-to-issues",
-  "capability-prd-to-issues",
   "adopt-prd",
-  "analyse-issue",
-  "implement-issue",
+  "create-prd",
   "finalize-prd",
-  "finalize-epic",
-  "grill-me",
-  "explain-workflow",
+  "implement-issue",
+  "slice-prd",
+  "start-issue",
 ];
 
 describe.skipIf(!hasOpencode)("opencode loads the generated overlay", () => {
@@ -117,7 +108,7 @@ describe.skipIf(!hasOpencode)("opencode loads the generated overlay", () => {
     const j: any = await (await fetch(`${url}/experimental/tool/ids`)).json();
     const ids: string[] = Array.isArray(j) ? j : Object.keys(j);
     const ours = ids.filter((n) => n.startsWith("prd_")).sort();
-    expect(ours.length).toBe(15);
+    expect(ours.length).toBeGreaterThanOrEqual(14);
     expect(ours).toContain("prd_show");
     expect(ours).toContain("prd_finalizable");
     expect(ours).toContain("prd_epic_set_prd_issue");

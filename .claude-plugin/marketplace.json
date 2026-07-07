@@ -1,7 +1,0 @@
-{
-  "name": "platform-workflows",
-  "owner": { "name": "Patric Plattner" },
-  "plugins": [
-    { "name": "prd-workflow", "source": "./plugins/prd-workflow" }
-  ]
-}

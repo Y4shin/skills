@@ -3,36 +3,30 @@
  *
  * Replaces the `fgj` CLI for every prd-workflow operation. The only external
  * `fgj` touch left is fetching the auth token (`fgj auth token`); everything
- * else is a direct HTTPS call. Labels and milestones are referenced by numeric
- * id on issue create/edit, so we resolve (and, for milestones, auto-create)
- * names → ids.
+ * else is a direct HTTPS call.
  */
 
 import { spawnSync } from "node:child_process";
-
-import { ForgejoError } from "./errors";
-import * as forge from "./forge";
+import { ForgejoError } from "./errors.js";
+import * as forge from "./forge.js";
 
 export { ForgejoError };
 
 const TOKEN_ENV_VARS = ["FORGEJO_TOKEN", "CODEBERG_TOKEN"] as const;
 
-/** Token acquisition touch-point, grouped so tests can stub it. */
 export const tokenIo = {
-  /** The fgj CLI's stored token for *host*, or "" if the CLI is absent/fails. */
   fgjAuthToken(host: string): string {
     const r = spawnSync("fgj", ["auth", "token", "--hostname", host], { encoding: "utf-8" });
-    if (r.error || r.status !== 0 || r.stdout == null) return "";
-    return r.stdout.trim();
+    return r.error || r.status !== 0 || r.stdout == null ? "" : r.stdout.trim();
   },
 };
 
 export function hostFromRemote(remote: string): string {
   const r = remote.trim();
   if (!r) throw new ForgejoError("no origin remote — cannot reach a Forgejo instance");
-  let m = /^[a-zA-Z]+:\/\/(?:[^@/]+@)?([^:/]+)/.exec(r); // scheme://[user@]host...
+  let m = /^[a-zA-Z]+:\/\/(?:[^@/]+@)?([^:/]+)/.exec(r);
   if (m) return m[1];
-  m = /^[^@]+@([^:]+):/.exec(r); // scp-like git@host:owner/repo.git
+  m = /^[^@]+@([^:]+):/.exec(r);
   if (m) return m[1];
   throw new ForgejoError(`cannot parse host from remote '${remote}'`);
 }
@@ -43,22 +37,20 @@ export class Client {
   owner: string;
   repo: string;
   host: string;
-  private _token: string | null;
+  private _token: string | null = null;
   private _labels: Record<string, number> | null = null;
 
-  constructor(owner: string, repo: string, host: string, token: string | null = null) {
+  constructor(owner: string, repo: string, host: string, token?: string | null) {
     this.owner = owner;
     this.repo = repo;
     this.host = host;
-    this._token = token;
+    if (token !== undefined) this._token = token;
   }
 
   static fromRepo(): Client {
     const f = forge.detect();
     if (f.provider !== "fgj") {
-      throw new ForgejoError(
-        `the forgejo client only handles Forgejo/Codeberg repos (detected provider: ${f.provider})`,
-      );
+      throw new ForgejoError(`forgejo client only handles Forgejo repos (detected: ${f.provider})`);
     }
     const host = hostFromRemote(forge.io.remoteUrl());
     return new Client(f.owner, f.repo, host);
@@ -74,31 +66,20 @@ export class Client {
     if (!tok) {
       for (const v of TOKEN_ENV_VARS) {
         const env = process.env[v];
-        if (env) {
-          tok = env.trim();
-          break;
-        }
+        if (env) { tok = env.trim(); break; }
       }
     }
     if (!tok) {
       throw new ForgejoError(
         `no API token for ${this.host}: run \`fgj auth login --hostname ${this.host}\` ` +
-          `(or set one of ${TOKEN_ENV_VARS.join(", ")})`,
+        `(or set one of ${TOKEN_ENV_VARS.join(", ")})`,
       );
     }
     this._token = tok;
     return tok;
   }
 
-  // ---------------------------------------------------------------- transport
-  // Overridable on the instance (tests assign a recorder), mirroring the Python
-  // `c._request = ...` pattern.
-  async request(
-    method: string,
-    path: string,
-    body?: Json | null,
-    query?: Record<string, unknown> | null,
-  ): Promise<Json> {
+  async request(method: string, path: string, body?: Json | null, query?: Record<string, unknown> | null): Promise<Json> {
     let url = `${this.base}${path}`;
     if (query) {
       const params = new URLSearchParams();
@@ -136,14 +117,11 @@ export class Client {
     return `/repos/${this.owner}/${this.repo}${suffix}`;
   }
 
-  // ---------------------------------------------------------------- labels
-
+  // Labels
   async listLabels(): Promise<Record<string, number>> {
     if (this._labels === null) {
       const rows = (await this.request("GET", this.repoPath("/labels"), null, { limit: 100 })) ?? [];
-      const table: Record<string, number> = {};
-      for (const r of rows) table[r.name] = r.id;
-      this._labels = table;
+      this._labels = Object.fromEntries(rows.map((r: any) => [r.name, r.id]));
     }
     return this._labels;
   }
@@ -153,11 +131,7 @@ export class Client {
     const created: string[] = [];
     for (const [name, color] of labels) {
       if (name in existing) continue;
-      const row = await this.request("POST", this.repoPath("/labels"), {
-        name,
-        color: `#${color.replace(/^#/, "")}`,
-      });
-      existing[name] = row.id;
+      await this.request("POST", this.repoPath("/labels"), { name, color: `#${color.replace(/^#/, "")}` });
       created.push(name);
     }
     return created;
@@ -167,20 +141,15 @@ export class Client {
     const table = await this.listLabels();
     const ids: number[] = [];
     for (const n of names) {
-      if (!(n in table)) {
-        throw new ForgejoError(`label '${n}' does not exist — run \`ensure-labels\` first`);
-      }
+      if (!(n in table)) throw new ForgejoError(`label '${n}' does not exist — run ensure-labels first`);
       ids.push(table[n]);
     }
     return ids;
   }
 
-  // ---------------------------------------------------------------- milestones
-
+  // Milestones
   async findMilestone(title: string): Promise<number | null> {
-    const rows =
-      (await this.request("GET", this.repoPath("/milestones"), null, { state: "all", limit: 100 })) ??
-      [];
+    const rows = (await this.request("GET", this.repoPath("/milestones"), null, { state: "all", limit: 100 })) ?? [];
     for (const r of rows) if (r.title === title) return r.id;
     return null;
   }
@@ -197,20 +166,11 @@ export class Client {
   }
 
   async listMilestones(): Promise<Json[]> {
-    return (
-      (await this.request("GET", this.repoPath("/milestones"), null, { state: "all", limit: 100 })) ??
-      []
-    );
+    return (await this.request("GET", this.repoPath("/milestones"), null, { state: "all", limit: 100 })) ?? [];
   }
 
-  // ---------------------------------------------------------------- issues
-
-  async createIssue(
-    title: string,
-    body: string,
-    labels: ReadonlyArray<string> = [],
-    milestone: string | null = null,
-  ): Promise<Json> {
+  // Issues
+  async createIssue(title: string, body: string, labels: ReadonlyArray<string> = [], milestone: string | null = null): Promise<Json> {
     const payload: Json = { title, body };
     if (labels.length) payload.labels = await this.labelIds(labels);
     if (milestone) payload.milestone = await this.ensureMilestone(milestone);
@@ -222,14 +182,7 @@ export class Client {
   }
 
   async listIssues(label: string | null = null, state: string | null = null): Promise<Json[]> {
-    return (
-      (await this.request("GET", this.repoPath("/issues"), null, {
-        labels: label,
-        state,
-        type: "issues",
-        limit: 50,
-      })) ?? []
-    );
+    return (await this.request("GET", this.repoPath("/issues"), null, { labels: label, state, type: "issues", limit: 50 })) ?? [];
   }
 
   async comment(index: number, body: string): Promise<void> {
@@ -247,48 +200,24 @@ export class Client {
     return mid;
   }
 
-  async updateIssue(
-    index: number,
-    title: string | null = null,
-    body: string | null = null,
-  ): Promise<void> {
+  async updateIssue(index: number, title?: string | null, body?: string | null): Promise<void> {
     const payload: Json = {};
-    if (title !== null) payload.title = title;
-    if (body !== null) payload.body = body;
-    if (Object.keys(payload).length) {
-      await this.request("PATCH", this.repoPath(`/issues/${index}`), payload);
-    }
+    if (title !== undefined && title !== null) payload.title = title;
+    if (body !== undefined && body !== null) payload.body = body;
+    if (Object.keys(payload).length) await this.request("PATCH", this.repoPath(`/issues/${index}`), payload);
   }
 
-  async editLabels(
-    index: number,
-    add: ReadonlyArray<string> = [],
-    remove: ReadonlyArray<string> = [],
-  ): Promise<void> {
-    if (add.length) {
-      await this.request("POST", this.repoPath(`/issues/${index}/labels`), {
-        labels: await this.labelIds(add),
-      });
-    }
+  async editLabels(index: number, add: ReadonlyArray<string> = [], remove: ReadonlyArray<string> = []): Promise<void> {
+    if (add.length) await this.request("POST", this.repoPath(`/issues/${index}/labels`), { labels: await this.labelIds(add) });
     for (const name of remove) {
       const table = await this.listLabels();
-      if (name in table) {
-        await this.request("DELETE", this.repoPath(`/issues/${index}/labels/${table[name]}`));
-      }
+      if (name in table) await this.request("DELETE", this.repoPath(`/issues/${index}/labels/${table[name]}`));
     }
   }
 
-  // ---------------------------------------------------------------- relationships
-
   async addDependency(index: number, blocker: number): Promise<void> {
-    await this.request("POST", this.repoPath(`/issues/${index}/dependencies`), {
-      index: blocker,
-      owner: this.owner,
-      repo: this.repo,
-    });
+    await this.request("POST", this.repoPath(`/issues/${index}/dependencies`), { index: blocker, owner: this.owner, repo: this.repo });
   }
-
-  // ---------------------------------------------------------------- pulls
 
   async createPr(head: string, base: string, title: string, body: string): Promise<Json> {
     return this.request("POST", this.repoPath("/pulls"), { head, base, title, body });

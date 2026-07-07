@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+result
+.vscode/
+.pytest_cache/
+plugins/
+tests/
+flake.lock
+flake.nix
+.claude-plugin/
+.claude/
+docs/plan-generic-profile.md
+.venv/
