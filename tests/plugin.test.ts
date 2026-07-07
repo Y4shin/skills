@@ -1,16 +1,15 @@
 /**
- * Layer 1: unit-test the opencode native tools directly — no opencode, no model.
+ * Unit-test the prd-workflow tools directly — no pi runtime, no opencode.
  *
- * The tools are plain `{ description, args, execute }` objects, so we build the
- * plugin's tool map and call `execute(args, ctx)` with a fake context. This
- * exercises the same code opencode runs when the model invokes a tool.
+ * The tools are exported from the pi extension's createTools() factory.
+ * We call execute(args, ctx) with a fake context and assert the results.
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
 
-import { PrdWorkflowPlugin } from "../src/opencode/plugin";
+import { createTools } from "../src/pi/index";
 import { mkTmp } from "./util";
 
 function sampleTree(): string {
@@ -33,26 +32,23 @@ function sampleTree(): string {
   return t;
 }
 
-// A minimal stand-in for opencode's ToolContext (only `directory` is used).
-const ctx = (directory: string) => ({ directory, worktree: directory }) as any;
+const ctx = (directory: string) => ({ directory }) as any;
 
-describe("opencode native tools", () => {
-  let tools: Record<string, { description: string; args: unknown; execute: Function }>;
+describe("prd-workflow tools", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
 
-  beforeAll(async () => {
-    const hooks = await PrdWorkflowPlugin({} as any);
-    tools = hooks.tool as any;
+  beforeAll(() => {
+    tools = createTools();
   });
 
-  test("registers the prd_* tools with descriptions + arg schemas", () => {
+  test("registers all tools with descriptions", () => {
     const names = Object.keys(tools).sort();
-    expect(names.length).toBeGreaterThanOrEqual(14);
+    expect(names.length).toBeGreaterThanOrEqual(15);
     expect(names).toContain("prd_show");
     expect(names).toContain("prd_finalizable");
     expect(names).toContain("prd_epic_tick");
     for (const t of Object.values(tools)) {
       expect(typeof t.description).toBe("string");
-      expect(t.args).toBeTruthy();
       expect(typeof t.execute).toBe("function");
     }
   });
@@ -80,10 +76,7 @@ describe("opencode native tools", () => {
 
   test("prd_set mutates frontmatter (readable back via prd_get)", async () => {
     const t = sampleTree();
-    const set = await tools.prd_set.execute(
-      { selector: "login", field: "status", value: "in-progress" },
-      ctx(t),
-    );
+    const set = await tools.prd_set.execute({ selector: "login", field: "status", value: "in-progress" }, ctx(t));
     expect(set).toContain("in-progress");
     const got = await tools.prd_get.execute({ selector: "login", field: "status" }, ctx(t));
     expect(got).toBe("in-progress");
@@ -97,8 +90,6 @@ describe("opencode native tools", () => {
 
   test("prd_assert_kind fails on a kind mismatch", async () => {
     const t = sampleTree();
-    await expect(
-      tools.prd_assert_kind.execute({ selector: "login", kind: "epic" }, ctx(t)),
-    ).rejects.toThrow(/not/);
+    await expect(tools.prd_assert_kind.execute({ selector: "login", kind: "epic" }, ctx(t))).rejects.toThrow(/not/);
   });
 });
