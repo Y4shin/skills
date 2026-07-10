@@ -1,6 +1,6 @@
 ---
 name: prd-workflow-overview
-description: Entry point for PRD/epic/slice questions in repos using the prd-workflow (docs/prd/ tree). Use when: 'is this PRD ready?', 'what's left on PRD X?', 'list the planning tree', 'status of PRD X?', 'is the planning tree valid?', or the first PRD/epic/slice question in a fresh conversation. Routes action requests to the matching workflow skill.
+description: "Entry point for PRD/epic/slice questions in repos using the prd-workflow (docs/prd/ tree). Use when: 'is this PRD ready?', 'what's left on PRD X?', 'list the planning tree', 'status of PRD X?', 'is the planning tree valid?', or the first PRD/epic/slice question in a fresh conversation. Routes action requests to the matching workflow skill."
 ---
 
 # Working with PRDs (prd-workflow)
