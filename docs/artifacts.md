@@ -1,26 +1,88 @@
-# PRD + work-artifact reference
+# Task + work-artifact reference
 
-Shared by the `create-prd`, `slice-prd`, `start-issue`, `implement-issue`, `finalize-prd`, and `adopt-prd` skills.
+Shared by all task-workflow skills.
 
 ## Three tiers
 
-- **epic** (`kind: epic`) — a coordinated outcome that spans several PRDs. Realised on the forge as a **milestone** (not an issue). Its child PRD issues are assigned that milestone. Has no slices of its own. *Optional* — a lone PRD needs no epic.
-- **PRD** (`kind: prd`) — one feature or one foundational capability. Its own issue, broken into slices. May belong to an epic (`epic:` field — the PRD issue then carries the epic's milestone) or stand alone.
-- **slice** — one independently-grabbable issue: a vertical tracer-bullet.
+- **epic** (`kind: epic`) — a coordinated outcome that spans several tasks. Has no slices of its own. *Optional* — a lone task needs no epic.
+- **task** (`kind: task`) — one feature or one foundational capability. Broken into slices. May belong to an epic (`epic:` field).
+- **slice** (`kind: slice`) — one independently-grabbable vertical tracer-bullet.
 
-## Canonical work directory (committed)
+No GitHub/Forgejo issues. State lives entirely in `docs/tasks/` directory tree and frontmatter. Slice ordering uses `blocked_by` slugs, not issue numbers.
+
+## Directory structure
 
 ```
-docs/prd/epics/<epic-slug>/
-  epic.md                # kind: epic — the epic brief + decomposition
-
-docs/prd/<prd-slug>/
-  prd.md                 # the PRD (frontmatter below) + "## Implementation notes" log
-  slices/
-    <n>-<slug>.md        # one per slice/issue: spec + (after start-issue) "## Test plan"
+docs/tasks/
+├── state.yaml                          # session resumption
+├── CHANGELOG.md                        # completed task summaries
+├── <task-slug>/                        # active task
+│   ├── task.md
+│   └── slices/
+│       ├── <n>-<slug>.md               # todo / in-progress
+│       └── archive/                    # done slices
+│           └── <n>-<slug>.md
+├── archive/                            # completed tasks
+│   └── <task-slug>/
+│       ├── task.md
+│       └── slices/
+│           ├── <n>-<slug>.md
+│           └── archive/
+│               └── <n>-<slug>.md
+├── epics/
+│   ├── <epic-slug>/
+│   │   └── epic.md                     # active epic
+│   └── archive/                        # completed epics
+│       └── <epic-slug>/
+│           └── epic.md
 ```
+
+## State distribution
+
+| Data | Location |
+|---|---|
+| Active task / slice / epic | `docs/tasks/state.yaml` `active` block |
+| Next action | `docs/tasks/state.yaml` `next_action` |
+| Last completed action | `docs/tasks/state.yaml` `last_action` |
+| Slice status, size, timestamps | Slice doc frontmatter |
+| Task status, timestamps | Task doc frontmatter |
+| Epic status, timestamps | Epic doc frontmatter |
+| Completed task log | `docs/tasks/CHANGELOG.md` |
 
 ## Frontmatter
+
+### Task (`task.md`)
+
+```yaml
+---
+kind: task
+title: <short human title>
+slug: <kebab-slug>
+epic: <epic-slug>              # OPTIONAL
+slices: [<slug-a>, <slug-b>]   # slice slugs in dependency order
+status: draft | slices-planned | in-progress | done
+started_at: <ISO 8601>
+completed_at: <ISO 8601>
+---
+```
+
+### Slice (`slices/<n>-<slug>.md`)
+
+```yaml
+---
+kind: slice
+title: <short human title>
+slug: <kebab-slug>
+task: ../task.md
+mode: hitl | afk
+analysed: false
+status: todo | in-progress | done
+size: s | m | l | xl
+blocked_by: [<slug>, ...]     # slice slugs, not issue numbers
+started_at: <ISO 8601>
+completed_at: <ISO 8601>
+---
+```
 
 ### Epic (`epic.md`)
 
@@ -29,68 +91,30 @@ docs/prd/<prd-slug>/
 kind: epic
 title: <short human title>
 slug: <kebab-slug>
-epic_milestone: <#n>       # the epic's milestone number/id
-prds:                      # ordered child PRD decomposition
-  - slug: <prd-slug>
-    issue: <#n>
-    blocked_by: [<prd-slug>, ...]
+tasks:                          # ordered child task decomposition
+  - slug: <task-slug>
+    blocked_by: [<task-slug>, ...]
     done: false
-status: draft | prds-planned | in-progress | done
+status: draft | tasks-planned | in-progress | done
+started_at: <ISO 8601>
+completed_at: <ISO 8601>
 ---
 ```
-
-### PRD (`prd.md`)
-
-```yaml
----
-kind: prd
-title: <short human title>
-slug: <kebab-slug>
-epic: <epic-slug>    # OPTIONAL — omit if standalone
-milestone: M<NN>     # optional, docs-only milestone pointer
-prd_issue: <#n>      # filled by slice-prd
-slices: [<#a>, <#b>] # filled by slice-prd
-status: draft | issues-created | in-progress | done
----
-```
-
-### Slice (`slices/<n>-<slug>.md`)
-
-```yaml
----
-kind: prd
-title: <short human title>
-slug: <kebab-slug>
-issue: <#n>
-prd: ../prd.md
-mode: hitl | afk
-analysed: false      # true once start-issue has appended a ## Test plan
----
-```
-
-## Tracker model
-
-| Concept | Mechanism |
-|---|---|
-| Epic | A milestone. Child PRD issues are assigned this milestone. |
-| PRD issue | An issue with `prd` label. Owns the slice issues via `blocked_by`. |
-| Slice issue | An issue with `mode:hitl/afk` and `status:todo/in-progress/done` labels. |
-| Ordering | Native `blocked_by` dependencies for all ordering. |
-| PRD ↔ epic | The PRD issue is assigned the epic's milestone. |
 
 ## Branching model
 
-- Each PRD has one integration branch: `prd/<prd-slug>`, branched from `main`.
-- Slices branch off `prd/<prd-slug>` as `slice/<n>-<slug>`, merge back in.
-- **No per-slice PR.** Only `finalize-prd` opens a PR (or merges locally on local forge).
+- Each task has one integration branch: `task/<task-slug>`, branched from `main`.
+- Slices branch off `task/<task-slug>` as `slice/<slug>`, merge back in.
+- **No per-slice PR.** Only `finalize-task` merges into main.
 
 ## Lifecycle
 
-1. `create-prd` → writes `prd.md` (status `draft`) or `epic.md` (status `draft`)
-2. `slice-prd` → creates/edits the PRD issue, creates slice issues, writes slice docs (status `issues-created`)
-3. `start-issue <n>` → sets `analysed: true`, appends `## Test plan` to slice doc
-4. `implement-issue <n>` → TDD, merges into PRD branch, closes slice issue, **deletes slice doc**
-5. `finalize-prd <slug>` → harvests knowledge, deletes PRD dir, opens/merges the single PR
-6. *(if epic and last child)* `finalize-prd` also ticks the epic and finalizes it
+1. `create-task` → writes `task.md` with `started_at` (status `draft`) or `epic.md` (status `draft`)
+2. `slice-task` → writes slice docs (status `slices-planned`)
+3. `size-slices` → sets `size` per slice
+4. `start-slice <slug>` → sets `analysed: true`, writes test plan (status `in-progress`, `started_at`)
+5. `implement-slice <slug>` → TDD, merges into task branch, archives slice doc to `slices/archive/`
+6. `finalize-task <slug>` → harvests knowledge, archives task to `docs/tasks/archive/`, merges into main
+7. *(if epic and last child)* `finalize-task` also finalizes the epic
 
-A surviving slice doc ⇒ unfinished work. A surviving `docs/prd/<slug>/` ⇒ unfinished PRD.
+An unarchived slice doc ⇒ unfinished work. An unarchived `docs/tasks/<slug>/` ⇒ unfinished task.

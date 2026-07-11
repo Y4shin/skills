@@ -1,8 +1,8 @@
 {
-  description = "Dev shell + build env for the prd-workflow plugins' bundled TypeScript tool";
+  description = "Dev shell + build env for the task-workflow TypeScript tools";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:Nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -19,9 +19,8 @@
           ];
 
           shellHook = ''
-            echo "prd-workflow build shell — node $(${node}/bin/node --version)"
+            echo "task-workflow dev shell — node $(${node}/bin/node --version)"
             echo "install deps:  npm install"
-            echo "build bundles + opencode overlay:  npm run build"
             echo "run tests:  npm test"
           '';
         };

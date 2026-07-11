@@ -1,9 +1,11 @@
 /**
- * Discover and resolve prd-workflow artifacts in a repo's `docs/prd` tree.
+ * Discover and resolve task-workflow artifacts in a repo's `docs/tasks` tree.
  *
- *   docs/prd/epics/<slug>/epic.md   kind: epic
- *   docs/prd/<slug>/prd.md          kind: prd (one kind — no feature/capability split)
- *   docs/prd/<slug>/slices/<n>-<slug>.md
+ *   docs/tasks/epics/<slug>/epic.md       kind: epic
+ *   docs/tasks/<slug>/task.md             kind: task
+ *   docs/tasks/<slug>/slices/<n>-<slug>.md  kind: slice
+ *   docs/tasks/archive/<slug>/...            archived task
+ *   docs/tasks/epics/archive/<slug>/...      archived epic
  */
 
 import { existsSync, readdirSync, statSync } from "node:fs";
@@ -20,7 +22,7 @@ const SLICE_RE = /^(\d+)-(.+)\.md$/;
 export function findRoot(start: string): string {
   let dir = resolve(start);
   while (true) {
-    if (isDir(join(dir, "docs", "prd")) || existsSync(join(dir, ".git"))) return dir;
+    if (isDir(join(dir, "docs", "tasks")) || existsSync(join(dir, ".git"))) return dir;
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -28,8 +30,8 @@ export function findRoot(start: string): string {
   return resolve(start);
 }
 
-export function prdRoot(root: string): string {
-  return join(root, "docs", "prd");
+export function taskRoot(root: string): string {
+  return join(root, "docs", "tasks");
 }
 
 function isDir(p: string): boolean {
@@ -54,11 +56,12 @@ export interface Slice {
   path: string;
   number: number;
   slug: string;
+  status: string | null;
 }
 
 export class Artifact {
   path: string;
-  kind: string; // "epic" | "prd"
+  kind: string; // "epic" | "task" | "slice"
   doc: Document;
 
   constructor(path: string, kind: string, doc: Document) {
@@ -81,17 +84,6 @@ export class Artifact {
     return s === undefined || s === null ? null : (s as string);
   }
 
-  /** The PRD's own issue number, or null for epics (epics are milestones). */
-  get issue(): number | null {
-    const v = this.doc.data["prd_issue"];
-    return typeof v === "number" ? v : v == null ? null : (v as number);
-  }
-
-  get milestone(): number | null {
-    const v = this.doc.data["epic_milestone"];
-    return typeof v === "number" ? v : v == null ? null : (v as number);
-  }
-
   get slicesDir(): string {
     return join(this.dir, "slices");
   }
@@ -103,14 +95,88 @@ export class Artifact {
     for (const name of readdirSync(d).sort()) {
       if (!name.endsWith(".md")) continue;
       const m = SLICE_RE.exec(name);
-      if (m) out.push({ path: join(d, name), number: parseInt(m[1], 10), slug: m[2] });
+      if (m) {
+        const path = join(d, name);
+        let status: string | null = null;
+        try {
+          const doc = parse(path);
+          const s = doc.data["status"];
+          status = s === undefined || s === null ? null : (s as string);
+        } catch {
+          // can't parse — treat as unknown
+        }
+        out.push({ path, number: parseInt(m[1], 10), slug: m[2], status });
+      }
+    }
+    return out;
+  }
+
+  /** List only active (non-archived) slice files — excludes slices/archive/. */
+  activeSliceFiles(): Slice[] {
+    const d = this.slicesDir;
+    if (!isDir(d)) return [];
+    const archiveDir = join(d, "archive");
+    const out: Slice[] = [];
+    for (const name of readdirSync(d).sort()) {
+      if (!name.endsWith(".md")) continue;
+      // skip archive dir entries
+      if (isDir(join(d, name))) continue;
+      const m = SLICE_RE.exec(name);
+      if (m) {
+        const path = join(d, name);
+        let status: string | null = null;
+        try {
+          const doc = parse(path);
+          const s = doc.data["status"];
+          status = s === undefined || s === null ? null : (s as string);
+        } catch {
+          // can't parse
+        }
+        out.push({ path, number: parseInt(m[1], 10), slug: m[2], status });
+      }
     }
     return out;
   }
 }
 
+function discoverFromDir(root: string, leaf: string, kind: string, skipEpicsDir = false): Artifact[] {
+  const base = taskRoot(root);
+  if (!isDir(base)) return [];
+  const out: Artifact[] = [];
+  for (const name of readdirSync(base).sort()) {
+    if (name === "epics" || name === "archive" || name === "state.yaml" || name === "CHANGELOG.md") continue;
+    const f = join(base, name, leaf);
+    if (isFile(f)) {
+      if (skipEpicsDir && basename(dirname(dirname(f))) === "epics") continue;
+      let doc: Document;
+      try { doc = parse(f); } catch (e) {
+        if (e instanceof FrontmatterError) continue;
+        throw e;
+      }
+      out.push(new Artifact(f, (doc.data["kind"] as string) ?? kind, doc));
+    }
+  }
+  return out;
+}
+
 export function discoverEpics(root: string): Artifact[] {
-  const base = join(prdRoot(root), "epics");
+  const base = join(taskRoot(root), "epics");
+  const out: Artifact[] = [];
+  for (const f of globChildFiles(base, "epic.md")) {
+    // Skip archive
+    if (f.includes("/archive/")) continue;
+    let doc: Document;
+    try { doc = parse(f); } catch (e) {
+      if (e instanceof FrontmatterError) continue;
+      throw e;
+    }
+    out.push(new Artifact(f, (doc.data["kind"] as string) ?? "epic", doc));
+  }
+  return out;
+}
+
+export function discoverArchivedEpics(root: string): Artifact[] {
+  const base = join(taskRoot(root), "epics", "archive");
   const out: Artifact[] = [];
   for (const f of globChildFiles(base, "epic.md")) {
     let doc: Document;
@@ -123,23 +189,30 @@ export function discoverEpics(root: string): Artifact[] {
   return out;
 }
 
-export function discoverPrds(root: string): Artifact[] {
-  const base = prdRoot(root);
+export function discoverTasks(root: string): Artifact[] {
+  return discoverFromDir(root, "task.md", "task", true);
+}
+
+export function discoverArchivedTasks(root: string): Artifact[] {
+  const base = join(taskRoot(root), "archive");
+  if (!isDir(base)) return [];
   const out: Artifact[] = [];
-  for (const f of globChildFiles(base, "prd.md")) {
-    if (basename(dirname(dirname(f))) === "epics") continue;
-    let doc: Document;
-    try { doc = parse(f); } catch (e) {
-      if (e instanceof FrontmatterError) continue;
-      throw e;
+  for (const name of readdirSync(base).sort()) {
+    const f = join(base, name, "task.md");
+    if (isFile(f)) {
+      let doc: Document;
+      try { doc = parse(f); } catch (e) {
+        if (e instanceof FrontmatterError) continue;
+        throw e;
+      }
+      out.push(new Artifact(f, (doc.data["kind"] as string) ?? "task", doc));
     }
-    out.push(new Artifact(f, (doc.data["kind"] as string) ?? "prd", doc));
   }
   return out;
 }
 
 export function discoverAll(root: string): Artifact[] {
-  return [...discoverEpics(root), ...discoverPrds(root)];
+  return [...discoverEpics(root), ...discoverTasks(root)];
 }
 
 function asIssue(selector: string): number | null {
@@ -150,9 +223,9 @@ function asIssue(selector: string): number | null {
 export function resolveArtifact(
   root: string,
   selector: string,
-  want?: "epic" | "prd",
+  want?: "epic" | "task",
 ): Artifact {
-  const candidates = want === "epic" ? discoverEpics(root) : want === "prd" ? discoverPrds(root) : discoverAll(root);
+  const candidates = want === "epic" ? discoverEpics(root) : want === "task" ? discoverTasks(root) : discoverAll(root);
 
   // 1) explicit path
   const p = isAbsolute(selector) ? selector : join(process.cwd(), selector);
@@ -160,7 +233,7 @@ export function resolveArtifact(
     const sel = existsSync(selector) ? selector : p;
     let target: string;
     if (isDir(sel)) {
-      target = isFile(join(sel, "epic.md")) ? join(sel, "epic.md") : join(sel, "prd.md");
+      target = isFile(join(sel, "epic.md")) ? join(sel, "epic.md") : join(sel, "task.md");
     } else {
       target = sel;
     }
@@ -168,18 +241,11 @@ export function resolveArtifact(
     for (const a of candidates) {
       if (resolve(a.path) === target) return a;
     }
-    throw new ResolutionError(`'${selector}' is not a recognised artifact under ${prdRoot(root)}`);
+    throw new ResolutionError(`'${selector}' is not a recognised artifact under ${taskRoot(root)}`);
   }
 
-  // 2) issue number or milestone number
-  const n = asIssue(selector);
-  let hits: Artifact[];
-  if (n !== null) {
-    hits = candidates.filter(a => a.issue === n || a.milestone === n);
-  } else {
-    // 3) slug
-    hits = candidates.filter(a => a.slug === selector || basename(a.dir) === selector);
-  }
+  // 2) slug
+  const hits = candidates.filter(a => a.slug === selector || basename(a.dir) === selector);
 
   if (hits.length === 0) throw new ResolutionError(`no ${want ?? "artifact"} matches '${selector}'`);
   if (hits.length > 1) {
@@ -192,7 +258,7 @@ export function relPath(root: string, p: string): string {
   return relative(root, p).split("\\").join("/");
 }
 
-/** Check if the prd-workflow is initialized. */
+/** Check if the task-workflow is initialized. */
 export function isInitialized(root: string): boolean {
-  return isDir(prdRoot(root));
+  return isDir(taskRoot(root));
 }

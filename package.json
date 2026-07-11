@@ -1,7 +1,7 @@
 {
-  "name": "prd-workflow",
-  "version": "0.11.0",
-  "description": "PRD workflow: epic → PRD → slices → TDD → finalize. Pi extension.",
+  "name": "task-workflow",
+  "version": "0.12.0",
+  "description": "Task workflow: task → slices → TDD → finalize. Pi extension.",
   "keywords": ["pi-package"],
   "type": "module",
   "scripts": {

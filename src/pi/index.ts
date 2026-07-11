@@ -1,8 +1,13 @@
 /**
- * Pi extension for the prd-workflow.
+ * Pi extension for the task-workflow.
  *
- * Registers prd_* tools for artifact operations on the docs/prd/ planning tree,
- * plus a /init-prd-workflow command.
+ * Registers task_* tools for artifact operations on the docs/tasks/ planning tree,
+ * plus a /init-task-workflow command.
+ *
+ * Renamed from prd_*:
+ *   prd_show → task_show, prd_get → task_get, etc.
+ * Dropped:
+ *   prd_forge, prd_epic_prd_issue, prd_epic_set_prd_issue
  *
  * The tools call core functions directly. The agent uses them when following the
  * SKILL.md workflow instructions.
@@ -14,15 +19,17 @@ import { Type } from "typebox";
 import {
   Artifact,
   discoverAll,
+  discoverArchivedEpics,
+  discoverArchivedTasks,
   discoverEpics,
-  discoverPrds,
+  discoverTasks,
   findRoot,
   isInitialized,
-  prdRoot,
+  taskRoot,
   resolveArtifact,
 } from "../core/model.js";
-import { forgeSnippet, detect as detectForge, NotAGitRepo, UnknownForge } from "../core/forge.js";
 import { profileText } from "../core/index.js";
+import * as state from "../core/state.js";
 import { existsSync, readFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -30,8 +37,6 @@ import { join } from "node:path";
 
 function artToRecord(a: Artifact): Record<string, unknown> {
   const data: Record<string, unknown> = { path: a.path, kind: a.kind, slug: a.slug, status: a.status };
-  if (a.issue !== null) data.issue = a.issue;
-  if (a.milestone !== null) data.milestone = a.milestone;
   return data;
 }
 
@@ -60,31 +65,30 @@ function def(description: string, args: Record<string, unknown>, exec: (args: an
 
 const Str = (d: string) => ({ type: "string" as const, description: d });
 const OptBool = { type: "boolean" as const, optional: true as const };
-const l = (v: string) => ({ type: "string" as const, literal: v } as any);
 
 export function createTools(): Record<string, ToolDef> {
   return {
-    prd_show: def(
-      "Show artifact frontmatter (epic or PRD), resolved by slug, issue number, or path.",
-      { selector: Str("Slug, issue number (#n), or path"), json: OptBool },
+    task_show: def(
+      "Show artifact frontmatter (epic or task), resolved by slug or path.",
+      { selector: Str("Slug or path"), json: OptBool },
       async (p, ctx) => {
         const a = resolveArtifact(getRoot(ctx.directory), p.selector);
         return p.json ? JSON.stringify(artToRecord(a), null, 2) : formatArtifact(a);
       },
     ),
 
-    prd_get: def(
+    task_get: def(
       "Print a single frontmatter field of an artifact.",
-      { selector: Str("Slug, issue number, or path"), field: Str("Field name") },
+      { selector: Str("Slug or path"), field: Str("Field name") },
       async (p, ctx) => {
         const a = resolveArtifact(getRoot(ctx.directory), p.selector);
         return a.doc.data[p.field] === undefined ? "" : String(a.doc.data[p.field]);
       },
     ),
 
-    prd_set: def(
+    task_set: def(
       "Set a scalar frontmatter field (auto-typed: int, bool, null, string).",
-      { selector: Str("Slug, issue number, or path"), field: Str("Field name"), value: Str("New value") },
+      { selector: Str("Slug or path"), field: Str("Field name"), value: Str("New value") },
       async (p, ctx) => {
         const a = resolveArtifact(getRoot(ctx.directory), p.selector);
         let v: unknown = p.value;
@@ -98,26 +102,26 @@ export function createTools(): Record<string, ToolDef> {
       },
     ),
 
-    prd_set_slices: def(
-      "Set a PRD's `slices:` list to the given issue numbers.",
-      { selector: Str("PRD slug, issue number, or path"), numbers: { type: "array" as const, items: Str("Issue number") } },
+    task_set_slices: def(
+      "Set a task's `slices:` list to the given slice slugs.",
+      { selector: Str("Task slug or path"), slugs: { type: "array" as const, items: Str("Slice slug") } },
       async (p, ctx) => {
-        const a = resolveArtifact(getRoot(ctx.directory), p.selector, "prd");
-        a.doc.data["slices"] = p.numbers.map((n: string) => parseInt(n.replace(/^#+/, ""), 10));
+        const a = resolveArtifact(getRoot(ctx.directory), p.selector, "task");
+        a.doc.data["slices"] = p.slugs as string[];
         a.doc.save();
-        return `slices: [${(a.doc.data["slices"] as number[]).join(", ")}]`;
+        return `slices: [${(a.doc.data["slices"] as string[]).join(", ")}]`;
       },
     ),
 
-    prd_resolve: def(
-      "Resolve a slug / issue number / path to the artifact's file path.",
-      { selector: Str("Slug, issue number, or path"), kind: { type: "string" as const, optional: true, enum: ["epic", "prd"] } },
+    task_resolve: def(
+      "Resolve a slug or path to the artifact's file path.",
+      { selector: Str("Slug or path"), kind: { type: "string" as const, optional: true, enum: ["epic", "task"] } },
       async (p, ctx) => resolveArtifact(getRoot(ctx.directory), p.selector, p.kind).path,
     ),
 
-    prd_assert_kind: def(
-      "Assert an artifact's `kind` (epic/prd). Fails with a useful message if it differs.",
-      { selector: Str("Slug, issue number, or path"), kind: { type: "string" as const, enum: ["epic", "prd"] } },
+    task_assert_kind: def(
+      "Assert an artifact's `kind` (epic/task). Fails with a useful message if it differs.",
+      { selector: Str("Slug or path"), kind: { type: "string" as const, enum: ["epic", "task"] } },
       async (p, ctx) => {
         const a = resolveArtifact(getRoot(ctx.directory), p.selector);
         if (a.kind !== p.kind) throw new Error(`'${p.selector}' has kind '${a.kind}', not '${p.kind}'.`);
@@ -125,138 +129,133 @@ export function createTools(): Record<string, ToolDef> {
       },
     ),
 
-    prd_list: def(
-      "List artifacts in the docs/prd tree, with optional filters.",
-      { kind: { type: "string" as const, optional: true, enum: ["epic", "prd"] }, status: { ...Str("Status filter"), optional: true }, epic: { ...Str("Epic slug filter"), optional: true }, json: OptBool },
+    task_list: def(
+      "List artifacts in the docs/tasks tree, with optional filters. Excludes archived artifacts by default.",
+      { kind: { type: "string" as const, optional: true, enum: ["epic", "task"] }, status: { ...Str("Status filter"), optional: true }, epic: { ...Str("Epic slug filter"), optional: true }, json: OptBool },
       async (p, ctx) => {
         const root = getRoot(ctx.directory);
-        let arts = p.kind === "epic" ? discoverEpics(root) : p.kind === "prd" ? discoverPrds(root) : discoverAll(root);
+        let arts = p.kind === "epic" ? discoverEpics(root) : p.kind === "task" ? discoverTasks(root) : discoverAll(root);
         if (p.status) arts = arts.filter((a: Artifact) => a.status === p.status);
         if (p.epic) arts = arts.filter((a: Artifact) => a.doc.data["epic"] === p.epic);
         if (p.json) return JSON.stringify(arts.map(artToRecord), null, 2);
-        return arts.map((a: Artifact) => `${a.slug} (${a.kind})${a.status ? ` [${a.status}]` : ""}${a.issue ? ` #${a.issue}` : ""}${a.milestone ? ` M${a.milestone}` : ""}`).join("\n") || "(empty)";
+        return arts.map((a: Artifact) => `${a.slug} (${a.kind})${a.status ? ` [${a.status}]` : ""}`).join("\n") || "(empty)";
       },
     ),
 
-    prd_slices: def(
-      "List a PRD's surviving slice docs (presence == open work).",
-      { selector: Str("PRD slug, issue number, or path"), json: OptBool },
+    task_slices: def(
+      "List a task's active slice docs (excludes archived).",
+      { selector: Str("Task slug or path"), json: OptBool },
       async (p, ctx) => {
-        const a = resolveArtifact(getRoot(ctx.directory), p.selector, "prd");
-        const slices = a.sliceFiles();
+        const a = resolveArtifact(getRoot(ctx.directory), p.selector, "task");
+        const slices = a.activeSliceFiles();
         if (p.json) return JSON.stringify(slices, null, 2);
-        return slices.length === 0 ? "(no open slices — ready to finalize)" : slices.map(s => `#${s.number} — ${s.slug}`).join("\n");
+        return slices.length === 0 ? "(no open slices)" : slices.map(s => `${s.number} — ${s.slug}`).join("\n");
       },
     ),
 
-    prd_finalizable: def(
-      "Check a PRD is ready to finalize (no surviving slice docs). Fails listing open slices otherwise.",
-      { selector: Str("PRD slug, issue number, or path") },
+    task_finalizable: def(
+      "Check a task is ready to finalize (no active slice docs). Fails listing open slices otherwise.",
+      { selector: Str("Task slug or path") },
       async (p, ctx) => {
-        const a = resolveArtifact(getRoot(ctx.directory), p.selector, "prd");
-        const slices = a.sliceFiles();
+        const a = resolveArtifact(getRoot(ctx.directory), p.selector, "task");
+        const slices = a.activeSliceFiles();
         if (slices.length === 0) return "ready to finalize";
-        throw new Error(`PRD '${a.slug}' has ${slices.length} open slice(s): ${slices.map(s => `#${s.number}`).join(", ")}`);
+        throw new Error(`task '${a.slug}' has ${slices.length} open slice(s): ${slices.map(s => `${s.number}`).join(", ")}`);
       },
     ),
 
-    prd_lint: def(
-      "Show frontmatter violations across the docs/prd tree — the adopt-prd worklist.",
+    task_lint: def(
+      "Show frontmatter violations across the docs/tasks tree.",
       { selector: { ...Str("Optional path; omit to scan all"), optional: true }, json: OptBool },
       async (p, ctx) => {
         const root = getRoot(ctx.directory);
-        if (!existsSync(prdRoot(root))) return "(no docs/prd directory)";
+        if (!existsSync(taskRoot(root))) return "(no docs/tasks directory)";
         const violations: string[] = [];
         for (const a of discoverAll(root)) {
           for (const f of ["kind", "title", "slug", "status"]) {
             if (a.doc.data[f] === undefined || a.doc.data[f] === null) violations.push(`${a.path}: missing '${f}'`);
           }
         }
+        // Also scan archived
+        for (const a of [...discoverArchivedEpics(root)]) {
+          for (const f of ["kind", "title", "slug", "status"]) {
+            if (a.doc.data[f] === undefined || a.doc.data[f] === null) violations.push(`${a.path} (archived): missing '${f}'`);
+          }
+        }
         return violations.length ? (p.json ? JSON.stringify(violations, null, 2) : violations.join("\n")) : "(no violations)";
       },
     ),
 
-    prd_epic_prds: def(
-      "List an epic's planned child PRDs with their issue/done state.",
-      { selector: Str("Epic slug, milestone number, or path"), json: OptBool },
+    task_epic_tasks: def(
+      "List an epic's planned child tasks with their done state.",
+      { selector: Str("Epic slug or path"), json: OptBool },
       async (p, ctx) => {
         const a = resolveArtifact(getRoot(ctx.directory), p.selector, "epic");
-        const prds = a.doc.data["prds"];
-        if (!Array.isArray(prds)) return "(no child PRDs planned yet)";
-        return prds.map((p: any) => `${p.slug}${p.issue ? ` #${p.issue}` : " (no issue)"}${p.done ? " ✓" : ""}${p.blocked_by?.length ? ` blocked_by: ${p.blocked_by.join(", ")}` : ""}`).join("\n");
+        const tasks = a.doc.data["tasks"];
+        if (!Array.isArray(tasks)) return "(no child tasks planned yet)";
+        return tasks.map((t: any) => `${t.slug}${t.done ? " ✓" : ""}${t.blocked_by?.length ? ` blocked_by: ${t.blocked_by.join(", ")}` : ""}`).join("\n");
       },
     ),
 
-    prd_epic_set_prd_issue: def(
-      "Fill the issue number of an epic's child PRD entry.",
-      { selector: Str("Epic slug, milestone number, or path"), prd_slug: Str("Child PRD slug"), issue: Str("Issue number (#n or n)") },
+    task_epic_tick: def(
+      "Mark an epic's child task as finalized (done: true).",
+      { selector: Str("Epic slug or path"), task_slug: Str("Child task slug") },
       async (p, ctx) => {
         const a = resolveArtifact(getRoot(ctx.directory), p.selector, "epic");
-        const prds = Array.isArray(a.doc.data["prds"]) ? [...a.doc.data["prds"]] : [];
-        const n = parseInt(p.issue.replace(/^#+/, ""), 10);
-        let found = false;
-        for (const c of prds) { if ((c as any).slug === p.prd_slug) { (c as any).issue = n; found = true; break; } }
-        if (!found) prds.push({ slug: p.prd_slug, issue: n });
-        a.doc.data["prds"] = prds;
-        a.doc.save();
-        return `${p.prd_slug} → #${n}`;
+        const tasks = Array.isArray(a.doc.data["tasks"]) ? [...a.doc.data["tasks"]] : [];
+        for (const c of tasks) { if ((c as any).slug === p.task_slug) { (c as any).done = true; a.doc.data["tasks"] = tasks; a.doc.save(); return `${p.task_slug} → done`; } }
+        throw new Error(`no task '${p.task_slug}' in epic '${a.slug}'`);
       },
     ),
 
-    prd_epic_prd_issue: def(
-      "Print the issue number of an epic's child PRD entry.",
-      { selector: Str("Epic slug, milestone number, or path"), prd_slug: Str("Child PRD slug") },
+    task_epic_finalizable: def(
+      "Check every child task of an epic is finalized. Fails with list of unfinished children.",
+      { selector: Str("Epic slug or path") },
       async (p, ctx) => {
         const a = resolveArtifact(getRoot(ctx.directory), p.selector, "epic");
-        const prds = Array.isArray(a.doc.data["prds"]) ? a.doc.data["prds"] : [];
-        for (const c of prds) { if ((c as any).slug === p.prd_slug) { const i = (c as any).issue; if (i) return String(i); } }
-        throw new Error(`no issue for PRD '${p.prd_slug}' in epic '${a.slug}'`);
-      },
-    ),
-
-    prd_epic_tick: def(
-      "Mark an epic's child PRD as finalized (done: true).",
-      { selector: Str("Epic slug, milestone number, or path"), prd_slug: Str("Child PRD slug") },
-      async (p, ctx) => {
-        const a = resolveArtifact(getRoot(ctx.directory), p.selector, "epic");
-        const prds = Array.isArray(a.doc.data["prds"]) ? [...a.doc.data["prds"]] : [];
-        for (const c of prds) { if ((c as any).slug === p.prd_slug) { (c as any).done = true; a.doc.data["prds"] = prds; a.doc.save(); return `${p.prd_slug} → done`; } }
-        throw new Error(`no PRD '${p.prd_slug}' in epic '${a.slug}'`);
-      },
-    ),
-
-    prd_epic_finalizable: def(
-      "Check every child PRD of an epic is finalized. Fails with list of unfinished children.",
-      { selector: Str("Epic slug, milestone number, or path") },
-      async (p, ctx) => {
-        const a = resolveArtifact(getRoot(ctx.directory), p.selector, "epic");
-        const prds = Array.isArray(a.doc.data["prds"]) ? a.doc.data["prds"] : [];
-        const undone = prds.filter((p: any) => !p.done).map((p: any) => p.slug || "?");
+        const tasks = Array.isArray(a.doc.data["tasks"]) ? a.doc.data["tasks"] : [];
+        const undone = tasks.filter((t: any) => !t.done).map((t: any) => t.slug || "?");
         if (undone.length === 0) return "ready to finalize — all children done";
         throw new Error(`unfinished children: ${undone.join(", ")}`);
       },
     ),
 
-    prd_forge: def(
-      "Get provider-specific command snippets for issue/PR operations. Use key 'keys' to list, 'git_type' to detect provider.",
-      { key: Str("Snippet key") },
-      async (p, ctx) => {
-        if (p.key === "keys") {
-          return ["git_type","owner","repo","auth_check","ensure_labels","cmd_get_issue","cmd_create_issue","cmd_list_issues","cmd_comment","cmd_close_issue","cmd_edit_labels","cmd_edit_issue","cmd_create_pr","cmd_create_milestone","cmd_close_milestone","cmd_add_dependency","ownership_note"].join("\n");
-        }
-        try {
-          const f = detectForge();
-          return forgeSnippet(f, p.key);
-        } catch (e) {
-          if (e instanceof NotAGitRepo) return "NOT_A_GIT_REPO: run `git init` first.";
-          if (e instanceof UnknownForge) return `UNKNOWN_FORGE: remote '${(e as any).remote}' not recognised.`;
-          throw e;
-        }
+    task_state: def(
+      "Show the current workflow state from docs/tasks/state.yaml.",
+      {},
+      async (_p, ctx) => {
+        const root = getRoot(ctx.directory);
+        const s = state.load(root);
+        return [
+          `active task:  ${s.active.task ?? "(none)"}`,
+          `active slice: ${s.active.slice ?? "(none)"}`,
+          `active epic:  ${s.active.epic ?? "(none)"}`,
+          `last action:  ${s.last_action}`,
+          `next action:  ${s.next_action}`,
+        ].join("\n");
       },
     ),
 
-    prd_reference: def(
-      "Print the prd-workflow artifact schema reference.",
+    task_state_set: def(
+      "Set a workflow state field. Fields: active.task, active.slice, active.epic, last_action, next_action.",
+      { field: Str("Field path (e.g. 'active.task' or 'next_action')"), value: Str("New value (use 'null' to clear)") },
+      async (p, ctx) => {
+        const root = getRoot(ctx.directory);
+        const s = state.load(root);
+        const v = p.value === "null" ? null : p.value;
+        if (p.field === "active.task") s.active.task = v;
+        else if (p.field === "active.slice") s.active.slice = v;
+        else if (p.field === "active.epic") s.active.epic = v;
+        else if (p.field === "last_action") s.last_action = v ?? "";
+        else if (p.field === "next_action") s.next_action = v ?? "";
+        else throw new Error(`unknown field '${p.field}'`);
+        state.save(root, s);
+        return `${p.field} = ${v ?? "null"}`;
+      },
+    ),
+
+    task_reference: def(
+      "Print the task-workflow artifact schema reference.",
       {},
       async (_p, ctx) => {
         const p = join(getRoot(ctx.directory), "docs", "artifacts.md");
@@ -264,18 +263,18 @@ export function createTools(): Record<string, ToolDef> {
       },
     ),
 
-    prd_profile: def(
-      "Print the project's docs/prd/profile.md (optional project-specific context).",
+    task_profile: def(
+      "Print the project's docs/tasks/profile.md (optional project-specific context).",
       {},
       async (_p, ctx) => profileText(getRoot(ctx.directory)) || "(no profile)",
     ),
 
-    prd_workflow_gate: def(
-      "Check if the prd-workflow is initialized (docs/prd/ exists). Returns empty string if ready.",
+    task_workflow_gate: def(
+      "Check if the task-workflow is initialized (docs/tasks/ exists). Returns empty string if ready.",
       {},
       async (_p, ctx) => {
         if (isInitialized(getRoot(ctx.directory))) return "";
-        return "> [!STOP] prd-workflow not initialized.\n> Run `/init-prd-workflow` first.";
+        return "> [!STOP] task-workflow not initialized.\n> Run `/skill:onboard-workflow` first.";
       },
     ),
   };
@@ -306,7 +305,7 @@ export default function (pi: ExtensionAPI) {
 
     pi.registerTool({
       name,
-      label: name.replace(/^prd_/, "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+      label: name.replace(/^task_/, "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
       description: def.description,
       parameters: Type.Object(params),
       async execute(_id: string, args: any, _sig: any, _upd: any, ctx: any) {
@@ -316,13 +315,13 @@ export default function (pi: ExtensionAPI) {
     });
   }
 
-  pi.registerCommand("init-prd-workflow", {
-    description: "Initialize the prd-workflow by creating the docs/prd/ directory.",
+  pi.registerCommand("init-task-workflow", {
+    description: "Initialize the task-workflow by creating the docs/tasks/ directory.",
     handler: async (_args, ctx) => {
       const root = getRoot(ctx.cwd);
       if (isInitialized(root)) { ctx.ui.notify("Already initialized", "info"); return; }
-      mkdirSync(prdRoot(root), { recursive: true });
-      ctx.ui.notify(`Created ${prdRoot(root)}`, "info");
+      mkdirSync(taskRoot(root), { recursive: true });
+      ctx.ui.notify(`Created ${taskRoot(root)}`, "info");
     },
   });
 }
