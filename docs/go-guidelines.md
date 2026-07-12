@@ -3,6 +3,16 @@
 > Language-specific coding guidelines for Go projects using this workflow.
 > The `get_guidelines` and `list_guidelines` tools make this available to the
 > agent when implementing or testing Go code.
+>
+> **These are guidelines, not hard rules.** Every rule below can be broken when
+> there is a strong reason. If you break one, you MUST:
+>
+> 1. Add a `// rule: <name> — <explanation>` comment at the point of deviation.
+> 2. Include a note in the slice's implementation notes explaining why the
+>    rule was broken and what trade-off was made.
+>
+> This ensures deviations are intentional, reviewed, and not buried in tool
+> call output.
 
 ## Tooling
 
@@ -581,13 +591,33 @@ func walkDir(root string) ([]string, error) {
 // Avoid deep recursion without a bound
 ```
 
-### Rule 2 — Loops must have a bound
+### Rule 2 — Loops must have a bound (with channel exception)
 
-Every loop should have a statically determinable upper bound. Guard potentially
-unbounded loops (retry loops, channel receives, watchers) with a max count or
-context deadline.
+Every loop should have a determinable upper bound. Guard potentially unbounded
+loops (retry loops, watchers) with a max count or context deadline.
+
+**Exception: channel consumption.** Receiving from a channel is inherently
+unbounded — you don't know how many messages will arrive. This is acceptable
+as long as the channel consumer is bounded by one of:
+
+- The channel being closed (`for msg := range ch`)
+- Context cancellation
+- A sentinel / termination message
 
 ```go
+// Good — channel consumption bounded by context + close
+for {
+    select {
+    case msg, ok := <-ch:
+        if !ok {
+            return nil  // channel closed
+        }
+        process(msg)
+    case <-ctx.Done():
+        return ctx.Err()  // bounded by context
+    }
+}
+
 // Good — bounded retry
 const maxRetries = 3
 for i := 0; i < maxRetries; i++ {
@@ -596,23 +626,17 @@ for i := 0; i < maxRetries; i++ {
         return nil
     }
 }
-
-// Guard unbounded loops
-for {
-    select {
-    case msg := <-ch:
-        process(msg)
-    case <-ctx.Done():
-        return ctx.Err()  // bounded by context
-    }
-}
 ```
 
-### Rule 4 — Function length ≤ 60 lines
+### Rule 4 — Function length ≤ 100 lines
 
-If a function doesn't fit on one screen, it's doing too much. Extract helpers
-and smaller functions. Table-driven tests are exempt from this rule (their
-length is data, not logic).
+If a function doesn't fit on one or two screens, it's doing too much.
+Extract helpers and smaller functions. Table-driven tests are exempt from
+this rule (their length is data, not logic).
+
+The 100-line threshold accounts for Go's explicitness (explicit error
+handling, type declarations, etc.). Functions under 60 lines are still
+preferred where possible.
 
 ### Rule 5 — At least two guard clauses per function
 
@@ -673,11 +697,7 @@ resp.Body.Close()                           // but this one should be checked
 
 Use `//nolint:errcheck` sparingly and only with a justification comment.
 
-### Rule 8 — No preprocessor
-
-Go has no preprocessor. Satisfied by construction.
-
-### Rule 10 — Zero warnings, static analysis
+### Rule 8 — Zero warnings, static analysis
 
 Compile with all vet checks, run `golangci-lint`, and treat every warning as
 an error.
@@ -695,58 +715,72 @@ blockers, not noise.
 | Rule | Reason not applicable to Go |
 | --- | --- |
 | **3** — No dynamic memory after init | Go is garbage-collected; slices, maps, and goroutine stacks allocate dynamically. This rule is for bare-metal / embedded C. |
+| **8** — No preprocessor | Code generation (`go generate`, `stringer`, `mockgen`) is encouraged — it's not a preprocessor, it's compile-time code generation. |
 | **9** — Restrict pointers, no function pointers | Go IS pointers, and function values / interface dispatch are the language's primary abstraction mechanism. |
 
 ## Design: low coupling, high cohesion
 
 ### Define interfaces at the consumer
 
-Conventional wisdom is "program to an interface, not an implementation." In
-Go this means: **define the interface in the package that needs the behaviour,
-not the package that provides it.**
+**The pattern:** the package that _needs_ a behaviour defines the interface.
+The package that _provides_ the behaviour never imports the consumer — it
+just happens to satisfy the interface.
+
+**Why this matters:** if the producer owns the interface, every consumer must
+import the producer. That creates a dependency graph that radiates out from
+each library and makes it impossible to swap implementations without changing
+imports.
+
+**Common mistake (producer-owned interface):**
 
 ```go
-// package order — consumer owns the interface
-type PaymentGateway interface {
+// package stripe
+type StripeClient struct{}
+func (s *StripeClient) Charge(amount int) error { /* … */ }
+
+// package order — forced to import stripe
+type OrderService struct {
+    gateway *stripe.StripeClient  // coupled to concrete type
+}
+```
+
+Problem: `order` cannot exist without `stripe`. Tests must import `stripe`.
+Switching to Adyen means changing `order`.
+
+**Go way (consumer-owned interface):**
+
+```go
+// package order — consumer defines what it needs
+type PaymentCharger interface {
     Charge(ctx context.Context, cents int) error
 }
 
 type Service struct {
-    gateway PaymentGateway
+    charger PaymentCharger  // depends only on 3 words
 }
 
-func NewService(gateway PaymentGateway) *Service {
-    return &Service{gateway: gateway}
+func NewService(charger PaymentCharger) *Service {
+    return &Service{charger: charger}
 }
 
-// package stripe — producer satisfies the interface implicitly
-// It does NOT import order. No import cycle, no coupling to consumer.
-type Client struct{ /* … */ }
+// package stripe — no imports from order, just happens to match
+func (c *Client) Charge(ctx context.Context, cents int) error { /* … */ }
+
+// package adyen — also matches, also no imports from order
 func (c *Client) Charge(ctx context.Context, cents int) error { /* … */ }
 ```
 
-This gives **low coupling**:
-
-- The consumer (`order`) depends only on an interface — three methods, not a
-  whole library.
-- The producer (`stripe`) knows nothing about the consumer. It just has a
-  `Charge` method that happens to match.
-- Swapping the implementation (stripe → adyen → mock) requires zero changes
-  to the consumer.
-
-It gives **high cohesion**:
-
-- `order.Service` only handles order logic. Payment goes through the gateway
-  — it doesn't care how.
-- `stripe.Client` only does Stripe API calls. Order logic stays out.
+Now `order` imports nothing but its own types. Tests inject a one-line mock.
+Swapping stripe → adyen → mock is a one-line change in `main()`.
 
 ### Constructor injection
 
-Wire dependencies through constructors, not global state, not `init()`, not
-`sync.Once` singletons.
+Wire dependencies through constructors where practical. This makes coupling
+**visible** — every dependency is in the signature. You cannot accidentally
+create a service without its database.
 
 ```go
-// Good — explicit dependencies
+// Preferred — explicit dependencies
 func NewService(
     db *sql.DB,
     gateway PaymentGateway,
@@ -755,17 +789,29 @@ func NewService(
     return &Service{db: db, gateway: gateway, logger: logger}
 }
 
-// Bad — hidden dependency
+// Tolerable when pragmatically necessary
+func NewService(db *sql.DB, gateway PaymentGateway) *Service {
+    logger := slog.Default()  // acceptable default
+    return &Service{db: db, gateway: gateway, logger: logger}
+}
+
+// Avoid where possible — hidden coupling
 func NewService() *Service {
     return &Service{
-        db:      openGlobalDB(),   // hidden coupling
-        gateway: getGlobalStripe(), // hidden coupling
+        db:      openGlobalDB(),    // hidden coupling
+        gateway: getGlobalStripe(),  // hidden coupling
     }
 }
 ```
 
-Constructor injection makes coupling **visible**. Every dependency is in the
-signature. You cannot accidentally create a service without its database.
+**`init()` is not forbidden.** It is occasionally necessary for:
+
+- Registering database drivers (`database/sql`)
+- Registering crypto algorithms
+- Compile-time lookups (templates, embed.FS)
+
+Just avoid using `init()` for wiring business dependencies. That belongs in
+`main()` or a composition helper.
 
 ### Strategy pattern
 
@@ -812,8 +858,9 @@ The strategy pattern gives you:
 
 ### Wire at the top
 
-All wiring happens in `main()` (or a dedicated `wire.go`). Packages do not
-know about each other's concrete types except through interfaces.
+Prefer to wire most dependencies in `main()` (or a dedicated `wire.go`).
+Packages should not know about each other's concrete types except through
+interfaces.
 
 ```go
 func main() {
@@ -821,25 +868,26 @@ func main() {
     pricer := &pricing.FlatRatePricer{Rate: cfg.FlatRate}
     gateway := stripe.NewClient(cfg.StripeKey)
     svc := order.NewService(pricer, gateway)
-    
+
     handler := handler.NewOrderHandler(svc)
-    
-    srv := httptest.NewServer(handler)
+
     log.Info("listening", "addr", srv.Listener.Addr())
 }
 ```
 
-This is the **composition root** — the only place where concrete types meet.
-Every package above this line is decoupled from every other.
+Composition helpers are fine — extracting wiring into `newServer(cfg) *Server`
+keeps `main()` concise while preserving the single composition point. The
+key constraint: **no package outside `main()` should call another package's
+constructor with concrete application types.**
 
 ### Summary of coupling & cohesion rules
 
 | Principle | Go mechanism | Benefit |
 | --- | --- | --- |
-| Define interfaces at consumer | Small interface in the importing package | No import cycles, swappable implementations |
-| Constructor injection | `NewX(dep1, dep2) *X` | Visible coupling, cannot create invalid instances |
+| Define interfaces at consumer | Interface in the importing package | No import cycles, swappable implementations |
+| Constructor injection | `NewX(dep1, dep2, …) *X` | Visible coupling, cannot create invalid instances |
 | Strategy pattern | Interface + multiple implementations | OCP, testability, zero coupling to concrete types |
-| Composition root | All wiring in `main()` | Single place to change, packages stay decoupled |
+| Composition root | Wiring in `main()` or helpers | Single place to change, packages stay decoupled |
 | High cohesion | One clear responsibility per type | Understandable, testable, replaceable |
 
 - Don't use `panic` for regular error handling.

@@ -15,6 +15,7 @@ description: >
 ## Steps
 
 1. **Merge.** Construct commit message: `slice(<task-slug>): <slice title>`.
+
    ```bash
    git checkout task/<task-slug>
    git merge --no-ff slice/<slug> -m "slice(<task-slug>): <slice title>"
@@ -26,7 +27,11 @@ description: >
    - `task_set <slice-path> completed_at <ISO now>`
 
 3. **Append implementation note.** Add a 2–4 line note to the task's
-   `## Implementation notes`: what was built, any decisions made.
+   `## Implementation notes`: what was built, any decisions made. If any
+   coding guidelines were broken (see `get_guidelines` / `list_guidelines`),
+   include a line explaining which rule was broken and why — this ensures
+   the user sees it in the work summary rather than buried in tool call
+   output.
 
 4. **Archive the slice.** Use `archive-artifact <slice-path>`.
 

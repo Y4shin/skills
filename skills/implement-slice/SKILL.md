@@ -50,6 +50,11 @@ when the workflow state changes. Use these tools to fetch further detail:
 Projects can create optional `docs/<lang>-guidelines.md` files to document
 language-specific conventions. The extension auto-discovers them.
 
+**These are guidelines, not hard rules.** If you break one, add a
+`// rule: <name> — <explanation>` comment at the point of deviation and
+ensure the reason is included in the implementation note recorded by
+`land-slice` (step 6).
+
 ## Step 4 — TDD: develop-tdd
 
 Invoke `develop-tdd <slice-slug>`. This runs RED → GREEN → REFACTOR. It returns
