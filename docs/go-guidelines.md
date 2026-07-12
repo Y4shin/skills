@@ -551,7 +551,296 @@ Run with `go test -fuzz=FuzzValidateEmail ./...`.
 - **Keep packages small.** A package that needs more than 5–6 source files is
   probably doing too much. Split it.
 
-## What not to do
+## NASA Power of 10 (Go edition)
+
+Adapted from JPL's "The Power of 10: Rules for Developing Safety-Critical Code"
+(Gerard J. Holzmann). These rules are designed for high-reliability systems,
+and several apply naturally to production Go code.
+
+### Rule 1 — Simple control flow
+
+Avoid `goto`. Prefer iteration over recursion. If you must recurse, document
+the maximum depth and guard against stack overflow.
+
+```go
+// Good — iterative
+func walkDir(root string) ([]string, error) {
+    var files []string
+    err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+        if err != nil {
+            return err
+        }
+        if !d.IsDir() {
+            files = append(files, path)
+        }
+        return nil
+    })
+    return files, err
+}
+
+// Avoid deep recursion without a bound
+```
+
+### Rule 2 — Loops must have a bound
+
+Every loop should have a statically determinable upper bound. Guard potentially
+unbounded loops (retry loops, channel receives, watchers) with a max count or
+context deadline.
+
+```go
+// Good — bounded retry
+const maxRetries = 3
+for i := 0; i < maxRetries; i++ {
+    err := tryOperation(ctx)
+    if err == nil {
+        return nil
+    }
+}
+
+// Guard unbounded loops
+for {
+    select {
+    case msg := <-ch:
+        process(msg)
+    case <-ctx.Done():
+        return ctx.Err()  // bounded by context
+    }
+}
+```
+
+### Rule 4 — Function length ≤ 60 lines
+
+If a function doesn't fit on one screen, it's doing too much. Extract helpers
+and smaller functions. Table-driven tests are exempt from this rule (their
+length is data, not logic).
+
+### Rule 5 — At least two guard clauses per function
+
+Every function that accepts external input must have at least two precondition
+checks. See the [Negative space programming](#negative-space-programming)
+section above for the full treatment.
+
+```go
+func UpdateUser(ctx context.Context, id string, req *UpdateRequest) (*User, error) {
+    if id == "" {                          // guard 1
+        return nil, errors.New("id required")
+    }
+    if req == nil {                         // guard 2
+        return nil, errors.New("request body required")
+    }
+    // … body safe from here
+}
+```
+
+### Rule 6 — Minimum scope
+
+Declare variables as close to their use as possible. Prefer block-scoped
+(`{}`) declarations over function-scoped. This reduces the window for
+accidental misuse.
+
+```go
+// Good — scoped close to use
+if err := process(data); err != nil {
+    return err
+}
+
+// Good — minimal scope for intermediate result
+{
+    stats := computeStats(items)
+    if stats.P99 > threshold {
+        log.Warn().Float64("p99", stats.P99).Msg("latency spike")
+    }
+}
+// stats is not accessible here
+```
+
+### Rule 7 — Check every return value
+
+An unchecked error in Go will silently produce a zero-value — no crash, no
+log line, just wrong behaviour. Every non-void function call whose result is
+not explicitly discarded must be checked.
+
+```go
+// Good
+if err := db.Save(&user).Error; err != nil {
+    return fmt.Errorf("save user: %w", err)
+}
+
+// Acceptable when intentionally discarding
+_, _ = io.Copy(ioutil.Discard, resp.Body)  // explicit discard
+resp.Body.Close()                           // but this one should be checked
+```
+
+Use `//nolint:errcheck` sparingly and only with a justification comment.
+
+### Rule 8 — No preprocessor
+
+Go has no preprocessor. Satisfied by construction.
+
+### Rule 10 — Zero warnings, static analysis
+
+Compile with all vet checks, run `golangci-lint`, and treat every warning as
+an error.
+
+```bash
+go vet ./...
+golangci-lint run ./...
+```
+
+Maintain a static-analysis baseline. New warnings on existing code are
+blockers, not noise.
+
+### Rules intentionally omitted
+
+| Rule | Reason not applicable to Go |
+| --- | --- |
+| **3** — No dynamic memory after init | Go is garbage-collected; slices, maps, and goroutine stacks allocate dynamically. This rule is for bare-metal / embedded C. |
+| **9** — Restrict pointers, no function pointers | Go IS pointers, and function values / interface dispatch are the language's primary abstraction mechanism. |
+
+## Design: low coupling, high cohesion
+
+### Define interfaces at the consumer
+
+Conventional wisdom is "program to an interface, not an implementation." In
+Go this means: **define the interface in the package that needs the behaviour,
+not the package that provides it.**
+
+```go
+// package order — consumer owns the interface
+type PaymentGateway interface {
+    Charge(ctx context.Context, cents int) error
+}
+
+type Service struct {
+    gateway PaymentGateway
+}
+
+func NewService(gateway PaymentGateway) *Service {
+    return &Service{gateway: gateway}
+}
+
+// package stripe — producer satisfies the interface implicitly
+// It does NOT import order. No import cycle, no coupling to consumer.
+type Client struct{ /* … */ }
+func (c *Client) Charge(ctx context.Context, cents int) error { /* … */ }
+```
+
+This gives **low coupling**:
+
+- The consumer (`order`) depends only on an interface — three methods, not a
+  whole library.
+- The producer (`stripe`) knows nothing about the consumer. It just has a
+  `Charge` method that happens to match.
+- Swapping the implementation (stripe → adyen → mock) requires zero changes
+  to the consumer.
+
+It gives **high cohesion**:
+
+- `order.Service` only handles order logic. Payment goes through the gateway
+  — it doesn't care how.
+- `stripe.Client` only does Stripe API calls. Order logic stays out.
+
+### Constructor injection
+
+Wire dependencies through constructors, not global state, not `init()`, not
+`sync.Once` singletons.
+
+```go
+// Good — explicit dependencies
+func NewService(
+    db *sql.DB,
+    gateway PaymentGateway,
+    logger *slog.Logger,
+) *Service {
+    return &Service{db: db, gateway: gateway, logger: logger}
+}
+
+// Bad — hidden dependency
+func NewService() *Service {
+    return &Service{
+        db:      openGlobalDB(),   // hidden coupling
+        gateway: getGlobalStripe(), // hidden coupling
+    }
+}
+```
+
+Constructor injection makes coupling **visible**. Every dependency is in the
+signature. You cannot accidentally create a service without its database.
+
+### Strategy pattern
+
+When a function or type has a behaviour that varies, extract it into an
+interface and inject different strategies.
+
+```go
+type Pricer interface {
+    Price(ctx context.Context, items []LineItem) (cents int, err error)
+}
+
+// Strategies
+type FlatRatePricer struct{ Rate int }
+func (p *FlatRatePricer) Price(_ context.Context, items []LineItem) (int, error) {
+    return p.Rate * len(items), nil
+}
+
+type ItemBasedPricer struct{ /* catalogue */ }
+func (p *ItemBasedPricer) Price(ctx context.Context, items []LineItem) (int, error) {
+    total := 0
+    for _, item := range items {
+        total += item.CentsEach
+    }
+    return total, nil
+}
+
+// Inject strategy at construction
+type OrderService struct {
+    pricer  Pricer
+    gateway PaymentGateway
+}
+
+func NewOrderService(pricer Pricer, gateway PaymentGateway) *OrderService {
+    return &OrderService{pricer: pricer, gateway: gateway}
+}
+```
+
+The strategy pattern gives you:
+
+- **Open/closed principle** — add new pricers without touching existing code.
+- **Testability** — inject a `Pricer` that returns known values.
+- **Zero coupling to concrete implementations** — the service only knows
+  `Pricer` (three words, one method).
+
+### Wire at the top
+
+All wiring happens in `main()` (or a dedicated `wire.go`). Packages do not
+know about each other's concrete types except through interfaces.
+
+```go
+func main() {
+    db := openDB(cfg)
+    pricer := &pricing.FlatRatePricer{Rate: cfg.FlatRate}
+    gateway := stripe.NewClient(cfg.StripeKey)
+    svc := order.NewService(pricer, gateway)
+    
+    handler := handler.NewOrderHandler(svc)
+    
+    srv := httptest.NewServer(handler)
+    log.Info("listening", "addr", srv.Listener.Addr())
+}
+```
+
+This is the **composition root** — the only place where concrete types meet.
+Every package above this line is decoupled from every other.
+
+### Summary of coupling & cohesion rules
+
+| Principle | Go mechanism | Benefit |
+| --- | --- | --- |
+| Define interfaces at consumer | Small interface in the importing package | No import cycles, swappable implementations |
+| Constructor injection | `NewX(dep1, dep2) *X` | Visible coupling, cannot create invalid instances |
+| Strategy pattern | Interface + multiple implementations | OCP, testability, zero coupling to concrete types |
+| Composition root | All wiring in `main()` | Single place to change, packages stay decoupled |
+| High cohesion | One clear responsibility per type | Understandable, testable, replaceable |
 
 - Don't use `panic` for regular error handling.
 - Don't use `init()` unless you absolutely must (e.g. `crypto` package
