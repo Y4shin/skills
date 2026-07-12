@@ -14,7 +14,9 @@ Slice doc with `## Test plan`. On branch `slice/<slug>`.
 
 ## Steps
 
-1. Read the slice doc's `## Acceptance criteria` and `## Test plan`.
+1. Read the slice doc's `## Acceptance criteria` and `## Test plan`. Also read
+   `docs/testing.md` if it exists for project test conventions (framework,
+   assertion style, naming patterns, run commands).
 
 2. **RED:** Write the test first. Every assertion must derive from the
    acceptance criteria. Run it — it **must fail**. If it passes without
@@ -33,6 +35,7 @@ Slice doc with `## Test plan`. On branch `slice/<slug>`.
    passing, any refactoring done.
 
 ## Constraints
+
 - Never write a test to match wrong implementation.
 - Never skip RED — the test must be seen failing.
 - No speculative code beyond what the slice requires.

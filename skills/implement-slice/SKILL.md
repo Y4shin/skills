@@ -36,7 +36,8 @@ If no remote, skip fetch/pull.
 ## Step 3 — Load context
 
 Read the slice doc `docs/tasks/<task-slug>/slices/<n>-<slug>.md` (spec + test
-plan) **and** its parent `task.md`. Follow the project's code conventions.
+plan) **and** its parent `task.md`. Also read `docs/testing.md` if it exists
+for project test conventions. Follow the project's code conventions.
 
 ## Step 4 — TDD: develop-tdd
 
@@ -56,6 +57,7 @@ archive, and state update.
 ## Step 7 — Hand off
 
 Read `state.yaml` via `task_state`. Report:
+
 - "All slices done → run `/skill:finalize-task <task-slug>`"
 - "Next: `/skill:start-slice <next-slug>`"
 

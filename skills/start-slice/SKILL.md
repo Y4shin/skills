@@ -1,21 +1,21 @@
 ---
 name: start-slice
 description: >
-  Understand a slice, decide the test strategy before writing any code, and
-  append a confirmed test plan to the slice doc. Uses grill-me for the test
-  strategy interview. Use before implement-slice.
+  Understand a slice, determine its failure modes, then design a comprehensive
+  test strategy via the design-test-strategy skill. Appends the confirmed test
+  plan to the slice doc. Use before implement-slice.
 ---
 
 # Start Slice — Test Strategy
 
-Phase 1.5: understand the slice, then challenge the developer to decide the
-right test strategy *before* writing a line of code.
+Phase 1.5: understand the slice, identify its failure modes, then design a
+comprehensive test strategy *before* writing a line of code.
 
 ## Prerequisites
 
 Slice doc exists with `analysed: false`.
 
-**Use `task_profile` to load test infrastructure conventions.**
+**Use `task_profile` to load test infrastructure conventions (fallback).**
 
 **Use `task_reference` to load the slice doc/lifecycle reference.**
 
@@ -23,74 +23,69 @@ Slice doc exists with `analysed: false`.
 
 Read the task's `task.md` and the slice doc at
 `docs/tasks/<task-slug>/slices/<n>-<slug>.md` in full. Present a structured
-summary: task context, slice behaviour, acceptance criteria, blocked_by.
+summary: task context, slice behaviour, acceptance criteria, blocked_by, mode
+(hitl / afk).
 
-## Step 2 — Grill on test strategy (one question at a time)
+## Step 2 — Grill on layers and failure modes (one question at a time)
 
 Invoke `grill-me` with the agenda:
 
 1. "What does this slice touch end-to-end? Which layers?"
-2. "What's the simplest test that gives honest confidence this works in
-   *production*?"
-3. "If you run that test every few minutes while coding, is the feedback fast
-   enough?"
-4. "Walk me through the failure modes — at least two. Does the test type catch
-   each one?"
-5. "Do we need a real dependency (real DB, real HTTP, real browser) here, or
-   can it be faked?"
-6. "Is any part already tested elsewhere? What's the exact gap we're filling?"
+2. "Walk me through the failure modes — at least two."
 
-**Test-type vocabulary:** use the test types, file patterns, and run commands
-from the project profile's "Test infrastructure". `none` is valid only if the
-slice is truly trivial or fully covered elsewhere.
+After both are confirmed, record the answers — they become inputs to the
+testing strategy.
 
-## Step 3 — Persist the test plan
+## Step 3 — Design the testing strategy
 
-Once confirmed, set `task_set <slice-path> analysed true` in the slice doc's
-frontmatter. Append a `## Test plan` section to the slice doc:
+Invoke `/skill:design-test-strategy <slice-slug>`.
 
-```markdown
-## Test plan
+This skill will:
 
-**Test type:** <one type from the project's test infrastructure>
-**Reasoning:** <one sentence>
+- Read `docs/testing.md` for project test conventions
+- Take the layer analysis and failure modes from Step 2 as inputs
+- Generate a comprehensive testing strategy covering test types, scope,
+  dependency strategy, key scenarios, edge cases, error handling, and how
+  each failure mode is caught
+- Present it for your approval
+- Iterate on feedback until confirmed
+- Persist the richer `## Test plan` section to the slice doc
 
-### Assertions
-- <key assertion 1>
-- <key assertion 2>
-- <error cases>
+If `docs/testing.md` does not exist yet, the skill falls back to
+`task_profile` test infrastructure and warns the project should create it.
 
-### Test file
-`<path>`
+## Step 4 — Finalise
 
-### Run command
-`<run command>`
-```
+Once `design-test-strategy` returns successfully:
 
-## Step 4 — Set active state
+1. Set `task_set <slice-path> analysed true` in the slice doc's frontmatter.
 
-Update slice frontmatter:
-- `task_set <slice-path> status in-progress`
-- `task_set <slice-path> started_at <ISO now>`
+2. Update slice frontmatter:
+   - `task_set <slice-path> status in-progress`
+   - `task_set <slice-path> started_at <ISO now>`
 
-Update state.yaml:
-- `task_state_set active.slice <slice-slug>`
-- `task_state_set last_action start-slice analysed <slice-slug>`
-- `task_state_set next_action implement-slice <slice-slug>`
+3. Update state.yaml:
+   - `task_state_set active.slice <slice-slug>`
+   - `task_state_set last_action start-slice analysed <slice-slug>`
+   - `task_state_set next_action implement-slice <slice-slug>`
 
-Commit: `docs(slice): add test plan for <slice-slug>`.
+4. Commit: `docs(slice): add test plan for <slice-slug>`.
 
 ## Error handling
 
 - If the slice doc is missing, the slice wasn't produced by this workflow —
   confirm the task/slug.
 - If the slice is already `analysed: true`, skip grilling and confirm the
-  existing test plan is still valid.
+  existing test plan is still valid. If the existing test plan uses the old
+  schema (simple assertion bullets), consider re-running through
+  `design-test-strategy` to upgrade it.
 
 ## Constraints
 
-- **Spec-first** — assertions derive from acceptance criteria, never from an
-  implementation.
+- **Spec-first** — every scenario and assertion must derive from acceptance
+  criteria, never from an implementation.
+- **Failure modes before strategy** — you must understand what can break before
+  designing how to catch it.
 - Don't start implementing here.
 
 **Handoff:** "Ready for `/skill:implement-slice <slice-slug>`."

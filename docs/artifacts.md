@@ -2,7 +2,20 @@
 
 Shared by all task-workflow skills.
 
-## Three tiers
+## Project-level conventions (`docs/testing.md`)
+
+In addition to `docs/tasks/`, every project using the task-workflow SHOULD
+maintain a `docs/testing.md` file at the project root (not inside
+`docs/tasks/`). This file describes the project's testing infrastructure and
+conventions. It is read by `design-test-strategy` before generating a test
+plan for a slice, and it is updated during `finalize-task` as new patterns
+or tooling are discovered.
+
+See the template in `onboard-workflow` for the recommended contents.
+
+---
+
+Three tiers
 
 - **epic** (`kind: epic`) — a coordinated outcome that spans several tasks. Has no slices of its own. *Optional* — a lone task needs no epic.
 - **task** (`kind: task`) — one feature or one foundational capability. Broken into slices. May belong to an epic (`epic:` field).
@@ -40,7 +53,7 @@ docs/tasks/
 ## State distribution
 
 | Data | Location |
-|---|---|
+| --- | --- |
 | Active task / slice / epic | `docs/tasks/state.yaml` `active` block |
 | Next action | `docs/tasks/state.yaml` `next_action` |
 | Last completed action | `docs/tasks/state.yaml` `last_action` |

@@ -22,7 +22,7 @@ planning tree. **Prefer these tools over shelling out or hand-editing frontmatte
 ## Answering questions — read-only
 
 | The user asks… | Run tool |
-|---|---|
+| --- | --- |
 | "Is this task ready (to finalize)?" | `task_finalizable <slug>` |
 | "What's left / which slices are open on task X?" | `task_slices <slug>` |
 | "List the tasks / epics / what's in progress?" | `task_list` (optionally with `status` or `kind` filter) |
@@ -42,7 +42,7 @@ the still-open slice numbers otherwise. Treat that as the answer.
 For anything that *creates or changes* artifacts, invoke the matching skill:
 
 | Action | Skill |
-|---|---|
+| --- | --- |
 | Resume after interruption | `/skill:resume-workflow` |
 | New task or epic | `/skill:create-task` |
 | Slice a task | `/skill:slice-task` |
@@ -53,6 +53,13 @@ For anything that *creates or changes* artifacts, invoke the matching skill:
 | Archive something | `/skill:archive-artifact` |
 | Migrate from old prd-workflow | `/skill:migrate-workflow` |
 | Init a fresh repo | `/skill:onboard-workflow` |
+
+## Project-level files
+
+| File | Purpose |
+| --- | --- |
+| `docs/tasks/` | Planning tree (epics, tasks, slices) |
+| `docs/testing.md` | Test infrastructure, conventions, and commands (read by `design-test-strategy` and `develop-tdd`) |
 
 ## Rules
 

@@ -56,8 +56,14 @@ git log --oneline --no-merges main..task/<task-slug>
 ## Step 4 — Fold into permanent docs
 
 Migrate durable knowledge into the project's permanent design docs, decision
-log, or changelog (from `task_profile` "Knowledge destinations"). Commit onto
-the task branch.
+log, or changelog (from `task_profile` "Knowledge destinations").
+
+**Pay special attention to `docs/testing.md`:** if this task introduced new
+testing patterns, tools, conventions, or infrastructure lessons, update
+`docs/testing.md` accordingly. This ensures the `design-test-strategy` skill
+has accurate project context for future slices.
+
+Commit onto the task branch.
 
 ## Step 5 — Summarize
 
@@ -71,6 +77,7 @@ If `task_get <task-slug> epic` returns a value:
 
 If this was the last child (`task_epic_finalizable <epic-slug>` says ready),
 finalize the epic too:
+
 - Set `completed_at` on the epic: `task_set <epic-slug> completed_at <ISO now>`
 - Archive: `archive-artifact <epic-slug>` or `git mv docs/tasks/epics/<epic-slug>/ docs/tasks/epics/archive/<epic-slug>/`
 - Summarize the epic to CHANGELOG.
