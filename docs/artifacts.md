@@ -11,6 +11,19 @@ conventions. It is read by `design-test-strategy` before generating a test
 plan for a slice, and it is updated during `finalize-task` as new patterns
 or tooling are discovered.
 
+### Naming convention for guideline files
+
+Any file in `docs/` matching one of these patterns is auto-discovered by the
+coding-guidelines extension and made available via `get_guidelines()` and
+`list_guidelines()`:
+
+| Pattern | Example | Auto-detected topics |
+| --- | --- | --- |
+| `docs/testing.md` | `docs/testing.md` | `testing` |
+| `docs/<lang>-guidelines.md` | `docs/typescript-guidelines.md` | `typescript` |
+| `docs/<lang>-conventions.md` | `docs/python-conventions.md` | `python` |
+| `docs/<topic>-practices.md` | `docs/mocking-practices.md` | `mocking` |
+
 See the template in `onboard-workflow` for the recommended contents.
 
 ---

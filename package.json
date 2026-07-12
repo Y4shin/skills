@@ -24,7 +24,7 @@
     "vitest": "^2.1.0"
   },
   "pi": {
-    "extensions": ["./src/pi/index.ts"],
+    "extensions": ["./src/pi/index.ts", "./src/pi/guidelines.ts"],
     "skills": ["./skills"]
   }
 }

@@ -54,6 +54,11 @@ This skill will:
 If `docs/testing.md` does not exist yet, the skill falls back to
 `task_profile` test infrastructure and warns the project should create it.
 
+The project may also have `docs/<lang>-guidelines.md` files for language-specific
+coding conventions. The **coding-guidelines extension** auto-discovers these and
+injects them into the system prompt at session start and when state changes.
+Use `list_guidelines()` to see what's available.
+
 ## Step 4 — Finalise
 
 Once `design-test-strategy` returns successfully:

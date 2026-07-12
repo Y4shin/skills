@@ -39,6 +39,17 @@ Read the slice doc `docs/tasks/<task-slug>/slices/<n>-<slug>.md` (spec + test
 plan) **and** its parent `task.md`. Also read `docs/testing.md` if it exists
 for project test conventions. Follow the project's code conventions.
 
+The **coding-guidelines extension** (shipped with this package) injects
+language-specific best practices into the system prompt at session start and
+when the workflow state changes. Use these tools to fetch further detail:
+
+- `get_guidelines(language?, topic?)` — fetch conventions for a specific
+  language or topic (e.g. mocking, naming, error-handling)
+- `list_guidelines()` — see all available guideline sources
+
+Projects can create optional `docs/<lang>-guidelines.md` files to document
+language-specific conventions. The extension auto-discovers them.
+
 ## Step 4 — TDD: develop-tdd
 
 Invoke `develop-tdd <slice-slug>`. This runs RED → GREEN → REFACTOR. It returns

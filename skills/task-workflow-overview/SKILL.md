@@ -60,6 +60,18 @@ For anything that *creates or changes* artifacts, invoke the matching skill:
 | --- | --- |
 | `docs/tasks/` | Planning tree (epics, tasks, slices) |
 | `docs/testing.md` | Test infrastructure, conventions, and commands (read by `design-test-strategy` and `develop-tdd`) |
+| `docs/<lang>-guidelines.md` | Language-specific coding conventions (auto-discovered by the guidelines extension) |
+
+## Guideline tools
+
+| Tool | Purpose |
+| --- | --- |
+| `get_guidelines(language?, topic?)` | Fetch coding conventions for a language or topic |
+| `list_guidelines()` | List all available guideline sources in the project |
+
+These tools are registered by the **coding-guidelines extension** shipped with
+this package. The extension also auto-injects a reference to relevant guidelines
+into the system prompt at session start and when the workflow state changes.
 
 ## Rules
 

@@ -18,6 +18,11 @@ Slice doc with `## Test plan`. On branch `slice/<slug>`.
    `docs/testing.md` if it exists for project test conventions (framework,
    assertion style, naming patterns, run commands).
 
+   The **coding-guidelines extension** injects relevant best practices into the
+   system prompt when the slice changes. Use `get_guidelines(language, topic?)`
+   to fetch detailed conventions for the language(s) you're working with.
+   Abide by any injected guidelines and project-level conventions.
+
 2. **RED:** Write the test first. Every assertion must derive from the
    acceptance criteria. Run it — it **must fail**. If it passes without
    implementation, the test is wrong; fix it.
