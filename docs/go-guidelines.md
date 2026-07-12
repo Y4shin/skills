@@ -132,6 +132,208 @@ project-root/
   return nil, fmt.Errorf("find user: %w", err)
   ```
 
+## Negative space programming
+
+Go does not have a built-in `assert` statement. The idiomatic way to enforce
+preconditions, postconditions, and invariants is through **guard clauses** that
+return errors, complemented by **type-level enforcement** that makes illegal
+states unrepresentable at compile time.
+
+The goal (inspired by ThePrimeagen, TigerBeetle's TigerStyle, and NASA's
+Rule #5 — "use a minimum of two runtime assertions per function") is to
+**constrain the space of possible program states**, cutting off invalid paths
+so only correct ones remain.
+
+### Preconditions (guard clauses)
+
+Check every assumption about inputs at the top of the function. Fail fast and
+early. Do not let invalid data propagate.
+
+```go
+// Good — preconditions documented and enforced at the boundary
+func CreateUser(ctx context.Context, name string, age int) (*User, error) {
+    if name == "" {
+        return nil, errors.New("name must not be empty")
+    }
+    if age < 0 || age > 150 {
+        return nil, fmt.Errorf("age %d out of range [0, 150]", age)
+    }
+    // … body is safe from here on
+}
+```
+
+Think of each guard clause as a **Hoare triple**:
+> Given `{name != "" && age in [0,150]}`, When `CreateUser`, Then `{user != nil || err != nil}`
+
+### Postconditions (result validation)
+
+After computation, verify that the result satisfies the contract before
+returning it. This catches invariant violations close to their source.
+
+```go
+func Divide(a, b int) (int, error) {
+    if b == 0 {
+        return 0, errors.New("division by zero")
+    }
+    result := a / b
+    // Postcondition: a == result * b + remainder
+    // (trivially true for integer division, but illustrates the pattern)
+    if result*b > a {
+        return 0, fmt.Errorf("internal: division invariant violated: %d / %d", a, b)
+    }
+    return result, nil
+}
+```
+
+Postconditions are especially useful when:
+
+- Working with caches (did the value get stored?)
+- Database writes (did the row count match expectations?)
+- Complex transforms (does the output structure hold?)
+
+### Invariants (must-never-happen checks)
+
+For conditions that should be **impossible** — programmer bugs, not runtime
+inputs — panic with a message that explains what went wrong. This is the
+closest Go has to a traditional `assert`.
+
+```go
+func (s *Server) handleRequest(req *Request) {
+    if req == nil {
+        panic("handleRequest: req is nil — programmer bug")
+    }
+    if s.db == nil {
+        panic("handleRequest: server has no db — forgot Init()?")
+    }
+    // …
+}
+```
+
+Panic for invariants only when:
+
+1. The condition represents a **programmer mistake**, not user input.
+2. Continuing would produce silent corruption or data loss.
+3. Recovery is impossible at this level (let the caller `recover` if it can).
+
+### Exhaustive switches (compile-time negative space)
+
+Use exhaustive `switch` statements to make the compiler enforce that every
+possible case is handled. This moves negative space from runtime to compile
+time.
+
+```go
+type Status string
+
+const (
+    StatusPending   Status = "pending"
+    StatusActive    Status = "active"
+    StatusSuspended Status = "suspended"
+)
+
+func (s Status) IsValid() bool {
+    switch s {
+    case StatusPending, StatusActive, StatusSuspended:
+        return true
+    default:
+        return false
+    }
+}
+
+// For enums that must NEVER see an unknown value:
+func (s Status) assertValid() {
+    switch s {
+    case StatusPending, StatusActive, StatusSuspended:
+        // ok
+    default:
+        panic(fmt.Sprintf("Status.assertValid: unknown value %q", s))
+    }
+}
+```
+
+### Type-level enforcement ("Parse, don't validate")
+
+Push the boundary from runtime checks to compile-time types. Make illegal
+states unrepresentable.
+
+```go
+// Bad — every function must check sign
+func CalculateArea(width, height int) (int, error) {
+    if width <= 0 || height <= 0 { /* … */ }
+}
+
+// Better — type encodes the invariant
+type PositiveInt struct {
+    val int
+}
+
+func NewPositiveInt(n int) (PositiveInt, error) {
+    if n <= 0 {
+        return PositiveInt{}, fmt.Errorf("%d is not positive", n)
+    }
+    return PositiveInt{val: n}, nil
+}
+
+func (p PositiveInt) Value() int { return p.val }
+
+// Now the function signature documents the constraint
+func CalculateArea(width, height PositiveInt) int {
+    return width.Value() * height.Value()
+}
+```
+
+Apply "Parse, don't validate" at module boundaries (HTTP handlers, CLI flags,
+message deserialisation). Once a value is parsed into your typed domain, the
+compiler enforces correctness — no more runtime checks needed downstream.
+
+### Testing the negative space
+
+Your tests should explicitly verify:
+
+1. **Precondition violations** — call the function with invalid inputs and
+   assert that the expected error is returned, not a panic, not nil.
+2. **Postcondition violations** — if your code has invariants, write a test
+   that would trigger the invariant check and verify the error.
+3. **Boundaries** — values just below, at, and just above each threshold
+   (e.g. `-1`, `0`, `1` for a positive-only parameter).
+4. **Missing values** — nil, empty string, zero-value struct, nil map/slice.
+
+```go
+func TestCreateUser_Preconditions(t *testing.T) {
+    tests := []struct {
+        name string
+        age  int
+        want string // substring of expected error message
+    }{
+        {name: "",  age: 30, want: "name must not be empty"},
+        {name: "a", age: -1, want: "out of range"},
+        {name: "a", age: 151, want: "out of range"},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name+"/"+strconv.Itoa(tt.age), func(t *testing.T) {
+            _, err := CreateUser(context.Background(), tt.name, tt.age)
+            if err == nil {
+                t.Fatal("expected error, got nil")
+            }
+            if !strings.Contains(err.Error(), tt.want) {
+                t.Errorf("error = %q, want substring %q", err.Error(), tt.want)
+            }
+        })
+    }
+}
+```
+
+### Summary of Go's negative space toolkit
+
+| What | Go mechanism | When to use |
+| --- | --- | --- |
+| Input validation | Guard clause returning `error` | Every public function with untrusted inputs |
+| Invariant enforcement | `panic` with descriptive message | Programmer bugs, impossible states |
+| Exhaustiveness | `switch` with `default: panic()` | Enums, sealed unions, closed sets |
+| Type enforcement | Wrapper types with constructors | Domain primitives (IDs, emails, positive ints) |
+| Result guarantees | Postcondition check before return | Caches, DB writes, complex transforms |
+| Test negative paths | Table-driven error tables | Every function with preconditions |
+
 ## Testing
 
 ### Table-driven tests
