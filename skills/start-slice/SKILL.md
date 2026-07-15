@@ -121,6 +121,13 @@ Loop until approved or changes exhausted.`,
 
 ## Step 3 — Parent loop (handle interactive requests)
 
+**CRITICAL — Parent is a relay, not a decision-maker.** You must NEVER answer
+interview questions yourself. Your sole job is to pass every question to the
+user via `ask_user_question()` and relay their answer back. If you auto-answer
+a question, the user is excluded from their own design process. Every
+`interview_request` and every `need_decision` MUST go through
+`ask_user_question()` before any reply is sent.
+
 Run the shared parent loop to relay grill-agent questions and approval-agent
 decisions:
 
@@ -153,26 +160,73 @@ while (true) {
         message: JSON.stringify({ answer })
       })
     } else if (request.reason === "need_decision") {
-      // approval-agent is asking for approval of the test strategy
-      // Present it and ask user to approve, request changes, or chat
-      await subagent_supervisor({
-        action: "reply",
-        replyTo: request.id,
-        message: "approved"  // or "changes: <description>" if user requests changes
+      // approval-agent is asking for approval of the test strategy.
+      // The agent's message contains the test strategy summary.
+      const decision = await ask_user_question({
+        header: "Approve",
+        question: `${request.message}\n\nApprove this test strategy?`,
+        options: [
+          { label: "Approved",
+            description: "Accept the test strategy as written." },
+          { label: "Request changes",
+            description: "Describe what needs to change." }
+        ]
       })
+
+      if (decision === "Approved") {
+        await subagent_supervisor({
+          action: "reply",
+          replyTo: request.id,
+          message: "approved"
+        })
+      } else {
+        // The custom answer from "Request changes" or typed text
+        await subagent_supervisor({
+          action: "reply",
+          replyTo: request.id,
+          message: `changes: ${decision}`
+        })
+      }
     }
   }
 }
 ```
 
 For `need_decision` from the approval-agent: the agent's message contains the
-test strategy summary. Present it to the user. If the user approves: reply
-`"approved"`. If they request changes: reply `"changes: <description>"`.
+test strategy summary. Present it to the user via `ask_user_question` as shown
+above. If the user approves: reply `"approved"`. If they request changes:
+reply `"changes: <description>"`.
+
+### Verify chain completion
+
+After the `while` loop exits, `wait()` returned — but `wait()` returns when
+*any* active run finishes, not specifically the chain. You MUST verify the
+chain completed through all 4 steps:
+
+```
+const chainStatus = await subagent({ action: "status", id: "<chain-run-id>" })
+if (chainStatus.state !== "complete" || chainStatus.currentStep < 3) {
+  // Chain did NOT complete. The run that finished was likely a
+  // revived single step, not the chain. Report the failure.
+  report: "<describe what went wrong, which steps ran, what's missing>"
+  return  // Do NOT proceed to Step 4 — do not edit the slice doc yourself.
+}
+```
+
+**The parent must never edit the slice doc directly.** Only the chain worker
+(step 4) touches the slice doc frontmatter and test plan. If the chain didn't
+complete, report the failure — do not try to compensate by doing the worker's
+job yourself.
 
 ## Step 4 — Report
 
-After the chain completes, read `{chain_dir}/final/result.md`. Verify the
-slice doc has `analysed: true` and a `## Test plan` section.
+After verifying the chain completed all 4 steps:
+
+1. Read `{chain_dir}/final/result.md` to confirm the worker's actions.
+2. Verify the slice doc has `analysed: true` and a `## Test plan` section
+   (use `task_show` on the slice slug).
+3. If either check fails, the chain did not complete correctly — report it,
+   do not try to fix it yourself.
 
 Report: "Slice `<slug>` analysed — test plan written. Ready for
 `/skill:implement-slice <slug>`."
@@ -189,5 +243,21 @@ Report: "Slice `<slug>` analysed — test plan written. Ready for
 - Spec-first — every scenario and assertion must derive from acceptance criteria.
 - Failure modes before strategy — understand what can break before designing how to catch it.
 - Don't start implementing here.
+- **Do not interrupt the chain.** The grill-agent can be slow while exploring
+  the codebase — this is expected. Only interrupt if the chain has had zero
+  activity for 15+ minutes. Use `subagent({ action: "status" })` to check
+  rather than assuming it is stuck. Interrupting the chain destroys it;
+  sequential steps (test-strategist → approval-agent → worker) are lost on
+  resume because `resume` revives only the current step as a single run, not
+  the full chain.
+- **Do not edit the slice doc yourself.** The parent is a relay and reporter,
+  not a worker. Only the chain's worker step (step 4) edits the slice doc
+  frontmatter and test plan. If the chain fails, report the failure — never
+  try to compensate by editing the slice doc directly.
+- **Verify chain completion before reporting success.** After `wait()` returns,
+  check the chain's actual `status.json` via
+  `subagent({ action: "status", id: "..." })`. Confirm `state === "complete"`
+  and all steps ran. `wait()` returns when any run finishes — the completed
+  run might be a revived single step, not the full chain.
 
 **Handoff:** "Ready for `/skill:implement-slice <slice-slug>`."
