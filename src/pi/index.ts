@@ -29,9 +29,7 @@ import {
 } from "../core/model.js";
 import { profileText } from "../core/index.js";
 import * as state from "../core/state.js";
-import {
-	readNtfyConfig,
-} from "./ntfy.js";
+import { readNtfyConfig, sendNtfyNotification } from "./ntfy.js";
 import { existsSync, readFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -473,8 +471,7 @@ export default function (pi: ExtensionAPI) {
 					content: [
 						{
 							type: "text",
-							text:
-								"No ntfy config found at ~/.unipi/config/notify/config.json.",
+							text: "No ntfy config found at ~/.unipi/config/notify/config.json.",
 						},
 					],
 					details: { sent: false },
@@ -487,7 +484,7 @@ export default function (pi: ExtensionAPI) {
 				high: 5,
 			};
 			const ntfyPriority = params.priority
-				? priorityMap[params.priority] ?? 3
+				? (priorityMap[params.priority] ?? 3)
 				: 3;
 
 			const sent = await fetch(
@@ -496,9 +493,7 @@ export default function (pi: ExtensionAPI) {
 					method: "POST",
 					headers: {
 						"Content-Type": "text/plain",
-						...(cfg.token
-							? { Authorization: `Bearer ${cfg.token}` }
-							: {}),
+						...(cfg.token ? { Authorization: `Bearer ${cfg.token}` } : {}),
 						...(params.title ? { Title: params.title } : {}),
 						Priority: String(ntfyPriority),
 					},
@@ -518,5 +513,77 @@ export default function (pi: ExtensionAPI) {
 				details: { sent },
 			};
 		},
+	});
+
+	// ── pi-subagents lifecycle hooks ────────────────────────────────────
+	// Auto-fire ntfy notifications when pi-subagents events need attention.
+
+	pi.on("message_end", async (event, _ctx) => {
+		const msg = event.message as unknown as Record<string, unknown>;
+
+		// Supervisor request: subagent called contact_supervisor
+		if (
+			msg.type === "custom" &&
+			msg.customType === "subagent_supervisor_request"
+		) {
+			const details = msg.details as
+				| Record<string, unknown>
+				| undefined;
+			const agent = (details?.agent as string) ?? "unknown";
+			const text =
+				typeof msg.content === "string"
+					? msg.content.slice(0, 200)
+					: "Subagent needs your attention.";
+
+			await sendNtfyNotification({
+				title: `🤖 ${agent} needs attention`,
+				message: text,
+				tags: ["bell", "rotating_light"],
+				priority: 4,
+			});
+			return;
+		}
+
+		// Subagent notify: async completion/failure
+		if (msg.type === "custom" && msg.customType === "subagent-notify") {
+			const details = msg.details as
+				| Record<string, unknown>
+				| undefined;
+			const agent = (details?.agent as string) ?? "unknown";
+			const status = (details?.status as string) ?? "unknown";
+
+			if (status === "failed" || status === "paused") {
+				await sendNtfyNotification({
+					title: `❌ ${agent} ${status}`,
+					message:
+						typeof msg.content === "string"
+							? msg.content.slice(0, 300)
+							: `${agent} ${status}.`,
+					tags: ["x", "warning"],
+					priority: 5,
+				});
+			}
+			return;
+		}
+
+		// Control notice: needs_attention signal
+		if (
+			msg.type === "custom" &&
+			msg.customType === "subagent_control_notice"
+		) {
+			const details = msg.details as
+				| Record<string, unknown>
+				| undefined;
+			const agent = (details?.agent as string) ?? "unknown";
+			const reason = (details?.reason as string) ?? "unknown";
+
+			await sendNtfyNotification({
+				title: `⚠️ ${agent} needs attention`,
+				message: `Reason: ${reason}\n${typeof msg.content === "string" ? msg.content.slice(0, 200) : ""}`,
+				tags: ["warning", "rotating_light"],
+				priority: 4,
+			});
+			return;
+		}
 	});
 }

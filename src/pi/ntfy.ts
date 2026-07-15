@@ -17,46 +17,46 @@ import { join } from "node:path";
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 export interface NtfyConfig {
-  enabled: boolean;
-  serverUrl: string;
-  topic: string;
-  token?: string;
-  priority?: number;
+	enabled: boolean;
+	serverUrl: string;
+	topic: string;
+	token?: string;
+	priority?: number;
 }
 
 interface NotifyConfig {
-  ntfy?: NtfyConfig;
+	ntfy?: NtfyConfig;
 }
 
 const DEFAULT_CONFIG_PATH = join(
-  homedir(),
-  ".unipi",
-  "config",
-  "notify",
-  "config.json",
+	homedir(),
+	".unipi",
+	"config",
+	"notify",
+	"config.json",
 );
 
 export function readNtfyConfig(
-  configPath = DEFAULT_CONFIG_PATH,
+	configPath = DEFAULT_CONFIG_PATH,
 ): NtfyConfig | null {
-  try {
-    if (!existsSync(configPath)) return null;
-    const raw = readFileSync(configPath, "utf-8");
-    const config = JSON.parse(raw) as NotifyConfig;
-    if (!config.ntfy?.enabled || !config.ntfy?.topic) return null;
-    return config.ntfy;
-  } catch {
-    return null;
-  }
+	try {
+		if (!existsSync(configPath)) return null;
+		const raw = readFileSync(configPath, "utf-8");
+		const config = JSON.parse(raw) as NotifyConfig;
+		if (!config.ntfy?.enabled || !config.ntfy?.topic) return null;
+		return config.ntfy;
+	} catch {
+		return null;
+	}
 }
 
 // ─── Sending ──────────────────────────────────────────────────────────────────
 
 export interface NtfyPayload {
-  title?: string;
-  message: string;
-  priority?: number;
-  tags?: string[];
+	title?: string;
+	message: string;
+	priority?: number;
+	tags?: string[];
 }
 
 /**
@@ -64,80 +64,80 @@ export interface NtfyPayload {
  * Returns true if the notification was sent successfully.
  */
 export async function sendNtfyNotification(
-  payload: NtfyPayload,
-  config?: NtfyConfig,
+	payload: NtfyPayload,
+	config?: NtfyConfig,
 ): Promise<boolean> {
-  const cfg = config ?? readNtfyConfig();
-  if (!cfg) return false;
+	const cfg = config ?? readNtfyConfig();
+	if (!cfg) return false;
 
-  const url = `${cfg.serverUrl.replace(/\/+$/, "")}/${cfg.topic}`;
-  const headers: Record<string, string> = {
-    "Content-Type": "text/plain",
-  };
+	const url = `${cfg.serverUrl.replace(/\/+$/, "")}/${cfg.topic}`;
+	const headers: Record<string, string> = {
+		"Content-Type": "text/plain",
+	};
 
-  if (cfg.token) {
-    headers["Authorization"] = `Bearer ${cfg.token}`;
-  }
-  if (payload.title) {
-    headers["Title"] = payload.title;
-  }
-  if (payload.tags?.length) {
-    headers["Tags"] = payload.tags.join(",");
-  }
+	if (cfg.token) {
+		headers["Authorization"] = `Bearer ${cfg.token}`;
+	}
+	if (payload.title) {
+		headers["Title"] = payload.title;
+	}
+	if (payload.tags?.length) {
+		headers["Tags"] = payload.tags.join(",");
+	}
 
-  // ntfy uses a header-based priority: 1=min, 2=low, 3=default, 4=high, 5=max
-  const priority = payload.priority ?? cfg.priority ?? 3;
-  headers["Priority"] = String(priority);
+	// ntfy uses a header-based priority: 1=min, 2=low, 3=default, 4=high, 5=max
+	const priority = payload.priority ?? cfg.priority ?? 3;
+	headers["Priority"] = String(priority);
 
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: payload.message,
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
+	try {
+		const response = await fetch(url, {
+			method: "POST",
+			headers,
+			body: payload.message,
+		});
+		return response.ok;
+	} catch {
+		return false;
+	}
 }
 
 // ─── Convenience wrappers ────────────────────────────────────────────────────
 
 /** Send a notification that a subagent needs user attention. */
 export async function notifyNeedsAttention(
-  agent: string,
-  reason: string,
+	agent: string,
+	reason: string,
 ): Promise<boolean> {
-  return sendNtfyNotification({
-    title: "🤖 Subagent needs attention",
-    message: `Agent "${agent}" needs you:\n${reason}`,
-    tags: ["bell", "rotating_light"],
-    priority: 4,
-  });
+	return sendNtfyNotification({
+		title: "🤖 Subagent needs attention",
+		message: `Agent "${agent}" needs you:\n${reason}`,
+		tags: ["bell", "rotating_light"],
+		priority: 4,
+	});
 }
 
 /** Send a notification that a chain completed successfully. */
 export async function notifyChainComplete(
-  chain: string,
-  result: string,
+	chain: string,
+	result: string,
 ): Promise<boolean> {
-  return sendNtfyNotification({
-    title: "✅ Chain completed",
-    message: `Chain "${chain}" finished.\n${result}`,
-    tags: ["white_check_mark"],
-    priority: 2,
-  });
+	return sendNtfyNotification({
+		title: "✅ Chain completed",
+		message: `Chain "${chain}" finished.\n${result}`,
+		tags: ["white_check_mark"],
+		priority: 2,
+	});
 }
 
 /** Send a notification that a chain failed. */
 export async function notifyChainFailed(
-  chain: string,
-  error: string,
+	chain: string,
+	error: string,
 ): Promise<boolean> {
-  return sendNtfyNotification({
-    title: "❌ Chain failed",
-    message: `Chain "${chain}" failed:\n${error}`,
-    tags: ["x", "warning"],
-    priority: 5,
-  });
+	return sendNtfyNotification({
+		title: "❌ Chain failed",
+		message: `Chain "${chain}" failed:\n${error}`,
+		tags: ["x", "warning"],
+		priority: 5,
+	});
 }
