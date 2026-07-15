@@ -17,6 +17,41 @@ presents it for user approval, then a worker persists it.
 Slice doc exists with `analysed: false`. Use `task_profile` for test
 infrastructure conventions. Use `task_reference` for the slice lifecycle.
 
+## Step 0 — Pre-flight (remote sync check)
+
+Before doing any work, check whether the local branch is behind the remote:
+
+```
+git fetch origin
+```
+
+If the remote has commits ahead of local (`git rev-list --count HEAD..@{u}`
+is non-zero), **stop and ask the user** before proceeding:
+
+```
+const ahead = parseInt(bash("git rev-list --count HEAD..@{u}"))
+if (ahead > 0) {
+  const action = await ask_user_question({
+    header: "Remote ahead",
+    question: `Remote origin/main has ${ahead} new commit(s) not in your
+local branch. Pull before continuing?`,
+    options: [
+      { label: "Pull now",
+        description: "Run git pull --rebase to sync before starting." },
+      { label: "Skip — continue anyway",
+        description: "Proceed without pulling. You may get conflicts later." }
+    ]
+  })
+
+  if (action === "Pull now") {
+    bash("git pull --rebase")
+  }
+  // If skip, proceed with a warning but don't block.
+}
+```
+
+If the pull fails with conflicts, stop — the user must resolve them manually.
+
 ## Step 1 — Fetch context
 
 Read the task's `task.md` and the slice doc at
@@ -91,8 +126,13 @@ If you have uncertainties, include ## Questions for the user in your output.`,
 
 Read the test plan from the slice doc at docs/tasks/<task-slug>/slices/<n>-<slug>.md.
 
-Present a summary of the test strategy to the user via
-contact_supervisor({ reason: "need_decision" }). Ask for approval.
+If the test-strategist included ## Questions for the user, resolve each one
+via contact_supervisor({ reason: "interview_request" }) one at a time. After
+each answer, incorporate it into the test plan in the slice doc.
+
+Once all questions are resolved, present the ENTIRE test strategy (not a
+summary — the full test plan as written in the slice doc) to the user for
+final verification via contact_supervisor({ reason: "need_decision" }).
 
 If changes are requested, update the slice doc with edit and re-present.
 Loop until approved or changes exhausted.`,
@@ -160,11 +200,11 @@ while (true) {
         message: JSON.stringify({ answer })
       })
     } else if (request.reason === "need_decision") {
-      // approval-agent is asking for approval of the test strategy.
-      // The agent's message contains the test strategy summary.
+      // approval-agent is presenting the ENTIRE test strategy for final
+      // verification. All questions have been resolved and incorporated.
       const decision = await ask_user_question({
-        header: "Approve",
-        question: `${request.message}\n\nApprove this test strategy?`,
+        header: "Verify",
+        question: `Review the complete test strategy below:\n\n${request.message}\n\nApprove this test strategy?`,
         options: [
           { label: "Approved",
             description: "Accept the test strategy as written." },
@@ -193,9 +233,11 @@ while (true) {
 ```
 
 For `need_decision` from the approval-agent: the agent's message contains the
-test strategy summary. Present it to the user via `ask_user_question` as shown
-above. If the user approves: reply `"approved"`. If they request changes:
-reply `"changes: <description>"`.
+**entire** test strategy (read from the slice doc, with all questions resolved
+and incorporated). Present the full strategy to the user via
+`ask_user_question` as shown above — this is their last chance to review
+before it's committed. If the user approves: reply `"approved"`. If they
+request changes: reply `"changes: <description>"`.
 
 ### Verify chain completion
 
