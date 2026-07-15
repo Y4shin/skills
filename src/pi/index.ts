@@ -20,7 +20,6 @@ import {
 	type Artifact,
 	discoverAll,
 	discoverArchivedEpics,
-	discoverArchivedTasks,
 	discoverEpics,
 	discoverTasks,
 	findRoot,
@@ -30,6 +29,9 @@ import {
 } from "../core/model.js";
 import { profileText } from "../core/index.js";
 import * as state from "../core/state.js";
+import {
+	readNtfyConfig,
+} from "./ntfy.js";
 import { existsSync, readFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -437,6 +439,84 @@ export default function (pi: ExtensionAPI) {
 			}
 			mkdirSync(taskRoot(root), { recursive: true });
 			ctx.ui.notify(`Created ${taskRoot(root)}`, "info");
+		},
+	});
+
+	// ── notify_user tool ────────────────────────────────────────────────
+	// Reads @pi-unipi/notify ntfy config and sends phone notifications.
+	// Available to agents in chains via inheritProjectContext.
+
+	pi.registerTool({
+		name: "notify_user",
+		label: "Notify User",
+		description:
+			"Send a notification to the user's configured native/ntfy platforms. " +
+			"Use for critical errors or when the user explicitly asked to be notified.",
+		parameters: Type.Object({
+			title: Type.Optional(Type.String({ description: "Notification title" })),
+			message: Type.String({ description: "Notification message body" }),
+			priority: Type.Optional(
+				Type.Union([
+					Type.Literal("low"),
+					Type.Literal("normal"),
+					Type.Literal("high"),
+				]),
+			),
+		}),
+		async execute(
+			_toolCallId: string,
+			params: { title?: string; message: string; priority?: string },
+		) {
+			const cfg = readNtfyConfig();
+			if (!cfg) {
+				return {
+					content: [
+						{
+							type: "text",
+							text:
+								"No ntfy config found at ~/.unipi/config/notify/config.json.",
+						},
+					],
+					details: { sent: false },
+				};
+			}
+
+			const priorityMap: Record<string, number> = {
+				low: 2,
+				normal: 3,
+				high: 5,
+			};
+			const ntfyPriority = params.priority
+				? priorityMap[params.priority] ?? 3
+				: 3;
+
+			const sent = await fetch(
+				`${cfg.serverUrl.replace(/\/+$/, "")}/${cfg.topic}`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "text/plain",
+						...(cfg.token
+							? { Authorization: `Bearer ${cfg.token}` }
+							: {}),
+						...(params.title ? { Title: params.title } : {}),
+						Priority: String(ntfyPriority),
+					},
+					body: params.message,
+				},
+			).then((r) => r.ok);
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: sent
+							? `Notification sent to ${cfg.serverUrl}/${cfg.topic}`
+							: "Failed to send notification.",
+					},
+				],
+				details: { sent },
+			};
 		},
 	});
 }
