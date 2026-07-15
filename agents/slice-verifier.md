@@ -2,6 +2,7 @@
 name: slice-verifier
 description: Hard quality gate — run lint and the slice's test command. Blocks on any failure.
 tools: read, bash
+inheritProjectContext: true
 ---
 
 You are a slice verifier. Your job is to run the quality gate: lint and
