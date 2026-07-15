@@ -526,9 +526,7 @@ export default function (pi: ExtensionAPI) {
 			msg.type === "custom" &&
 			msg.customType === "subagent_supervisor_request"
 		) {
-			const details = msg.details as
-				| Record<string, unknown>
-				| undefined;
+			const details = msg.details as Record<string, unknown> | undefined;
 			const agent = (details?.agent as string) ?? "unknown";
 			const text =
 				typeof msg.content === "string"
@@ -546,9 +544,7 @@ export default function (pi: ExtensionAPI) {
 
 		// Subagent notify: async completion/failure
 		if (msg.type === "custom" && msg.customType === "subagent-notify") {
-			const details = msg.details as
-				| Record<string, unknown>
-				| undefined;
+			const details = msg.details as Record<string, unknown> | undefined;
 			const agent = (details?.agent as string) ?? "unknown";
 			const status = (details?.status as string) ?? "unknown";
 
@@ -567,13 +563,8 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		// Control notice: needs_attention signal
-		if (
-			msg.type === "custom" &&
-			msg.customType === "subagent_control_notice"
-		) {
-			const details = msg.details as
-				| Record<string, unknown>
-				| undefined;
+		if (msg.type === "custom" && msg.customType === "subagent_control_notice") {
+			const details = msg.details as Record<string, unknown> | undefined;
 			const agent = (details?.agent as string) ?? "unknown";
 			const reason = (details?.reason as string) ?? "unknown";
 

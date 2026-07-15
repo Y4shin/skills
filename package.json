@@ -34,7 +34,14 @@
       "./src/pi/check-subagents.ts"
     ],
     "skills": [
-      "./skills"
+      "./skills/create-task",
+      "./skills/finalize-task",
+      "./skills/implement-slice",
+      "./skills/migrate-workflow",
+      "./skills/onboard-workflow",
+      "./skills/resume-workflow",
+      "./skills/start-slice",
+      "./skills/task-workflow-overview"
     ],
     "subagents": {
       "agents": [

@@ -1,100 +1,193 @@
 ---
 name: start-slice
 description: >
-  Understand a slice, determine its failure modes, then design a comprehensive
-  test strategy via the design-test-strategy skill. Appends the confirmed test
-  plan to the slice doc. Use before implement-slice.
+  Launch the start-slice chain to analyse a slice, determine failure modes,
+  design a test strategy, and get user approval. Dispatches grill-agent →
+  test-strategist → approval-agent → worker. Use before implement-slice.
 ---
 
-# Start Slice — Test Strategy
+# Start Slice — Test Strategy (Chain)
 
-Phase 1.5: understand the slice, identify its failure modes, then design a
-comprehensive test strategy *before* writing a line of code.
+Phase 1.5: launch the start-slice chain — grill-agent explores layers and
+failure modes, test-strategist writes a test plan draft, approval-agent
+presents it for user approval, then a worker persists it.
 
 ## Prerequisites
 
-Slice doc exists with `analysed: false`.
+Slice doc exists with `analysed: false`. Use `task_profile` for test
+infrastructure conventions. Use `task_reference` for the slice lifecycle.
 
-**Use `task_profile` to load test infrastructure conventions (fallback).**
-
-**Use `task_reference` to load the slice doc/lifecycle reference.**
-
-## Step 1 — Fetch + present
+## Step 1 — Fetch context
 
 Read the task's `task.md` and the slice doc at
-`docs/tasks/<task-slug>/slices/<n>-<slug>.md` in full. Present a structured
-summary: task context, slice behaviour, acceptance criteria, blocked_by, mode
-(hitl / afk).
+`docs/tasks/<task-slug>/slices/<n>-<slug>.md` in full.
 
-## Step 2 — Grill on layers and failure modes (one question at a time)
+Read `task_profile` and `task_reference`.
 
-Invoke `grill-me` with the agenda:
+## Step 2 — Launch the interactive chain
 
-1. "What does this slice touch end-to-end? Which layers?"
-2. "Walk me through the failure modes — at least two."
-
-After both are confirmed, record the answers — they become inputs to the
-testing strategy.
-
-## Step 3 — Design the testing strategy: dispatch test-strategist subagent
-
-Read the slice doc in full. Construct the subagent task from the confirmed
-layer analysis and failure modes from Step 2. Dispatch `test-strategist` via:
+Construct the chain, passing the task and slice context:
 
 ```
+const sliceDoc = `<contents of the slice doc>`
+const taskDoc = `<contents of the task.md>`
+const profile = `<task_profile output>`
+const reference = `<task_reference output>`
+
 subagent({
-  agent: "test-strategist",
-  task: `Design a testing strategy for slice <slug> (task: <task-slug>).
+  async: true,
+  chain: [
+    {
+      agent: "grill-agent",
+      task: `Analyse a slice for a task-workflow project and identify its layers
+and failure modes.
 
-Slice doc: docs/tasks/<task-slug>/slices/<n>-<slug>.md
+Task context:
+${taskDoc}
 
-Layer analysis:
-<confirmed layer analysis from Step 2>
+Slice doc:
+${sliceDoc}
 
-Failure modes:
-<confirmed failure modes from Step 2>
+Project profile:
+${profile}
 
-Generate a comprehensive test plan covering test types, scope,
-dependency strategy, key scenarios, edge cases, error handling, and failure
-mode coverage. Persist it as a ## Test plan section in the slice doc.`
+Your job:
+1. Read the task and slice docs carefully. Explore the codebase to identify
+   which layers / surfaces this slice touches end-to-end.
+2. Walk the failure-mode tree: what can break? Identify at least two concrete
+   failure modes.
+3. Ask the user one question at a time via contact_supervisor. For each:
+   - If you can answer from the codebase: do it. Move on.
+   - If you need the user: give a recommended answer with reasoning.
+4. Continue until both questions are resolved:
+   a. "What does this slice touch end-to-end? Which layers?"
+   b. "What are the failure modes? What can break?"
+
+When done, output a structured summary under ## Interview summary that includes:
+- Confirmed layer analysis
+- Confirmed failure modes (at least two)
+- Any user preferences or constraints discovered`,
+      output: "grill/analysis.md"
+    },
+    {
+      agent: "test-strategist",
+      task: `Design a testing strategy for this slice.
+
+Read {chain_dir}/grill/analysis.md for the confirmed layer analysis and
+failure modes.
+
+Slice doc path: docs/tasks/<task-slug>/slices/<n>-<slug>.md
+
+Generate a comprehensive test plan covering test types, scope, dependency
+strategy, key scenarios, edge cases, error handling, and failure mode
+coverage. Persist it as a ## Test plan section in the slice doc.
+
+If you have uncertainties, include ## Questions for the user in your output.`,
+      output: "strategy/result.md"
+    },
+    {
+      agent: "approval-agent",
+      task: `Present the test strategy and get user approval.
+
+Read the test plan from the slice doc at docs/tasks/<task-slug>/slices/<n>-<slug>.md.
+
+Present a summary of the test strategy to the user via
+contact_supervisor({ reason: "need_decision" }). Ask for approval.
+
+If changes are requested, update the slice doc with edit and re-present.
+Loop until approved or changes exhausted.`,
+      output: "approval/result.md"
+    },
+    {
+      agent: "worker",
+      task: `Finalise the approved test strategy.
+
+1. Read {chain_dir}/approval/result.md to confirm approval.
+2. Verify the ## Test plan section exists in the slice doc.
+3. Set frontmatter on the slice doc:
+   - task_set <slice-path> analysed true
+   - task_set <slice-path> status in-progress
+   - task_set <slice-path> started_at <ISO now>
+4. Update state.yaml:
+   - task_state_set active.slice <slice-slug>
+   - task_state_set last_action start-slice analysed <slice-slug>
+   - task_state_set next_action implement-slice <slice-slug>
+5. Commit: docs(slice): add test plan for <slice-slug>`,
+      output: "final/result.md"
+    }
+  ]
 })
 ```
 
-Wait for the subagent to complete. Verify the test plan was written to the
-slice doc by reading it back.
+## Step 3 — Parent loop (handle interactive requests)
 
-## Step 4 — Finalise
+Run the shared parent loop to relay grill-agent questions and approval-agent
+decisions:
 
-Once `design-test-strategy` returns successfully:
+```
+while (true) {
+  await wait()
 
-1. Set `task_set <slice-path> analysed true` in the slice doc's frontmatter.
+  const pending = await subagent_supervisor({ action: "pending" })
+  if (pending.length === 0) break  // chain completed
 
-2. Update slice frontmatter:
-   - `task_set <slice-path> status in-progress`
-   - `task_set <slice-path> started_at <ISO now>`
+  for (const request of pending) {
+    if (request.reason === "interview_request") {
+      const { question, context, recommended, reasoning } =
+        JSON.parse(request.interview)
 
-3. Update state.yaml:
-   - `task_state_set active.slice <slice-slug>`
-   - `task_state_set last_action start-slice analysed <slice-slug>`
-   - `task_state_set next_action implement-slice <slice-slug>`
+      const answer = await ask_user_question({
+        header: "Slice",
+        question: `**Context:** ${context}\n\n**Question:** ${question}\n\n**Recommended:** ${recommended}\n\n**Reasoning:** ${reasoning}`,
+        options: [
+          { label: `Accept: ${recommended.slice(0, 55)}`,
+            description: "Agree with the recommended answer." },
+          { label: "Custom answer",
+            description: "Provide a different answer." }
+        ]
+      })
 
-4. Commit: `docs(slice): add test plan for <slice-slug>`.
+      await subagent_supervisor({
+        action: "reply",
+        replyTo: request.id,
+        message: JSON.stringify({ answer })
+      })
+    } else if (request.reason === "need_decision") {
+      // approval-agent is asking for approval of the test strategy
+      // Present it and ask user to approve, request changes, or chat
+      await subagent_supervisor({
+        action: "reply",
+        replyTo: request.id,
+        message: "approved"  // or "changes: <description>" if user requests changes
+      })
+    }
+  }
+}
+```
+
+For `need_decision` from the approval-agent: the agent's message contains the
+test strategy summary. Present it to the user. If the user approves: reply
+`"approved"`. If they request changes: reply `"changes: <description>"`.
+
+## Step 4 — Report
+
+After the chain completes, read `{chain_dir}/final/result.md`. Verify the
+slice doc has `analysed: true` and a `## Test plan` section.
+
+Report: "Slice `<slug>` analysed — test plan written. Ready for
+`/skill:implement-slice <slug>`."
 
 ## Error handling
 
-- If the slice doc is missing, the slice wasn't produced by this workflow —
-  confirm the task/slug.
-- If the slice is already `analysed: true`, skip grilling and confirm the
-  existing test plan is still valid. If the existing test plan uses the old
-  schema (simple assertion bullets), consider re-running through
-  `design-test-strategy` to upgrade it.
+- If the slice doc is missing, confirm the task/slug.
+- If `analysed: true` already, confirm the existing test plan is still valid.
+- If the chain fails at any step, inspect the corresponding `{chain_dir}`
+  output file for partial results.
 
 ## Constraints
 
-- **Spec-first** — every scenario and assertion must derive from acceptance
-  criteria, never from an implementation.
-- **Failure modes before strategy** — you must understand what can break before
-  designing how to catch it.
+- Spec-first — every scenario and assertion must derive from acceptance criteria.
+- Failure modes before strategy — understand what can break before designing how to catch it.
 - Don't start implementing here.
 
 **Handoff:** "Ready for `/skill:implement-slice <slice-slug>`."
