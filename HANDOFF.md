@@ -1,6 +1,8 @@
 # Handoff: Subagent Conversion
 
-## Plan
+## Status: IMPLEMENTED (v0.17.0)
+
+## What was done
 
 Convert 4 skills into pi-subagents agent definitions, bundled within this same
 `task-workflow` package. Add a startup extension that checks for `pi-subagents`

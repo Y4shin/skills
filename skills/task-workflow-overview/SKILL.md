@@ -54,6 +54,18 @@ For anything that *creates or changes* artifacts, invoke the matching skill:
 | Migrate from old prd-workflow | `/skill:migrate-workflow` |
 | Init a fresh repo | `/skill:onboard-workflow` |
 
+**Orchestrator skills** (`start-slice`, `implement-slice`, `finalize-task`)
+dispatch subagents for heavy-lifting work:
+
+| Subagent | Used by | Role |
+| --- | --- | --- |
+| `test-strategist` | `start-slice` | Designs test plans from slice requirements |
+| `tdd-worker` | `implement-slice` | RED → GREEN → REFACTOR implementation |
+| `slice-verifier` | `implement-slice` | Lint + test gate |
+| `task-summarizer` | `finalize-task` | Writes changelog entries |
+
+Subagents require `pi-subagents` to be installed (`pi install npm:pi-subagents`).
+
 ## Project-level files
 
 | File | Purpose |

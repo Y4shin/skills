@@ -65,10 +65,20 @@ has accurate project context for future slices.
 
 Commit onto the task branch.
 
-## Step 5 — Summarize
+## Step 5 — Summarize: dispatch task-summarizer subagent
 
-Invoke `summarize-task <task-slug>`. This appends a changelog entry to
-`docs/tasks/CHANGELOG.md`. Commit.
+Dispatch `task-summarizer` via:
+
+```
+subagent({
+  agent: "task-summarizer",
+  task: `Summarize task <task-slug> into docs/tasks/CHANGELOG.md.
+Task doc: docs/tasks/<task-slug>/task.md
+Append a 3-5 line changelog entry with date, title, key changes, and outcome.`
+})
+```
+
+Wait for the subagent to complete, then commit the changelog update.
 
 ## Step 6 — Tick the epic (if applicable)
 

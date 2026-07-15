@@ -36,28 +36,32 @@ Invoke `grill-me` with the agenda:
 After both are confirmed, record the answers — they become inputs to the
 testing strategy.
 
-## Step 3 — Design the testing strategy
+## Step 3 — Design the testing strategy: dispatch test-strategist subagent
 
-Invoke `/skill:design-test-strategy <slice-slug>`.
+Read the slice doc in full. Construct the subagent task from the confirmed
+layer analysis and failure modes from Step 2. Dispatch `test-strategist` via:
 
-This skill will:
+```
+subagent({
+  agent: "test-strategist",
+  task: `Design a testing strategy for slice <slug> (task: <task-slug>).
 
-- Read `docs/testing.md` for project test conventions
-- Take the layer analysis and failure modes from Step 2 as inputs
-- Generate a comprehensive testing strategy covering test types, scope,
-  dependency strategy, key scenarios, edge cases, error handling, and how
-  each failure mode is caught
-- Present it for your approval
-- Iterate on feedback until confirmed
-- Persist the richer `## Test plan` section to the slice doc
+Slice doc: docs/tasks/<task-slug>/slices/<n>-<slug>.md
 
-If `docs/testing.md` does not exist yet, the skill falls back to
-`task_profile` test infrastructure and warns the project should create it.
+Layer analysis:
+<confirmed layer analysis from Step 2>
 
-The project may also have `docs/<lang>-guidelines.md` files for language-specific
-coding conventions. The **coding-guidelines extension** auto-discovers these and
-injects them into the system prompt at session start and when state changes.
-Use `list_guidelines()` to see what's available.
+Failure modes:
+<confirmed failure modes from Step 2>
+
+Generate a comprehensive test plan covering test types, scope,
+dependency strategy, key scenarios, edge cases, error handling, and failure
+mode coverage. Persist it as a ## Test plan section in the slice doc.`
+})
+```
+
+Wait for the subagent to complete. Verify the test plan was written to the
+slice doc by reading it back.
 
 ## Step 4 — Finalise
 

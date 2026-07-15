@@ -55,15 +55,28 @@ language-specific conventions. The extension auto-discovers them.
 ensure the reason is included in the implementation note recorded by
 `land-slice` (step 6).
 
-## Step 4 — TDD: develop-tdd
+## Step 4 — TDD: dispatch tdd-worker subagent
 
-Invoke `develop-tdd <slice-slug>`. This runs RED → GREEN → REFACTOR. It returns
-when all tests pass.
+Read the slice doc in full. Construct the subagent task from the acceptance
+criteria and test plan. Dispatch `tdd-worker` via:
 
-## Step 5 — Verify (hard gate)
+```
+subagent({ agent: "tdd-worker", task: "Implement slice <slug> for task <task-slug>.\n\nSlice doc: docs/tasks/<task-slug>/slices/<n>-<slug>.md\nTask doc: docs/tasks/<task-slug>/task.md\n\nImplement the acceptance criteria using strict TDD (RED → GREEN → REFACTOR)." })
+```
 
-Invoke `verify-slice <slice-slug>`. If it fails, **stop**. Go back to Step 4 to
-fix. Do not proceed to Step 6.
+Wait for the subagent to complete. If it fails, analyse the failure and retry
+with corrections.
+
+## Step 5 — Verify (hard gate): dispatch slice-verifier subagent
+
+Dispatch `slice-verifier` via:
+
+```
+subagent({ agent: "slice-verifier", task: "Verify slice <slug> for task <task-slug>.\nSlice doc: docs/tasks/<task-slug>/slices/<n>-<slug>.md" })
+```
+
+If the verifier fails, **stop**. Go back to Step 4 to fix. Do not proceed to
+Step 6.
 
 ## Step 6 — Land
 

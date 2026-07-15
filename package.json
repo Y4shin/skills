@@ -1,6 +1,6 @@
 {
   "name": "task-workflow",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Task workflow: task → slices → TDD → finalize. Pi extension.",
   "keywords": ["pi-package"],
   "type": "module",
@@ -14,6 +14,7 @@
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
+    "pi-subagents": "*",
     "typebox": "*"
   },
   "devDependencies": {
@@ -27,8 +28,12 @@
     "extensions": [
       "./src/pi/index.ts",
       "./src/pi/guidelines.ts",
-      "./src/pi/model-router.ts"
+      "./src/pi/model-router.ts",
+      "./src/pi/check-subagents.ts"
     ],
-    "skills": ["./skills"]
+    "skills": ["./skills"],
+    "subagents": {
+      "agents": ["./agents"]
+    }
   }
 }
