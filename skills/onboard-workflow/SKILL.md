@@ -11,6 +11,35 @@ description: >
 
 ## Steps
 
+0. **Remote sync check.**
+
+   ```
+   git fetch origin
+   ```
+
+   If remote has commits ahead (`git rev-list --count HEAD..@{u}` > 0),
+   **stop and ask** before proceeding:
+
+   ```
+   const ahead = parseInt(bash("git rev-list --count HEAD..@{u}"))
+   if (ahead > 0) {
+     const action = await ask_user_question({
+       header: "Remote ahead",
+       question: `Remote origin/main has ${ahead} new commit(s) not in
+your local branch. Pull before continuing?`,
+       options: [
+         { label: "Pull now",
+           description: "Run git pull --rebase to sync." },
+         { label: "Skip — continue anyway",
+           description: "Proceed without pulling." }
+       ]
+     })
+     if (action === "Pull now") bash("git pull --rebase")
+   }
+   ```
+
+   If pull fails with conflicts, stop — resolve manually.
+
 1. **Check gate.** Run `task_workflow_gate`. If `docs/tasks/` already exists,
    stop and report:
    "This repo is already initialized. If you need to migrate from the old

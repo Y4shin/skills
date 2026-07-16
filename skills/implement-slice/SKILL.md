@@ -1,103 +1,207 @@
 ---
 name: implement-slice
 description: >
-  Build a slice via strict TDD against the confirmed test plan. Orchestrates
-  the full build pipeline: branch → develop-tdd → verify (hard gate) → land.
-  Use after start-slice.
+  Launch the implement-slice chain to build a slice via strict TDD. Dispatches
+  worker (branch+sync) → tdd-worker (TDD) → slice-verifier (gate) → worker
+  (land). Use after start-slice.
 ---
 
-# Implement Slice — Build with TDD
+# Implement Slice — Build with TDD (Chain)
 
-Phase 2: execute the agreed test plan with full repo automation.
+Phase 2: launch the implement-slice chain — worker sets up the branch,
+tdd-worker implements via TDD, slice-verifier runs the quality gate, and
+worker lands the result.
 
 ## Prerequisites
 
-Slice doc has `analysed: true` and `## Test plan`.
+Slice doc has `analysed: true` and `## Test plan`. Use `task_profile` for
+code conventions and CI commands.
 
-**Use `task_profile` for code conventions and CI commands.**
+## Step 0 — Pre-flight (remote sync check)
 
-**Use `task_list` to see the planning tree.**
-
-## Step 1 — Set state
-
-Report starting slice `<slug>`.
-
-## Step 2 — Sync + branch
-
-```bash
-git fetch origin 2>/dev/null || true
-git checkout main && git pull --ff-only origin main 2>/dev/null || true
-git checkout task/<task-slug> 2>/dev/null || git checkout -b task/<task-slug>
-git checkout -b slice/<slug>
-```
-
-If no remote, skip fetch/pull.
-
-## Step 3 — Load context
-
-Read the slice doc `docs/tasks/<task-slug>/slices/<n>-<slug>.md` (spec + test
-plan) **and** its parent `task.md`. Also read `docs/testing.md` if it exists
-for project test conventions. Follow the project's code conventions.
-
-The **coding-guidelines extension** (shipped with this package) injects
-language-specific best practices into the system prompt at session start and
-when the workflow state changes. Use these tools to fetch further detail:
-
-- `get_guidelines(language?, topic?)` — fetch conventions for a specific
-  language or topic (e.g. mocking, naming, error-handling)
-- `list_guidelines()` — see all available guideline sources
-
-Projects can create optional `docs/<lang>-guidelines.md` files to document
-language-specific conventions. The extension auto-discovers them.
-
-**These are guidelines, not hard rules.** If you break one, add a
-`// rule: <name> — <explanation>` comment at the point of deviation and
-ensure the reason is included in the implementation note recorded by
-`land-slice` (step 6).
-
-## Step 4 — TDD: dispatch tdd-worker subagent
-
-Read the slice doc in full. Construct the subagent task from the acceptance
-criteria and test plan. Dispatch `tdd-worker` via:
+Before doing any work, check whether the local branch is behind the remote:
 
 ```
-subagent({ agent: "tdd-worker", task: "Implement slice <slug> for task <task-slug>.\n\nSlice doc: docs/tasks/<task-slug>/slices/<n>-<slug>.md\nTask doc: docs/tasks/<task-slug>/task.md\n\nImplement the acceptance criteria using strict TDD (RED → GREEN → REFACTOR)." })
+git fetch origin
 ```
 
-Wait for the subagent to complete. If it fails, analyse the failure and retry
-with corrections.
-
-## Step 5 — Verify (hard gate): dispatch slice-verifier subagent
-
-Dispatch `slice-verifier` via:
+If the remote has commits ahead of local (`git rev-list --count HEAD..@{u}`
+is non-zero), **stop and ask the user** before proceeding:
 
 ```
-subagent({ agent: "slice-verifier", task: "Verify slice <slug> for task <task-slug>.\nSlice doc: docs/tasks/<task-slug>/slices/<n>-<slug>.md" })
+const ahead = parseInt(bash("git rev-list --count HEAD..@{u}"))
+if (ahead > 0) {
+  const action = await ask_user_question({
+    header: "Remote ahead",
+    question: `Remote origin/main has ${ahead} new commit(s) not in your
+local branch. Pull before continuing?`,
+    options: [
+      { label: "Pull now",
+        description: "Run git pull --rebase to sync before starting." },
+      { label: "Skip — continue anyway",
+        description: "Proceed without pulling. You may get conflicts later." }
+    ]
+  })
+
+  if (action === "Pull now") {
+    bash("git pull --rebase")
+  }
+  // If skip, proceed with a warning but don't block.
+}
 ```
 
-If the verifier fails, **stop**. Go back to Step 4 to fix. Do not proceed to
-Step 6.
+If the pull fails with conflicts, stop — the user must resolve them manually.
 
-## Step 6 — Land
+## Step 1 — Validate prerequisites
 
-Invoke `land-slice <slice-slug>`. This handles merge, commit, timestamps,
-archive, and state update.
+Verify `analysed: true` on the slice doc. If not, run `/skill:start-slice`
+first. Read the slice doc and its parent `task.md`.
 
-## Step 7 — Hand off
+## Step 2 — Launch the implementation chain
 
-Read `state.yaml` via `task_state`. Report:
+Construct the chain:
 
-- "All slices done → run `/skill:finalize-task <task-slug>`"
-- "Next: `/skill:start-slice <next-slug>`"
+```
+const taskSlug = "<task-slug>"
+const sliceSlug = "<slice-slug>"
+const slicePath = "docs/tasks/<task-slug>/slices/<n>-<slice-slug>.md"
+const taskPath = "docs/tasks/<task-slug>/task.md"
+
+subagent({
+  async: true,
+  chain: [
+    {
+      agent: "worker",
+      task: `Prepare the implementation branch for slice "${sliceSlug}"
+(task: "${taskSlug}").
+
+1. Sync with origin if remote exists:
+   git fetch origin 2>/dev/null || true
+   git checkout main && git pull --ff-only origin main 2>/dev/null || true
+
+2. Ensure the task integration branch exists:
+   git checkout task/${taskSlug} 2>/dev/null || git checkout -b task/${taskSlug}
+
+3. Create the slice feature branch:
+   git checkout -b slice/${sliceSlug}
+
+4. Read the slice doc at ${slicePath} and the task doc at ${taskPath}.
+   Read docs/testing.md if it exists for project test conventions.
+
+5. Report: branch slice/${sliceSlug} created, context loaded.`,
+      output: "setup/result.md"
+    },
+    {
+      agent: "tdd-worker",
+      task: `Implement slice "${sliceSlug}" for task "${taskSlug}" using strict TDD.
+
+Slice doc: ${slicePath}
+Task doc: ${taskPath}
+
+Read the slice doc's acceptance criteria and test plan. Follow the
+strict TDD cycle:
+
+1. RED — write a failing test derived from acceptance criteria.
+   The test MUST fail before implementation.
+2. GREEN — write minimal code to make the test pass. No speculative code.
+3. REFACTOR — clean up, improve names, extract helpers. Test must still pass.
+4. Repeat for each acceptance criterion.
+5. Run the full test suite if available. Fix anything that breaks.
+
+Read docs/testing.md for project conventions. Use get_guidelines for
+language-specific best practices. Follow any injected coding guidelines.`,
+      output: "tdd/result.md"
+    },
+    {
+      agent: "slice-verifier",
+      task: `Verify slice "${sliceSlug}" for task "${taskSlug}".
+
+Slice doc: ${slicePath}
+
+Run the quality gate:
+1. Find and run the lint command (from package.json scripts or linter configs).
+   Skip with a warning if no lint tool is configured.
+2. Find and run the test command from the slice doc's ## Test plan →
+   Run command.
+
+If lint fails: STOP and report. If tests fail: STOP and report.
+Only proceed if both are clean.`,
+      output: "verify/result.md"
+    },
+    {
+      agent: "worker",
+      task: `Land slice "${sliceSlug}" for task "${taskSlug}".
+
+Slice doc: ${slicePath}
+Task doc: ${taskPath}
+
+1. Read the slice doc for title, acceptance criteria, and test plan.
+
+2. Merge the slice into the task branch:
+   git checkout task/${taskSlug}
+   git merge --no-ff slice/${sliceSlug} -m "slice(${taskSlug}): <slice title>"
+   git branch -d slice/${sliceSlug}
+
+3. Record completion on the slice doc:
+   task_set ${slicePath} status done
+   task_set ${slicePath} completed_at <ISO now>
+
+4. Append a 2-4 line implementation note to the task's ## Implementation notes:
+   what was built, any decisions made, any guideline deviations.
+
+5. Archive the slice:
+   mkdir -p docs/tasks/${taskSlug}/slices/archive
+   git mv ${slicePath} docs/tasks/${taskSlug}/slices/archive/<n>-<slug>.md
+
+6. Commit the landing artifacts:
+   git add docs/tasks/
+   git commit -m "docs(slice): land ${sliceSlug} into ${taskSlug}"
+
+7. Check remaining slices via task_slices ${taskSlug}:
+   - If last slice: task_set ${taskSlug} status done,
+     task_set ${taskSlug} completed_at <ISO now>,
+     task_state_set active.slice null,
+     task_state_set next_action finalize-task ${taskSlug}
+   - If more remain: task_state_set active.slice null,
+     task_state_set next_action start-slice <next-slug>
+
+8. Set task_state_set last_action implement-slice landed ${sliceSlug}`,
+      output: "land/result.md"
+    }
+  ]
+})
+```
+
+## Step 3 — Wait for completion
+
+This is a non-interactive chain — no grill-agent or approval-agent.
+
+```
+await wait({ all: true })
+```
+
+Read `{chain_dir}/land/result.md` to confirm landing was successful.
+
+## Step 4 — Report
+
+Report the outcome:
+
+- Slice implemented, verified, and landed
+- Number of remaining slices
+- If all slices done: "Run `/skill:finalize-task <task-slug>`"
+- If more remain: "Next: `/skill:start-slice <next-slug>`"
 
 ## Error handling
 
-- If the slice doc is missing or has `analysed: false`, run `/skill:start-slice` first.
+- If `analysed: false`, run `/skill:start-slice` first.
+- If the verifier fails, inspect `{chain_dir}/verify/result.md` and restart
+  the chain (the tdd-worker will fix issues and retry).
+- If merge conflicts arise, resolve them to keep both new and already-merged
+  slices working.
 - Never merge a red slice into the task branch.
-- Resolve merge conflicts to keep both the new and already-merged slices working.
 
 ## Constraints
 
-- **Spec-first** — never write a test to match a wrong implementation.
-- **No speculative code** — implement only what the slice requires.
-- **No per-slice PR** — slices merge into the task branch; only finalize merges to main.
+- Spec-first — never write a test to match a wrong implementation.
+- No speculative code — implement only what the slice requires.
+- No per-slice PR — slices merge into the task branch; only finalize merges to main.

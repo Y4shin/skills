@@ -17,7 +17,8 @@ Use the registered `task_*` tools (`task_show`, `task_list`, `task_get`,
 `task_set`, `task_resolve`, `task_assert_kind`, `task_slices`,
 `task_finalizable`, `task_lint`, `task_epic_*`, `task_state`, `task_state_set`,
 `task_reference`, `task_profile`, `task_workflow_gate`) to query and mutate the
-planning tree. **Prefer these tools over shelling out or hand-editing frontmatter.**
+planning tree. **Prefer these tools over shelling out or hand-editing
+frontmatter.**
 
 ## Answering questions — read-only
 
@@ -45,33 +46,44 @@ For anything that *creates or changes* artifacts, invoke the matching skill:
 | --- | --- |
 | Resume after interruption | `/skill:resume-workflow` |
 | New task or epic | `/skill:create-task` |
-| Slice a task | `/skill:slice-task` |
-| Size the slices | `/skill:size-slices` |
 | Analyse a slice's test strategy | `/skill:start-slice` |
 | Build a slice (TDD) | `/skill:implement-slice` |
 | Close out a task (or epic) | `/skill:finalize-task` |
-| Archive something | `/skill:archive-artifact` |
 | Migrate from old prd-workflow | `/skill:migrate-workflow` |
 | Init a fresh repo | `/skill:onboard-workflow` |
 
-**Orchestrator skills** (`start-slice`, `implement-slice`, `finalize-task`)
-dispatch subagents for heavy-lifting work:
+**Orchestrator skills** (`create-task`, `start-slice`, `implement-slice`,
+`finalize-task`) dispatch subagent chains for heavy-lifting work. The chains
+may include interactive agents (grill-agent, approval-agent) that pause for
+user input via `contact_supervisor`.
 
-| Subagent | Used by | Role |
-| --- | --- | --- |
-| `test-strategist` | `start-slice` | Designs test plans from slice requirements |
-| `tdd-worker` | `implement-slice` | RED → GREEN → REFACTOR implementation |
-| `slice-verifier` | `implement-slice` | Lint + test gate |
-| `task-summarizer` | `finalize-task` | Writes changelog entries |
+| Chain | Steps |
+| --- | --- |
+| **create-task** | grill-agent → worker |
+| **start-slice** | grill-agent → test-strategist → approval-agent → worker |
+| **implement-slice** | worker → tdd-worker → slice-verifier → worker |
+| **finalize-task** | worker → task-summarizer → worker |
 
-Subagents require `pi-subagents` to be installed (`pi install npm:pi-subagents`).
+**Agents** used by these chains:
+
+| Agent | Role |
+| --- | --- |
+| `grill-agent` | Autonomous interviewer — explores codebase, asks user one question at a time |
+| `approval-agent` | Presents plans/strategies for user approval, handles revise-re-present loop |
+| `test-strategist` | Designs test plans from slice requirements and failure modes |
+| `tdd-worker` | RED → GREEN → REFACTOR implementation |
+| `slice-verifier` | Lint + test quality gate |
+| `task-summarizer` | Writes changelog entries |
+
+Subagents require `pi-subagents` to be installed (`pi install
+npm:pi-subagents`).
 
 ## Project-level files
 
 | File | Purpose |
 | --- | --- |
 | `docs/tasks/` | Planning tree (epics, tasks, slices) |
-| `docs/testing.md` | Test infrastructure, conventions, and commands (read by `design-test-strategy` and `develop-tdd`) |
+| `docs/testing.md` | Test infrastructure, conventions, and commands |
 | `docs/<lang>-guidelines.md` | Language-specific coding conventions (auto-discovered by the guidelines extension) |
 
 ## Guideline tools
