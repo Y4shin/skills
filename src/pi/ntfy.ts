@@ -36,9 +36,13 @@ const DEFAULT_CONFIG_PATH = join(
 	"config.json",
 );
 
-export function readNtfyConfig(
-	configPath = DEFAULT_CONFIG_PATH,
-): NtfyConfig | null {
+const CONFIG_PATH_ENV = "TASK_WORKFLOW_NTFY_CONFIG";
+
+function defaultConfigPath(): string {
+	return process.env[CONFIG_PATH_ENV] || DEFAULT_CONFIG_PATH;
+}
+
+export function readNtfyConfig(configPath = defaultConfigPath()): NtfyConfig | null {
 	try {
 		if (!existsSync(configPath)) return null;
 		const raw = readFileSync(configPath, "utf-8");
@@ -59,6 +63,15 @@ export interface NtfyPayload {
 	tags?: string[];
 }
 
+function encodeHeaderValue(value: string): string {
+	// WHATWG fetch requires header values to be ByteString/Latin-1. ntfy accepts
+	// RFC 2047 encoded UTF-8 headers, which lets our emoji titles survive Node's
+	// header validation instead of making the notification silently fail.
+	return /^[\u0000-\u00ff]*$/.test(value)
+		? value
+		: `=?UTF-8?B?${Buffer.from(value, "utf-8").toString("base64")}?=`;
+}
+
 /**
  * Send a notification via ntfy.sh using the configured server, topic, and token.
  * Returns true if the notification was sent successfully.
@@ -68,9 +81,9 @@ export async function sendNtfyNotification(
 	config?: NtfyConfig,
 ): Promise<boolean> {
 	const cfg = config ?? readNtfyConfig();
-	if (!cfg) return false;
+	if (!cfg?.enabled || !cfg.serverUrl || !cfg.topic) return false;
 
-	const url = `${cfg.serverUrl.replace(/\/+$/, "")}/${cfg.topic}`;
+	const url = `${cfg.serverUrl.replace(/\/+$/, "")}/${encodeURIComponent(cfg.topic)}`;
 	const headers: Record<string, string> = {
 		"Content-Type": "text/plain",
 	};
@@ -79,7 +92,7 @@ export async function sendNtfyNotification(
 		headers["Authorization"] = `Bearer ${cfg.token}`;
 	}
 	if (payload.title) {
-		headers["Title"] = payload.title;
+		headers["Title"] = encodeHeaderValue(payload.title);
 	}
 	if (payload.tags?.length) {
 		headers["Tags"] = payload.tags.join(",");

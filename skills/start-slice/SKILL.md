@@ -102,7 +102,8 @@ When done, output a structured summary under ## Interview summary that includes:
 - Confirmed layer analysis
 - Confirmed failure modes (at least two)
 - Any user preferences or constraints discovered`,
-      output: "grill/analysis.md"
+      output: "grill/analysis.md",
+      acceptance: "attested"
     },
     {
       agent: "test-strategist",
@@ -285,6 +286,9 @@ Report: "Slice `<slug>` analysed — test plan written. Ready for
 - Spec-first — every scenario and assertion must derive from acceptance criteria.
 - Failure modes before strategy — understand what can break before designing how to catch it.
 - Don't start implementing here.
+- `grill-agent` is an interview/planning step, not an implementation step. It
+  is expected to finish without repository edits; the chain marks it
+  `acceptance: "attested"` and stores its handoff in `{chain_dir}/grill/analysis.md`.
 - **Do not interrupt the chain.** The grill-agent can be slow while exploring
   the codebase — this is expected. Only interrupt if the chain has had zero
   activity for 15+ minutes. Use `subagent({ action: "status" })` to check

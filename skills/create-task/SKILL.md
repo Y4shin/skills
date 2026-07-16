@@ -91,13 +91,15 @@ at a time via contact_supervisor with a recommended answer and reasoning.
 Continue until the decision tree is fully walked.
 
 When done, output a structured interview summary under ## Interview summary
-that includes all confirmed decisions and the proposed slice breakdown.`
+that includes all confirmed decisions and the proposed slice breakdown.`,
+      output: "interview/summary.md",
+      acceptance: "attested"
     },
     {
       agent: "worker",
-      task: `Write a task doc and slice docs from the interview summary in {previous}.
+      task: `Write a task doc and slice docs from the interview summary.
 
-Read {previous} for the interview summary with all confirmed decisions.
+Read {chain_dir}/interview/summary.md for the interview summary with all confirmed decisions.
 
 1. Determine the task slug (3-5 word kebab of the title, must not collide
    with existing tasks from task_list).
@@ -204,6 +206,19 @@ Report: task slug, number of slices, first slice slug.
 - If the project has no `docs/tasks/`, run `/skill:onboard-workflow` first.
 - If another task is already active, warn before overwriting.
 - If the chain fails, inspect `{chain_dir}` for partial output.
+- If the grill-agent produces a usable `## Interview summary` but the chain is
+  rejected before the worker step, do not re-interview. Re-run only the worker
+  step against `{chain_dir}/interview/summary.md` or manually create the task
+  artifacts from that summary.
+
+## Learned failure mode
+
+`grill-agent` is an interview/planning step, not an implementation step. It is
+expected to finish without repository edits. The chain therefore sets
+`acceptance: "attested"` and writes the interview to
+`{chain_dir}/interview/summary.md` so the harness does not reject the step for
+"completed without making edits" and so recovery can resume from the saved
+handoff.
 
 ## Constraints
 

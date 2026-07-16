@@ -62,6 +62,30 @@ function formatArtifact(a: Artifact): string {
 		.join("\n");
 }
 
+function parseSubagentNotify(
+	msg: Record<string, unknown>,
+): { agent: string; status: string; content: string } {
+	const details = msg.details as Record<string, unknown> | undefined;
+	const content = typeof msg.content === "string" ? msg.content : "";
+	let agent = (details?.agent as string | undefined) ?? "unknown";
+	let status = (details?.status as string | undefined) ?? "unknown";
+
+	const header = content.split("\n", 1)[0] ?? "";
+	const single = header.match(
+		/^Background task (completed|failed|paused): \*\*(.+?)\*\*(?:\s+\([^)]*\))?$/,
+	);
+	const grouped = header.match(/^Background tasks completed \(\d+\):\s+(.+)$/);
+	if (single) {
+		status = single[1] ?? status;
+		agent = single[2] ?? agent;
+	} else if (grouped) {
+		status = "completed";
+		agent = "subagents";
+	}
+
+	return { agent, status, content };
+}
+
 // ─── tool definitions (exported for testing) ─────────────────────────────────────
 
 export interface ToolDef {
@@ -487,19 +511,14 @@ export default function (pi: ExtensionAPI) {
 				? (priorityMap[params.priority] ?? 3)
 				: 3;
 
-			const sent = await fetch(
-				`${cfg.serverUrl.replace(/\/+$/, "")}/${cfg.topic}`,
+			const sent = await sendNtfyNotification(
 				{
-					method: "POST",
-					headers: {
-						"Content-Type": "text/plain",
-						...(cfg.token ? { Authorization: `Bearer ${cfg.token}` } : {}),
-						...(params.title ? { Title: params.title } : {}),
-						Priority: String(ntfyPriority),
-					},
-					body: params.message,
+					title: params.title,
+					message: params.message,
+					priority: ntfyPriority,
 				},
-			).then((r) => r.ok);
+				cfg,
+			);
 
 			return {
 				content: [
@@ -523,7 +542,7 @@ export default function (pi: ExtensionAPI) {
 
 		// Supervisor request: subagent called contact_supervisor
 		if (
-			msg.type === "custom" &&
+			msg.role === "custom" &&
 			msg.customType === "subagent_supervisor_request"
 		) {
 			const details = msg.details as Record<string, unknown> | undefined;
@@ -542,19 +561,22 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		// Subagent notify: async completion/failure
-		if (msg.type === "custom" && msg.customType === "subagent-notify") {
-			const details = msg.details as Record<string, unknown> | undefined;
-			const agent = (details?.agent as string) ?? "unknown";
-			const status = (details?.status as string) ?? "unknown";
+		// Subagent notify: async completion/failure/pause
+		if (msg.role === "custom" && msg.customType === "subagent-notify") {
+			const { agent, status, content } = parseSubagentNotify(msg);
+			const message = content ? content.slice(0, 500) : `${agent} ${status}.`;
 
-			if (status === "failed" || status === "paused") {
+			if (status === "completed") {
+				await sendNtfyNotification({
+					title: `✅ ${agent} completed`,
+					message,
+					tags: ["white_check_mark"],
+					priority: 2,
+				});
+			} else if (status === "failed" || status === "paused") {
 				await sendNtfyNotification({
 					title: `❌ ${agent} ${status}`,
-					message:
-						typeof msg.content === "string"
-							? msg.content.slice(0, 300)
-							: `${agent} ${status}.`,
+					message,
 					tags: ["x", "warning"],
 					priority: 5,
 				});
@@ -563,7 +585,7 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		// Control notice: needs_attention signal
-		if (msg.type === "custom" && msg.customType === "subagent_control_notice") {
+		if (msg.role === "custom" && msg.customType === "subagent_control_notice") {
 			const details = msg.details as Record<string, unknown> | undefined;
 			const agent = (details?.agent as string) ?? "unknown";
 			const reason = (details?.reason as string) ?? "unknown";
