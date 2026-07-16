@@ -155,12 +155,15 @@ Run the shared parent loop to relay grill-agent questions and approval-agent
 decisions:
 
 ```
+const chainRunId = "<id returned by subagent launch>"
+
 while (true) {
-  const finished = await wait()
+  // Supervisor-safe wait: a child blocked in contact_supervisor may not wake
+  // an unbounded wait immediately on some pi-subagents versions. Use a short
+  // bounded wait, then always inspect pending supervisor requests.
+  await wait({ id: chainRunId, timeoutMs: 5000 })
 
   const pending = await subagent_supervisor({ action: "pending" })
-  if (pending.length === 0) break  // chain completed
-
   for (const request of pending) {
     if (request.reason === "interview_request") {
       const { question, context, recommended, reasoning } =
@@ -190,6 +193,13 @@ while (true) {
       })
     }
   }
+
+  const chainStatus = await subagent({ action: "status", id: chainRunId })
+  if (chainStatus.state === "complete") break
+  if (chainStatus.state === "failed" || chainStatus.state === "paused") {
+    report: "create-task chain did not complete; inspect status and chain_dir"
+    return
+  }
 }
 ```
 
@@ -210,6 +220,10 @@ Report: task slug, number of slices, first slice slug.
   rejected before the worker step, do not re-interview. Re-run only the worker
   step against `{chain_dir}/interview/summary.md` or manually create the task
   artifacts from that summary.
+- If status shows a child blocked in `contact_supervisor` but no supervisor
+  message is visible, do not wait indefinitely. Call
+  `subagent_supervisor({ action: "pending" })`; the bounded wait loop above is
+  intentionally used to surface this pi-subagents supervisor-delivery race.
 
 ## Learned failure mode
 
