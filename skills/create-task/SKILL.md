@@ -93,7 +93,10 @@ Continue until the decision tree is fully walked.
 When done, output a structured interview summary under ## Interview summary
 that includes all confirmed decisions and the proposed slice breakdown.`,
       output: "interview/summary.md",
-      acceptance: "attested"
+      acceptance: {
+        level: "none",
+        reason: "planning/interview step only; worker finalization verifies the handoff"
+      }
     },
     {
       agent: "worker",
@@ -228,11 +231,10 @@ Report: task slug, number of slices, first slice slug.
 ## Learned failure mode
 
 `grill-agent` is an interview/planning step, not an implementation step. It is
-expected to finish without repository edits. The chain therefore sets
-`acceptance: "attested"` and writes the interview to
-`{chain_dir}/interview/summary.md` so the harness does not reject the step for
-"completed without making edits" and so recovery can resume from the saved
-handoff.
+expected to finish without repository edits. The chain therefore disables the
+generic subagent acceptance gate for this step and writes the interview to
+`{chain_dir}/interview/summary.md`. The create-task workflow's actual gate is
+the worker finalization that creates the task/slice artifacts from that handoff.
 
 ## Constraints
 

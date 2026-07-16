@@ -103,7 +103,10 @@ When done, output a structured summary under ## Interview summary that includes:
 - Confirmed failure modes (at least two)
 - Any user preferences or constraints discovered`,
       output: "grill/analysis.md",
-      acceptance: "attested"
+      acceptance: {
+        level: "none",
+        reason: "planning/interview step only; workflow-level checks verify the handoff"
+      }
     },
     {
       agent: "test-strategist",
@@ -119,7 +122,11 @@ strategy, key scenarios, edge cases, error handling, and failure mode
 coverage. Persist it as a ## Test plan section in the slice doc.
 
 If you have uncertainties, include ## Questions for the user in your output.`,
-      output: "strategy/result.md"
+      output: "strategy/result.md",
+      acceptance: {
+        level: "none",
+        reason: "planning-doc update only; parent approval and final checks verify the result"
+      }
     },
     {
       agent: "approval-agent",
@@ -137,7 +144,11 @@ final verification via contact_supervisor({ reason: "need_decision" }).
 
 If changes are requested, update the slice doc with edit and re-present.
 Loop until approved or changes exhausted.`,
-      output: "approval/result.md"
+      output: "approval/result.md",
+      acceptance: {
+        level: "none",
+        reason: "interactive approval step; supervisor approval is the acceptance signal"
+      }
     },
     {
       agent: "worker",
@@ -154,7 +165,11 @@ Loop until approved or changes exhausted.`,
    - task_state_set last_action start-slice analysed <slice-slug>
    - task_state_set next_action implement-slice <slice-slug>
 5. Commit: docs(slice): add test plan for <slice-slug>`,
-      output: "final/result.md"
+      output: "final/result.md",
+      acceptance: {
+        level: "none",
+        reason: "docs/workflow finalization; parent verifies frontmatter and test plan after completion"
+      }
     }
   ]
 })
@@ -297,8 +312,14 @@ Report: "Slice `<slug>` analysed — test plan written. Ready for
 - Failure modes before strategy — understand what can break before designing how to catch it.
 - Don't start implementing here.
 - `grill-agent` is an interview/planning step, not an implementation step. It
-  is expected to finish without repository edits; the chain marks it
-  `acceptance: "attested"` and stores its handoff in `{chain_dir}/grill/analysis.md`.
+  is expected to finish without repository edits; the chain disables the
+  generic subagent acceptance gate for this step and stores its handoff in
+  `{chain_dir}/grill/analysis.md`.
+- Generic subagent acceptance is disabled for all start-slice chain steps because
+  the workflow has its own gates: user approval, worker finalization, and parent
+  verification of slice frontmatter plus the `## Test plan` section. This avoids
+  implementation-oriented evidence requirements such as `tests-added` on a
+  planning-only workflow.
 - **Do not interrupt the chain.** The grill-agent can be slow while exploring
   the codebase — this is expected. Only interrupt if the chain has had zero
   activity for 15+ minutes. Use `subagent({ action: "status" })` to check

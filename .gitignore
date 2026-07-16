@@ -6,3 +6,5 @@ __pycache__/
 *.pyc
 /result
 /.vscode/
+# Pi runtime artifacts
+/.pi-subagents/
