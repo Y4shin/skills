@@ -199,3 +199,39 @@ describe("extensions behave inside a real session", () => {
 		expect(subagentWarning).toBeUndefined();
 	});
 });
+
+// ─── Ideas to port (sketched, not yet implemented) ───────────────────────────────
+// Origin's tests/agents.test.ts (deleted on origin, import-fixed here) tested
+// pi's built-in tools rather than this package, but it sketched several agent-
+// mechanic cases this suite doesn't yet cover. Fold these in later using the
+// harness helpers (reply / call / toolCallNames / errorToolResults):
+//
+// 1. Error recovery — a tool fails and the agent continues:
+//      s.setResponses([
+//        reply([call("read", { path: "nonexistent.txt" })]),   // read fails → ENOENT
+//        reply([call("bash", { command: "echo recovered" })]),
+//        reply("recovered"),
+//      ]);
+//    Assert the failing toolResult carries isError + ENOENT text (use
+//    errorToolResults(s.session, "read")) and that a later turn still ran.
+//
+// 2. Empty LLM response — the agent must handle an empty assistant turn:
+//      s.setResponses([reply([])]);   // fauxAssistantMessage([]) → stopReason "stop"
+//    Assert faux.state.callCount === 1 and session.prompt() didn't throw.
+//
+// 3. Multiple tool calls in one assistant turn (parallel execution):
+//      s.setResponses([
+//        reply([call("bash", { command: "echo a" }), call("bash", { command: "echo b" })]),
+//        reply("done"),
+//      ]);
+//    Assert toolCallNames(s.events) contains two "bash" entries from one call.
+//
+// 4. Leaner auth wiring — origin used the real AuthStorage.inMemory +
+//    ModelRegistry.inMemory rather than a duck-typed registry. That's cleaner
+//    than harness.fakeModelRegistry() if it survives the faux stream dispatch;
+//    verify, then swap fakeModelRegistry for the real pair.
+//
+// 5. Lightweight completion checks — faux.state.callCount and
+//    getPendingResponseCount() are cheap "the loop ran N times / drained the
+//    queue" assertions; pair them with the content assertions used above.
+

@@ -84,6 +84,21 @@ no bash subprocesses:
 | Close | `/skill:finalize-task` | Harvests knowledge, archives task |
 | Migrate | `/skill:migrate-workflow` | Converts `docs/prd/` → `docs/tasks/` |
 
+### Ad-hoc tasks
+
+For a raw idea too small for the full pipeline but still wanting full control
+(strict TDD + hard verify gate):
+
+| Step | Skill | What the agent does |
+|---|---|---|
+| Refine | `/skill:adhoc-task` | Relentless grill on the idea → spec; then a testing-strategy feedback loop |
+| Build | `/skill:adhoc-task` (chain) | `adhoc-refiner` → `tdd-worker` → `slice-verifier` |
+| Harvest | `/skill:adhoc-task` | Migrate durable knowledge (architecture, decisions, testing lessons) to permanent docs |
+
+Ad-hoc work creates **no `docs/tasks/` artifacts** — the spec is ephemeral,
+living in the chain run directory. The git branch and chain logs are the
+only audit trail. Requires `pi-subagents`.
+
 ## Full skill catalogue
 
 ### Orchestration
@@ -107,6 +122,7 @@ no bash subprocesses:
 |---|---|
 | `start-slice` | Understand the slice, decide test strategy |
 | `implement-slice` | Orchestrate build: branch → TDD → verify → land |
+| `adhoc-task` | Refine a raw idea → build under full control (ephemeral, no docs/tasks/ artifacts) |
 | `develop-tdd` | RED → GREEN → REFACTOR loop |
 | `verify-slice` | Hard gate: run lint + test, block on failure |
 | `land-slice` | Merge into task branch, archive slice, update state |

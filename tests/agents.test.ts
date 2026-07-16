@@ -16,7 +16,7 @@ import {
 	createFauxCore,
 	fauxAssistantMessage,
 	fauxToolCall,
-} from "@earendil-works/pi-ai";
+} from "../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/compat.js";
 
 // ─── Session factory ─────────────────────────────────────────────────────────────
 
