@@ -71,6 +71,9 @@ const reference = `<task_reference output>`
 
 subagent({
   async: true,
+  timeoutMs: 600_000,
+  turnBudget: { maxTurns: 50, graceTurns: 6 },
+  control: { enabled: true, needsAttentionAfterMs: 300_000, notifyChannels: ["event"] },
   chain: [
     {
       agent: "grill-agent",
