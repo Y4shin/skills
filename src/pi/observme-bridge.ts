@@ -122,7 +122,7 @@ function removeInjectedEnv(keys: string[]): void {
 
 // ─── Extension factory ──────────────────────────────────────────────────────
 
-export function observmeBridgeFactory(pi: ExtensionAPI): void {
+export default function (pi: ExtensionAPI): void {
 	// Start resolving the ObservMe API eagerly
 	apiReady = resolveApi(pi);
 

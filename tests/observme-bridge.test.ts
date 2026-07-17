@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
-import { observmeBridgeFactory } from "../src/pi/observme-bridge";
+import observmeBridgeFactory from "../src/pi/observme-bridge";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
