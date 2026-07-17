@@ -45,7 +45,7 @@ subagent({
 | **`output` paths** | Each step writes to a file: `output: "strategy/draft.md"`. Later steps reference it via `{outputs.name}` |
 | **Parallel groups** | A step can be a `parallel` group of agents running concurrently |
 | **`async: true`** | The whole chain runs in background. Parent uses `wait()` to block until completion or attention needed |
-| **Intercom detach** | When a step calls `contact_supervisor` with `need_decision` or `interview_request`, the chain **detaches** — parent gets control back, handles the interaction, resumes the child |
+| **Supervisor detach** | When a step calls `contact_supervisor` with `need_decision` or `interview_request`, the chain **detaches** via pi-subagents' native supervisor channel — parent gets control back, handles the interaction, resumes the child |
 
 ## Agent roster
 

@@ -4,7 +4,7 @@
  * Mirrors pi-subagents' `test/support/real-session-runner.ts`:
  *   - installs a `pi` binary shim that execs our supervisor-child-cli.mjs,
  *   - boots a real parent `AgentSession` backed by the faux LLM,
- *   - loads pi-subagents + pi-intercom via `additionalExtensionPaths` (so jiti's
+ *   - loads pi-subagents via `additionalExtensionPaths` (so jiti's
  *     `@mariozechner/* -> @earendil-works/*` alias map gives them the parent's
  *     module instances) and the task-workflow extension via `extensionFactories`,
  *   - registers a mocked `ask_user_question` so the headless parent can complete
@@ -45,7 +45,6 @@ import {
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const TASK_WORKFLOW_EXT = path.join(REPO_ROOT, "src/pi/index.ts");
 const PI_SUBAGENTS_EXT = path.join(REPO_ROOT, "node_modules/pi-subagents/src/extension/index.ts");
-const PI_INTERCOM_EXT = path.join(REPO_ROOT, "node_modules/pi-intercom/index.ts");
 const CHILD_CLI_PATH = fileURLToPath(new URL("./supervisor-child-cli.mjs", import.meta.url));
 
 /**
@@ -390,7 +389,7 @@ export async function runSupervisorRoundtrip(options: RunOptions = {}): Promise<
 			cwd,
 			agentDir: home,
 			settingsManager,
-			additionalExtensionPaths: [TASK_WORKFLOW_EXT, PI_SUBAGENTS_EXT, PI_INTERCOM_EXT],
+			additionalExtensionPaths: [TASK_WORKFLOW_EXT, PI_SUBAGENTS_EXT],
 			noSkills: true,
 			noPromptTemplates: true,
 			noThemes: true,
@@ -451,6 +450,7 @@ export async function runSupervisorRoundtrip(options: RunOptions = {}): Promise<
 		throw error;
 	}
 }
+
 
 // Convenience: names of tools the parent invoked, in order.
 export function toolCallNames(events: readonly AgentSessionEvent[]): string[] {

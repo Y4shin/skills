@@ -3,7 +3,7 @@
  *
  * Spawns a REAL child `pi` subprocess (via the binary shim) whose faux model
  * calls `contact_supervisor`. The parent session (real, with pi-subagents +
- * pi-intercom + task-workflow loaded) drives the create-task Step 3 parent loop:
+ * task-workflow loaded) drives the create-task Step 3 parent loop:
  *
  *   subagent(async) → wait({id}) → subagent_supervisor(pending) →
  *   ask_user_question → subagent_supervisor(reply) → subagent(status)
@@ -32,7 +32,7 @@ function launchAsyncDir(session: { messages: unknown[] }): string | undefined {
 	return undefined;
 }
 
-describe("supervisor round-trip (real pi-subagents + pi-intercom)", () => {
+describe("supervisor round-trip (pi-subagents native channel)", () => {
 	test("parent wakes on the child's contact_supervisor, asks the user, replies, and the chain completes", async () => {
 		const run = await runSupervisorRoundtrip({ respond: parentLoopResponder(), timeoutMs: 90_000 });
 
@@ -50,7 +50,7 @@ describe("supervisor round-trip (real pi-subagents + pi-intercom)", () => {
 			// parent promptly, not stall until a 60s inactivity watchdog.
 			const waitResult = toolResultTexts(run.parentSession, "wait").at(-1) ?? "";
 			expect(waitResult).toMatch(/attention/i);
-			expect(waitResult).not.toMatch(/Waited 1m/); // fast-path wake, not the watchdog fallback
+			expect(waitResult).not.toMatch(/Waited \d+m(?!s)\b/);
 
 			// The parent surfaced the child's interview_request before replying.
 			const pendingResults = toolResultTexts(run.parentSession, "subagent_supervisor")
