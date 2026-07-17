@@ -191,10 +191,9 @@ decisions:
 const chainRunId = "<id returned by subagent launch>"
 
 while (true) {
-  // Supervisor-safe wait: a child blocked in contact_supervisor may not wake
-  // an unbounded wait immediately on some pi-subagents versions. Use a short
-  // bounded wait, then always inspect pending supervisor requests.
-  await wait({ id: chainRunId, timeoutMs: 5000 })
+  // Event-driven wait: wake on completion or a child needing attention, then
+  // inspect any pending supervisor requests before checking chain state.
+  await wait({ id: chainRunId })
 
   const pending = await subagent_supervisor({ action: "pending" })
   for (const request of pending) {
@@ -333,7 +332,7 @@ Report: "Slice `<slug>` analysed — test plan written. Ready for
   try to compensate by editing the slice doc directly.
 - If status shows a child blocked in `contact_supervisor` but no supervisor
   message is visible, do not wait indefinitely. Call
-  `subagent_supervisor({ action: "pending" })`; the bounded wait loop above is
+  `subagent_supervisor({ action: "pending" })`; the event-driven wait loop above is
   intentionally used to surface this pi-subagents supervisor-delivery race.
 - **Verify chain completion before reporting success.** After `wait()` returns,
   check the chain's actual `status.json` via
