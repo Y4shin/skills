@@ -12,5 +12,6 @@ flake.lock
 flake.nix
 .claude-plugin/
 .claude/
+.pi/
 docs/plan-generic-profile.md
 .venv/
