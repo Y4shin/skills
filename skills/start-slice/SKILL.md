@@ -191,8 +191,10 @@ decisions:
 const chainRunId = "<id returned by subagent launch>"
 
 while (true) {
-  // Event-driven wait: wake on completion or a child needing attention, then
-  // inspect any pending supervisor requests before checking chain state.
+  // Detached foreground runs keep the turn alive here. Do not run sleep
+  // timers or polling loops just to wait for it. wait() wakes on completion
+  // or attention, then we inspect any pending supervisor requests before
+  // checking state.
   await wait({ id: chainRunId })
 
   const pending = await subagent_supervisor({ action: "pending" })

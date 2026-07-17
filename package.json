@@ -1,6 +1,6 @@
 {
   "name": "task-workflow",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Task workflow: task → slices → TDD → finalize. Pi extension.",
   "keywords": [
     "pi-package"
