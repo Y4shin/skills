@@ -85,6 +85,10 @@ function implementSliceSteps(slice, index, total) {
   return [
     {
       agent: "worker",
+      as: "setup",
+      phase: "Preparation",
+      label: "Prepare branch for slice",
+      outputMode: "file-only",
       task: `Prepare the implementation branch for slice "${sliceSlug}"
 (task: "${taskSlug}"). Slice ${index + 1} of ${total}.
 
@@ -113,6 +117,10 @@ function implementSliceSteps(slice, index, total) {
     },
     {
       agent: "tdd-worker",
+      as: "tdd",
+      phase: "Implementation",
+      label: "TDD cycle",
+      outputMode: "file-only",
       task: `Implement slice "${sliceSlug}" for task "${taskSlug}"
 using strict TDD. Slice ${index + 1} of ${total}.
 
@@ -151,6 +159,10 @@ Include a ## Divergence from plan section:
     },
     {
       agent: "slice-verifier",
+      as: "verify",
+      phase: "Verification",
+      label: "Run lint and tests",
+      outputMode: "file-only",
       task: `Verify slice "${sliceSlug}" for task "${taskSlug}".
 Slice ${index + 1} of ${total}.
 
@@ -166,6 +178,9 @@ Only proceed if both are clean.`,
     },
     {
       agent: "worker",
+      as: "diverge",
+      phase: "Divergence",
+      label: "Check plan divergence",
       task: `Check for plan divergence that could affect remaining slices.
 Slice ${index + 1} of ${total}.
 
@@ -204,6 +219,10 @@ If significant divergences exist:
     },
     {
       agent: "worker",
+      as: "land",
+      phase: "Landing",
+      label: "Merge and archive slice",
+      outputMode: "file-only",
       task: `Land slice "${sliceSlug}" for task "${taskSlug}".
 Slice ${index + 1} of ${total}.${isLast ? " LAST SLICE." : ""}
 
@@ -255,6 +274,8 @@ pendingSlices.forEach((slice, i) => {
 
 subagent({
   async: true,
+  timeoutMs: 600_000,
+  turnBudget: { maxTurns: 60, graceTurns: 8 },
   chain: allSteps
 })
 ```
@@ -356,6 +377,9 @@ while (true) {
           chain: [
             {
               agent: "tdd-worker",
+              as: "retry-tdd",
+              phase: "Implementation",
+              label: "TDD continuation (retry)",
               task: `CONTINUATION (attempt ${retries + 1}): Implement slice "${sliceSlug}"
 for task "${taskSlug}" using strict TDD.
 Slice ${failedIndex + 1} of ${pendingSlices.length}.
@@ -373,8 +397,11 @@ Follow the strict TDD cycle.`,
             },
             {
               agent: "slice-verifier",
+              as: "retry-verify",
+              phase: "Verification",
+              label: "Verify (retry)",
+              outputMode: "file-only",
               task: `Verify slice "${sliceSlug}" for task "${taskSlug}".
-Slice ${failedIndex + 1} of ${pendingSlices.length}.
 
 Slice doc: ${slicePath}
 
@@ -425,6 +452,9 @@ Stop on first failure.`,
           remainingSteps.push(
             {
               agent: "worker",
+              as: "retry-diverge",
+              phase: "Divergence",
+              label: "Divergence check (retry)",
               task: `Check for plan divergence for slice "${sliceSlug}".
 Slice ${failedIndex + 1} of ${pendingSlices.length}.
 Read {chain_dir}/tdd/${sliceSlug}-result.md and ${slicePath}.
@@ -439,8 +469,11 @@ use contact_supervisor({ reason: "need_discussion" }).`,
             },
             {
               agent: "worker",
+              as: "retry-land",
+              phase: "Landing",
+              label: "Merge and archive (retry)",
+              outputMode: "file-only",
               task: `Land slice "${sliceSlug}" for task "${taskSlug}".
-Slice ${failedIndex + 1} of ${pendingSlices.length}.
 Merge, record done, archive, commit.`,
               output: `land/${sliceSlug}-result.md`
             }

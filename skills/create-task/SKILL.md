@@ -82,6 +82,9 @@ subagent({
   chain: [
     {
       agent: "grill-agent",
+      as: "task-summary",
+      phase: "Planning",
+      label: "Interview: define task and slice breakdown",
       task: `Interview the user to define a new task.
 
 Project context (from task_profile):
@@ -113,6 +116,9 @@ includes all confirmed decisions and the proposed slice breakdown
     },
     {
       agent: "grill-agent",
+      as: "testing-summary",
+      phase: "Planning",
+      label: "Interview: testing strategy per slice",
       task: `Interview the user about testing strategy for every slice.
 
 Read {chain_dir}/interview/task-summary.md for the task definition and
@@ -142,6 +148,10 @@ that includes, for each slice: layer analysis, confirmed failure modes
     },
     {
       agent: "test-strategist",
+      as: "strategy",
+      phase: "Planning",
+      label: "Write test plans from interviews",
+      outputMode: "file-only",
       task: `Write a test plan for every slice from the interview summaries.
 
 Read {chain_dir}/interview/task-summary.md for the task definition
@@ -169,6 +179,10 @@ If you have uncertainties, include ## Questions for the user in your output.`,
     },
     {
       agent: "approval-agent",
+      as: "approval",
+      phase: "Approval",
+      label: "User approves all test strategies",
+      outputMode: "file-only",
       task: `Present the COMPLETE testing strategy for ALL slices and get
 one-shot user approval.
 
@@ -193,6 +207,10 @@ changes exhausted.`,
     },
     {
       agent: "worker",
+      as: "task-artifacts",
+      phase: "Landing",
+      label: "Create task and slice docs",
+      outputMode: "file-only",
       task: `Create the task doc and all slice docs with their approved test plans.
 
 Read {chain_dir}/approval/result.md to confirm approval.

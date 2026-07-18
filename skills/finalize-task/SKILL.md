@@ -69,9 +69,15 @@ const taskPath = "docs/tasks/<task-slug>/task.md"
 
 subagent({
   async: true,
+  timeoutMs: 300_000,
+  turnBudget: { maxTurns: 30, graceTurns: 5 },
   chain: [
     {
       agent: "worker",
+      as: "ci-harvest",
+      phase: "Cleanup",
+      label: "Run CI gate and harvest knowledge",
+      outputMode: "file-only",
       task: `Run the CI gate and harvest knowledge for task "${taskSlug}".
 
 Task doc: ${taskPath}
@@ -97,6 +103,10 @@ Task doc: ${taskPath}
     },
     {
       agent: "task-summarizer",
+      as: "changelog",
+      phase: "Changelog",
+      label: "Write changelog entry",
+      outputMode: "file-only",
       task: `Write a changelog entry for task "${taskSlug}".
 
 Task doc: ${taskPath}
@@ -113,6 +123,10 @@ Task doc: ${taskPath}
     },
     {
       agent: "worker",
+      as: "archive",
+      phase: "Landing",
+      label: "Archive task and merge to main",
+      outputMode: "file-only",
       task: `Archive task "${taskSlug}" and integrate into main.
 
 Task doc: ${taskPath}

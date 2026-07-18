@@ -118,6 +118,9 @@ const chain = []
 if (needs.taskDefinition) {
   chain.push({
     agent: "grill-agent",
+    as: "task-def",
+    phase: "Planning",
+    label: "Interview: revise task definition",
     task: `Revise the task definition for "${taskSlug}".
 
 Current task doc: docs/tasks/${taskSlug}/task.md
@@ -155,6 +158,9 @@ if (needs.sliceTesting.length > 0) {
 
   chain.push({
     agent: "grill-agent",
+    as: "slice-testing",
+    phase: "Planning",
+    label: "Interview: testing strategy per slice",
     task: `Interview about testing strategy for specific slices.
 
 ${taskContext}
@@ -191,6 +197,10 @@ if (needs.slicePlanGeneration.length > 0) {
 
   chain.push({
     agent: "test-strategist",
+    as: "strategy",
+    phase: "Planning",
+    label: "Write revised test plans",
+    outputMode: "file-only",
     task: `Write test plans for specific slices.
 
 ${strategySource}
@@ -218,6 +228,9 @@ If you have uncertainties, include ## Questions for the user.`,
 if (needs.slicePlanGeneration.length > 0) {
   chain.push({
     agent: "approval-agent",
+    as: "approval",
+    phase: "Approval",
+    label: "User approves revisions",
     task: `Present the test strategies for approval.
 
 Read every test plan from {chain_dir}/test-plans/.
@@ -243,6 +256,10 @@ const workerTask = buildWorkerTask()
 
 chain.push({
   agent: "worker",
+  as: "apply",
+  phase: "Landing",
+  label: "Apply all revisions",
+  outputMode: "file-only",
   task: workerTask,
   output: "revise/result.md"
 })
@@ -293,7 +310,7 @@ function buildWorkerTask() {
 ## Step 4 — Launch and run parent loop
 
 ```
-const chainRunId = subagent({ async: true, chain })
+const chainRunId = subagent({ async: true, timeoutMs: 600_000, turnBudget: { maxTurns: 50, graceTurns: 6 }, chain })
 
 while (true) {
   await wait({ id: chainRunId })

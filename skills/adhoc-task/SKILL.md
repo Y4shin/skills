@@ -96,17 +96,31 @@ first step writes the spec there, the later steps read it.
 
 ```
 subagent({
+  async: true,
+  timeoutMs: 300_000,
+  turnBudget: { maxTurns: 30, graceTurns: 5 },
   chain: [
     {
       agent: "adhoc-refiner",
+      as: "refine",
+      phase: "Planning",
+      label: "Crystallize ephemeral spec",
+      outputMode: "file-only",
       task: "Crystallize the confirmed ad-hoc spec + test plan into {chain_dir}/task.md.\n\nTitle: <title>\nSlug: <slug>\nBranch: <chosen-branch>\n\nImplementation spec:\n<confirmed spec from Step 1 — behaviour, boundaries, out-of-scope, acceptance criteria>\n\nTesting strategy:\n<confirmed test plan from Step 2 — types, scenarios, edge cases, failure modes>\n\nResolve the Run command from docs/testing.md / package.json / Makefile / CI. Do not ask the user."
     },
     {
       agent: "tdd-worker",
+      as: "build",
+      phase: "Implementation",
+      label: "TDD: implement spec",
       task: "Implement the spec at {chain_dir}/task.md via strict TDD (RED → GREEN → REFACTOR).\n\nThere is no parent task doc and no slice branch. Work on the current branch (already set to <chosen-branch>); do not create or switch branches. Derive every assertion from the spec's acceptance criteria and Test plan. Run the full suite before finishing."
     },
     {
       agent: "slice-verifier",
+      as: "verify",
+      phase: "Verification",
+      label: "Run lint and tests",
+      outputMode: "file-only",
       task: "Verify the ad-hoc work against {chain_dir}/task.md. Run lint and the test Run command from the doc's ## Test plan. Block on any failure."
     }
   ]

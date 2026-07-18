@@ -83,9 +83,15 @@ const taskPath = "docs/tasks/<task-slug>/task.md"
 
 subagent({
   async: true,
+  timeoutMs: 600_000,
+  turnBudget: { maxTurns: 60, graceTurns: 8 },
   chain: [
     {
       agent: "worker",
+      as: "setup",
+      phase: "Preparation",
+      label: "Prepare branch and sync",
+      outputMode: "file-only",
       task: `Prepare the implementation branch for slice "${sliceSlug}"
 (task: "${taskSlug}").
 
@@ -107,6 +113,10 @@ subagent({
     },
     {
       agent: "tdd-worker",
+      as: "implementation",
+      phase: "Implementation",
+      label: "TDD cycle",
+      outputMode: "file-only",
       task: `Implement slice "${sliceSlug}" for task "${taskSlug}" using strict TDD.
 
 Slice doc: ${slicePath}
@@ -152,6 +162,10 @@ In your output, include a ## Divergence from plan section:
     },
     {
       agent: "slice-verifier",
+      as: "verify",
+      phase: "Verification",
+      label: "Run lint and tests",
+      outputMode: "file-only",
       task: `Verify slice "${sliceSlug}" for task "${taskSlug}".
 
 Slice doc: ${slicePath}
@@ -168,6 +182,9 @@ Only proceed if both are clean.`,
     },
     {
       agent: "worker",
+      as: "divergence-check",
+      phase: "Divergence",
+      label: "Check for plan divergence",
       task: `Check for plan divergence that could affect remaining slices.
 
 Read {chain_dir}/tdd/result.md for the ## Divergence from plan section
@@ -213,6 +230,10 @@ If significant divergences exist:
     },
     {
       agent: "worker",
+      as: "land",
+      phase: "Landing",
+      label: "Merge and archive slice",
+      outputMode: "file-only",
       task: `Land slice "${sliceSlug}" for task "${taskSlug}".
 
 Slice doc: ${slicePath}
@@ -348,6 +369,9 @@ while (true) {
           chain: [
             {
               agent: "tdd-worker",
+              as: "retry-tdd",
+              phase: "Implementation",
+              label: "TDD continuation (retry)",
               task: `CONTINUATION (attempt ${retries + 1}): Implement slice "${sliceSlug}"
 for task "${taskSlug}" using strict TDD.
 
@@ -365,6 +389,10 @@ pick up from the first unfinished acceptance criterion.`,
             },
             {
               agent: "slice-verifier",
+              as: "retry-verify",
+              phase: "Verification",
+              label: "Verify (retry)",
+              outputMode: "file-only",
               task: `Verify slice "${sliceSlug}" for task "${taskSlug}".
 
 Slice doc: ${slicePath}
@@ -413,6 +441,9 @@ If lint fails: STOP. If tests fail: STOP.`,
               chain: [
                 {
                   agent: "worker",
+                  as: "retry-diverge",
+                  phase: "Divergence",
+                  label: "Divergence check (retry)",
                   task: `Check for plan divergence that could affect remaining slices.
 
 Read {chain_dir}/tdd/result.md for the ## Divergence from plan section
@@ -439,6 +470,10 @@ If significant divergences exist:
                 },
                 {
                   agent: "worker",
+                  as: "retry-land",
+                  phase: "Landing",
+                  label: "Merge and archive (retry)",
+                  outputMode: "file-only",
                   task: `Land slice "${sliceSlug}" for task "${taskSlug}".
 
 Slice doc: ${slicePath}
