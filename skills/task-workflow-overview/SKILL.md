@@ -57,20 +57,22 @@ For anything that *creates or changes* artifacts, invoke the matching skill:
 | --- | --- |
 | Resume after interruption | `/skill:resume-workflow` |
 | New task or epic (with test strategies) | `/skill:create-task` |
+| Revise a task or (re-)analyse slices | `/skill:revise-task` |
 | Build all remaining slices autonomously | `/skill:pipeline-slices` |
 | Build a single slice (TDD) | `/skill:implement-slice` |
 | Close out a task (or epic) | `/skill:finalize-task` |
 | Migrate from old prd-workflow | `/skill:migrate-workflow` |
 | Init a fresh repo | `/skill:onboard-workflow` |
 
-**Orchestrator skills** (`create-task`, `implement-slice`, `pipeline-slices`,
-`finalize-task`) dispatch subagent chains for heavy-lifting work. The chains
+**Orchestrator skills** (`create-task`, `revise-task`, `implement-slice`,
+`pipeline-slices`, `finalize-task`) dispatch subagent chains for heavy-lifting work. The chains
 may pause for user input via `contact_supervisor` only when necessary.
 
 | Chain | Steps |
 | --- | --- |
 | **create-task** | grill-agent → test-strategist → approval-agent → worker |
 | **implement-slice** | worker → tdd-worker → slice-verifier → worker (diverge) → worker (land) |
+| **revise-task** | Dynamic: composes grill-agent → [grill-agent] → [test-strategist] → [approval-agent] → worker based on what needs changing |
 | **pipeline-slices** | For each slice: worker (setup) → tdd-worker → slice-verifier → worker (diverge) → worker (land) |
 | **finalize-task** | worker → task-summarizer → worker |
 

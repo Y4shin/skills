@@ -131,6 +131,12 @@ only audit trail. Requires `pi-subagents`.
 |---|---|
 | `finalize-task` | Hard CI gate, harvest knowledge, archive task |
 
+### Revision
+
+| Skill | Purpose |
+|---|---|
+| `revise-task` | Dynamically compose a chain to revise a task or (re-)analyse slices. Handles pre-v1.2.0 unanalysed slices, task scope changes, test plan updates, and metadata-only changes. |
+
 ### Infrastructure
 
 | Skill | Purpose |
