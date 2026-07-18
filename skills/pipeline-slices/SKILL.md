@@ -317,8 +317,187 @@ while (true) {
   const chainStatus = await subagent({ action: "status", id: chainRunId })
   if (chainStatus.state === "complete") break
   if (chainStatus.state === "failed" || chainStatus.state === "paused") {
-    report: "pipeline chain did not complete; inspect status and chain_dir"
-    return
+    // Detect which slice's tdd-worker failed by checking output files.
+    // The chain processes slices sequentially, so the first slice without
+    // a tdd result is the one that failed.
+    let failedSlice = null
+    let failedIndex = -1
+    for (let i = 0; i < pendingSlices.length; i++) {
+      const s = pendingSlices[i]
+      const tddPath = `{chain_dir}/tdd/${s.slug}-result.md`
+      const exists = bash(`test -f ${tddPath} && echo yes || echo no`).trim()
+      if (exists === "no") {
+        failedSlice = s
+        failedIndex = i
+        break
+      }
+    }
+
+    if (failedSlice) {
+      let retries = 0
+      const maxRetries = 2
+      const sliceSlug = failedSlice.slug
+      const slicePath = `docs/tasks/${taskSlug}/slices/${failedIndex + 1}-${sliceSlug}.md`
+
+      while (retries < maxRetries) {
+        retries++
+        report: `tdd-worker for ${sliceSlug} did not complete (attempt ${retries}/${maxRetries + 1}). Retrying…`
+
+        // Check if there's partial output
+        const tddResultPath = `{chain_dir}/tdd/${sliceSlug}-result.md`
+        let priorOutput = ""
+        const hasPartial = bash(`test -f ${tddResultPath} && echo yes || echo no`).trim()
+        if (hasPartial === "yes") {
+          priorOutput = bash(`cat ${tddResultPath}`)
+        }
+
+        const retryRunId = subagent({
+          async: true,
+          chain: [
+            {
+              agent: "tdd-worker",
+              task: `CONTINUATION (attempt ${retries + 1}): Implement slice "${sliceSlug}"
+for task "${taskSlug}" using strict TDD.
+Slice ${failedIndex + 1} of ${pendingSlices.length}.
+
+Slice doc: ${slicePath}
+Task doc: ${taskPath}
+
+The previous attempt did not complete.${hasPartial === "yes" ? ` Here is what was accomplished:
+
+${priorOutput}
+
+Continue from where the previous attempt left off.` : " Start from scratch."} Do NOT redo completed work.
+Follow the strict TDD cycle.`,
+              output: `tdd/${sliceSlug}-result.md`
+            },
+            {
+              agent: "slice-verifier",
+              task: `Verify slice "${sliceSlug}" for task "${taskSlug}".
+Slice ${failedIndex + 1} of ${pendingSlices.length}.
+
+Slice doc: ${slicePath}
+
+Run lint, then tests from ## Test plan → Run command.
+Stop on first failure.`,
+              output: `verify/${sliceSlug}-result.md`
+            }
+          ]
+        })
+
+        // Wait for retry, relay interview requests
+        while (true) {
+          await wait({ id: retryRunId })
+          const pendingRetry = await subagent_supervisor({ action: "pending" })
+          for (const req of pendingRetry) {
+            if (req.reason === "interview_request") {
+              const { question, context, recommended, reasoning } =
+                JSON.parse(req.interview)
+              const answer = await ask_user_question({
+                header: "Uncertain",
+                question: `**Context:** ${context}\n\n**Question:** ${question}\n\n**Recommended:** ${recommended}\n\n**Reasoning:** ${reasoning}`,
+                options: [
+                  { label: `Accept: ${recommended.slice(0, 55)}`,
+                    description: "Agree with the recommended answer." },
+                  { label: "Custom answer",
+                    description: "Provide a different answer." }
+                ]
+              })
+              await subagent_supervisor({
+                action: "reply",
+                replyTo: req.id,
+                message: JSON.stringify({ answer })
+              })
+            }
+          }
+          const retryStatus = await subagent({ action: "status", id: retryRunId })
+          if (retryStatus.state === "complete") break
+          if (retryStatus.state === "failed" || retryStatus.state === "paused") break
+        }
+
+        const retryFinalStatus = await subagent({ action: "status", id: retryRunId })
+        if (retryFinalStatus.state === "complete") {
+          // Retry succeeded — rebuild the remaining chain (diverge + land
+          // for this slice, then all remaining slices in full) and launch
+          const remainingSteps = []
+
+          // Diverge + land for the retried slice
+          remainingSteps.push(
+            {
+              agent: "worker",
+              task: `Check for plan divergence for slice "${sliceSlug}".
+Slice ${failedIndex + 1} of ${pendingSlices.length}.
+Read {chain_dir}/tdd/${sliceSlug}-result.md and ${slicePath}.
+If no significant divergences, output "no significant divergence".
+If significant divergences affect remaining slices,
+use contact_supervisor({ reason: "need_discussion" }).`,
+              output: `diverge/${sliceSlug}-result.md`,
+              acceptance: {
+                level: "none",
+                reason: "interactive divergence discussion"
+              }
+            },
+            {
+              agent: "worker",
+              task: `Land slice "${sliceSlug}" for task "${taskSlug}".
+Slice ${failedIndex + 1} of ${pendingSlices.length}.
+Merge, record done, archive, commit.`,
+              output: `land/${sliceSlug}-result.md`
+            }
+          )
+
+          // Append remaining slices (full implementSliceSteps)
+          for (let j = failedIndex + 1; j < pendingSlices.length; j++) {
+            remainingSteps.push(...implementSliceSteps(pendingSlices[j], j, pendingSlices.length))
+          }
+
+          const tailRunId = subagent({
+            async: true,
+            chain: remainingSteps
+          })
+
+          // Relay any divergence discussions from the tail
+          while (true) {
+            await wait({ id: tailRunId })
+            const pendingTail = await subagent_supervisor({ action: "pending" })
+            for (const req of pendingTail) {
+              if (req.reason === "need_discussion") {
+                const { summary, affectedSlices, recommendation, options } =
+                  JSON.parse(req.discussion)
+                const decision = await ask_user_question({
+                  header: "Diverged",
+                  question: `**What diverged:** ${summary}\n\n**Affected slices:** ${affectedSlices}\n\n**Recommendation:** ${recommendation}`,
+                  options: options.map(opt => ({
+                    label: opt.label,
+                    description: opt.description
+                  }))
+                })
+                await subagent_supervisor({
+                  action: "reply",
+                  replyTo: req.id,
+                  message: JSON.stringify({ decision })
+                })
+              }
+            }
+            const tailStatus = await subagent({ action: "status", id: tailRunId })
+            if (tailStatus.state === "complete") break
+            if (tailStatus.state === "failed" || tailStatus.state === "paused") {
+              report: "tail chain did not complete; inspect chain_dir"
+              return
+            }
+          }
+          break  // Retry succeeded
+        }
+      }
+
+      if (retries >= maxRetries) {
+        report: `tdd-worker for ${sliceSlug} did not complete after ${maxRetries + 1} attempts. Inspect {chain_dir}/tdd/${sliceSlug}-result.md.`
+        return
+      }
+    } else {
+      report: "pipeline chain did not complete; inspect status and chain_dir"
+      return
+    }
   }
 }
 ```

@@ -326,8 +326,196 @@ while (true) {
   const chainStatus = await subagent({ action: "status", id: chainRunId })
   if (chainStatus.state === "complete") break
   if (chainStatus.state === "failed" || chainStatus.state === "paused") {
-    report: "implement-slice chain did not complete; inspect status and chain_dir"
-    return
+    // Check if tdd-worker exhausted its turn budget (the most common
+    // failure mode). If so, retry with learnings from the partial output.
+    const tddResultPath = "{chain_dir}/tdd/result.md"
+    const tddResultExists = bash(`test -f ${tddResultPath} && echo yes || echo no`).trim()
+
+    if (tddResultExists === "yes") {
+      let retries = 0
+      const maxRetries = 2
+
+      while (retries < maxRetries) {
+        retries++
+        report: `tdd-worker did not complete (attempt ${retries}/${maxRetries + 1}). Retrying with prior output…`
+
+        // Read partial output for context on what remains
+        const priorOutput = bash(`cat ${tddResultPath}`)
+
+        // Re-launch tdd-worker with continuation context
+        const retryRunId = subagent({
+          async: true,
+          chain: [
+            {
+              agent: "tdd-worker",
+              task: `CONTINUATION (attempt ${retries + 1}): Implement slice "${sliceSlug}"
+for task "${taskSlug}" using strict TDD.
+
+Slice doc: ${slicePath}
+Task doc: ${taskPath}
+
+The previous attempt did not complete. Here is what was accomplished:
+
+${priorOutput}
+
+Continue from where the previous attempt left off. Follow the same
+strict TDD cycle. Do NOT redo work that was already completed —
+pick up from the first unfinished acceptance criterion.`,
+              output: "tdd/result.md"
+            },
+            {
+              agent: "slice-verifier",
+              task: `Verify slice "${sliceSlug}" for task "${taskSlug}".
+
+Slice doc: ${slicePath}
+
+Run the quality gate:
+1. Find and run the lint command. Skip with warning if none configured.
+2. Find and run the test command from ## Test plan → Run command.
+
+If lint fails: STOP. If tests fail: STOP.`,
+              output: "verify/result.md"
+            }
+          ]
+        })
+
+        // Wait for retry chain, relay any interview requests
+        while (true) {
+          await wait({ id: retryRunId })
+          const pendingRetry = await subagent_supervisor({ action: "pending" })
+          for (const req of pendingRetry) {
+            if (req.reason === "interview_request") {
+              const { question, context, recommended, reasoning } =
+                JSON.parse(req.interview)
+              const answer = await ask_user_question({
+                header: "Uncertain",
+                question: `**Context:** ${context}\n\n**Question:** ${question}\n\n**Recommended:** ${recommended}\n\n**Reasoning:** ${reasoning}`,
+                options: [
+                  { label: `Accept: ${recommended.slice(0, 55)}`,
+                    description: "Agree with the recommended answer." },
+                  { label: "Custom answer",
+                    description: "Provide a different answer." }
+                ]
+              })
+              await subagent_supervisor({
+                action: "reply",
+                replyTo: req.id,
+                message: JSON.stringify({ answer })
+              })
+            }
+          }
+          const retryStatus = await subagent({ action: "status", id: retryRunId })
+          if (retryStatus.state === "complete") {
+            // Retry succeeded — patch the main chain status by manually
+            // running the remaining steps (diverge + land)
+            const tailRunId = subagent({
+              async: true,
+              chain: [
+                {
+                  agent: "worker",
+                  task: `Check for plan divergence that could affect remaining slices.
+
+Read {chain_dir}/tdd/result.md for the ## Divergence from plan section
+and any ## Significant divergences.
+
+Read the slice doc at ${slicePath} for the original plan.
+
+If NO significant divergences: output "no significant divergence" and stop.
+
+If significant divergences exist:
+1. Read the task doc at ${taskPath}.
+2. Read EVERY remaining slice doc at docs/tasks/${taskSlug}/slices/.
+3. For each remaining slice, determine if the divergence affects it.
+4. If NO remaining slices are affected: explain why. Proceed.
+5. If any remaining slices ARE affected, use
+   contact_supervisor({ reason: "need_discussion" }) with summary,
+   affectedSlices, recommendation, and options.
+   After the supervisor replies, apply updates. Output "divergence handled".`,
+                  output: "diverge/result.md",
+                  acceptance: {
+                    level: "none",
+                    reason: "interactive divergence discussion"
+                  }
+                },
+                {
+                  agent: "worker",
+                  task: `Land slice "${sliceSlug}" for task "${taskSlug}".
+
+Slice doc: ${slicePath}
+Task doc: ${taskPath}
+
+1. Read the slice doc and {chain_dir}/tdd/result.md.
+2. Merge into task branch:
+   git checkout task/${taskSlug}
+   git merge --no-ff slice/${sliceSlug} -m "slice(${taskSlug}): <slice title>"
+   git branch -d slice/${sliceSlug}
+3. Record completion:
+   task_set ${slicePath} status done
+   task_set ${slicePath} completed_at <ISO now>
+4. Append implementation note to task's ## Implementation notes.
+5. Archive the slice:
+   mkdir -p docs/tasks/${taskSlug}/slices/archive
+   git mv ${slicePath} docs/tasks/${taskSlug}/slices/archive/<n>-<slug>.md
+6. Commit: git add docs/tasks/ && git commit -m "docs(slice): land ${sliceSlug} into ${taskSlug}"
+7. Check remaining slices. If last: set task done.
+8. Set task_state_set last_action implement-slice landed ${sliceSlug}`,
+                  output: "land/result.md"
+                }
+              ]
+            })
+
+            // Relay any divergence discussions from the tail chain
+            while (true) {
+              await wait({ id: tailRunId })
+              const pendingTail = await subagent_supervisor({ action: "pending" })
+              for (const req of pendingTail) {
+                if (req.reason === "need_discussion") {
+                  const { summary, affectedSlices, recommendation, options } =
+                    JSON.parse(req.discussion)
+                  const decision = await ask_user_question({
+                    header: "Diverged",
+                    question: `**What diverged:** ${summary}\n\n**Affected slices:** ${affectedSlices}\n\n**Recommendation:** ${recommendation}`,
+                    options: options.map(opt => ({
+                      label: opt.label,
+                      description: opt.description
+                    }))
+                  })
+                  await subagent_supervisor({
+                    action: "reply",
+                    replyTo: req.id,
+                    message: JSON.stringify({ decision })
+                  })
+                }
+              }
+              const tailStatus = await subagent({ action: "status", id: tailRunId })
+              if (tailStatus.state === "complete") break
+              if (tailStatus.state === "failed") {
+                report: "retry chain tail did not complete; inspect chain_dir"
+                return
+              }
+            }
+            break  // Retry succeeded, exit the outer retry loop
+          }
+          if (retryStatus.state === "failed" || retryStatus.state === "paused") {
+            break  // Retry also failed, fall through to next iteration or escalation
+          }
+        }
+
+        // If retry chain completed successfully, break out of retry loop
+        const finalStatus = await subagent({ action: "status", id: retryRunId })
+        if (finalStatus.state === "complete") break
+      }
+
+      // If all retries exhausted, escalate to user
+      const finalCheck = await subagent({ action: "status", id: chainRunId })
+      if (retries >= maxRetries) {
+        report: `tdd-worker did not complete after ${maxRetries + 1} attempts. Inspect {chain_dir}/tdd/result.md and decide next steps.`
+        return
+      }
+    } else {
+      report: "implement-slice chain did not complete; inspect status and chain_dir"
+      return
+    }
   }
 }
 ```

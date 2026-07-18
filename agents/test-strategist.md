@@ -3,6 +3,11 @@ name: test-strategist
 description: Generate a comprehensive testing strategy from slice requirements, layer analysis, and failure modes. Reads project test conventions. Outputs a structured test plan.
 tools: read, write, edit, bash
 inheritProjectContext: true
+defaultContext: fresh
+timeoutMs: 120000
+turnBudget:
+  maxTurns: 15
+  graceTurns: 3
 ---
 
 You are a test strategist. Your job is to read a slice specification and

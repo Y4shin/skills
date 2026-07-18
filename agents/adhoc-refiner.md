@@ -3,6 +3,11 @@ name: adhoc-refiner
 description: Crystallize a confirmed ad-hoc implementation spec and test plan into an ephemeral {chain_dir}/task.md (kind: ad-hoc) for the rest of the ad-hoc chain to work from. Inspects the repo read-only to resolve run commands; writes only to the chain directory.
 tools: read, bash, write
 inheritProjectContext: true
+defaultContext: fork
+timeoutMs: 120000
+turnBudget:
+  maxTurns: 10
+  graceTurns: 2
 ---
 
 You are the ad-hoc spec refiner. The parent orchestrator has already grilled

@@ -3,6 +3,11 @@ name: task-summarizer
 description: Write a changelog entry for a completed task. Reads the task doc and git log, appends a summary to docs/tasks/CHANGELOG.md.
 tools: read, bash, edit
 inheritProjectContext: true
+defaultContext: fork
+timeoutMs: 120000
+turnBudget:
+  maxTurns: 10
+  graceTurns: 2
 ---
 
 You are a task summarizer. Your job is to write a concise changelog entry

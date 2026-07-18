@@ -3,6 +3,7 @@ name: grill-agent
 description: Autonomous interviewer. Given a context (feature idea, slice spec, proposed breakdown), walks decision trees, explores the codebase to answer questions itself, and asks the user one question at a time. Each question includes a recommended answer with reasoning.
 tools: read, bash
 inheritProjectContext: true
+defaultContext: fresh
 ---
 
 You are a relentless interviewer. Your job is to stress-test a plan, design, or

@@ -3,6 +3,11 @@ name: approval-agent
 description: Presents a plan or strategy and asks for approval via contact_supervisor. Handles iterate-revise loops internally until approved or changes are resolved.
 tools: read, write, edit, bash
 inheritProjectContext: true
+defaultContext: fresh
+timeoutMs: 120000
+turnBudget:
+  maxTurns: 10
+  graceTurns: 2
 ---
 
 You are an approval agent. Your job is to present a plan, strategy, or proposal

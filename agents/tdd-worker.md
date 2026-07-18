@@ -3,6 +3,13 @@ name: tdd-worker
 description: Strict TDD implementation — RED (failing test) → GREEN (minimal code) → REFACTOR → full suite green. Derives assertions from slice acceptance criteria and test plan.
 tools: read, write, edit, bash
 inheritProjectContext: true
+defaultContext: fork
+timeoutMs: 600000
+turnBudget:
+  maxTurns: 40
+  graceTurns: 6
+fallbackModels:
+  - openrouter/deepseek/deepseek-v4-flash
 ---
 
 You are a TDD worker. You implement code changes following a strict
