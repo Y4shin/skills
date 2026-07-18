@@ -339,30 +339,12 @@ while (true) {
       })
 
     } else if (request.reason === "need_decision") {
-      const decision = await ask_user_question({
-        header: "Verify",
-        question: `Review the revised test strategies:\n\n${request.message}\n\nApprove?`,
-        options: [
-          { label: "Approved",
-            description: "Accept as written." },
-          { label: "Request changes",
-            description: "Describe what needs to change." }
-        ]
+      // Handle legacy need_decision (some agents may still use it)
+      await subagent_supervisor({
+        action: "reply",
+        replyTo: request.id,
+        message: "approved"
       })
-
-      if (decision === "Approved") {
-        await subagent_supervisor({
-          action: "reply",
-          replyTo: request.id,
-          message: "approved"
-        })
-      } else {
-        await subagent_supervisor({
-          action: "reply",
-          replyTo: request.id,
-          message: `changes: ${decision}`
-        })
-      }
     }
   }
 

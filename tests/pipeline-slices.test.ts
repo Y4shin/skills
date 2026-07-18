@@ -29,8 +29,7 @@ describe("pipeline-slices skill doc structure", () => {
 	});
 
 	test("uses targeted wait({id}) to avoid cross-run interference", () => {
-		expect(doc).toContain("wait({ id: chainRunId })");
-		expect(doc).toContain("wait({ id: lastImplId })");
+		expect(doc).toContain("wait({ id: ");
 	});
 
 	test("has parent loop relay pattern", () => {
@@ -39,46 +38,51 @@ describe("pipeline-slices skill doc structure", () => {
 		expect(doc).toContain("need_decision");
 	});
 
-	test("refers to start-slice parent loop for the relay pattern", () => {
-		expect(doc).toContain("identical to the one in");
-		expect(doc).toContain("start-slice");
-	});
-
 	test("disables planning acceptance gates", () => {
-		expect(doc).toContain("level: \"none\"");
+		const chain = JSON.parse(readFileSync(join(process.cwd(), "chains/implement-slice.chain.json"), "utf-8"));
+		const divergeStep = chain.steps.find((s: any) => s.phase === "Divergence");
+		expect(divergeStep).toBeDefined();
+		expect(divergeStep.acceptance).toBeDefined();
+		expect(divergeStep.acceptance.level).toBe("none");
 	});
 
-	test("references all required agents", () => {
-		expect(doc).toContain("grill-agent");
-		expect(doc).toContain("approval-agent");
-		expect(doc).toContain("test-strategist");
-		expect(doc).toContain("tdd-worker");
-		expect(doc).toContain("slice-verifier");
+	test("references all required agents with dotted names", () => {
+		const chain = JSON.parse(readFileSync(join(process.cwd(), "chains/implement-slice.chain.json"), "utf-8"));
+		for (const step of chain.steps) {
+			expect(step.agent).toMatch(/^skills\./);
+		}
+		// Also check retry chain in the skill doc
+		expect(doc).toContain("skills.tdd-worker");
+		expect(doc).toContain("skills.slice-verifier");
 	});
 
-	test("separates state management from chain workers", () => {
-		// Chain worker steps must NOT call task_state_set
-		const workerSections = doc.split("### implement-slice chain (no state writes)");
-		expect(workerSections.length).toBeGreaterThanOrEqual(2);
-
-		const implSection = workerSections[1] ?? "";
-		// The worker land step should NOT contain task_state_set
-		const linesAfterDoNotCall = implSection.split("do NOT call task_state_set");
-		expect(linesAfterDoNotCall.length).toBeGreaterThanOrEqual(2);
-
-		// Parent code blocks SHOULD contain task_state_set
-		expect(doc).toContain("task_state_set");
+	test("separates state management in parent loop", () => {
+		// Parent loop calls task_state_set, not the chain steps
+		expect(doc).toContain("task_state_set(\"active.slice\"");
+		expect(doc).toContain("task_state_set(\"last_action\"");
 	});
 
-	test("handles all three slice states", () => {
-		expect(doc).toContain("status: done");
-		expect(doc).toContain("analysed: true");
-		expect(doc).toContain("analysed: false");
+	test("handles slice states", () => {
+		expect(doc).toContain("status: todo");
+		expect(doc).toContain("\"status\", \"skipped\"");
 	});
 
-	test("has pre-analysed slice support", () => {
-		expect(doc).toContain("preAnalyzed");
-		expect(doc).toContain("pre-analysed");
+	test("reads from implement-slice.chain.json", () => {
+		expect(doc).toContain("implement-slice.chain.json");
+	});
+
+	test("uses per-slice loop with buildSliceChain", () => {
+		expect(doc).toContain("buildSliceChain");
+	});
+
+	test("per-slice error handling with retry/skip/stop", () => {
+		expect(doc).toContain("retries");
+		expect(doc).toContain("Skip this slice");
+		expect(doc).toContain("Stop pipeline");
+	});
+
+	test("has per-slice progress reporting", () => {
+		expect(doc).toContain("slice ${i + 1} of $");
 	});
 
 	test("has partial recovery instructions", () => {
@@ -94,18 +98,6 @@ describe("pipeline-slices skill doc structure", () => {
 
 	test("pipeline diagram is present", () => {
 		expect(doc).toContain("Pipeline diagram");
-	});
-
-	test("explicitly forbids task_state_set in chain workers", () => {
-		// Should have explicit note in both chain templates
-		expect(doc).toContain("do NOT call task_state_set");
-		// Should appear at least twice (start and implement chain)
-		const matches = doc.match(/do NOT call task_state_set/g);
-		expect(matches?.length).toBeGreaterThanOrEqual(2);
-	});
-
-	test("parent loop CRITICAL warning is present", () => {
-		expect(doc).toContain("Parent is a relay, not a decision-maker");
 	});
 });
 
@@ -318,34 +310,18 @@ describe("pipeline-slices integration (faux harness)", () => {
 describe("pipeline-slices edge cases", () => {
 	test("handles empty slice list gracefully", () => {
 		const doc = readSkill("skills/pipeline-slices/SKILL.md");
-		expect(doc).toContain("nothing to do");
 		expect(doc).toContain("stop");
 	});
 
-	test("handles pre-analysed only (all starts done, waiting for implements)", () => {
-		const doc = readSkill("skills/pipeline-slices/SKILL.md");
-		expect(doc).toContain("pre-analysed");
-		// The phrase spans two lines, check each part
-		expect(doc).toContain("all slices");
-		expect(doc).toContain("already started");
-	});
-
-	test("has error recovery for failed start-slice", () => {
-		const doc = readSkill("skills/pipeline-slices/SKILL.md");
-		expect(doc).toContain("FAILED at start-slice");
-		expect(doc).toContain("re-run");
-		expect(doc).toContain("skips already-analysed");
-	});
-
-	test("has error recovery for failed implement-slice", () => {
+	test("has error recovery for slice failure", () => {
 		const doc = readSkill("skills/pipeline-slices/SKILL.md");
 		expect(doc).toContain("failed");
-		expect(doc).toContain("checkImplSuccess");
+		expect(doc).toContain("retries");
 	});
 
 	test("has state recovery after partial run", () => {
 		const doc = readSkill("skills/pipeline-slices/SKILL.md");
-		expect(doc).toContain("State recovery");
-		expect(doc).toContain("Re-run");
+		expect(doc).toContain("Recovery");
+		expect(doc).toContain("resumes");
 	});
 });

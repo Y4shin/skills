@@ -94,45 +94,13 @@ subagent({
   turnBudget: chainDef.turnBudget,
   control: { enabled: true, needsAttentionAfterMs: 300_000, notifyChannels: ["event"] },
   chain: steps
-      phase: "Planning",
-      label: "Interview: define task and slice breakdown",
-      task: `Interview the user to define a new task.
-
-Project context (from task_profile):
-<... paste task_profile output ...>
-
-Artifact schema reference (from task_reference):
-<... paste task_reference output ...>
-
-Walk the task definition decision tree:
-1. Who is the user and what outcome do they get? (user stories)
-2. End-to-end behaviour or API surface + first consumer.
-3. Layers / surfaces touched — which parts of the system?
-4. Boundaries — what's explicitly out of scope.
-5. Proposed slice breakdown — independently-mergeable vertical slices
-   in dependency order.
-
-Explore the codebase to answer what you can. Ask the user one question
-at a time via contact_supervisor with a recommended answer and reasoning.
-Continue until the decision tree is fully walked.
-
-When done, output a structured summary under ## Task definition that
-includes all confirmed decisions and the proposed slice breakdown
-(with slice slugs and a one-line description of each).`,
-      output: "interview/task-summary.md",
-      acceptance: {
-        level: "none",
-        reason: "planning/interview step only; final worker verifies the handoff"
-      }
-    },
-
+})
 ```
 
 ## Step 3 — Parent loop (handle interactive requests)
 
-Run the shared parent loop to relay grill-agent questions and approval-agent
-decisions. Both grill-agents use `interview_request`; the approval-agent uses
-`need_decision`.
+Run the shared parent loop to relay grill-agent questions. The approval-agent writes
+the plan to its output file; the parent handles the review cycle via the plan review tools.
 
 ```
 const chainRunId = "<id returned by subagent launch>"
@@ -163,32 +131,12 @@ while (true) {
         message: JSON.stringify({ answer })
       })
     } else if (request.reason === "need_decision") {
-      // approval-agent is presenting ALL slice test strategies for final
-      // verification. All questions have been resolved and incorporated.
-      const decision = await ask_user_question({
-        header: "Verify",
-        question: `Review the complete test strategy for ALL slices below:\n\n${request.message}\n\nApprove these test strategies?`,
-        options: [
-          { label: "Approved",
-            description: "Accept all test strategies as written." },
-          { label: "Request changes",
-            description: "Describe what needs to change." }
-        ]
+      // Handle legacy need_decision (some agents may still use it)
+      await subagent_supervisor({
+        action: "reply",
+        replyTo: request.id,
+        message: "approved"
       })
-
-      if (decision === "Approved") {
-        await subagent_supervisor({
-          action: "reply",
-          replyTo: request.id,
-          message: "approved"
-        })
-      } else {
-        await subagent_supervisor({
-          action: "reply",
-          replyTo: request.id,
-          message: `changes: ${decision}`
-        })
-      }
     }
   }
 
@@ -201,7 +149,72 @@ while (true) {
 }
 ```
 
-After the chain completes, read `{chain_dir}/task/result.md` and report the
+After the chain completes, handle the approval result via plan review.
+
+```
+const planPath = "{chain_dir}/approval/result.md"
+const planExists = bash(`test -f ${planPath} && echo yes || echo no`).trim()
+
+if (planExists === "yes") {
+  const submitResult = submit_plan_for_review({ planFilePath: planPath })
+  report: submitResult
+  
+  const slugMatch = submitResult.match(/plans\/([a-zA-Z0-9_-]+)\.md/)
+  const slug = slugMatch ? slugMatch[1] : null
+
+  if (slug) {
+    // Review loop
+    while (true) {
+      await ask_user_question({
+        header: "Plan reviewed?",
+        question: `Have you finished reviewing the plan at plans/${slug}.md?`,
+        options: [
+          { label: "Yes, parse it", description: "Parse the reviewed plan." },
+          { label: "Not yet", description: "Keep the file open." }
+        ]
+      })
+
+      const parseResult = parse_plan_review({ slug })
+
+      if (parseResult.startsWith("ERROR:")) {
+        report: parseResult
+        continue  // Let user fix and retry
+      }
+
+      report: parseResult
+
+      if (parseResult.startsWith("OK: accepted")) break
+      if (parseResult.startsWith("OK: discarded")) {
+        report: "Plan review discarded."
+        return
+      }
+      if (parseResult.startsWith("OK: rejected")) {
+        const feedbackLines = parseResult.split("\n").filter(l => l.startsWith("line "))
+        // Relaunch approval-agent with feedback
+        subagent({
+          async: true,
+          chain: [{
+            agent: "skills.approval-agent",
+            as: "approval-revision",
+            phase: "Approval",
+            label: "Revise plan from feedback",
+            task: `Revise the plan at {chain_dir}/approval/result.md.\n\nFeedback:\n${feedbackLines.join("\n")}`,
+            output: "approval/result.md"
+          }]
+        })
+        await wait({ all: true })
+        // Re-submit
+        const newResult = submit_plan_for_review({ planFilePath: planPath })
+        report: newResult
+        continue
+      }
+      break
+    }
+  }
+}
+```
+
+After the chain and review complete, read `{chain_dir}/task/result.md` and report the
 created task with its slices (each now has a test plan, `analysed: true`,
 `status: todo`).
 

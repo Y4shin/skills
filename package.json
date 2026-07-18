@@ -33,7 +33,8 @@
       "./src/pi/index.ts",
       "./src/pi/guidelines.ts",
       "./src/pi/check-subagents.ts",
-      "./src/pi/observme-bridge.ts"
+      "./src/pi/observme-bridge.ts",
+      "./src/pi/plan-review.ts"
     ],
     "skills": [
       "./skills/create-task",
