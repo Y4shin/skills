@@ -87,7 +87,7 @@ subagent({
   turnBudget: { maxTurns: 60, graceTurns: 8 },
   chain: [
     {
-      agent: "worker",
+      agent: "skills.worker",
       as: "setup",
       phase: "Preparation",
       label: "Prepare branch and sync",
@@ -112,7 +112,7 @@ subagent({
       output: "setup/result.md"
     },
     {
-      agent: "tdd-worker",
+      agent: "skills.tdd-worker",
       as: "implementation",
       phase: "Implementation",
       label: "TDD cycle",
@@ -161,7 +161,7 @@ In your output, include a ## Divergence from plan section:
       output: "tdd/result.md"
     },
     {
-      agent: "slice-verifier",
+      agent: "skills.slice-verifier",
       as: "verify",
       phase: "Verification",
       label: "Run lint and tests",
@@ -181,7 +181,7 @@ Only proceed if both are clean.`,
       output: "verify/result.md"
     },
     {
-      agent: "worker",
+      agent: "skills.worker",
       as: "divergence-check",
       phase: "Divergence",
       label: "Check for plan divergence",
@@ -229,7 +229,7 @@ If significant divergences exist:
       }
     },
     {
-      agent: "worker",
+      agent: "skills.worker",
       as: "land",
       phase: "Landing",
       label: "Merge and archive slice",
@@ -368,7 +368,7 @@ while (true) {
           async: true,
           chain: [
             {
-              agent: "tdd-worker",
+              agent: "skills.tdd-worker",
               as: "retry-tdd",
               phase: "Implementation",
               label: "TDD continuation (retry)",
@@ -388,7 +388,7 @@ pick up from the first unfinished acceptance criterion.`,
               output: "tdd/result.md"
             },
             {
-              agent: "slice-verifier",
+              agent: "skills.slice-verifier",
               as: "retry-verify",
               phase: "Verification",
               label: "Verify (retry)",
@@ -440,7 +440,7 @@ If lint fails: STOP. If tests fail: STOP.`,
               async: true,
               chain: [
                 {
-                  agent: "worker",
+                  agent: "skills.worker",
                   as: "retry-diverge",
                   phase: "Divergence",
                   label: "Divergence check (retry)",
@@ -469,7 +469,7 @@ If significant divergences exist:
                   }
                 },
                 {
-                  agent: "worker",
+                  agent: "skills.worker",
                   as: "retry-land",
                   phase: "Landing",
                   label: "Merge and archive (retry)",

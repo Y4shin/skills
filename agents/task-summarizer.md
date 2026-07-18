@@ -8,6 +8,7 @@ timeoutMs: 120000
 turnBudget:
   maxTurns: 10
   graceTurns: 2
+package: skills
 ---
 
 You are a task summarizer. Your job is to write a concise changelog entry

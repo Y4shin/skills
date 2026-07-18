@@ -73,7 +73,7 @@ subagent({
   turnBudget: { maxTurns: 30, graceTurns: 5 },
   chain: [
     {
-      agent: "worker",
+      agent: "skills.worker",
       as: "ci-harvest",
       phase: "Cleanup",
       label: "Run CI gate and harvest knowledge",
@@ -102,7 +102,7 @@ Task doc: ${taskPath}
       output: "ci-harvest/result.md"
     },
     {
-      agent: "task-summarizer",
+      agent: "skills.task-summarizer",
       as: "changelog",
       phase: "Changelog",
       label: "Write changelog entry",
@@ -122,7 +122,7 @@ Task doc: ${taskPath}
       output: "summary/result.md"
     },
     {
-      agent: "worker",
+      agent: "skills.worker",
       as: "archive",
       phase: "Landing",
       label: "Archive task and merge to main",

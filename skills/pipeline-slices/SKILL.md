@@ -84,7 +84,7 @@ function implementSliceSteps(slice, index, total) {
 
   return [
     {
-      agent: "worker",
+      agent: "skills.worker",
       as: "setup",
       phase: "Preparation",
       label: "Prepare branch for slice",
@@ -116,7 +116,7 @@ function implementSliceSteps(slice, index, total) {
       output: `setup/${sliceSlug}-result.md`
     },
     {
-      agent: "tdd-worker",
+      agent: "skills.tdd-worker",
       as: "tdd",
       phase: "Implementation",
       label: "TDD cycle",
@@ -158,7 +158,7 @@ Include a ## Divergence from plan section:
       output: `tdd/${sliceSlug}-result.md`
     },
     {
-      agent: "slice-verifier",
+      agent: "skills.slice-verifier",
       as: "verify",
       phase: "Verification",
       label: "Run lint and tests",
@@ -177,7 +177,7 @@ Only proceed if both are clean.`,
       output: `verify/${sliceSlug}-result.md`
     },
     {
-      agent: "worker",
+      agent: "skills.worker",
       as: "diverge",
       phase: "Divergence",
       label: "Check plan divergence",
@@ -218,7 +218,7 @@ If significant divergences exist:
       }
     },
     {
-      agent: "worker",
+      agent: "skills.worker",
       as: "land",
       phase: "Landing",
       label: "Merge and archive slice",
@@ -376,7 +376,7 @@ while (true) {
           async: true,
           chain: [
             {
-              agent: "tdd-worker",
+              agent: "skills.tdd-worker",
               as: "retry-tdd",
               phase: "Implementation",
               label: "TDD continuation (retry)",
@@ -396,7 +396,7 @@ Follow the strict TDD cycle.`,
               output: `tdd/${sliceSlug}-result.md`
             },
             {
-              agent: "slice-verifier",
+              agent: "skills.slice-verifier",
               as: "retry-verify",
               phase: "Verification",
               label: "Verify (retry)",
@@ -451,7 +451,7 @@ Stop on first failure.`,
           // Diverge + land for the retried slice
           remainingSteps.push(
             {
-              agent: "worker",
+              agent: "skills.worker",
               as: "retry-diverge",
               phase: "Divergence",
               label: "Divergence check (retry)",
@@ -468,7 +468,7 @@ use contact_supervisor({ reason: "need_discussion" }).`,
               }
             },
             {
-              agent: "worker",
+              agent: "skills.worker",
               as: "retry-land",
               phase: "Landing",
               label: "Merge and archive (retry)",

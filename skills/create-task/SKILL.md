@@ -81,7 +81,7 @@ subagent({
   control: { enabled: true, needsAttentionAfterMs: 300_000, notifyChannels: ["event"] },
   chain: [
     {
-      agent: "grill-agent",
+      agent: "skills.grill-agent",
       as: "task-summary",
       phase: "Planning",
       label: "Interview: define task and slice breakdown",
@@ -115,7 +115,7 @@ includes all confirmed decisions and the proposed slice breakdown
       }
     },
     {
-      agent: "grill-agent",
+      agent: "skills.grill-agent",
       as: "testing-summary",
       phase: "Planning",
       label: "Interview: testing strategy per slice",
@@ -147,7 +147,7 @@ that includes, for each slice: layer analysis, confirmed failure modes
       }
     },
     {
-      agent: "test-strategist",
+      agent: "skills.test-strategist",
       as: "strategy",
       phase: "Planning",
       label: "Write test plans from interviews",
@@ -178,7 +178,7 @@ If you have uncertainties, include ## Questions for the user in your output.`,
       }
     },
     {
-      agent: "approval-agent",
+      agent: "skills.approval-agent",
       as: "approval",
       phase: "Approval",
       label: "User approves all test strategies",
@@ -206,7 +206,7 @@ changes exhausted.`,
       }
     },
     {
-      agent: "worker",
+      agent: "skills.worker",
       as: "task-artifacts",
       phase: "Landing",
       label: "Create task and slice docs",

@@ -10,6 +10,7 @@ turnBudget:
   graceTurns: 2
 fallbackModels:
   - openrouter/deepseek/deepseek-v4-flash
+package: skills
 ---
 
 You are a slice verifier. Your job is to run the quality gate: lint and

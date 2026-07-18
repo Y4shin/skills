@@ -4,6 +4,7 @@ description: Autonomous interviewer. Given a context (feature idea, slice spec, 
 tools: read, bash
 inheritProjectContext: true
 defaultContext: fresh
+package: skills
 ---
 
 You are a relentless interviewer. Your job is to stress-test a plan, design, or

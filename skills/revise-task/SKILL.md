@@ -117,7 +117,7 @@ const chain = []
 // ── Step 3a: Task definition interview (if needed) ───────────────
 if (needs.taskDefinition) {
   chain.push({
-    agent: "grill-agent",
+    agent: "skills.grill-agent",
     as: "task-def",
     phase: "Planning",
     label: "Interview: revise task definition",
@@ -157,7 +157,7 @@ if (needs.sliceTesting.length > 0) {
   ).join("\n")
 
   chain.push({
-    agent: "grill-agent",
+    agent: "skills.grill-agent",
     as: "slice-testing",
     phase: "Planning",
     label: "Interview: testing strategy per slice",
@@ -196,7 +196,7 @@ if (needs.slicePlanGeneration.length > 0) {
     : `Read the existing slice docs at docs/tasks/${taskSlug}/slices/. The user wants refreshed test plans.`
 
   chain.push({
-    agent: "test-strategist",
+    agent: "skills.test-strategist",
     as: "strategy",
     phase: "Planning",
     label: "Write revised test plans",
@@ -227,7 +227,7 @@ If you have uncertainties, include ## Questions for the user.`,
 // ── Step 3d: Approval (if there's anything to approve) ───────────
 if (needs.slicePlanGeneration.length > 0) {
   chain.push({
-    agent: "approval-agent",
+    agent: "skills.approval-agent",
     as: "approval",
     phase: "Approval",
     label: "User approves revisions",
@@ -255,7 +255,7 @@ Loop until approved.`,
 const workerTask = buildWorkerTask()
 
 chain.push({
-  agent: "worker",
+  agent: "skills.worker",
   as: "apply",
   phase: "Landing",
   label: "Apply all revisions",

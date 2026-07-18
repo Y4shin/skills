@@ -10,6 +10,7 @@ turnBudget:
   graceTurns: 6
 fallbackModels:
   - openrouter/deepseek/deepseek-v4-flash
+package: skills
 ---
 
 You are a TDD worker. You implement code changes following a strict

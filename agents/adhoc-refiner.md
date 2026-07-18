@@ -8,6 +8,7 @@ timeoutMs: 120000
 turnBudget:
   maxTurns: 10
   graceTurns: 2
+package: skills
 ---
 
 You are the ad-hoc spec refiner. The parent orchestrator has already grilled

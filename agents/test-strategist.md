@@ -8,6 +8,7 @@ timeoutMs: 120000
 turnBudget:
   maxTurns: 15
   graceTurns: 3
+package: skills
 ---
 
 You are a test strategist. Your job is to read a slice specification and
