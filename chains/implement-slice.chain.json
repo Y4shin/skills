@@ -1,0 +1,65 @@
+{
+  "name": "implement-slice",
+  "description": "Prepare branch, TDD implementation, verify, check divergence, land slice",
+  "steps": [
+    {
+      "agent": "skills.worker",
+      "as": "setup",
+      "phase": "Preparation",
+      "label": "Prepare branch and sync",
+      "outputMode": "file-only",
+      "task": "Prepare the implementation branch for slice \"{sliceSlug}\" (task: \"{taskSlug}\").\n\n1. Sync with origin if remote exists:\n   git fetch origin 2>/dev/null || true\n   git checkout main && git pull --ff-only origin main 2>/dev/null || true\n\n2. Ensure the task integration branch exists:\n   git checkout task/{taskSlug} 2>/dev/null || git checkout -b task/{taskSlug}\n\n3. Create the slice feature branch:\n   git checkout -b slice/{sliceSlug}\n\n4. Read the slice doc at {slicePath} and the task doc at {taskPath}. Read docs/testing.md if it exists for project test conventions.\n\n5. Report: branch slice/{sliceSlug} created, context loaded.",
+      "output": "setup/result.md"
+    },
+    {
+      "agent": "skills.tdd-worker",
+      "as": "implementation",
+      "phase": "Implementation",
+      "label": "TDD cycle",
+      "outputMode": "file-only",
+      "task": "Implement slice \"{sliceSlug}\" for task \"{taskSlug}\" using strict TDD.\n\nSlice doc: {slicePath}\nTask doc: {taskPath}\n\nRead the slice doc's acceptance criteria and ## Test plan. Follow the strict TDD cycle:\n\n1. RED \u2014 write a failing test derived from acceptance criteria. The test MUST fail before implementation.\n2. GREEN \u2014 write minimal code to make the test pass. No speculative code.\n3. REFACTOR \u2014 clean up, improve names, extract helpers. Test must still pass.\n4. Repeat for each acceptance criterion.\n5. Run the full test suite if available. Fix anything that breaks.\n\nRead docs/testing.md for project conventions. Use get_guidelines for language-specific best practices. Follow any injected coding guidelines.\n\n\u2500\u2500 Uncertainty escape hatch \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nIf you encounter ANY of these situations, ask the supervisor via contact_supervisor({ reason: \"interview_request\" }) before proceeding:\n- The test plan seems outdated because prior slice implementations changed the code in ways the plan didn't anticipate.\n- An acceptance criterion is ambiguous and codebase exploration doesn't give a clear answer.\n- A failure mode in the test plan no longer applies, or a new failure mode has emerged that the plan doesn't cover.\n- You need to make a design decision that the test plan doesn't address.\n\nFor each question, include your recommended answer, reasoning, and context explaining what changed. Do NOT guess when an acceptance criterion or test plan is ambiguous \u2014 the cost of a wrong guess compounds across remaining slices.\n\n\u2500\u2500 Divergence tracking \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nIn your output, include a ## Divergence from plan section:\n- List every decision where implementation differed from the slice doc.\n- For each: explain what was planned, what was built, and why.\n- Rate each as \"minor\" (cosmetic, no impact) or \"significant\" (behavioural difference, may affect other slices).\n- If any significant divergence exists, end your output with a clear ## Significant divergences heading listing them.",
+      "output": "tdd/result.md"
+    },
+    {
+      "agent": "skills.slice-verifier",
+      "as": "verify",
+      "phase": "Verification",
+      "label": "Run lint and tests",
+      "outputMode": "file-only",
+      "task": "Verify slice \"{sliceSlug}\" for task \"{taskSlug}\".\n\nSlice doc: {slicePath}\n\nRun the quality gate:\n1. Find and run the lint command (from package.json scripts or linter configs). Skip with a warning if no lint tool is configured.\n2. Find and run the test command from the slice doc's ## Test plan \u2192 Run command.\n\nIf lint fails: STOP and report. If tests fail: STOP and report. Only proceed if both are clean.",
+      "output": "verify/result.md"
+    },
+    {
+      "agent": "skills.worker",
+      "as": "divergence-check",
+      "phase": "Divergence",
+      "label": "Check for plan divergence",
+      "task": "Check for plan divergence that could affect remaining slices.\n\nRead {chain_dir}/tdd/result.md for the ## Divergence from plan section and any ## Significant divergences.\n\nRead the slice doc at {slicePath} for the original plan.\n\nIf NO significant divergences: output \"no significant divergence\" and stop. This step is done \u2014 proceed to landing.\n\nIf significant divergences exist:\n1. Read the task doc at {taskPath}. Note the full slice breakdown.\n2. Read EVERY remaining slice doc (those with status: todo or in-progress) at docs/tasks/{taskSlug}/slices/. Focus on their ## Test plan and acceptance criteria.\n3. For each remaining slice, determine if the divergence affects it.\n   Examples of \"affects\":\n   - The divergence changed an API signature a later slice plans to call.\n   - The divergence introduced a new pattern/failure mode a later slice should know about.\n   - The divergence made a later slice's acceptance criterion invalid.\n4. If NO remaining slices are affected: output a brief note explaining why each divergence doesn't affect remaining slices. Proceed to landing.\n\n5. If any remaining slices ARE affected, prepare a discussion request via contact_supervisor({ reason: \"need_discussion\" }) with:\n   - **What diverged:** a concise summary of each significant divergence.\n   - **Affected slices:** which remaining slices are affected and how.\n   - **Recommendation:** your suggested action (update affected slice docs, continue anyway with caveats, or pause to replan).\n   - **Option A:** Update affected slice docs to match the new reality.\n   - **Option B:** Continue without changes (you accept the risk).\n   - **Option C:** Replan \u2014 pause here and revisit the task plan.\n\n   After the supervisor replies, apply any updates they request to the affected slice docs (e.g. updating acceptance criteria or test plans). Then output \"divergence handled\" and proceed.",
+      "output": "diverge/result.md",
+      "acceptance": {
+        "level": "none",
+        "reason": "interactive divergence discussion; supervisor decision is the acceptance signal"
+      }
+    },
+    {
+      "agent": "skills.worker",
+      "as": "land",
+      "phase": "Landing",
+      "label": "Merge and archive slice",
+      "outputMode": "file-only",
+      "task": "Land slice \"{sliceSlug}\" for task \"{taskSlug}\".\n\nSlice doc: {slicePath}\nTask doc: {taskPath}\n\n1. Read the slice doc for title, acceptance criteria, and test plan. Read {chain_dir}/tdd/result.md for the divergence report.\n\n2. Merge the slice into the task branch:\n   git checkout task/{taskSlug}\n   git merge --no-ff slice/{sliceSlug} -m \"slice({taskSlug}): <slice title>\"\n   git branch -d slice/{sliceSlug}\n\n3. Record completion on the slice doc:\n   task_set {slicePath} status done\n   task_set {slicePath} completed_at <ISO now>\n\n4. Append a divergence-aware implementation note to the task's ## Implementation notes:\n   - What was built.\n   - Any deviations from the plan (from the divergence report).\n   - Note which remaining slices were updated due to divergence (if any).\n\n5. Archive the slice:\n   mkdir -p docs/tasks/{taskSlug}/slices/archive\n   git mv {slicePath} docs/tasks/{taskSlug}/slices/archive/<n>-<slug>.md\n\n6. Commit the landing artifacts:\n   git add docs/tasks/\n   git commit -m \"docs(slice): land {sliceSlug} into {taskSlug}\"\n\n7. Check remaining slices via task_slices {taskSlug}:\n   - If last slice: task_set {taskSlug} status done,\n     task_set {taskSlug} completed_at <ISO now>,\n     task_state_set active.slice null,\n     task_state_set next_action finalize-task {taskSlug}\n   - If more remain: task_state_set active.slice null,\n     task_state_set next_action implement-slice <next-slug>\n\n8. Set task_state_set last_action implement-slice landed {sliceSlug}",
+      "output": "land/result.md"
+    }
+  ],
+  "timeoutMs": 600000,
+  "turnBudget": {
+    "maxTurns": 60,
+    "graceTurns": 8
+  },
+  "variables": [
+    "taskSlug",
+    "sliceSlug",
+    "slicePath",
+    "taskPath"
+  ]
+}

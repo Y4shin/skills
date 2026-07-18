@@ -67,97 +67,22 @@ If it reports open slices, list them and **stop**.
 const taskSlug = "<task-slug>"
 const taskPath = "docs/tasks/<task-slug>/task.md"
 
+// Read the chain definition from the extracted chain file
+const chainDef = JSON.parse(bash("cat chains/finalize-task.chain.json"))
+
+// Substitute runtime variables into step tasks
+const steps = chainDef.steps.map(step => ({
+  ...step,
+  task: step.task
+    .replaceAll("{taskSlug}", taskSlug)
+    .replaceAll("{taskPath}", taskPath)
+}))
+
 subagent({
   async: true,
-  timeoutMs: 300_000,
-  turnBudget: { maxTurns: 30, graceTurns: 5 },
-  chain: [
-    {
-      agent: "skills.worker",
-      as: "ci-harvest",
-      phase: "Cleanup",
-      label: "Run CI gate and harvest knowledge",
-      outputMode: "file-only",
-      task: `Run the CI gate and harvest knowledge for task "${taskSlug}".
-
-Task doc: ${taskPath}
-
-1. Checkout and sync:
-   git checkout task/${taskSlug}
-   git merge main 2>/dev/null || true
-
-2. Run the project's full CI command (from task_profile or detected from
-   repo tooling). If it fails: STOP. Report failures. Do not proceed.
-
-3. Read ${taskPath} in full, especially ## Implementation notes.
-   Review the branch diff:
-   git log --oneline --no-merges main..task/${taskSlug}
-
-4. Fold durable knowledge into the project's permanent docs:
-   - Update docs/testing.md if this task introduced new testing patterns,
-     tools, conventions, or infrastructure lessons.
-   - Update any other project docs as needed.
-
-5. Commit the harvested changes onto the task branch.`,
-      output: "ci-harvest/result.md"
-    },
-    {
-      agent: "skills.task-summarizer",
-      as: "changelog",
-      phase: "Changelog",
-      label: "Write changelog entry",
-      outputMode: "file-only",
-      task: `Write a changelog entry for task "${taskSlug}".
-
-Task doc: ${taskPath}
-
-1. Read the task doc — capture title, problem statement, implementation notes.
-2. Review git log: git log --oneline --no-merges main..task/${taskSlug}
-3. Draft a 3-5 line summary: date, title, key changes, outcome.
-4. Append to docs/tasks/CHANGELOG.md as:
-   ## <YYYY-MM-DD> — <title> (\`<slug>\`)
-   <Key changes and decisions>. <Outcome in one sentence>.
-
-5. Commit the changelog update.`,
-      output: "summary/result.md"
-    },
-    {
-      agent: "skills.worker",
-      as: "archive",
-      phase: "Landing",
-      label: "Archive task and merge to main",
-      outputMode: "file-only",
-      task: `Archive task "${taskSlug}" and integrate into main.
-
-Task doc: ${taskPath}
-
-1. If this task belongs to an epic (check epic field in frontmatter):
-   - task_epic_tick <epic-slug> ${taskSlug}
-   - If task_epic_finalizable <epic-slug> returns ready:
-     a. task_set <epic-slug> completed_at <ISO now>
-     b. git mv docs/tasks/epics/<epic-slug>/ docs/tasks/epics/archive/<epic-slug>/
-     c. Summarize the epic to CHANGELOG.md
-
-2. Archive the task:
-   git mv docs/tasks/${taskSlug}/ docs/tasks/archive/${taskSlug}/
-
-3. Clear state:
-   task_state_set active.task null
-   task_state_set active.slice null
-   task_state_set last_action finalize-task completed ${taskSlug}
-   task_state_set next_action ""
-   (Keep active.epic if more tasks remain under the epic.)
-
-4. Integrate into main:
-   git checkout main
-   git merge --no-ff task/${taskSlug} -m "task: finalize ${taskSlug}"
-   git branch -d task/${taskSlug}
-   (If remote exists, push main.)
-
-5. Commit: docs(task): finalize ${taskSlug}`,
-      output: "archive/result.md"
-    }
-  ]
+  timeoutMs: chainDef.timeoutMs,
+  turnBudget: chainDef.turnBudget,
+  chain: steps
 })
 ```
 

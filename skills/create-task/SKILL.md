@@ -74,15 +74,26 @@ Is this a single task or an epic (multi-task outcome)?
 Read `task_profile` and `task_reference`. Construct the chain:
 
 ```
+const profileOutput = bash("task_profile")
+const referenceOutput = bash("task_reference")
+
+// Read the chain definition from the extracted chain file
+const chainDef = JSON.parse(bash("cat chains/create-task.chain.json"))
+
+// Substitute runtime values into step tasks
+const steps = chainDef.steps.map(step => ({
+  ...step,
+  task: step.task
+    .replaceAll("{task_context}", profileOutput)
+    .replaceAll("{task_reference}", referenceOutput)
+}))
+
 subagent({
   async: true,
-  timeoutMs: 600_000,
-  turnBudget: { maxTurns: 50, graceTurns: 6 },
+  timeoutMs: chainDef.timeoutMs,
+  turnBudget: chainDef.turnBudget,
   control: { enabled: true, needsAttentionAfterMs: 300_000, notifyChannels: ["event"] },
-  chain: [
-    {
-      agent: "skills.grill-agent",
-      as: "task-summary",
+  chain: steps
       phase: "Planning",
       label: "Interview: define task and slice breakdown",
       task: `Interview the user to define a new task.
@@ -114,156 +125,7 @@ includes all confirmed decisions and the proposed slice breakdown
         reason: "planning/interview step only; final worker verifies the handoff"
       }
     },
-    {
-      agent: "skills.grill-agent",
-      as: "testing-summary",
-      phase: "Planning",
-      label: "Interview: testing strategy per slice",
-      task: `Interview the user about testing strategy for every slice.
 
-Read {chain_dir}/interview/task-summary.md for the task definition and
-slice breakdown confirmed in the previous step.
-
-Project context (from task_profile):
-<... paste task_profile output ...>
-
-For EACH slice in the breakdown (in dependency order):
-1. Which layers does this slice touch end-to-end?
-2. What are the failure modes? What can break? (at least two concrete modes)
-3. Testing approach: test types (unit/integration/e2e), scope, dependency
-   strategy (mocks vs real), key scenarios, edge cases, error handling.
-
-Explore the codebase to answer what you can. Ask the user one question
-at a time via contact_supervisor with a recommended answer and reasoning.
-Continue until all slices are covered.
-
-When done, output a structured summary under ## Per-slice testing strategy
-that includes, for each slice: layer analysis, confirmed failure modes
-(at least two), testing approach, and any user preferences or constraints.`,
-      output: "interview/testing-summary.md",
-      acceptance: {
-        level: "none",
-        reason: "planning/interview step only; final worker verifies the handoff"
-      }
-    },
-    {
-      agent: "skills.test-strategist",
-      as: "strategy",
-      phase: "Planning",
-      label: "Write test plans from interviews",
-      outputMode: "file-only",
-      task: `Write a test plan for every slice from the interview summaries.
-
-Read {chain_dir}/interview/task-summary.md for the task definition
-and slice breakdown.
-
-Read {chain_dir}/interview/testing-summary.md for per-slice layer
-analysis, failure modes, and testing approach.
-
-For EACH slice in the breakdown:
-1. Write a ## Test plan section. Cover: test types, scope, dependency
-   strategy, key scenarios, edge cases, error handling, failure mode
-   coverage, and the run command to execute.
-2. Every test scenario must derive from the slice's acceptance criteria
-   and confirmed failure modes.
-3. Write the test plan to {chain_dir}/test-plans/<n>-<slice-slug>.md
-   (one file per slice). The final worker will copy them into the
-   actual slice docs.
-
-If you have uncertainties, include ## Questions for the user in your output.`,
-      output: "strategy/result.md",
-      acceptance: {
-        level: "none",
-        reason: "planning-doc update only; parent approval and final checks verify the result"
-      }
-    },
-    {
-      agent: "skills.approval-agent",
-      as: "approval",
-      phase: "Approval",
-      label: "User approves all test strategies",
-      outputMode: "file-only",
-      task: `Present the COMPLETE testing strategy for ALL slices and get
-one-shot user approval.
-
-Read every test plan from {chain_dir}/test-plans/.
-Read the slice breakdown from {chain_dir}/interview/task-summary.md.
-
-If the test-strategist left ## Questions for the user, resolve each one via
-contact_supervisor({ reason: "interview_request" }) one at a time.
-
-Once all questions are resolved, present EVERY slice's ENTIRE test strategy
-(all test plan files) to the user for final verification via
-contact_supervisor({ reason: "need_decision" }).
-
-If changes are requested, update the affected test plan files in
-{chain_dir}/test-plans/ and re-present. Loop until approved or
-changes exhausted.`,
-      output: "approval/result.md",
-      acceptance: {
-        level: "none",
-        reason: "interactive approval step; supervisor approval is the acceptance signal"
-      }
-    },
-    {
-      agent: "skills.worker",
-      as: "task-artifacts",
-      phase: "Landing",
-      label: "Create task and slice docs",
-      outputMode: "file-only",
-      task: `Create the task doc and all slice docs with their approved test plans.
-
-Read {chain_dir}/approval/result.md to confirm approval.
-Read {chain_dir}/interview/task-summary.md for the task definition.
-Read every test plan from {chain_dir}/test-plans/.
-
-1. Determine the task slug (3-5 word kebab of the title, must not collide
-   with existing tasks from task_list).
-
-2. Write docs/tasks/<slug>/task.md with frontmatter:
-   kind: task
-   title: <title>
-   slug: <slug>
-   slices: []  (will be filled after slice docs are written)
-   status: draft
-   started_at: <ISO now>
-   completed_at: null
-
-   Include sections: Problem/why, User stories/behaviour, End-to-end
-   behaviour, Layers touched, Out of scope, Slice breakdown, Open questions,
-   Implementation notes.
-
-3. For each slice in the breakdown (in dependency order), write
-   docs/tasks/<slug>/slices/<n>-<slice-slug>.md with frontmatter:
-   kind: slice
-   title: <title>
-   slug: <slice-slug>
-   task: ../task.md
-   mode: hitl | afk
-   analysed: true
-   status: todo
-   size: m  (default; the user adjusts later)
-   blocked_by: [<slug>, ...]
-   started_at: null
-   completed_at: null
-
-   Include: What to build, Acceptance criteria, Blocked by section, and
-   the ## Test plan section copied from {chain_dir}/test-plans/<n>-<slice-slug>.md.
-
-4. Update the task's slices list with task_set_slices.
-
-5. Set task status: task_set <slug> status slices-planned
-
-6. Write state.yaml via task_state_set:
-   task_state_set active.task <slug>
-   task_state_set last_action create-task created task and <n> slices with test plans for <slug>
-   task_state_set next_action pipeline-slices <slug>
-
-7. Commit: docs(task): add <slug> task with <n> slices and test plans.`,
-      output: "task/result.md"
-    }
-  ]
-})
 ```
 
 ## Step 3 — Parent loop (handle interactive requests)

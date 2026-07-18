@@ -48,6 +48,9 @@
     "subagents": {
       "agents": [
         "./agents"
+      ],
+      "chains": [
+        "./chains"
       ]
     }
   }
