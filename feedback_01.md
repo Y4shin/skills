@@ -1,5 +1,10 @@
 # Feedback: Task/Slice tool-calls do not resolve slice artifacts
 
+> **Note (v1.2.0):** `start-slice` and `design-test-strategy` have been removed
+> from the workflow. Per-slice testing strategy is now designed during
+> `create-task`. The underlying tool-call issues documented below may still
+> apply to `implement-slice` and `finalize-task`.
+
 ## Problem
 
 The `task_set`, `task_show`, and related tool-calls in the prd-workflow toolkit

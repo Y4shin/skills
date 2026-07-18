@@ -1,4 +1,8 @@
-# Start-slice issue: `test-baseline`
+# Start-slice issue: `test-baseline` (HISTORICAL — `start-slice` removed in v1.2.0)
+
+> **Note:** `start-slice` has been removed from the workflow. Per-slice testing
+> strategy is now designed during the `create-task` interview, alongside task
+> definition. This issue report is retained for historical reference.
 
 ## Summary
 

@@ -20,6 +20,17 @@ Use the registered `task_*` tools (`task_show`, `task_list`, `task_get`,
 planning tree. **Prefer these tools over shelling out or hand-editing
 frontmatter.**
 
+## Workflow overview
+
+The workflow has three phases:
+
+1. **create-task** — the ONLY interactive phase. The user defines the task and
+   reviews test strategies for every slice in one sitting.
+2. **pipeline-slices** (or **implement-slice** one-at-a-time) — fully
+   autonomous TDD implementation. The agent asks only when uncertain or when
+   plan divergences affect remaining slices.
+3. **finalize-task** — CI gate, knowledge harvesting, changelog, archive, merge.
+
 ## Answering questions — read-only
 
 | The user asks… | Run tool |
@@ -45,23 +56,22 @@ For anything that *creates or changes* artifacts, invoke the matching skill:
 | Action | Skill |
 | --- | --- |
 | Resume after interruption | `/skill:resume-workflow` |
-| New task or epic | `/skill:create-task` |
-| Analyse a slice's test strategy | `/skill:start-slice` |
-| Build a slice (TDD) | `/skill:implement-slice` |
+| New task or epic (with test strategies) | `/skill:create-task` |
+| Build all remaining slices autonomously | `/skill:pipeline-slices` |
+| Build a single slice (TDD) | `/skill:implement-slice` |
 | Close out a task (or epic) | `/skill:finalize-task` |
 | Migrate from old prd-workflow | `/skill:migrate-workflow` |
 | Init a fresh repo | `/skill:onboard-workflow` |
 
-**Orchestrator skills** (`create-task`, `start-slice`, `implement-slice`,
+**Orchestrator skills** (`create-task`, `implement-slice`, `pipeline-slices`,
 `finalize-task`) dispatch subagent chains for heavy-lifting work. The chains
-may include interactive agents (grill-agent, approval-agent) that pause for
-user input via `contact_supervisor`.
+may pause for user input via `contact_supervisor` only when necessary.
 
 | Chain | Steps |
 | --- | --- |
-| **create-task** | grill-agent → worker |
-| **start-slice** | grill-agent → test-strategist → approval-agent → worker |
-| **implement-slice** | worker → tdd-worker → slice-verifier → worker |
+| **create-task** | grill-agent → test-strategist → approval-agent → worker |
+| **implement-slice** | worker → tdd-worker → slice-verifier → worker (diverge) → worker (land) |
+| **pipeline-slices** | For each slice: worker (setup) → tdd-worker → slice-verifier → worker (diverge) → worker (land) |
 | **finalize-task** | worker → task-summarizer → worker |
 
 **Agents** used by these chains:
@@ -71,7 +81,7 @@ user input via `contact_supervisor`.
 | `grill-agent` | Autonomous interviewer — explores codebase, asks user one question at a time |
 | `approval-agent` | Presents plans/strategies for user approval, handles revise-re-present loop |
 | `test-strategist` | Designs test plans from slice requirements and failure modes |
-| `tdd-worker` | RED → GREEN → REFACTOR implementation |
+| `tdd-worker` | RED → GREEN → REFACTOR implementation, asks when uncertain |
 | `slice-verifier` | Lint + test quality gate |
 | `task-summarizer` | Writes changelog entries |
 
@@ -108,3 +118,6 @@ into the system prompt at session start and when the workflow state changes.
   move to `archive/`. Done epics move to `epics/archive/`.
 - **Internal tracking only.** No GitHub/Forgejo issues. State lives entirely in
   `docs/tasks/` directory tree and frontmatter.
+- **Create-task is the only interactive phase.** After that, implementation
+  is autonomous. The agent asks only when genuinely uncertain or when plan
+  divergences threaten remaining slices.

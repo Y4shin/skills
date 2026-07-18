@@ -113,48 +113,48 @@ state.
 ### `create-task` chain (individual task, not from epic)
 
 ```
-grill-agent  ──→  worker  ──→  grill-agent  ──→  worker
-(autonomous:   (write       (present + confirm   (write slice docs,
- what, layers,  task.md)     slice breakdown)     set sizes, state)
- boundaries,
- slices)
+grill-agent  ──→  grill-agent  ──→  test-strategist  ──→  approval-agent  ──→  worker
+(autonomous:   (autonomous:   (write test       (present all       (create task.md
+ what, layers,  per-slice      plans to          strategies,        + slice docs
+ boundaries,    layers,        {chain_dir}/      ask approve,       with test plans,
+ slices)        failure modes, test-plans/)       iterate)           set state)
+                testing)
 ```
 
-Story: The user says "I want to add OAuth support." The grill-agent reads the
-codebase, finds existing auth patterns, and walks the decision tree: what
-provider? what scopes? token storage? expiration? It answers what it can from
-the code and asks the user only what it can't figure out. A worker writes the
-task doc. A second grill-agent presents the proposed slice breakdown and
-confirms with the user. A worker writes the slice docs and sets state.
+Story: Two focused grill-agents keep context clean. The first defines the
+task (who, outcome, layers, boundaries, slice breakdown). The second takes
+that breakdown and interviews about per-slice testing strategy (layers,
+failure modes, testing approach). The test-strategist generates test plans
+for every slice. The approval-agent presents ALL strategies for one-shot
+approval. A worker creates the task doc and all slice docs with their test
+plans, setting `analysed: true, status: todo` — ready for autonomous
+implementation.
 
-### `start-slice` chain
+### `start-slice` chain (REMOVED in v1.2.0)
 
-```
-grill-agent  ──→  test-strategist  ──→  approval-agent  ──→  worker
-(autonomous:   (write draft to   (present strategy,  (persist to slice
- layers,        {chain_dir}/      ask approve,        doc, mark analysed,
- failure modes)  draft.md)        iterate)             commit)
-```
-
-Story: The grill-agent reads the slice doc, explores the codebase, and walks
-the failure-mode tree: what layers does this touch? what can break? The
-test-strategist generates a comprehensive test plan and writes it to
-`{chain_dir}/draft.md`. The approval-agent presents the draft, asks "Approve?"
-and routes back changes or confirms. A worker persists the final plan to the
-slice doc, commits, and updates state.
+This chain was folded into `create-task`. Per-slice testing strategy is now
+designed during the initial create-task interview, alongside task definition.
+No more per-slice interactive analysis step needed.
 
 ### `implement-slice` chain
 
 ```
-worker  ──→  tdd-worker  ──→  slice-verifier  ──→  worker
-(branch,   (RED→GREEN→     (lint + test gate,   (merge, notes,
- read doc)   REFACTOR)       hard block)          archive, state)
+worker  ──→  tdd-worker  ──→  slice-verifier  ──→  worker       ──→  worker
+(branch,   (RED→GREEN→     (lint + test gate,   (divergence      (merge, notes,
+ read doc)   REFACTOR,      hard block)          check: compare   archive, state)
+             ask when                             plan vs built,
+             uncertain)                           discussion if
+                                                  needed)
 ```
 
 Story: A worker creates the slice branch and loads context. The tdd-worker
-runs strict RED → GREEN → REFACTOR. The slice-verifier runs the lint and test
-commands — hard gate, stops on failure. A worker merges into the task branch,
-appends implementation notes, archives the slice doc, and updates state.
+runs strict RED → GREEN → REFACTOR, asking the supervisor when uncertain
+about test plans or acceptance criteria. The slice-verifier runs lint and
+test — hard gate, stops on failure. A divergence checker compares what was
+built to the original plan; if significant deviations affect remaining
+slices, it initiates a one-shot discussion with the user. A worker merges
+into the task branch, appends implementation notes, archives the slice doc,
+and updates state.
 
 ### `finalize-task` chain
 
@@ -321,7 +321,7 @@ fragments. Its sharpness comes from autonomy, not inherited history.
 | 3. Update existing agents | ✅ Done | Added `inheritProjectContext: true` to all 4 agents |
 | 4. Parent loop | ✅ Done | Pattern documented inline in each interactive chain-launching skill |
 | 5. Remove model-router | ✅ Done | File deleted, package.json updated, tests pass |
-| 6. Chain definitions | ✅ Done | `start-slice`, `create-task` (incl. epic branch), `start-next-task`, `implement-slice`, `finalize-task` — all rewritten as chain launchers |
+| 6. Chain definitions | ✅ Done | `create-task` (two grill-agents), `implement-slice` (divergence check), `pipeline-slices` (big chain), `finalize-task` — all rewritten. `start-slice` removed. |
 | 7. Archive obsolete skills | ✅ Done | 9 skills moved to `skills/archive/` |
 | 8. Update overview skill | ✅ Done | `task-workflow-overview` updated with new routing table |
 | 9. Integration tests | 🔄 In progress | `tests/agents.test.ts` — faux provider plumbing works, auth passes, but session doesn't route LLM calls through the faux model yet. See the STATUS comment at the top of the test file for debug state and next steps. |

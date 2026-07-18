@@ -135,12 +135,9 @@ completed_at: <ISO 8601>
 
 ## Lifecycle
 
-1. `create-task` → writes `task.md` with `started_at` (status `draft`) or `epic.md` (status `draft`)
-2. `slice-task` → writes slice docs (status `slices-planned`)
-3. `size-slices` → sets `size` per slice
-4. `start-slice <slug>` → sets `analysed: true`, writes test plan (status `in-progress`, `started_at`)
-5. `implement-slice <slug>` → TDD, merges into task branch, archives slice doc to `slices/archive/`
-6. `finalize-task <slug>` → harvests knowledge, archives task to `docs/tasks/archive/`, merges into main
-7. *(if epic and last child)* `finalize-task` also finalizes the epic
+1. `create-task` → writes `task.md` with `started_at` (status `draft`), writes all slice docs with `## Test plan`, `analysed: true`, `status: todo`
+2. `pipeline-slices` or `implement-slice <slug>` → TDD, verifies, checks divergence, merges into task branch, archives slice doc to `slices/archive/`
+3. `finalize-task <slug>` → harvests knowledge, archives task to `docs/tasks/archive/`, merges into main
+4. *(if epic and last child)* `finalize-task` also finalizes the epic
 
 An unarchived slice doc ⇒ unfinished work. An unarchived `docs/tasks/<slug>/` ⇒ unfinished task.

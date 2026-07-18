@@ -30,6 +30,11 @@ issues** — state lives entirely in the directory tree, frontmatter, and
 4. **Hard gates are executable.** "Run lint + test; block on non-zero"
    replaces manual checklists.
 
+5. **One interactive phase.** All user interaction happens in `create-task`
+   (task definition + testing strategy for all slices). Implementation is
+   fully autonomous — the agent asks only when uncertain or when plan
+   divergences threaten remaining slices.
+
 ## Install
 
 ```bash
@@ -45,7 +50,7 @@ This auto-loads:
 | Resource | What |
 |---|---|
 | **Extension** (`src/pi/index.ts`) | 18 `task_*` native tools + `/init-task-workflow` command |
-| **Skills** (`skills/`) | 16 SKILL.md files |
+| **Skills** (`skills/`) | 10 SKILL.md files |
 
 Then in any repo:
 
@@ -77,10 +82,9 @@ no bash subprocesses:
 | Step | Skill | What the agent does |
 |---|---|---|
 | Setup | `/skill:onboard-workflow` or `/init-task-workflow` | Creates `docs/tasks/` |
-| Plan | `/skill:create-task` | Interviews you, writes `task.md` or `epic.md` |
-| Slice | `/skill:slice-task` | Breaks a task into slice docs (+ sizing) |
-| Analyse | `/skill:start-slice` | Grills on test strategy, appends test plan |
-| Build | `/skill:implement-slice` | TDD: develop → verify → land |
+| Plan | `/skill:create-task` | One interactive session: interviews for task definition AND per-slice testing strategy, writes task + slice docs with test plans |
+| Build (all) | `/skill:pipeline-slices` | One big chain: implements every remaining slice autonomously (TDD → verify → divergence check → land) |
+| Build (one) | `/skill:implement-slice` | Implements a single slice autonomously (TDD → verify → divergence check → land) |
 | Close | `/skill:finalize-task` | Harvests knowledge, archives task |
 | Migrate | `/skill:migrate-workflow` | Converts `docs/prd/` → `docs/tasks/` |
 
@@ -111,29 +115,21 @@ only audit trail. Requires `pi-subagents`.
 
 | Skill | Purpose |
 |---|---|
-| `create-task` | Interview user, write `task.md` or `epic.md` |
-| `grill-me` | Reusable interview discipline |
-| `slice-task` | Break a task into vertical slices |
-| `size-slices` | T-shirt sizing quiz per slice |
+| `create-task` | One interactive interview: task definition + per-slice testing strategy. Writes task.md and all slice docs with test plans. |
 
 ### Execution
 
 | Skill | Purpose |
 |---|---|
-| `start-slice` | Understand the slice, decide test strategy |
-| `implement-slice` | Orchestrate build: branch → TDD → verify → land |
+| `pipeline-slices` | Build a big chain implementing every remaining slice sequentially (TDD → verify → divergence check → land). |
+| `implement-slice` | Build a single slice autonomously (TDD → verify → divergence check → land). |
 | `adhoc-task` | Refine a raw idea → build under full control (ephemeral, no docs/tasks/ artifacts) |
-| `develop-tdd` | RED → GREEN → REFACTOR loop |
-| `verify-slice` | Hard gate: run lint + test, block on failure |
-| `land-slice` | Merge into task branch, archive slice, update state |
 
 ### Completion
 
 | Skill | Purpose |
 |---|---|
 | `finalize-task` | Hard CI gate, harvest knowledge, archive task |
-| `summarize-task` | Write changelog entry |
-| `archive-artifact` | Move done slice/task/epic to archive |
 
 ### Infrastructure
 
