@@ -157,7 +157,7 @@ for (let i = 0; i < pendingSlices.length; i++) {
             replyTo: request.id,
             message: JSON.stringify({ answer })
           })
-        } else if (request.reason === "need_discussion") {
+        } else if (request.reason === "need_decision") {
           const { summary, affectedSlices, recommendation, options } =
             JSON.parse(request.discussion)
           const decision = await ask_user_question({
@@ -321,7 +321,7 @@ The failing slice is still on its feature branch (\`slice/<slug>\`) with its wor
 
 ### Divergence discussion pause
 
-The chain pauses at the divergence-checker step when a `need_discussion` is
+The chain pauses at the divergence-checker step when a `need_decision` is
 outstanding. This is expected behavior. The chain resumes after the parent
 relays the user's decision.
 

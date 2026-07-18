@@ -107,7 +107,7 @@ Two types of requests may arrive during implementation:
 
 1. **interview_request** — tdd-worker is uncertain about the test plan or
    acceptance criteria.
-2. **need_discussion** — divergence-checker found plan deviations that affect
+2. **need_decision** — divergence-checker found plan deviations that affect
    remaining slices.
 
 ```
@@ -141,7 +141,7 @@ while (true) {
         message: JSON.stringify({ answer })
       })
 
-    } else if (request.reason === "need_discussion") {
+    } else if (request.reason === "need_decision") {
       // divergence-checker found significant plan deviations that affect
       // remaining slices. This is a ONE-SHOT discussion — the agent prepared
       // everything, now the user decides.
@@ -280,7 +280,7 @@ If significant divergences exist:
 3. For each remaining slice, determine if the divergence affects it.
 4. If NO remaining slices are affected: explain why. Proceed.
 5. If any remaining slices ARE affected, use
-   contact_supervisor({ reason: "need_discussion" }) with summary,
+   contact_supervisor({ reason: "need_decision" }) with summary,
    affectedSlices, recommendation, and options.
    After the supervisor replies, apply updates. Output "divergence handled".`,
                   output: "diverge/result.md",
@@ -325,7 +325,7 @@ Task doc: ${taskPath}
               await wait({ id: tailRunId })
               const pendingTail = await subagent_supervisor({ action: "pending" })
               for (const req of pendingTail) {
-                if (req.reason === "need_discussion") {
+                if (req.reason === "need_decision") {
                   const { summary, affectedSlices, recommendation, options } =
                     JSON.parse(req.discussion)
                   const decision = await ask_user_question({
@@ -398,7 +398,7 @@ Report the outcome:
 - If merge conflicts arise, resolve them to keep both new and already-merged
   slices working.
 - Never merge a red slice into the task branch.
-- If the divergence-checker's `need_discussion` isn't answered within a
+- If the divergence-checker's `need_decision` isn't answered within a
   reasonable time (the user walked away), the chain pauses — this is expected.
   Resume via `subagent({ action: "resume", id: "..." })` with the decision.
 
