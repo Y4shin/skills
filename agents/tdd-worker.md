@@ -4,12 +4,6 @@ description: Strict TDD implementation — RED (failing test) → GREEN (minimal
 tools: read, write, edit, bash
 inheritProjectContext: true
 defaultContext: fork
-timeoutMs: 600000
-turnBudget:
-  maxTurns: 40
-  graceTurns: 6
-fallbackModels:
-  - openrouter/deepseek/deepseek-v4-flash
 package: skills
 ---
 

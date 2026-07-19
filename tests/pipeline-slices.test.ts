@@ -40,7 +40,7 @@ describe("pipeline-slices skill doc structure", () => {
 
 	test("disables planning acceptance gates", () => {
 		const chain = JSON.parse(readFileSync(join(process.cwd(), "chains/implement-slice.chain.json"), "utf-8"));
-		const divergeStep = chain.steps.find((s: any) => s.phase === "Divergence");
+		const divergeStep = chain.chain.find((s: any) => s.phase === "Divergence");
 		expect(divergeStep).toBeDefined();
 		expect(divergeStep.acceptance).toBeDefined();
 		expect(divergeStep.acceptance.level).toBe("none");
@@ -48,7 +48,7 @@ describe("pipeline-slices skill doc structure", () => {
 
 	test("references all required agents with dotted names", () => {
 		const chain = JSON.parse(readFileSync(join(process.cwd(), "chains/implement-slice.chain.json"), "utf-8"));
-		for (const step of chain.steps) {
+		for (const step of chain.chain) {
 			expect(step.agent).toMatch(/^skills\./);
 		}
 		// Also check retry chain in the skill doc

@@ -84,7 +84,7 @@ const slicePath = "docs/tasks/<task-slug>/slices/<n>-<slice-slug>.md"
 const chainDef = JSON.parse(bash("cat chains/implement-slice.chain.json"))
 
 // Substitute runtime variables into step tasks
-const steps = chainDef.steps.map(step => ({
+const steps = chainDef.chain.map(step => ({
   ...step,
   task: step.task
     .replaceAll("{taskSlug}", taskSlug)

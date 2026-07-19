@@ -81,7 +81,7 @@ const referenceOutput = bash("task_reference")
 const chainDef = JSON.parse(bash("cat chains/create-task.chain.json"))
 
 // Substitute runtime values into step tasks
-const steps = chainDef.steps.map(step => ({
+const steps = chainDef.chain.map(step => ({
   ...step,
   task: step.task
     .replaceAll("{task_context}", profileOutput)

@@ -4,12 +4,6 @@ description: Hard quality gate — run lint and the slice's test command. Blocks
 tools: read, bash
 inheritProjectContext: true
 defaultContext: fresh
-timeoutMs: 120000
-turnBudget:
-  maxTurns: 8
-  graceTurns: 2
-fallbackModels:
-  - openrouter/deepseek/deepseek-v4-flash
 package: skills
 ---
 

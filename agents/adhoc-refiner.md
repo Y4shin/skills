@@ -4,10 +4,6 @@ description: Crystallize a confirmed ad-hoc implementation spec and test plan in
 tools: read, bash, write
 inheritProjectContext: true
 defaultContext: fork
-timeoutMs: 120000
-turnBudget:
-  maxTurns: 10
-  graceTurns: 2
 package: skills
 ---
 

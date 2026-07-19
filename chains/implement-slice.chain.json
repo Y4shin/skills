@@ -1,7 +1,7 @@
 {
   "name": "implement-slice",
   "description": "Prepare branch, TDD implementation, verify, check divergence, land slice",
-  "steps": [
+  "chain": [
     {
       "agent": "skills.worker",
       "as": "setup",
@@ -13,7 +13,7 @@
     },
     {
       "agent": "skills.tdd-worker",
-      "as": "implementation",
+      "as": "tdd",
       "phase": "Implementation",
       "label": "TDD cycle",
       "outputMode": "file-only",
@@ -31,7 +31,7 @@
     },
     {
       "agent": "skills.worker",
-      "as": "divergence-check",
+      "as": "divergence_check",
       "phase": "Divergence",
       "label": "Check for plan divergence",
       "task": "Check for plan divergence that could affect remaining slices.\n\nRead {chain_dir}/tdd/result.md for the ## Divergence from plan section and any ## Significant divergences.\n\nRead the slice doc at {slicePath} for the original plan.\n\nIf NO significant divergences: output \"no significant divergence\" and stop. This step is done \u2014 proceed to landing.\n\nIf significant divergences exist:\n1. Read the task doc at {taskPath}. Note the full slice breakdown.\n2. Read EVERY remaining slice doc (those with status: todo or in-progress) at docs/tasks/{taskSlug}/slices/. Focus on their ## Test plan and acceptance criteria.\n3. For each remaining slice, determine if the divergence affects it.\n   Examples of \"affects\":\n   - The divergence changed an API signature a later slice plans to call.\n   - The divergence introduced a new pattern/failure mode a later slice should know about.\n   - The divergence made a later slice's acceptance criterion invalid.\n4. If NO remaining slices are affected: output a brief note explaining why each divergence doesn't affect remaining slices. Proceed to landing.\n\n5. If any remaining slices ARE affected, prepare a discussion request via contact_supervisor({ reason: \"need_discussion\" }) with:\n   - **What diverged:** a concise summary of each significant divergence.\n   - **Affected slices:** which remaining slices are affected and how.\n   - **Recommendation:** your suggested action (update affected slice docs, continue anyway with caveats, or pause to replan).\n   - **Option A:** Update affected slice docs to match the new reality.\n   - **Option B:** Continue without changes (you accept the risk).\n   - **Option C:** Replan \u2014 pause here and revisit the task plan.\n\n   After the supervisor replies, apply any updates they request to the affected slice docs (e.g. updating acceptance criteria or test plans). Then output \"divergence handled\" and proceed.",

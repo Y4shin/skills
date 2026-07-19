@@ -54,11 +54,12 @@ describe("workflow skill orchestration docs", () => {
 				"utf-8",
 			);
 			const parsed = JSON.parse(content);
-			expect(parsed.steps.length).toBeGreaterThan(0);
-			expect(parsed.steps[0]).toHaveProperty("agent");
-			expect(parsed.steps[0]).toHaveProperty("as");
-			expect(parsed.steps[0]).toHaveProperty("phase");
-			expect(parsed.steps[0]).toHaveProperty("label");
+			expect(parsed.chain.length).toBeGreaterThan(0);
+			expect(parsed.chain[0]).toHaveProperty("agent");
+			expect(parsed.chain[0]).toHaveProperty("as");
+			expect(parsed.chain[0]).toHaveProperty("phase");
+			expect(parsed.chain[0]).toHaveProperty("label");
+			expect(parsed.chain[0].agent).toMatch(/^skills\./);
 		}
 	});
 });

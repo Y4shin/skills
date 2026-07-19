@@ -71,7 +71,7 @@ const taskPath = "docs/tasks/<task-slug>/task.md"
 const chainDef = JSON.parse(bash("cat chains/finalize-task.chain.json"))
 
 // Substitute runtime variables into step tasks
-const steps = chainDef.steps.map(step => ({
+const steps = chainDef.chain.map(step => ({
   ...step,
   task: step.task
     .replaceAll("{taskSlug}", taskSlug)

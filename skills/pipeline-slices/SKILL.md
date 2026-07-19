@@ -86,7 +86,7 @@ function buildSliceChain(slice, index, total) {
   const slicePath = `docs/tasks/${taskSlug}/slices/${index + 1}-${sliceSlug}.md`
 
   // Clone and parameterize each step with per-slice output paths
-  return chainDef.steps.map(step => ({
+  return chainDef.chain.map(step => ({
     ...step,
     task: step.task
       .replaceAll("{taskSlug}", taskSlug)

@@ -44,14 +44,14 @@ const AGENT_FILES = [
 	"agents/test-strategist.md",
 ] as const;
 
-const AGENT_DEFAULTS: Record<string, { context: string; timeout?: number; turns?: number; grace?: number; fallback?: string }> = {
-	"agents/adhoc-refiner.md": { context: "fork", timeout: 120000, turns: 10, grace: 2 },
-	"agents/approval-agent.md": { context: "fresh", timeout: 120000, turns: 10, grace: 2 },
+const AGENT_DEFAULTS: Record<string, { context: string; fallback?: string }> = {
+	"agents/adhoc-refiner.md": { context: "fork" },
+	"agents/approval-agent.md": { context: "fresh" },
 	"agents/grill-agent.md": { context: "fresh" },
-	"agents/slice-verifier.md": { context: "fresh", timeout: 120000, turns: 8, grace: 2, fallback: "openrouter/deepseek/deepseek-v4-flash" },
-	"agents/task-summarizer.md": { context: "fork", timeout: 120000, turns: 10, grace: 2 },
-	"agents/tdd-worker.md": { context: "fork", timeout: 600000, turns: 40, grace: 6, fallback: "openrouter/deepseek/deepseek-v4-flash" },
-	"agents/test-strategist.md": { context: "fresh", timeout: 120000, turns: 15, grace: 3 },
+	"agents/slice-verifier.md": { context: "fresh" },
+	"agents/task-summarizer.md": { context: "fork" },
+	"agents/tdd-worker.md": { context: "fork" },
+	"agents/test-strategist.md": { context: "fresh" },
 };
 
 describe("agent frontmatter", () => {
@@ -78,36 +78,18 @@ describe("agent frontmatter", () => {
 				expect(fm["defaultContext"]).toBe(expected.context);
 			});
 
-			if (expected.timeout !== undefined) {
-				test("has timeoutMs", () => {
-					expect(fm["timeoutMs"]).toBe(String(expected.timeout));
-				});
-			} else {
-				test("has no timeoutMs (unlimited)", () => {
-					expect(fm["timeoutMs"]).toBeUndefined();
-				});
-			}
+			// timeoutMs, turnBudget, and fallbackModels are set at the chain step level,
+			// not in agent frontmatter
+			test("timeoutMs is not in agent frontmatter (set in chain steps)", () => {
+				expect(fm["timeoutMs"]).toBeUndefined();
+			});
 
-			if (expected.turns !== undefined) {
-				test("has turnBudget with correct maxTurns", () => {
-					expect(content).toContain(`maxTurns: ${expected.turns}`);
-				});
-				test("has turnBudget with correct graceTurns", () => {
-					expect(content).toContain(`graceTurns: ${expected.grace}`);
-				});
-			} else {
-				test("has no turnBudget (unlimited)", () => {
-					expect(content).not.toContain("turnBudget:");
-				});
-			}
-
-			if (expected.fallback) {
-				test("has fallbackModels", () => {
-					expect(content).toContain(expected.fallback!);
-				});
-			}
+			test("turnBudget is not in agent frontmatter (set in chain steps)", () => {
+				expect(content).not.toContain("turnBudget:");
+			});
 		});
 	}
+
 });
 
 // ─── Chain file structure tests ──────────────────────────────────────
@@ -135,8 +117,8 @@ describe("chain JSON files", () => {
 			});
 
 			test("has steps array", () => {
-				expect(Array.isArray(parsed.steps)).toBe(true);
-				expect(parsed.steps.length).toBeGreaterThan(0);
+				expect(Array.isArray(parsed.chain)).toBe(true);
+				expect(parsed.chain.length).toBeGreaterThan(0);
 			});
 
 			test("has timeoutMs", () => {
@@ -151,7 +133,7 @@ describe("chain JSON files", () => {
 			});
 
 			test("each step has required fields", () => {
-				for (const [i, step] of parsed.steps.entries()) {
+				for (const [i, step] of parsed.chain.entries()) {
 					expect(step).toHaveProperty("agent");
 					expect(step).toHaveProperty("as");
 					expect(step).toHaveProperty("phase");
@@ -166,7 +148,7 @@ describe("chain JSON files", () => {
 			});
 
 			test("agents use dotted names", () => {
-				for (const step of parsed.steps) {
+				for (const step of parsed.chain) {
 					expect(step.agent).toMatch(/^skills\./);
 				}
 			});
@@ -228,7 +210,7 @@ describe("chain step metadata (Phase 2)", () => {
 	const finalizeTaskChain = JSON.parse(readFile("chains/finalize-task.chain.json"));
 
 	test("create-task chain steps have as/phase/label", () => {
-		for (const step of createTaskChain.steps) {
+		for (const step of createTaskChain.chain) {
 			expect(step).toHaveProperty("as");
 			expect(step).toHaveProperty("phase");
 			expect(step).toHaveProperty("label");
@@ -236,7 +218,7 @@ describe("chain step metadata (Phase 2)", () => {
 	});
 
 	test("create-task has outputMode on non-interview steps", () => {
-		for (const step of createTaskChain.steps) {
+		for (const step of createTaskChain.chain) {
 			if (step.label?.includes("Interview") || step.label?.includes("User approves")) {
 				expect(step.outputMode).toBeUndefined();
 			} else {
@@ -246,7 +228,7 @@ describe("chain step metadata (Phase 2)", () => {
 	});
 
 	test("finalize-task chain steps have as/phase/label", () => {
-		for (const step of finalizeTaskChain.steps) {
+		for (const step of finalizeTaskChain.chain) {
 			expect(step).toHaveProperty("as");
 			expect(step).toHaveProperty("phase");
 			expect(step).toHaveProperty("label");
@@ -256,7 +238,7 @@ describe("chain step metadata (Phase 2)", () => {
 	test("all chain steps use valid phase values", () => {
 		const validPhases = ["Preparation", "Planning", "Approval", "Implementation", "Verification", "Divergence", "Landing", "Changelog", "Cleanup"];
 		for (const chain of [createTaskChain, implementSliceChain, finalizeTaskChain]) {
-			for (const step of chain.steps) {
+			for (const step of chain.chain) {
 				expect(validPhases).toContain(step.phase);
 			}
 		}

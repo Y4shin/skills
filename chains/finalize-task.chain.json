@@ -1,10 +1,10 @@
 {
   "name": "finalize-task",
   "description": "Run CI gate, harvest knowledge, write changelog, archive task and merge to main",
-  "steps": [
+  "chain": [
     {
       "agent": "skills.worker",
-      "as": "ci-harvest",
+      "as": "ci_harvest",
       "phase": "Cleanup",
       "label": "Run CI gate and harvest knowledge",
       "outputMode": "file-only",

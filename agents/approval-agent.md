@@ -4,10 +4,6 @@ description: Writes a plan summary to the configured output file, then applies f
 tools: read, write, edit, bash
 inheritProjectContext: true
 defaultContext: fresh
-timeoutMs: 120000
-turnBudget:
-  maxTurns: 10
-  graceTurns: 2
 package: skills
 ---
 

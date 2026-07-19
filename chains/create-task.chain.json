@@ -1,10 +1,10 @@
 {
   "name": "create-task",
   "description": "Interview user, design testing strategy, approve, and create task artifacts",
-  "steps": [
+  "chain": [
     {
       "agent": "skills.grill-agent",
-      "as": "task-summary",
+      "as": "task_summary",
       "phase": "Planning",
       "label": "Interview: define task and slice breakdown",
       "task": "Interview the user to define a new task.\n\nProject context (from task_profile):\n{task_context}\n\nArtifact schema reference (from task_reference):\n{task_reference}\n\nWalk the task definition decision tree:\n1. Who is the user and what outcome do they get? (user stories)\n2. End-to-end behaviour or API surface + first consumer.\n3. Layers / surfaces touched — which parts of the system?\n4. Boundaries — what’s explicitly out of scope.\n5. Proposed slice breakdown — independently-mergeable vertical slices in dependency order.\n\nExplore the codebase to answer what you can. Ask the user one question at a time via contact_supervisor with a recommended answer and reasoning. Continue until the decision tree is fully walked.\n\nWhen done, output a structured summary under ## Task definition that includes all confirmed decisions and the proposed slice breakdown (with slice slugs and a one-line description of each).",
@@ -16,7 +16,7 @@
     },
     {
       "agent": "skills.grill-agent",
-      "as": "testing-summary",
+      "as": "testing_summary",
       "phase": "Planning",
       "label": "Interview: testing strategy per slice",
       "task": "Interview the user about testing strategy for every slice.\n\nRead {chain_dir}/interview/task-summary.md for the task definition and slice breakdown confirmed in the previous step.\n\nProject context (from task_profile):\n{task_context}\n\nFor EACH slice in the breakdown (in dependency order):\n1. Which layers does this slice touch end-to-end?\n2. What are the failure modes? What can break? (at least two concrete modes)\n3. Testing approach: test types (unit/integration/e2e), scope, dependency strategy (mocks vs real), key scenarios, edge cases, error handling.\n\nExplore the codebase to answer what you can. Ask the user one question at a time via contact_supervisor with a recommended answer and reasoning. Continue until all slices are covered.\n\nWhen done, output a structured summary under ## Per-slice testing strategy that includes, for each slice: layer analysis, confirmed failure modes (at least two), testing approach, and any user preferences or constraints.",
@@ -53,7 +53,7 @@
     },
     {
       "agent": "skills.worker",
-      "as": "task-artifacts",
+      "as": "task_artifacts",
       "phase": "Landing",
       "label": "Create task and slice docs",
       "outputMode": "file-only",

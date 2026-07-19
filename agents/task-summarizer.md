@@ -4,10 +4,6 @@ description: Write a changelog entry for a completed task. Reads the task doc an
 tools: read, bash, edit
 inheritProjectContext: true
 defaultContext: fork
-timeoutMs: 120000
-turnBudget:
-  maxTurns: 10
-  graceTurns: 2
 package: skills
 ---
 

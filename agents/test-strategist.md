@@ -4,10 +4,6 @@ description: Generate a comprehensive testing strategy from slice requirements, 
 tools: read, write, edit, bash
 inheritProjectContext: true
 defaultContext: fresh
-timeoutMs: 120000
-turnBudget:
-  maxTurns: 15
-  graceTurns: 3
 package: skills
 ---
 
