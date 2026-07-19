@@ -1,31 +1,31 @@
 ---
 name: revise-task
 description: >
-  Revise a task or its slices. Reads the prompt about what needs changing,
-  determines the scope (task definition, slice re-analysis, test plan updates,
-  or metadata only), composes the right chain of agents on the fly, and
-  applies the changes. Use for re-analysing unanalysed slices from older
-  tasks, updating the task scope, refreshing outdated test plans, or
-  reordering slices.
+  Revise a task or its slices. Reads the current state, interviews the user
+  about what needs changing, then applies changes directly. No subagents
+  needed for the interactive parts — the parent agent owns the interview
+  and applies edits directly. For re-analysing unanalysed slices, dispatches
+  test-strategist (subagent) to write new test plans.
+  Use for re-analysing unanalysed slices from older tasks, updating task
+  scope, refreshing outdated test plans, or reordering slices.
 ---
 
 # Revise Task (or Slices)
 
-Dynamically composes a chain based on what needs revising.
-No hardcoded chain — the parent agent reads the current state, asks the user
-what to change, and builds only the steps that are actually needed.
+The parent agent reads the current state, asks the user what to change,
+and applies edits directly. No subagent chain — everything inline.
 
 ## When to use
 
 | Situation | What happens |
 |---|---|
-| Re-analyse unanalysed slices (from pre-v1.2.0 tasks) | grill-agent (per-slice testing) → test-strategist → approval-agent → worker |
-| Modify the task definition (scope, layers, boundaries) | grill-agent (task def) → worker |
-| Modify task AND re-analyse slices | grill-agent (task def) → grill-agent (per-slice testing) → test-strategist → approval-agent → worker |
-| Refresh outdated test plans for specific slices | grill-agent (per-slice for those slices) → test-strategist → approval-agent → worker |
-| Just reorder slices / update blocked_by / change sizes | worker only |
-| Add new slices to an existing task | grill-agent (per-slice for new slices) → test-strategist → approval-agent → worker |
-| Remove slices | worker only |
+| Re-analyse unanalysed slices (from pre-v1.2.0 tasks) | Parent re-interviews per-slice testing strategy, dispatches test-strategist |
+| Modify the task definition (scope, layers, boundaries) | Parent interviews, edits task doc directly |
+| Modify task AND re-analyse slices | Parent interviews both, applies both |
+| Refresh outdated test plans for specific slices | Parent re-interviews for those slices, dispatches test-strategist |
+| Just reorder slices / update blocked_by / change sizes | Direct task_set calls |
+| Add new slices to an existing task | Parent interviews for new slices, dispatches test-strategist |
+| Remove slices | Direct file operations |
 
 ## Step 0 — Pre-flight
 
@@ -60,7 +60,7 @@ Task: "<title>" (<taskSlug>) — status: <status>
 Ask the user what they want to change:
 
 ```
-const revisePrompt = await ask_user_question({
+const reviseChoice = await ask_user_question({
   header: "Revise",
   question: `What needs to change on task "${taskSlug}"?\n\nCurrent state: ${unanalysed.length} unanalysed slice(s), ${analysed.length} analysed, ${done.length} done.\n\nDescribe what to revise:`,
   options: [
@@ -80,297 +80,118 @@ Parse the user's answer to determine what needs to happen:
 
 ```
 const needs = {
-  taskDefinition: false,      // Interview about task scope/layers/boundaries/slices
-  sliceTesting: [],           // Slice slugs that need (re-)analysis + test plans
-  slicePlanGeneration: [],    // Slice slugs that need test plans written
-  metadataOnly: [],           // Slice slugs that only need metadata changes
+  taskDefinition: false,
+  sliceTesting: [],           // Slice slugs needing re-interview + new test plans
+  metadataOnly: [],           // Slice slugs needing only metadata changes
 }
 ```
-
-**Determining scope from the user's answer:**
 
 - "Re-analyse unanalysed slices" →
   `needs.sliceTesting = unanalysed.map(s => s.slug)`
-  `needs.slicePlanGeneration = unanalysed.map(s => s.slug)`
-
 - "Re-analyse ALL non-done slices" →
   `needs.sliceTesting = [...unanalysed, ...analysed].map(s => s.slug)`
-  `needs.slicePlanGeneration = same`
-
 - "Modify task definition" →
   `needs.taskDefinition = true`
-  (Then ask: "Also re-analyse any slices?" and adjust accordingly)
+  (Then ask: "Also re-analyse any slices?")
+- Custom description → parse for keywords. If ambiguous, ask a clarifying
+  follow-up question.
 
-- Custom description → parse for keywords. If the user mentions "scope",
-  "layers", "boundaries", "breakdown", or "slices" in a task-level sense →
-  `needs.taskDefinition = true`. If they mention specific slice names or
-  "test plan" → add to `needs.sliceTesting`. If they mention "order",
-  "blocked_by", "size" → `needs.metadataOnly`.
+## Step 3a — Modify task definition (if needed)
 
-If the determination is ambiguous, ask a clarifying follow-up.
+Interview the user about what changed:
+- What has changed about the user outcome or user stories?
+- Has the end-to-end behaviour or API surface changed?
+- Are layers/surfaces touched different now?
+- Have boundaries/out-of-scope shifted?
+- Should the slice breakdown change? (add, remove, reorder slices)
 
-## Step 3 — Build the chain dynamically
+For each question, explore the codebase first, only ask the user for things
+the code can't answer. Provide a recommended answer with reasoning.
+
+Apply the changes directly:
 
 ```
-const chain = []
+const taskPath = `docs/tasks/${taskSlug}/task.md`
+// Read the current task doc, apply edits, write back
+// Use edit() for targeted changes
+```
 
-// ── Step 3a: Task definition interview (if needed) ───────────────
-if (needs.taskDefinition) {
-  chain.push({
-    agent: "skills.grill-agent",
-    as: "task-def",
-    phase: "Planning",
-    label: "Interview: revise task definition",
-    task: `Revise the task definition for "${taskSlug}".
+## Step 3b — Per-slice testing interview (if needed)
 
-Current task doc: docs/tasks/${taskSlug}/task.md
-Read it first — understand the current state.
+For each slice needing re-analysis, interview the user:
+1. **Layer analysis** — which layers does this slice touch end-to-end?
+   (Explore the codebase to answer as much as you can.)
+2. **Failure modes** — what can break? (At least 2, confirm with user.)
+3. **Testing approach** — test types, dependency strategy, key scenarios,
+   edge cases, error handling.
 
-The user wants to revise the task definition. Walk the decision tree:
-1. What has changed about the user outcome or user stories?
-2. Has the end-to-end behaviour or API surface changed?
-3. Are layers/surfaces touched different now?
-4. Have boundaries/out-of-scope shifted?
-5. Should the slice breakdown change? (add, remove, reorder slices)
+One question at a time. Always provide a recommended answer.
 
-Explore the codebase for context. Ask the user one question at a time
-via contact_supervisor with recommended answers. Continue until the
-revisions are fully understood.
+## Step 3c — Apply metadata changes (if only metadata)
 
-Output a structured ## Revised task definition with all confirmed changes.`,
-    output: "interview/task-summary.md",
-    acceptance: {
-      level: "none",
-      reason: "planning/interview step only"
-    }
-  })
-}
+If the user only wanted to reorder, update blocked_by, or change sizes:
 
-// ── Step 3b: Slice testing interviews (if needed) ────────────────
+```
+// Direct task_set calls
+task_set(`docs/tasks/${taskSlug}/slices/<n>-<slug>.md`, "size", "M")
+// etc.
+```
+
+## Step 4 — Dispatch test-strategist (if slices were re-analysed)
+
+If any slices were re-analysed in Step 3b, dispatch test-strategist to
+write the formal test plans:
+
+```
 if (needs.sliceTesting.length > 0) {
-  const taskContext = needs.taskDefinition
-    ? "Read {chain_dir}/interview/task-summary.md for the revised task definition (including any slice breakdown changes)."
-    : `Read docs/tasks/${taskSlug}/task.md for the task definition.`
+  subagent({
+    chain: [{
+      agent: "skills.test-strategist",
+      as: "strategy",
+      phase: "Planning",
+      label: "Write revised test plans",
+      task: `Write test plans for slices of task "${taskSlug}".
 
-  const sliceList = needs.sliceTesting.map(slug =>
-    `- ${slug} (docs/tasks/${taskSlug}/slices/<n>-${slug}.md)`
-  ).join("\n")
+Slices needing test plans: ${needs.sliceTesting.join(", ")}
 
-  chain.push({
-    agent: "skills.grill-agent",
-    as: "slice-testing",
-    phase: "Planning",
-    label: "Interview: testing strategy per slice",
-    task: `Interview about testing strategy for specific slices.
-
-${taskContext}
-
-Slices to (re-)analyse:
-${sliceList}
-
-For EACH of these slices:
-1. Read the slice doc for its acceptance criteria and what-to-build.
-2. Explore the codebase — which layers does this slice touch end-to-end?
-3. What are the failure modes? What can break? (at least two concrete modes)
-4. Testing approach: test types, scope, dependency strategy (mocks vs real),
-   key scenarios, edge cases, error handling.
-
-Ask the user one question at a time via contact_supervisor with
-recommended answers. Continue until all slices are covered.
-
-Output a ## Per-slice testing strategy with, for each slice: layer
-analysis, confirmed failure modes, testing approach, and any user
-preferences.`,
-    output: "interview/testing-summary.md",
-    acceptance: {
-      level: "none",
-      reason: "planning/interview step only"
-    }
-  })
-}
-
-// ── Step 3c: Test plan generation (if needed) ────────────────────
-if (needs.slicePlanGeneration.length > 0) {
-  const strategySource = needs.sliceTesting.length > 0
-    ? "Read {chain_dir}/interview/testing-summary.md for per-slice testing strategy."
-    : `Read the existing slice docs at docs/tasks/${taskSlug}/slices/. The user wants refreshed test plans.`
-
-  chain.push({
-    agent: "skills.test-strategist",
-    as: "strategy",
-    phase: "Planning",
-    label: "Write revised test plans",
-    outputMode: "file-only",
-    task: `Write test plans for specific slices.
-
-${strategySource}
-
-Slices needing test plans: ${needs.slicePlanGeneration.join(", ")}
+Interview notes (confirmed with user):
+${slicesNeedingTesting.map(s => `### ${s.slug}
+- Layer analysis: ${s.layerAnalysis}
+- Failure modes: ${s.failureModes}
+- Testing approach: ${s.testingApproach}
+`).join('\n')}
 
 For each slice:
-1. Write a ## Test plan section. Cover: test types, scope, dependency
-   strategy, key scenarios, edge cases, error handling, failure mode
-   coverage, and the run command.
-2. Every test scenario must derive from the slice's acceptance criteria
-   and confirmed failure modes.
-3. Write each test plan to {chain_dir}/test-plans/<n>-<slug>.md.
-
-If you have uncertainties, include ## Questions for the user.`,
-    output: "strategy/result.md",
-    acceptance: {
-      level: "none",
-      reason: "approval-agent verifies the result"
-    }
+1. Read the slice doc to understand acceptance criteria.
+2. Read docs/testing.md for project conventions.
+3. Write a ## Test plan section covering: test types, scope,
+   dependency strategy, key scenarios, edge cases, failure mode
+   coverage, error handling, test file path, run command.
+4. Append to the slice doc using edit.
+5. Set frontmatter: task_set <path> analysed true`,
+      output: "strategy/result.md",
+      outputMode: "file-only"
+    }]
   })
-}
 
-// ── Step 3d: Approval (if there's anything to approve) ───────────
-if (needs.slicePlanGeneration.length > 0) {
-  chain.push({
-    agent: "skills.approval-agent",
-    as: "approval",
-    phase: "Approval",
-    label: "User approves revisions",
-    task: `Present the test strategies for approval.
-
-Read every test plan from {chain_dir}/test-plans/.
-
-If the test-strategist left ## Questions for the user, resolve each one
-via contact_supervisor({ reason: "interview_request" }) one at a time.
-
-Present ALL test strategies for final verification via
-contact_supervisor({ reason: "need_decision" }).
-
-If changes are requested, update the test plan files and re-present.
-Loop until approved.`,
-    output: "approval/result.md",
-    acceptance: {
-      level: "none",
-      reason: "supervisor approval is the acceptance signal"
-    }
-  })
-}
-
-// ── Step 3e: Worker — apply everything ────────────────────────────
-const workerTask = buildWorkerTask()
-
-chain.push({
-  agent: "skills.worker",
-  as: "apply",
-  phase: "Landing",
-  label: "Apply all revisions",
-  outputMode: "file-only",
-  task: workerTask,
-  output: "revise/result.md"
-})
-```
-
-### Building the worker task
-
-The worker task is assembled from what needs doing:
-
-```
-function buildWorkerTask() {
-  const parts = [`Apply revisions to task "${taskSlug}".`]
-  const actions = []
-
-  if (needs.taskDefinition) {
-    actions.push(`1. Read {chain_dir}/interview/task-summary.md.
-2. Update docs/tasks/${taskSlug}/task.md with the revised definition.
-3. If the slice breakdown changed (slices added/removed/reordered):
-   - Create or remove slice docs as needed.
-   - Update task_set_slices with the new order.`)
-  }
-
-  if (needs.slicePlanGeneration.length > 0) {
-    actions.push(`- Read {chain_dir}/approval/result.md to confirm approval.
-- For each slice in [${needs.slicePlanGeneration.join(", ")}]:
-  - Copy the test plan from {chain_dir}/test-plans/<n>-<slug>.md
-    into the slice doc's ## Test plan section (creating or replacing it).
-  - Set frontmatter: task_set <slice-path> analysed true
-  - If status is todo: task_set <slice-path> status todo (keep as todo)
-- Commit: docs(task): revise test plans for <task-slug>`)
-  }
-
-  if (needs.metadataOnly.length > 0) {
-    actions.push(`- Update metadata for slices: [${needs.metadataOnly.join(", ")}].
-- Commit: docs(task): revise slice metadata for <task-slug>`)
-  }
-
-  actions.push(`- Set task_state_set last_action revise-task updated <task-slug>
-- If all slices now have analyset: true:
-    task_state_set next_action pipeline-slices <task-slug>
-  Else:
-    task_state_set next_action revise-task <task-slug> (unanalysed remain)`)
-
-  return parts.concat(actions).join("\n")
+  await wait({ all: true })
 }
 ```
 
-## Step 4 — Launch and run parent loop
+## Step 5 — Commit
 
 ```
-const chainRunId = subagent({ async: true, timeoutMs: 600_000, turnBudget: { maxTurns: 50, graceTurns: 6 }, chain })
-
-while (true) {
-  await wait({ id: chainRunId })
-
-  const pending = await subagent_supervisor({ action: "pending" })
-  for (const request of pending) {
-    if (request.reason === "interview_request") {
-      const { question, context, recommended, reasoning } =
-        JSON.parse(request.interview)
-
-      const answer = await ask_user_question({
-        header: "Revise",
-        question: `**Context:** ${context}\n\n**Question:** ${question}\n\n**Recommended:** ${recommended}\n\n**Reasoning:** ${reasoning}`,
-        options: [
-          { label: `Accept: ${recommended.slice(0, 55)}`,
-            description: "Agree with the recommended answer." },
-          { label: "Custom answer",
-            description: "Provide a different answer." }
-        ]
-      })
-
-      await subagent_supervisor({
-        action: "reply",
-        replyTo: request.id,
-        message: JSON.stringify({ answer })
-      })
-
-    } else if (request.reason === "need_decision") {
-      // Handle legacy need_decision (some agents may still use it)
-      await subagent_supervisor({
-        action: "reply",
-        replyTo: request.id,
-        message: "approved"
-      })
-    }
-  }
-
-  const status = await subagent({ action: "status", id: chainRunId })
-  if (status.state === "complete") break
-  if (status.state === "failed" || status.state === "paused") {
-    report: "revise-task chain did not complete; inspect status and chain_dir"
-    return
-  }
-}
+bash(`git add docs/tasks/${taskSlug}/ && git commit -m "docs(task): revise ${taskSlug}"`)
 ```
 
-## Step 5 — Report
-
-After the chain completes:
-
-```
-const result = read("{chain_dir}/revise/result.md")
+## Step 6 — Report
 
 Report:
 - What was revised (task definition, n slice test plans, metadata)
 - Any remaining unanalysed slices
 - Next action:
-  - All slices ready → "/skill:pipeline-slices <task-slug>"
-  - More unanalysed → "/skill:revise-task <task-slug>" again
-```
+  - All slices ready → `/skill:pipeline-slices <task-slug>`
+  - More to do → `/skill:revise-task <task-slug>` again
 
 ## Example: re-analysing unanalysed slices from an old task
 
@@ -379,22 +200,17 @@ User: /skill:revise-task config-db-migrations
 Agent: Task "Config DB Migrations" — 1 done, 2 analysed, 2 unanalysed.
        What needs to change?
 User: Re-analyse unanalysed slices
-Agent: [builds chain: grill-agent(per-slice for 2 slices) →
-       test-strategist → approval-agent → worker]
-       [launches, runs parent loop for grill + approval]
+Agent: [interviews per-slice testing strategy for 2 slices]
+       [dispatches test-strategist]
 Agent: Done. Both slices now have test plans and analyset: true.
        All 4 remaining slices ready. Next: /skill:pipeline-slices
 ```
 
 ## Constraints
 
-- **Dynamic chain composition.** The parent agent builds the chain array at
-  runtime based on what needs changing. There is no predefined chain.
-- **Only includes necessary steps.** If nothing needs a grill-agent, don't
-  include one. If there's nothing to approve, skip the approval-agent.
-- **Context flows through {chain_dir}.** Each step reads what the previous
-  steps wrote. The task definition interview writes to
-  `interview/task-summary.md`. The slice testing interview reads it.
-- **Handles both new and old tasks.** Pre-v1.2.0 tasks with `analysed: false`
-  slices work. Post-v1.2.0 tasks work too — useful for updating test plans
-  when the codebase evolved.
+- **Parent agent owns the interview.** No subagents ask the user questions.
+  The parent uses `ask_user_question` directly.
+- **Only dispatch test-strategist if slices were re-analysed.** If only
+  metadata changed, skip it.
+- **Explore first, ask second.** The codebase can answer many questions;
+  only ask the user for things the code can't tell you.

@@ -5,7 +5,7 @@ description: >
   testing strategy, then build it under full control (strict TDD + hard
   verify gate) via a subagent chain. Creates no docs/tasks/ artifacts — the
   spec is ephemeral, living in the chain run's {chain_dir}. Use for small or
-  quick changes that don't warrant a planned task. Requires pi-subagents.
+  quick changes that don't warrant a planned task.
 ---
 
 # Ad-hoc Task — refine, then build under control
@@ -20,10 +20,9 @@ are the only audit trail.
 
 ## Prerequisites
 
-- `pi-subagents` installed (`pi install npm:pi-subagents`). The build reuses
-  the `tdd-worker` and `slice-verifier` agents shipped with this package, plus
-  the `adhoc-refiner` agent defined here.
 - A git repo — the result lands on a branch.
+- The build reuses the `tdd-worker` and `slice-verifier` agents plus the
+  `adhoc-refiner` agent defined here.
 
 ## Step 0 — Pre-flight: branch + warnings
 
@@ -129,7 +128,28 @@ subagent({
 
 Wait for the chain to finish. If `slice-verifier` fails, **stop** — re-dispatch
 `tdd-worker` with the failure output (or the whole chain). Do not commit a
-red build.
+red build. If the tdd-worker writes an uncertainty file, resolve it with
+the user and re-dispatch.
+
+```
+const chainStatus = await subagent_wait({ all: true })
+
+if (chainStatus.state === "failed") {
+  const uncertaintyPath = "{chain_dir}/build/uncertainty.md"
+  if (bash(`test -f ${uncertaintyPath} && echo yes || echo no`).trim() === "yes") {
+    const uncertainty = read(uncertaintyPath)
+    const resolution = await ask_user_question({
+      header: "Uncertain",
+      question: `The TDD worker hit an uncertainty:\n\n${uncertainty}\n\nHow to proceed?`,
+      options: [
+        { label: "Accept recommended", description: "Proceed with the recommended approach." },
+        { label: "Custom answer", description: "Provide a specific answer." }
+      ]
+    })
+    // Re-dispatch with resolution
+  }
+}
+```
 
 ## Step 4 — Harvest durable knowledge
 
@@ -198,12 +218,12 @@ Do **not**:
 
 ## Error handling
 
-- If `pi-subagents` is missing, stop and tell the user to run
-  `pi install npm:pi-subagents`.
 - If `adhoc-refiner` leaves a `TODO: resolve run command`, do not proceed to
   the verifier — resolve the command with the user first, then re-run the
   refiner step.
 - Never commit when `slice-verifier` failed.
+- If the tdd-worker writes an uncertainty file, resolve it with the user and
+  re-dispatch.
 
 ## Constraints
 

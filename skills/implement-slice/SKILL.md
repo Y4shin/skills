@@ -2,18 +2,21 @@
 name: implement-slice
 description: >
   Build a slice via strict TDD with autonomous divergence handling. Dispatches
-  worker (branch+sync) → tdd-worker (TDD, asks when uncertain) →
-  slice-verifier (gate) → worker (divergence check) → worker (land).
-  No prior start-slice needed — slice already has its test plan from create-task.
+  worker (branch+sync) → tdd-worker (TDD, fails with context on uncertainty) →
+  slice-verifier (gate) → worker (divergence check, fails with context) →
+  worker (land). No supervisor/intercom needed — subagents fail with
+  structured artifacts that the parent handles.
   Use after create-task, or one-at-a-time instead of pipeline-slices.
 ---
 
 # Implement Slice — Build with TDD (Chain)
 
 Phase 2: build a slice via strict TDD. The slice already has a test plan
-(from create-task), so implementation is autonomous with two escape hatches:
-the tdd-worker asks when uncertain, and a divergence check after verification
-flags plan deviations that could affect remaining slices.
+(from create-task), so implementation is autonomous. Two escape hatches:
+- The tdd-worker, if uncertain, writes an uncertainty artifact and fails
+- The divergence check, if significant, writes a divergence artifact and fails
+The parent reads the artifact, resolves the question (with user if needed),
+and retries.
 
 ## Prerequisites
 
@@ -49,7 +52,6 @@ local branch. Pull before continuing?`,
   if (action === "Pull now") {
     bash("git pull --rebase")
   }
-  // If skip, proceed with a warning but don't block.
 }
 ```
 
@@ -59,7 +61,7 @@ If the pull fails with conflicts, stop — the user must resolve them manually.
 
 Verify the slice doc has `analysed: true` and a `## Test plan` section.
 If not, this slice hasn't been through create-task — run `/skill:create-task`
-first to plan the task with test strategies.
+first.
 
 Read the slice doc and its parent `task.md`. Set the slice to in-progress:
 
@@ -80,10 +82,8 @@ const taskSlug = "<task-slug>"
 const taskPath = "docs/tasks/<task-slug>/task.md"
 const sliceSlug = "<slice-slug>"
 const slicePath = "docs/tasks/<task-slug>/slices/<n>-<slice-slug>.md"
-// Read the chain definition from the extracted chain file
 const chainDef = JSON.parse(bash("cat chains/implement-slice.chain.json"))
 
-// Substitute runtime variables into step tasks
 const steps = chainDef.chain.map(step => ({
   ...step,
   task: step.task
@@ -93,7 +93,7 @@ const steps = chainDef.chain.map(step => ({
     .replaceAll("{taskPath}", taskPath)
 }))
 
-subagent({
+const chainRunId = subagent({
   async: true,
   timeoutMs: chainDef.timeoutMs,
   turnBudget: chainDef.turnBudget,
@@ -101,120 +101,77 @@ subagent({
 })
 ```
 
-## Step 3 — Parent loop (handle interactive requests)
-
-Two types of requests may arrive during implementation:
-
-1. **interview_request** — tdd-worker is uncertain about the test plan or
-   acceptance criteria.
-2. **need_decision** — divergence-checker found plan deviations that affect
-   remaining slices.
+## Step 3 — Wait for completion, handle failures
 
 ```
-const chainRunId = "<id returned by subagent launch>"
+let chainStatus = await subagent_wait({ id: chainRunId })
 
-while (true) {
-  await wait({ id: chainRunId })
+/**
+ * The chain can end in three states:
+ * 1. complete — all steps succeeded → proceed to landing
+ * 2. failed with uncertainty artifact → resolve and retry
+ * 3. failed with divergence artifact → ask user and handle
+ * 4. other failure → inspect and report
+ */
 
-  const pending = await subagent_supervisor({ action: "pending" })
-  for (const request of pending) {
-    if (request.reason === "interview_request") {
-      // tdd-worker hit something uncertain — test plan outdated, criterion
-      // ambiguous, or a design decision not covered by the plan.
-      const { question, context, recommended, reasoning } =
-        JSON.parse(request.interview)
+let retries = 0
+const maxRetries = 2
+let resolvedContext = ""
 
-      const answer = await ask_user_question({
-        header: "Uncertain",
-        question: `**Context:** ${context}\n\n**Question:** ${question}\n\n**Recommended:** ${recommended}\n\n**Reasoning:** ${reasoning}`,
-        options: [
-          { label: `Accept: ${recommended.slice(0, 55)}`,
-            description: "Agree with the recommended answer." },
-          { label: "Custom answer",
-            description: "Provide a different answer." }
-        ]
-      })
+while (chainStatus.state !== "complete" && retries <= maxRetries) {
+  // Check what kind of failure
+  const tddResultPath = "{chain_dir}/tdd/result.md"
+  const divergeResultPath = "{chain_dir}/diverge/result.md"
+  const tddUncertaintyPath = "{chain_dir}/tdd/uncertainty.md"
+  const divergeArtifactPath = "{chain_dir}/diverge/divergence.md"
 
-      await subagent_supervisor({
-        action: "reply",
-        replyTo: request.id,
-        message: JSON.stringify({ answer })
-      })
+  if (bash(`test -f ${tddUncertaintyPath} && echo yes || echo no`).trim() === "yes") {
+    // ── TDD uncertainty: resolve and retry ─────────────────────
+    const uncertainty = read(tddUncertaintyPath)
+    const resolution = await ask_user_question({
+      header: "Uncertain",
+      question: `**Slice:** ${sliceSlug}\n\nThe TDD worker hit an uncertainty:\n\n${uncertainty}\n\nHow should it proceed?`,
+      options: [
+        { label: "Accept recommended approach",
+          description: "Proceed with the recommended approach from the uncertainty." },
+        { label: "Custom answer",
+          description: "Provide a specific answer." }
+      ]
+    })
 
-    } else if (request.reason === "need_decision") {
-      // divergence-checker found significant plan deviations that affect
-      // remaining slices. This is a ONE-SHOT discussion — the agent prepared
-      // everything, now the user decides.
-      const { summary, affectedSlices, recommendation, options } =
-        JSON.parse(request.discussion)
+    resolvedContext = `Previous attempt got this resolution: ${resolution}\n\n`
 
-      const decision = await ask_user_question({
-        header: "Diverged",
-        question: `**What diverged:** ${summary}\n\n**Affected slices:** ${affectedSlices}\n\n**Recommendation:** ${recommendation}\n\nChoose how to proceed:`,
-        options: options.map(opt => ({
-          label: opt.label,
-          description: opt.description
-        }))
-      })
-
-      await subagent_supervisor({
-        action: "reply",
-        replyTo: request.id,
-        message: JSON.stringify({ decision })
-      })
-    }
-  }
-
-  const chainStatus = await subagent({ action: "status", id: chainRunId })
-  if (chainStatus.state === "complete") break
-  if (chainStatus.state === "failed" || chainStatus.state === "paused") {
-    // Check if tdd-worker exhausted its turn budget (the most common
-    // failure mode). If so, retry with learnings from the partial output.
-    const tddResultPath = "{chain_dir}/tdd/result.md"
-    const tddResultExists = bash(`test -f ${tddResultPath} && echo yes || echo no`).trim()
-
-    if (tddResultExists === "yes") {
-      let retries = 0
-      const maxRetries = 2
-
-      while (retries < maxRetries) {
-        retries++
-        report: `tdd-worker did not complete (attempt ${retries}/${maxRetries + 1}). Retrying with prior output…`
-
-        // Read partial output for context on what remains
-        const priorOutput = bash(`cat ${tddResultPath}`)
-
-        // Re-launch tdd-worker with continuation context
-        const retryRunId = subagent({
-          async: true,
-          chain: [
-            {
-              agent: "skills.tdd-worker",
-              as: "retry-tdd",
-              phase: "Implementation",
-              label: "TDD continuation (retry)",
-              task: `CONTINUATION (attempt ${retries + 1}): Implement slice "${sliceSlug}"
+    // Re-dispatch tdd-worker + slice-verifier with resolution
+    retries++
+    chainRunId = subagent({
+      async: true,
+      chain: [
+        {
+          agent: "skills.tdd-worker",
+          as: "retry-tdd",
+          phase: "Implementation",
+          label: "TDD continuation (retry)",
+          task: `CONTINUATION (attempt ${retries + 1}): Implement slice "${sliceSlug}"
 for task "${taskSlug}" using strict TDD.
 
 Slice doc: ${slicePath}
 Task doc: ${taskPath}
 
-The previous attempt did not complete. Here is what was accomplished:
+${resolvedContext}Resolution for the uncertainty: ${resolution}
 
-${priorOutput}
+${bash(`test -f ${tddResultPath} && echo "Prior output:\\n" + cat(tddResultPath) || ""`)}
 
-Continue from where the previous attempt left off. Follow the same
-strict TDD cycle. Do NOT redo work that was already completed —
-pick up from the first unfinished acceptance criterion.`,
-              output: "tdd/result.md"
-            },
-            {
-              agent: "skills.slice-verifier",
-              as: "retry-verify",
-              phase: "Verification",
-              label: "Verify (retry)",
-              outputMode: "file-only",
-              task: `Verify slice "${sliceSlug}" for task "${taskSlug}".
+Continue from where the previous attempt left off. Follow strict TDD.
+Do NOT redo completed work.`,
+          output: "tdd/result.md"
+        },
+        {
+          agent: "skills.slice-verifier",
+          as: "retry-verify",
+          phase: "Verification",
+          label: "Verify (retry)",
+          outputMode: "file-only",
+          task: `Verify slice "${sliceSlug}" for task "${taskSlug}".
 
 Slice doc: ${slicePath}
 
@@ -223,79 +180,41 @@ Run the quality gate:
 2. Find and run the test command from ## Test plan → Run command.
 
 If lint fails: STOP. If tests fail: STOP.`,
-              output: "verify/result.md"
-            }
-          ]
-        })
+          output: "verify/result.md"
+        }
+      ]
+    })
 
-        // Wait for retry chain, relay any interview requests
-        while (true) {
-          await wait({ id: retryRunId })
-          const pendingRetry = await subagent_supervisor({ action: "pending" })
-          for (const req of pendingRetry) {
-            if (req.reason === "interview_request") {
-              const { question, context, recommended, reasoning } =
-                JSON.parse(req.interview)
-              const answer = await ask_user_question({
-                header: "Uncertain",
-                question: `**Context:** ${context}\n\n**Question:** ${question}\n\n**Recommended:** ${recommended}\n\n**Reasoning:** ${reasoning}`,
-                options: [
-                  { label: `Accept: ${recommended.slice(0, 55)}`,
-                    description: "Agree with the recommended answer." },
-                  { label: "Custom answer",
-                    description: "Provide a different answer." }
-                ]
-              })
-              await subagent_supervisor({
-                action: "reply",
-                replyTo: req.id,
-                message: JSON.stringify({ answer })
-              })
-            }
-          }
-          const retryStatus = await subagent({ action: "status", id: retryRunId })
-          if (retryStatus.state === "complete") {
-            // Retry succeeded — patch the main chain status by manually
-            // running the remaining steps (diverge + land)
-            const tailRunId = subagent({
-              async: true,
-              chain: [
-                {
-                  agent: "skills.worker",
-                  as: "retry-diverge",
-                  phase: "Divergence",
-                  label: "Divergence check (retry)",
-                  task: `Check for plan divergence that could affect remaining slices.
+    chainStatus = await subagent_wait({ id: chainRunId })
 
-Read {chain_dir}/tdd/result.md for the ## Divergence from plan section
-and any ## Significant divergences.
+  } else if (bash(`test -f ${divergeArtifactPath} && echo yes || echo no`).trim() === "yes") {
+    // ── Divergence detected: ask user how to proceed ────────────
+    const divergence = read(divergeArtifactPath)
+    const decision = await ask_user_question({
+      header: "Diverged",
+      question: `**Slice:** ${sliceSlug}\n\nThe implementation diverged from the plan:\n\n${divergence}\n\nHow to proceed?`,
+      options: [
+        { label: "Accept divergence, continue",
+          description: "The divergence is fine — proceed with landing." },
+        { label: "Need to adjust remaining slices",
+          description: "Divergence affects other slices. Stop and revise." },
+        { label: "Stop and review",
+          description: "Stop the implementation for manual review." }
+      ]
+    })
 
-Read the slice doc at ${slicePath} for the original plan.
-
-If NO significant divergences: output "no significant divergence" and stop.
-
-If significant divergences exist:
-1. Read the task doc at ${taskPath}.
-2. Read EVERY remaining slice doc at docs/tasks/${taskSlug}/slices/.
-3. For each remaining slice, determine if the divergence affects it.
-4. If NO remaining slices are affected: explain why. Proceed.
-5. If any remaining slices ARE affected, use
-   contact_supervisor({ reason: "need_decision" }) with summary,
-   affectedSlices, recommendation, and options.
-   After the supervisor replies, apply updates. Output "divergence handled".`,
-                  output: "diverge/result.md",
-                  acceptance: {
-                    level: "none",
-                    reason: "interactive divergence discussion"
-                  }
-                },
-                {
-                  agent: "skills.worker",
-                  as: "retry-land",
-                  phase: "Landing",
-                  label: "Merge and archive (retry)",
-                  outputMode: "file-only",
-                  task: `Land slice "${sliceSlug}" for task "${taskSlug}".
+    if (decision === "Accept divergence, continue") {
+      // Re-dispatch the remaining steps (diverge + land)
+      chainRunId = subagent({
+        async: true,
+        chain: [
+          {
+            agent: "skills.worker",
+            as: "retry-land",
+            phase: "Landing",
+            label: "Merge and archive",
+            outputMode: "file-only",
+            task: `Land slice "${sliceSlug}" for task "${taskSlug}".
 
 Slice doc: ${slicePath}
 Task doc: ${taskPath}
@@ -309,69 +228,24 @@ Task doc: ${taskPath}
    task_set ${slicePath} status done
    task_set ${slicePath} completed_at <ISO now>
 4. Append implementation note to task's ## Implementation notes.
-5. Archive the slice:
-   mkdir -p docs/tasks/${taskSlug}/slices/archive
+5. Archive the slice: mkdir -p docs/tasks/${taskSlug}/slices/archive
    git mv ${slicePath} docs/tasks/${taskSlug}/slices/archive/<n>-<slug>.md
-6. Commit: git add docs/tasks/ && git commit -m "docs(slice): land ${sliceSlug} into ${taskSlug}"
-7. Check remaining slices. If last: set task done.
-8. Set task_state_set last_action implement-slice landed ${sliceSlug}`,
-                  output: "land/result.md"
-                }
-              ]
-            })
-
-            // Relay any divergence discussions from the tail chain
-            while (true) {
-              await wait({ id: tailRunId })
-              const pendingTail = await subagent_supervisor({ action: "pending" })
-              for (const req of pendingTail) {
-                if (req.reason === "need_decision") {
-                  const { summary, affectedSlices, recommendation, options } =
-                    JSON.parse(req.discussion)
-                  const decision = await ask_user_question({
-                    header: "Diverged",
-                    question: `**What diverged:** ${summary}\n\n**Affected slices:** ${affectedSlices}\n\n**Recommendation:** ${recommendation}`,
-                    options: options.map(opt => ({
-                      label: opt.label,
-                      description: opt.description
-                    }))
-                  })
-                  await subagent_supervisor({
-                    action: "reply",
-                    replyTo: req.id,
-                    message: JSON.stringify({ decision })
-                  })
-                }
-              }
-              const tailStatus = await subagent({ action: "status", id: tailRunId })
-              if (tailStatus.state === "complete") break
-              if (tailStatus.state === "failed") {
-                report: "retry chain tail did not complete; inspect chain_dir"
-                return
-              }
-            }
-            break  // Retry succeeded, exit the outer retry loop
+6. Commit: git add docs/tasks/ && git commit -m "docs(slice): land ${sliceSlug}"
+7. If last slice: set task done.
+8. Task state: task_state_set last_action implement-slice landed ${sliceSlug}`,
+            output: "land/result.md"
           }
-          if (retryStatus.state === "failed" || retryStatus.state === "paused") {
-            break  // Retry also failed, fall through to next iteration or escalation
-          }
-        }
-
-        // If retry chain completed successfully, break out of retry loop
-        const finalStatus = await subagent({ action: "status", id: retryRunId })
-        if (finalStatus.state === "complete") break
-      }
-
-      // If all retries exhausted, escalate to user
-      const finalCheck = await subagent({ action: "status", id: chainRunId })
-      if (retries >= maxRetries) {
-        report: `tdd-worker did not complete after ${maxRetries + 1} attempts. Inspect {chain_dir}/tdd/result.md and decide next steps.`
-        return
-      }
+        ]
+      })
+      chainStatus = await subagent_wait({ id: chainRunId })
     } else {
-      report: "implement-slice chain did not complete; inspect status and chain_dir"
+      report: `Divergence in ${sliceSlug} affects remaining slices. Run /skill:revise-task ${taskSlug} to update affected slice plans before continuing.`
       return
     }
+  } else {
+    // ── Other failure ───────────────────────────────────────────
+    report: `implement-slice chain failed. Inspect {chain_dir} for details.`
+    return
   }
 }
 ```
@@ -384,29 +258,24 @@ landing was successful.
 Report the outcome:
 
 - Slice implemented, verified, and landed
-- Any divergences from the plan (and whether they triggered a discussion)
+- Any divergences from the plan (and how they were resolved)
 - Number of remaining slices
 - If all slices done: "Run `/skill:finalize-task <task-slug>`"
 - If more remain: "Next: `/skill:implement-slice <next-slug>` or `/skill:pipeline-slices <task-slug>`"
 
 ## Error handling
 
-- If `analysed: false` or no `## Test plan`, run `/skill:create-task` first —
-  the slice wasn't planned properly.
-- If the verifier fails, inspect `{chain_dir}/verify/result.md` and restart
-  the chain (the tdd-worker will fix issues and retry).
-- If merge conflicts arise, resolve them to keep both new and already-merged
-  slices working.
+- If `analysed: false` or no `## Test plan`, run `/skill:create-task` first.
+- If the verifier fails, inspect `{chain_dir}/verify/result.md` and restart.
+- If merge conflicts arise, resolve manually.
 - Never merge a red slice into the task branch.
-- If the divergence-checker's `need_decision` isn't answered within a
-  reasonable time (the user walked away), the chain pauses — this is expected.
-  Resume via `subagent({ action: "resume", id: "..." })` with the decision.
+- If all retries exhausted for TDD uncertainty, ask the user to review
+  `{chain_dir}/tdd/result.md` and decide next steps.
 
 ## Constraints
 
 - Spec-first — never write a test to match a wrong implementation.
 - No speculative code — implement only what the slice requires.
 - No per-slice PR — slices merge into the task branch; only finalize merges to main.
-- Ask when uncertain — guessing compounds across slices.
-- Divergence is expected — the plan is a plan, not a contract. Minor deviations
-  are normal. The divergence check exists to catch the ones that matter.
+- Subagents never ask the user questions — they fail with structured artifacts.
+- Divergence is expected — the plan is a plan, not a contract.

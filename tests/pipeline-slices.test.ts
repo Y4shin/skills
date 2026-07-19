@@ -32,10 +32,11 @@ describe("pipeline-slices skill doc structure", () => {
 		expect(doc).toContain("wait({ id: ");
 	});
 
-	test("has parent loop relay pattern", () => {
-		expect(doc).toContain("subagent_supervisor({ action: \"pending\" })");
-		expect(doc).toContain("interview_request");
-		expect(doc).toContain("need_decision");
+	test("uses subagent_wait for non-interactive chain completion", () => {
+		expect(doc).toContain("subagent_wait");
+		// No supervisor/intercom relay
+		expect(doc).not.toContain("subagent_supervisor");
+		expect(doc).not.toContain("contact_supervisor");
 	});
 
 	test("disables planning acceptance gates", () => {
@@ -63,7 +64,7 @@ describe("pipeline-slices skill doc structure", () => {
 	});
 
 	test("handles slice states", () => {
-		expect(doc).toContain("status: todo");
+		expect(doc).toContain("\"status\", \"in-progress\"");
 		expect(doc).toContain("\"status\", \"skipped\"");
 	});
 
@@ -71,8 +72,10 @@ describe("pipeline-slices skill doc structure", () => {
 		expect(doc).toContain("implement-slice.chain.json");
 	});
 
-	test("uses per-slice loop with buildSliceChain", () => {
-		expect(doc).toContain("buildSliceChain");
+	test("uses per-slice loop with chain variable substitution", () => {
+		expect(doc).toContain("for (let i = 0; i < pendingSlices.length; i++)");
+		expect(doc).toContain("sliceChain");
+		expect(doc).toContain("sliceSlug");
 	});
 
 	test("per-slice error handling with retry/skip/stop", () => {
@@ -85,8 +88,8 @@ describe("pipeline-slices skill doc structure", () => {
 		expect(doc).toContain("slice ${i + 1} of $");
 	});
 
-	test("has partial recovery instructions", () => {
-		expect(doc).toContain("Recovery");
+	test("has error recovery instructions", () => {
+		expect(doc).toContain("retries");
 		expect(doc).toContain("pipeline-slices");
 	});
 
@@ -321,7 +324,6 @@ describe("pipeline-slices edge cases", () => {
 
 	test("has state recovery after partial run", () => {
 		const doc = readSkill("skills/pipeline-slices/SKILL.md");
-		expect(doc).toContain("Recovery");
-		expect(doc).toContain("resumes");
+		expect(doc).toContain("re-run");
 	});
 });

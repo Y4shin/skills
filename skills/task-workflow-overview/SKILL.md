@@ -24,11 +24,12 @@ frontmatter.**
 
 The workflow has three phases:
 
-1. **create-task** — the ONLY interactive phase. The user defines the task and
-   reviews test strategies for every slice in one sitting.
+1. **create-task** — the ONLY interactive phase. The parent agent interviews
+   the user directly for task definition and per-slice testing strategy.
+   No subagents involved in the interactive parts.
 2. **pipeline-slices** (or **implement-slice** one-at-a-time) — fully
-   autonomous TDD implementation. The agent asks only when uncertain or when
-   plan divergences affect remaining slices.
+   autonomous TDD implementation. Subagents fail with structured artifacts
+   when uncertain; the parent resolves and retries.
 3. **finalize-task** — CI gate, knowledge harvesting, changelog, archive, merge.
 
 ## Answering questions — read-only
@@ -64,31 +65,30 @@ For anything that *creates or changes* artifacts, invoke the matching skill:
 | Migrate from old prd-workflow | `/skill:migrate-workflow` |
 | Init a fresh repo | `/skill:onboard-workflow` |
 
-**Orchestrator skills** (`create-task`, `revise-task`, `implement-slice`,
-`pipeline-slices`, `finalize-task`) dispatch subagent chains for heavy-lifting work. The chains
-may pause for user input via `contact_supervisor` only when necessary.
+**Interactive skills** (`create-task`, `revise-task`) use `ask_user_question`
+directly — no subagents involved for the interactive parts.
+
+**Implementation skills** (`implement-slice`, `pipeline-slices`, `finalize-task`)
+dispatch subagent chains for autonomous work:
 
 | Chain | Steps |
 | --- | --- |
-| **create-task** | grill-agent → test-strategist → approval-agent → worker |
 | **implement-slice** | worker → tdd-worker → slice-verifier → worker (diverge) → worker (land) |
-| **revise-task** | Dynamic: composes grill-agent → [grill-agent] → [test-strategist] → [approval-agent] → worker based on what needs changing |
 | **pipeline-slices** | For each slice: worker (setup) → tdd-worker → slice-verifier → worker (diverge) → worker (land) |
 | **finalize-task** | worker → task-summarizer → worker |
 
-**Agents** used by these chains:
+**Agents** used by these chains — all non-interactive:
 
 | Agent | Role |
 | --- | --- |
-| `grill-agent` | Autonomous interviewer — explores codebase, asks user one question at a time |
-| `approval-agent` | Presents plans/strategies for user approval, handles revise-re-present loop |
 | `test-strategist` | Designs test plans from slice requirements and failure modes |
-| `tdd-worker` | RED → GREEN → REFACTOR implementation, asks when uncertain |
+| `tdd-worker` | RED → GREEN → REFACTOR implementation, writes uncertainty artifact on ambiguity |
 | `slice-verifier` | Lint + test quality gate |
+| `worker` | Generic implementation and archival tasks |
 | `task-summarizer` | Writes changelog entries |
 
-Subagents require `pi-subagents` to be installed (`pi install
-npm:pi-subagents`).
+Subagents never use `contact_supervisor` — they fail with structured artifacts
+when uncertain, and the parent resolves.
 
 ## Project-level files
 
@@ -121,5 +121,5 @@ into the system prompt at session start and when the workflow state changes.
 - **Internal tracking only.** No GitHub/Forgejo issues. State lives entirely in
   `docs/tasks/` directory tree and frontmatter.
 - **Create-task is the only interactive phase.** After that, implementation
-  is autonomous. The agent asks only when genuinely uncertain or when plan
-  divergences threaten remaining slices.
+  is autonomous. Subagents never ask the user questions — they fail with
+  structured artifacts and the parent resolves.

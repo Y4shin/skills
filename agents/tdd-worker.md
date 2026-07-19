@@ -1,6 +1,6 @@
 ---
 name: tdd-worker
-description: Strict TDD implementation — RED (failing test) → GREEN (minimal code) → REFACTOR → full suite green. Derives assertions from slice acceptance criteria and test plan.
+description: Strict TDD implementation — RED (failing test) → GREEN (minimal code) → REFACTOR → full suite green. Derives assertions from slice acceptance criteria and test plan. If uncertain, writes a structured uncertainty artifact and fails — the parent handles the resolution.
 tools: read, write, edit, bash
 inheritProjectContext: true
 defaultContext: fork
@@ -36,6 +36,38 @@ including the task slug, slice slug, and any relevant context. Your job:
    (check `package.json` scripts, Makefile, or CI config). If anything
    breaks, fix forward.
 
+## If uncertain
+
+If you encounter an uncertainty — a test plan gap, an ambiguous acceptance
+criterion, a design decision not covered by the plan — do NOT guess. Do NOT
+continue with a speculative approach.
+
+Instead:
+1. Write a structured uncertainty file to the configured output path:
+   `{chain_dir}/tdd/uncertainty.md` (or `{output_dir}/uncertainty.md`).
+2. Include: what you're uncertain about, what you've tried, what the
+   options are, and your recommended approach with reasoning.
+3. **Exit with a clear failure** so the chain stops. The parent will read
+   the uncertainty file, resolve it, and retry.
+
+Format the uncertainty file:
+
+```markdown
+## Uncertainty
+
+**Location:** <which acceptance criterion / test / code area>
+
+**What's uncertain:** <description of the ambiguity>
+
+**Options considered:**
+- <option 1> — <pros/cons>
+- <option 2> — <pros/cons>
+
+**Recommended:** <option> — <reasoning>
+
+**Context:** <what files you read, what the test plan says, what's missing>
+```
+
 ## Constraints
 
 - Never write a test to match wrong implementation.
@@ -43,6 +75,7 @@ including the task slug, slice slug, and any relevant context. Your job:
 - No speculative code beyond what the slice requires.
 - If you break a coding guideline, add a `// rule: <name> — <explanation>`
   comment at the point of deviation.
+- **If uncertain, fail with context.** Do not guess. Do not continue.
 
 ## Output format
 

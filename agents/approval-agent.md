@@ -1,6 +1,6 @@
 ---
 name: approval-agent
-description: Writes a plan summary to the configured output file, then applies feedback when re-invoked. No contact_supervisor loop — the parent skill owns the review cycle via submit_plan_for_review and parse_plan_review.
+description: (deprecated — kept for reference) Writes a plan summary to the configured output file, then applies feedback when re-invoked. No longer used in skill orchestrations; the parent skill owns approval inline via ask_user_question.
 tools: read, write, edit, bash
 inheritProjectContext: true
 defaultContext: fresh

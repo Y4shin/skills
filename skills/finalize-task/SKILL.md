@@ -89,7 +89,7 @@ subagent({
 ## Step 3 — Wait for completion
 
 ```
-await wait({ all: true })
+await subagent_wait({ all: true })
 ```
 
 Read `{chain_dir}/archive/result.md` to confirm archiving and integration.

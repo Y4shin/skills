@@ -33,7 +33,11 @@ function launchAsyncDir(session: { messages: unknown[] }): string | undefined {
 }
 
 describe("supervisor round-trip (pi-subagents native channel)", () => {
-	test("parent wakes on the child's contact_supervisor, asks the user, replies, and the chain completes", async () => {
+	// SKIPPED: The supervisor/intercom pattern has been replaced by fail-with-context.
+	// Subagents no longer use contact_supervisor. They write uncertainty/divergence
+	// artifacts and fail; the parent reads the artifact, resolves, and retries.
+	// This test infrastructure is kept for reference.
+	test.skip("parent wakes on the child's contact_supervisor, asks the user, replies, and the chain completes", async () => {
 		const run = await runSupervisorRoundtrip({ respond: parentLoopResponder(), timeoutMs: 90_000 });
 
 		try {

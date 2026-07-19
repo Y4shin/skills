@@ -7,18 +7,19 @@ function readSkill(relativePath: string): string {
 }
 
 describe("workflow skill orchestration docs", () => {
-	test("create-task uses async chain and file-based review", () => {
+	test("create-task uses inline interview and test-strategist subagent", () => {
 		const doc = readSkill("skills/create-task/SKILL.md");
 
-		expect(doc).toContain("async: true");
-		expect(doc).toContain("await wait({ id: ");
-		expect(doc).toContain("subagent_supervisor({ action: \"pending\" })");
-		expect(doc).toContain("create-task.chain.json");
-		// File-based plan review tools
-		expect(doc).toContain("submit_plan_for_review");
-		expect(doc).toContain("parse_plan_review");
-		// Dotted agent names
-		expect(doc).toContain("skills.");
+		// Uses inline interview with ask_user_question
+		expect(doc).toContain("ask_user_question");
+		// Dispatches test-strategist for formal test plans
+		expect(doc).toContain("skills.test-strategist");
+		// Writes artifacts directly
+		expect(doc).toContain("write(`docs/tasks/");
+		expect(doc).toContain("task_set_slices");
+		// No supervisor/intercom patterns
+		expect(doc).not.toContain("subagent_supervisor");
+		expect(doc).not.toContain("contact_supervisor");
 	});
 
 	test("implement-slice uses async chain with extracted JSON", () => {
@@ -39,11 +40,17 @@ describe("workflow skill orchestration docs", () => {
 
 	test("agents use dotted names (package: skills)", () => {
 		for (const agent of [
-			"adhoc-refiner", "approval-agent", "grill-agent",
-			"slice-verifier", "task-summarizer", "tdd-worker", "test-strategist",
+			"adhoc-refiner", "slice-verifier", "task-summarizer",
+			"tdd-worker", "test-strategist",
 		]) {
 			const content = readSkill("agents/" + agent + ".md");
 			expect(content).toContain("package: skills");
+		}
+		// Deprecated agents still exist but are no longer used in skill orchestrations
+		for (const agent of ["approval-agent", "grill-agent"]) {
+			const content = readSkill("agents/" + agent + ".md");
+			expect(content).toContain("package: skills");
+			expect(content).toContain("deprecated");
 		}
 	});
 

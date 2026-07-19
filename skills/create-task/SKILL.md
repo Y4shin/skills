@@ -1,20 +1,19 @@
 ---
 name: create-task
 description: >
-  Launch the create-task chain to interview the user and produce a task doc
-  (or epic) with slice docs that include full test plans. This is the ONLY
-  interactive phase — after this, implementation runs autonomously.
-  Dispatches two grill-agents (task definition + per-slice testing strategy),
-  test-strategist, approval-agent, and worker.
+  Interview the user to produce a task doc (or epic) with slice docs that
+  include full test plans. The parent agent interviews the user directly
+  via ask_user_question — no subagents needed for the interactive parts.
+  Dispatches test-strategist (subagent) to write formal test plans from
+  the confirmed interview results.
   Use when starting a new feature, capability, or multi-task outcome.
 ---
 
 # Create Task (or Epic)
 
-Phase 0: launch the create-task chain — two focused grill-agents interview
-the user (task definition, then per-slice testing strategy), test-strategist
-writes test plans, approval-agent presents everything for one-shot approval,
-then a worker writes the artifacts.
+Phase 0: the parent agent interviews the user to define the task and its
+slices, then dispatches test-strategist to write formal test plans, then
+writes the artifacts directly.
 
 Once this completes, slices are ready for autonomous implementation —
 no further analysis or approval steps needed.
@@ -54,7 +53,6 @@ local branch. Pull before continuing?`,
   if (action === "Pull now") {
     bash("git pull --rebase")
   }
-  // If skip, proceed with a warning but don't block.
 }
 ```
 
@@ -62,165 +60,278 @@ If the pull fails with conflicts, stop — the user must resolve them manually.
 
 ## Step 1 — Determine scope
 
-Is this a single task or an epic (multi-task outcome)?
-
-- **Single task** → proceed with Step 2.
-- **Epic** → use the same chain but seed the grill-agents with epic-level
-  context. After the epic doc is written, hand off child tasks serially to
-  `/skill:create-task` with `epic: <epic-slug>` seeded.
-
-## Step 2 — Launch the interactive chain
-
-Read `task_profile` and `task_reference`. Construct the chain:
+Ask the user whether this is a single task or an epic (multi-task outcome):
 
 ```
-const profileOutput = bash("task_profile")
-const referenceOutput = bash("task_reference")
-
-// Read the chain definition from the extracted chain file
-const chainDef = JSON.parse(bash("cat chains/create-task.chain.json"))
-
-// Substitute runtime values into step tasks
-const steps = chainDef.chain.map(step => ({
-  ...step,
-  task: step.task
-    .replaceAll("{task_context}", profileOutput)
-    .replaceAll("{task_reference}", referenceOutput)
-}))
-
-subagent({
-  async: true,
-  timeoutMs: chainDef.timeoutMs,
-  turnBudget: chainDef.turnBudget,
-  control: { enabled: true, needsAttentionAfterMs: 300_000, notifyChannels: ["event"] },
-  chain: steps
+const isEpic = await ask_user_question({
+  header: "Scope",
+  question: "Is this a single task or an epic (multi-task outcome)?",
+  options: [
+    { label: "Single task",
+      description: "One self-contained outcome with multiple slices." },
+    { label: "Epic",
+      description: "Multiple child tasks, each with their own slices." }
+  ]
 })
 ```
 
-## Step 3 — Parent loop (handle interactive requests)
+- **Single task** → proceed with Step 2.
+- **Epic** → capture the epic-level context, create the epic doc, then
+  hand off each child task serially to this same skill with epic context
+  pre-seeded.
 
-Run the shared parent loop to relay grill-agent questions. The approval-agent writes
-the plan to its output file; the parent handles the review cycle via the plan review tools.
+## Step 2 — Interview: task definition
+
+Read `task_profile` and `task_reference` for context and schema reference.
+
+Interview the user to define the task. Follow this structure, but be
+conversational — ask one question at a time, use the codebase to answer
+what you can yourself.
+
+### 2a — Task title and description
+
+Ask the user for:
+- **Task title** — short, descriptive
+- **One-line description** — what outcome does this deliver?
+- **User stories** — who benefits and how?
+
+### 2b — Scope and layers
+
+Explore the codebase to understand the architecture. Ask the user about:
+- **End-to-end behaviour** — what does the user experience?
+- **API surface** — what interfaces change or are added?
+- **Layers touched** — which parts of the codebase are involved?
+- **Boundaries** — what is explicitly out of scope?
+
+For each area, recommend based on what you find in the codebase. Only ask
+when the code can't answer (e.g. user preference, domain knowledge).
+
+### 2c — Slice breakdown
+
+Work with the user to split the task into slices. Each slice should be:
+- Independently implementable (adds one capability)
+- Vertically scoped (touches all layers, not just one)
+- Testable in isolation
+
+For each slice, confirm:
+- **Slice title and slug** — short kebab-case identifier
+- **Acceptance criteria** — what "done" looks like
+- **What to build** — one paragraph of what this slice delivers
+- **Estimated size** — S/M/L/XL
+
+### 2d — Slice ordering
+
+Confirm the implementation order:
+- Which slices have no dependencies (can be built first)?
+- Which depend on earlier slices?
+- Record `blocked_by` for dependent slices
+
+## Step 3 — Per-slice testing strategy
+
+For each slice, interview the user about the testing strategy. Ask one
+question at a time — do not batch. For each slice:
+
+1. **Layer analysis** — which layers does this slice touch end-to-end?
+   (Explore the codebase to answer this yourself.)
+2. **Failure modes** — what can break? (At least 2 concrete failure modes
+   per slice. Confirm with the user.)
+3. **Testing approach** — test types (unit/integration/e2e), dependency
+   strategy (mocks vs real), key scenarios, edge cases, error handling.
+
+The test-strategist subagent will later write formal test plans from these
+confirmed answers. The interview output is the source of truth.
+
+## Step 4 — Determine the slug
 
 ```
-const chainRunId = "<id returned by subagent launch>"
+// Derive from the task title
+const slug = title.toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-|-$/g, '')
+```
 
-while (true) {
-  await wait({ id: chainRunId })
+Check for collisions with `task_list`. If the slug already exists, ask the
+user for a different title or append a qualifier.
 
-  const pending = await subagent_supervisor({ action: "pending" })
-  for (const request of pending) {
-    if (request.reason === "interview_request") {
-      const { question, context, recommended, reasoning } =
-        JSON.parse(request.interview)
+## Step 5 — Write the task doc
 
-      const answer = await ask_user_question({
-        header: "Task def",
-        question: `**Context:** ${context}\n\n**Question:** ${question}\n\n**Recommended:** ${recommended}\n\n**Reasoning:** ${reasoning}`,
-        options: [
-          { label: `Accept: ${recommended.slice(0, 55)}`,
-            description: "Agree with the recommended answer." },
-          { label: "Custom answer",
-            description: "Provide a different answer." }
-        ]
-      })
+Create the task doc using `write`:
 
-      await subagent_supervisor({
-        action: "reply",
-        replyTo: request.id,
-        message: JSON.stringify({ answer })
-      })
-    } else if (request.reason === "need_decision") {
-      // Handle legacy need_decision (some agents may still use it)
-      await subagent_supervisor({
-        action: "reply",
-        replyTo: request.id,
-        message: "approved"
-      })
-    }
-  }
+```
+const taskDoc = `---
+kind: task
+slug: ${slug}
+title: ${title}
+description: ${description}
+status: todo
+slices:
+${slices.map((s, i) => `  - ${i + 1}-${s.slug}`).join('\n')}
+epic: ${epicSlug || ''}
+---
 
-  const chainStatus = await subagent({ action: "status", id: chainRunId })
-  if (chainStatus.state === "complete") break
-  if (chainStatus.state === "failed" || chainStatus.state === "paused") {
-    report: "create-task chain did not complete; inspect status and chain_dir"
-    return
-  }
+# ${title}
+
+${description}
+
+## User stories
+
+${userStories}
+
+## Scope
+
+### End-to-end behaviour
+${behaviour}
+
+### API surface
+${apiSurface}
+
+### Layers touched
+${layersTouched}
+
+### Out of scope
+${outOfScope}
+
+## Slices
+
+${slices.map((s, i) => `### ${i + 1}. ${s.title} (\`${s.slug}\`)
+- **Size:** ${s.size}
+- **Acceptance criteria:** ${s.acceptanceCriteria}
+- **What to build:** ${s.whatToBuild}
+- **Dependencies:** ${s.blocked_by || 'none'}`).join('\n\n')}
+
+## Implementation notes
+
+<!-- filled in during implementation -->
+
+`
+
+write(`docs/tasks/${slug}/task.md`, taskDoc)
+```
+
+## Step 6 — Write slice docs
+
+For each slice, create its slice doc:
+
+```
+for (const [i, slice] of slices.entries()) {
+  const sliceDoc = `---
+kind: slice
+slug: ${slice.slug}
+title: ${slice.title}
+parent_task: ${slug}
+status: todo
+size: ${slice.size}
+analysed: false
+blocked_by: ${slice.blocked_by || ''}
+---
+
+# ${slice.slug}
+
+## Acceptance criteria
+
+${slice.acceptanceCriteria}
+
+## What to build
+
+${slice.whatToBuild}
+
+## Failure modes
+
+${slice.failureModes.map(fm => `- ${fm}`).join('\n')}
+
+## Test plan
+
+<!-- filled in by test-strategist -->
+`
+
+  write(`docs/tasks/${slug}/slices/${i + 1}-${slice.slug}.md`, sliceDoc)
 }
 ```
 
-After the chain completes, handle the approval result via plan review.
+Set the slices list:
 
 ```
-const planPath = "{chain_dir}/approval/result.md"
-const planExists = bash(`test -f ${planPath} && echo yes || echo no`).trim()
+task_set_slices(slug, slices.map((_, i) => `${i + 1}-${s.slug}`))
+```
 
-if (planExists === "yes") {
-  const submitResult = submit_plan_for_review({ planFilePath: planPath })
-  report: submitResult
-  
-  const slugMatch = submitResult.match(/plans\/([a-zA-Z0-9_-]+)\.md/)
-  const slug = slugMatch ? slugMatch[1] : null
+## Step 7 — Dispatch test-strategist
 
-  if (slug) {
-    // Review loop
-    while (true) {
-      await ask_user_question({
-        header: "Plan reviewed?",
-        question: `Have you finished reviewing the plan at plans/${slug}.md?`,
-        options: [
-          { label: "Yes, parse it", description: "Parse the reviewed plan." },
-          { label: "Not yet", description: "Keep the file open." }
-        ]
-      })
+Launch the test-strategist subagent to write formal test plans for all
+slices. This is a non-interactive subagent — it reads the slice docs and
+the interview notes, and writes the `## Test plan` sections.
 
-      const parseResult = parse_plan_review({ slug })
+```
+const sliceList = slices.map((s, i) =>
+  `docs/tasks/${slug}/slices/${i + 1}-${s.slug}.md`
+).join(' ')
 
-      if (parseResult.startsWith("ERROR:")) {
-        report: parseResult
-        continue  // Let user fix and retry
-      }
+subagent({
+  chain: [{
+    agent: "skills.test-strategist",
+    as: "strategy",
+    phase: "Planning",
+    label: "Write test plans for all slices",
+    task: `Write test plans for ALL slices of task "${slug}".
 
-      report: parseResult
+Slices to write test plans for:
+${slices.map((s, i) => `  ${i + 1}. ${s.slug} (docs/tasks/${slug}/slices/${i + 1}-${s.slug}.md)`).join('\n')}
 
-      if (parseResult.startsWith("OK: accepted")) break
-      if (parseResult.startsWith("OK: discarded")) {
-        report: "Plan review discarded."
-        return
-      }
-      if (parseResult.startsWith("OK: rejected")) {
-        const feedbackLines = parseResult.split("\n").filter(l => l.startsWith("line "))
-        // Relaunch approval-agent with feedback
-        subagent({
-          async: true,
-          chain: [{
-            agent: "skills.approval-agent",
-            as: "approval-revision",
-            phase: "Approval",
-            label: "Revise plan from feedback",
-            task: `Revise the plan at {chain_dir}/approval/result.md.\n\nFeedback:\n${feedbackLines.join("\n")}`,
-            output: "approval/result.md"
-          }]
-        })
-        await wait({ all: true })
-        // Re-submit
-        const newResult = submit_plan_for_review({ planFilePath: planPath })
-        report: newResult
-        continue
-      }
-      break
-    }
-  }
+Interview notes for each slice (confirmed with user):
+
+${slices.map((s, i) => `### ${s.slug}
+- **Layer analysis:** ${s.layerAnalysis}
+- **Failure modes:** ${s.failureModes.join(', ')}
+- **Testing approach:** ${s.testingApproach}
+- **Key scenarios:** ${s.keyScenarios}
+- **Edge cases:** ${s.edgeCases}
+- **Error handling:** ${s.errorHandling}
+`).join('\n')}
+
+For each slice:
+1. Read the slice doc to understand the acceptance criteria.
+2. Read docs/testing.md for project test conventions.
+3. Write a ## Test plan section covering: test types, scope, dependency
+   strategy, key scenarios (Given/When/Then), edge cases, failure mode
+   coverage, error handling, test file path, and run command.
+4. Append the test plan to the slice doc using edit.
+5. Set frontmatter: task_set <path> analysed true
+
+If you have uncertainties, include ## Questions for the user in your
+output — but try to resolve them from the project conventions in
+docs/testing.md first.`,
+    output: "strategy/result.md",
+    outputMode: "file-only"
+  }]
+})
+```
+
+Since the test-strategist is non-interactive, no parent loop is needed.
+Wait for the chain to complete:
+
+```
+await wait({ all: true })
+```
+
+Check the chain result. If the test-strategist left `## Questions for the
+user`, resolve them manually:
+
+```
+const strategyResult = read("{chain_dir}/strategy/result.md")
+if (strategyResult.includes("## Questions for the user")) {
+  // Extract questions and ask the user
+  // Then re-dispatch test-strategist with the answers
 }
 ```
 
-After the chain and review complete, read `{chain_dir}/task/result.md` and report the
-created task with its slices (each now has a test plan, `analysed: true`,
-`status: todo`).
+## Step 8 — Commit
 
-## Step 4 — Hand off
+```
+bash(\`git add docs/tasks/${slug}/ && git commit -m "docs(task): create ${slug}"\`)
+```
 
-Report: task slug, number of slices, note that all slices have test plans.
+## Step 9 — Hand off
+
+Report the task slug, number of slices, and that all slices have test plans.
 
 "Task is fully planned with test strategies. Next: `/skill:pipeline-slices <slug>` to implement all slices, or `/skill:implement-slice <first-slug>` to do them one at a time."
 
@@ -228,25 +339,19 @@ Report: task slug, number of slices, note that all slices have test plans.
 
 - If the project has no `docs/tasks/`, run `/skill:onboard-workflow` first.
 - If another task is already active, warn before overwriting.
-- If the chain fails, inspect `{chain_dir}` for partial output.
-- If either grill-agent produces a usable summary but the chain is rejected
-  before the worker step, do not re-interview. Re-run only from the failed
-  step onward using the saved summaries in `{chain_dir}`.
-- If status shows a child blocked in `contact_supervisor` but no supervisor
-  message is visible, do not wait indefinitely. Call
-  `subagent_supervisor({ action: "pending" })`; the event-driven wait loop above is
-  intentionally used to surface this pi-subagents supervisor-delivery race.
+- If the test-strategist leaves `## Questions for the user`, resolve them
+  before proceeding. Do not commit with unresolved questions.
+- If the test-strategist chain fails, inspect `{chain_dir}` for partial
+  output and re-dispatch.
 
 ## Constraints
 
 - English only. No speculative scope — anything not justified goes to Open questions.
-- The interview is autonomous: grill-agents explore the codebase first, only
-  ask the user for things the code can't answer.
-- Two separate grill-agents keep context focused: the first defines the task
-  and slice breakdown; the second (with that breakdown in hand) designs the
-  testing strategy for each slice. Each has a clean, focused session.
+- The parent agent explores the codebase first, only asks the user for things
+  the code can't answer.
+- Ask one question at a time. Never batch questions.
+- Always provide a recommended answer with reasoning before asking.
 - This is the ONLY interactive phase. After create-task completes, implementation
   runs autonomously via `/skill:pipeline-slices` or `/skill:implement-slice`.
-  No per-slice interviews or approvals are needed.
-- Slices are created with `analysed: true, status: todo` — ready for immediate
-  implementation.
+- Slices are created with `analysed: false` initially, then set to `analysed: true`
+  by the test-strategist after writing the test plan.

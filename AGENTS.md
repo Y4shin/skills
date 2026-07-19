@@ -8,20 +8,20 @@ version control with no external issue tracker.
 
 ```
 skills/             ← SKILL.md files (one per sub-directory)
-  create-task/        One interactive session: task def + per-slice test plans
+  create-task/        Inline task definition and per-slice testing interviews
   implement-slice/    Build a single slice (TDD → verify → diverge → land)
   pipeline-slices/    Build all remaining slices in one autonomous chain
-  revise-task/        Dynamically revise a task or (re-)analyse slices
+  revise-task/        Inline revision of a task or (re-)analysis of slices
   finalize-task/      CI gate, harvest knowledge, archive, merge
   onboard-workflow/   Initialize docs/tasks/ in a fresh repo
   migrate-workflow/   Convert docs/prd/ → docs/tasks/
   resume-workflow/    Read state + artifacts, report current position
   task-workflow-overview/  Entry point: routes queries and actions
   adhoc-task/         Ephemeral TDD for small one-off work
-  archive/            Obsolete skills (design-test-strategy, develop-tdd, etc.)
-agents/             ← PiSubAgent definitions (tdd-worker, grill-agent, etc.)
-src/pi/             ← Extension source (task_* native tools, guidelines, startup checks)
-docs/               ← Package documentation (artifacts reference, guidelines)
+  archive/            Obsolete skills
+agents/             ← PiSubAgent definitions (tdd-worker, slice-verifier, etc.)
+src/pi/             ← Extension source (task_* native tools, guidelines)
+docs/               ← Package documentation
 tests/              ← Integration tests
 tools/              ← Developer tooling and demos
 ```
@@ -30,42 +30,67 @@ tools/              ← Developer tooling and demos
 
 ### Three-phase workflow
 
-1. **create-task** — the only interactive phase. User defines the task AND
-   reviews test strategies for all slices in one sitting.
+1. **create-task** — the only interactive phase. The parent agent interviews
+   the user directly via `ask_user_question` — no subagents involved. Test
+   plans are formalized by test-strategist (non-interactive subagent).
 2. **pipeline-slices** or **implement-slice** — autonomous TDD implementation.
-   Agents ask only when uncertain or when plan divergences threaten remaining
-   slices.
+   Subagents never ask the user questions. When uncertain, they write a
+   structured artifact and fail; the parent resolves and retries.
 3. **finalize-task** — CI gate, knowledge harvesting, changelog, archive, merge.
 
-### Subagent chains
+### Subagent usage
 
-All orchestrator skills dispatch `subagent({ chain: [...] })`:
-
-| Skill | Chain |
+| Skill | Subagent use |
 |---|---|
-| create-task | grill-agent → grill-agent → test-strategist → approval-agent → worker |
-| implement-slice | worker → tdd-worker → slice-verifier → worker → worker |
-| pipeline-slices | implement-slice steps repeated for each remaining slice |
-| revise-task | Dynamic: composed at runtime based on what needs changing |
+| create-task | test-strategist (non-interactive, writes test plans) |
+| implement-slice | worker → tdd-worker → slice-verifier → worker → worker (all non-interactive) |
+| pipeline-slices | Same chain repeated per slice |
+| revise-task | test-strategist (non-interactive, if slices re-analysed) |
 | finalize-task | worker → task-summarizer → worker |
 
-Interactive chains (`grill-agent`, `approval-agent`) use
-`contact_supervisor` for user interaction. The parent agent's loop
-(`wait()` → `subagent_supervisor({ action: "pending" })` → relay → reply)
-is the bridge.
+Subagents **never use `contact_supervisor` or `subagent_supervisor`**. When
+they encounter uncertainty, they write a structured artifact and fail. The
+parent reads the artifact, resolves the question (with the user if needed),
+and retries.
 
 ### Agent roster
 
-| Agent | Role |
-|---|---|
-| `grill-agent` | Autonomous interviewer — explores codebase first, asks one question at a time |
-| `approval-agent` | Presents plans for approval, handles revise-re-present loop |
-| `test-strategist` | Designs test plans from requirements and failure modes |
-| `tdd-worker` | RED → GREEN → REFACTOR implementation |
-| `slice-verifier` | Hard lint + test gate |
-| `task-summarizer` | Writes changelog entries |
+| Agent | Role | Interactive? |
+|---|---|---|
+| `test-strategist` | Designs test plans from requirements and failure modes | No |
+| `tdd-worker` | RED → GREEN → REFACTOR implementation; writes uncertainty artifact on ambiguity | No |
+| `slice-verifier` | Hard lint + test gate | No |
+| `worker` | Generic implementation, landing, and archival tasks | No |
+| `task-summarizer` | Writes changelog entries | No |
+| `grill-agent` | *(deprecated)* — moved inline into create-task/revise-task skills | — |
+| `approval-agent` | *(deprecated)* — parent owns approval inline | — |
 
 All agents run with `context: "fresh"` and `inheritProjectContext: true`.
+
+### Interactive design pattern
+
+Interactive questioning (grill-agent, approval-agent) has been moved from
+subagents into the parent skills. The parent agent uses `ask_user_question`
+directly:
+
+- **create-task**: Parent interviews user for task definition and per-slice
+  testing strategy, one question at a time with recommended answers.
+- **revise-task**: Parent reads current state, interviews user about changes,
+  applies edits directly.
+
+Non-interactive work (TDD, verification, test plan writing, archival) is
+still delegated to subagents.
+
+### Fail-with-context pattern
+
+Subagents never ask the user questions. When uncertain, they:
+
+1. Write a structured artifact (e.g. `uncertainty.md`, `divergence.md`)
+2. Fail the chain step
+3. The parent detects the failure, reads the artifact, resolves (via
+   `ask_user_question` if needed), and retries with the resolution
+
+This avoids the fragile supervisor/intercom bridge entirely.
 
 ### Task tools
 
@@ -80,11 +105,11 @@ the tools.
 
 - Every skill is a `skills/<name>/SKILL.md` with YAML frontmatter
   (`name`, `description`).
-- Skills that dispatch chains include the full parent loop in the SKILL.md.
+- Skills own all interactive questioning via `ask_user_question`.
 - Template variables `{chain_dir}`, `{previous}`, `{task}` are used in chain
   step task prompts for context flow between steps.
-- Acceptance is disabled (`level: "none"`) for planning/interview steps;
-  the workflow's own gates (user approval, worker finalization) verify enough.
+- Acceptance is disabled (`level: "none"`) for planning steps; the workflow's
+  own gates (user approval, worker finalization) verify enough.
 
 ### Versioning
 
