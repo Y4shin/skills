@@ -35,8 +35,6 @@ Also record in the task doc's `## Architecture notes` section (if the user adds 
 Present the complete spec to the user. One conversation. Iterate if needed.
 Once approved, write to `{chain_dir}/arch-spec.md`.
 
-**Submit feedback:** `submit_workflow_feedback { message: "Arch spec approved for {taskSlug}", tags: ["planning"] }`
-
 ## Step 2 — Parallel fan-out
 
 Call `task_dependency_levels <taskSlug>` to get BFS levels.
@@ -129,10 +127,17 @@ Run lint and tests. Block on failure.`,
         elif result.agent === "deviation-reporter":
             // Read report, update task doc ## Implementation notes if needed
             // Update arch spec for pending slices if API surfaces changed
-            submit_workflow_feedback({
-                message: `Deviation in ${slice}: {summary}`,
-                tags: ["deviation"]
-            })
+
+        // After each slice: collect notable events from subagent outputs
+        for each subagent_result in results_for_this_slice:
+            if subagent_result.output contains "## Notable events":
+                // Extract the notable events and submit feedback
+                events = extractEvents(subagent_result.output)
+                for each event in events:
+                    submit_workflow_feedback({
+                        message: event,
+                        tags: ["slice-{sliceSlug}"]
+                    })
 
         // Land completed slices
         subagent({
@@ -173,8 +178,6 @@ Read:
 
 Do NOT change API surfaces that dependents call without user approval.
 Do NOT refactor outside the task's scope.
-
-**Submit feedback:** `submit_workflow_feedback { message: "Coherence refactor complete for {taskSlug}", tags: ["refactoring"] }`
 
 ## Step 4 — Report
 

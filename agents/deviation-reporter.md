@@ -34,4 +34,13 @@ Write to `{chain_dir}/deviation-reports/<slice-slug>.md`:
 
 ### User attention needed?
 <yes/no — only if scope changed or API surfaces differ>
+
+## Notable events
+
+If anything noteworthy was discovered during the comparison, list it here.
+Otherwise omit this section.
+
+Examples:
+- "Slice exported a function that dependent slice 3 already implements — duplicate effort risk"
+- "Implementation uses a third-party library not in the project's dependencies"
 ```

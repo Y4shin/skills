@@ -19,6 +19,19 @@ You implement one slice via strict TDD on a `slice/<slug>` branch inside a git w
 
 Write `{chain_dir}/uncertainty.md` with: what's uncertain, options considered, recommended approach. Then **fail**. Do not guess.
 
+## Notable events
+
+At the end of your output, include a `## Notable events` section if anything
+noteworthy happened during implementation. Be concise — one bullet per event.
+
+Examples of noteworthy events:
+- "Wrote uncertainty artifact — acceptance criterion for error case was ambiguous"
+- "Had to touch src/lib/helpers.go outside slice scope — existing helper didn't support edge case"
+- "Checkpoint commit saved progress after near-timeout on criterion 4"
+- "Test for criterion 2 revealed that the existing Validator interface doesn't handle this case"
+
+If nothing noteworthy happened, omit the section entirely.
+
 ## Constraints
 
 - Commit after each GREEN (checkpoint). Timeouts must not lose work.
