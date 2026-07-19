@@ -14,10 +14,16 @@ describe("toObject", () => {
 });
 
 describe("fromObject", () => {
-  test("parses a valid object", () => {
+  test("parses v2 flat format", () => {
     const state = fromObject({ task: "login", slice: null });
     expect(state.task).toBe("login");
     expect(state.slice).toBeNull();
+  });
+
+  test("parses v1 nested format", () => {
+    const state = fromObject({ active: { task: "login", slice: "login-form", epic: "auth" }, last_action: "x", next_action: "y" });
+    expect(state.task).toBe("login");
+    expect(state.slice).toBe("login-form");
   });
 
   test("returns defaults for null/undefined", () => {

@@ -22,12 +22,23 @@ export function toObject(state: WorkflowState): Record<string, unknown> {
   };
 }
 
-/** Parse from a plain object read from YAML. */
+/** Parse from a plain object read from YAML. Supports both v2 flat format and v1 nested format. */
 export function fromObject(raw: unknown): WorkflowState {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_STATE };
   const o = raw as Record<string, unknown>;
+
+  // v2 format: { task: "login", slice: null }
+  if (typeof o.task === "string" || o.task === null) {
+    return {
+      task: typeof o.task === "string" ? o.task : null,
+      slice: typeof o.slice === "string" ? o.slice : null,
+    };
+  }
+
+  // v1 format: { active: { task: "login", slice: null, epic: null }, last_action: "...", next_action: "..." }
+  const active = (o.active as Record<string, unknown>) ?? {};
   return {
-    task: typeof o.task === "string" ? o.task : null,
-    slice: typeof o.slice === "string" ? o.slice : null,
+    task: typeof active.task === "string" ? active.task : null,
+    slice: typeof active.slice === "string" ? active.slice : null,
   };
 }

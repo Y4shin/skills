@@ -1,8 +1,10 @@
 {
   "name": "task-workflow",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Task → slices → TDD → finalize — a planning workflow for docs/tasks/. Pi extension.",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -25,7 +27,9 @@
     "vitest": "^2.1.0"
   },
   "pi": {
-    "extensions": ["./src/pi.ts"],
+    "extensions": [
+      "./src/pi.ts"
+    ],
     "skills": [
       "./skills/task-overview",
       "./skills/onboard-workflow",
@@ -34,7 +38,9 @@
       "./skills/finalize-task"
     ],
     "subagents": {
-      "agents": ["./agents"]
+      "agents": [
+        "./agents"
+      ]
     }
   }
 }
