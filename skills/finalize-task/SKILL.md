@@ -1,114 +1,73 @@
 ---
 name: finalize-task
-description: >
-  Launch the finalize-task chain to close out a completed task. Dispatches
-  worker (CI gate + harvest) → task-summarizer (changelog) → worker (archive
-  + epic tick + merge). If the task belongs to an epic and it's the last
-  child, also finalize the epic.
+description: Autonomous. Run CI gate, harvest knowledge, write changelog, archive task, merge to main. If task belongs to an epic and is the last child, also finalize the epic.
 ---
 
-# Finalize Task (or Epic) — Chain
+# Finalize Task
 
-Phase 3: launch the finalize-task chain — worker runs CI and harvests
-knowledge, task-summarizer writes the changelog entry, worker archives
-the task and integrates into main.
+## Step 0 — Prerequisites
 
-## Prerequisites
+`task_finalizable <slug>` — must return "ready to finalize" (no open slices).
 
-All slices archived. `task.md` has `status: done` and `## Implementation notes`.
-Use `task_profile` for knowledge destinations and CI commands.
-
-## Step 0 — Pre-flight (remote sync check)
-
-Before doing any work, check whether the local branch is behind the remote:
+## Step 1 — CI gate
 
 ```
-git fetch origin
+git checkout task/{taskSlug}
+git merge main 2>/dev/null || true
 ```
 
-If the remote has commits ahead of local (`git rev-list --count HEAD..@{u}`
-is non-zero), **stop and ask the user** before proceeding:
+Run the project's CI command (from `task_context` profile or detected from repo tooling). If it fails: STOP. Fix forward on the task branch. Do not merge a red branch.
 
+## Step 2 — Knowledge harvest
+
+Read the task doc, all deviation reports from `{chain_dir}/deviation-reports/` (if available), and the combined diff.
+
+Fold durable knowledge into project docs:
+- Update `docs/testing.md` if new patterns/tools were discovered
+- Update any other relevant docs under `docs/`
+- Append architecture lessons to the task doc's `## Implementation notes`
+
+Commit: `git add -A && git commit -m "docs(task): harvest knowledge for {taskSlug}"`
+
+## Step 3 — Changelog
+
+Write a 3-5 line entry to `docs/tasks/CHANGELOG.md`:
 ```
-const ahead = parseInt(bash("git rev-list --count HEAD..@{u}"))
-if (ahead > 0) {
-  const action = await ask_user_question({
-    header: "Remote ahead",
-    question: `Remote origin/main has ${ahead} new commit(s) not in your
-local branch. Pull before continuing?`,
-    options: [
-      { label: "Pull now",
-        description: "Run git pull --rebase to sync before starting." },
-      { label: "Skip — continue anyway",
-        description: "Proceed without pulling. You may get conflicts later." }
-    ]
-  })
-
-  if (action === "Pull now") {
-    bash("git pull --rebase")
-  }
-  // If skip, proceed with a warning but don't block.
-}
+## <YYYY-MM-DD> — <title> (<slug>)
+<key changes and decisions>. <outcome in one sentence>.
 ```
 
-If the pull fails with conflicts, stop — the user must resolve them manually.
+Commit: `git add docs/tasks/CHANGELOG.md && git commit -m "docs: changelog {taskSlug}"`
 
-## Step 1 — Validate prerequisites
+## Step 4 — Task deviation → epic (if applicable)
 
-```
-task_finalizable <slug>
-```
+Read the task doc. If it belongs to an epic (`epic:` field):
+- Compare the task's original scope against what was actually delivered
+- Check if the epic's task list entry needs updating
+- Check if the epic's description needs updating
+- If deviations found: update the epic doc. If significant: ask user.
 
-If it reports open slices, list them and **stop**.
-
-## Step 2 — Launch the finalization chain
-
-```
-const taskSlug = "<task-slug>"
-const taskPath = "docs/tasks/<task-slug>/task.md"
-
-// Read the chain definition from the extracted chain file
-const chainDef = JSON.parse(bash("cat chains/finalize-task.chain.json"))
-
-// Substitute runtime variables into step tasks
-const steps = chainDef.chain.map(step => ({
-  ...step,
-  task: step.task
-    .replaceAll("{taskSlug}", taskSlug)
-    .replaceAll("{taskPath}", taskPath)
-}))
-
-subagent({
-  async: true,
-  timeoutMs: chainDef.timeoutMs,
-  turnBudget: chainDef.turnBudget,
-  chain: steps
-})
-```
-
-## Step 3 — Wait for completion
+## Step 5 — Archive
 
 ```
-await subagent_wait({ all: true })
+task_epic_tick <epic-slug> {taskSlug}  # if belongs to epic
+git mv docs/tasks/{taskSlug}/ docs/tasks/archive/{taskSlug}/
+task_state_set task null
+task_state_set slice null
+git checkout main
+git merge --no-ff task/{taskSlug} -m "task: finalize {taskSlug}"
+git branch -d task/{taskSlug}
 ```
 
-Read `{chain_dir}/archive/result.md` to confirm archiving and integration.
+If remote exists: `git push origin main`
 
-## Step 4 — Report
+## Step 6 — Epic finalization (if last child)
 
-Report: task archived, CHANGELOG updated, epic status (if any), main branch
-updated.
+If the epic's `task_epic_finalizable` returns ready:
+- Summarize the epic to CHANGELOG.md
+- Archive the epic: `git mv docs/tasks/epics/<slug>/ docs/tasks/epics/archive/<slug>/`
+- Finalize epic doc
 
-## Error handling
+## Step 7 — Report
 
-- Never finalize partial work — Step 1 is a hard gate.
-- If CI fails, fix forward on the task branch — never merge a red branch.
-- The task archive is a git mv, preserving history.
-- If the task has no `## Implementation notes`, the worker will add them from
-  the git log before harvesting.
-
-## Constraints
-
-- CI must be green before archiving.
-- Knowledge harvesting is mandatory — every task leaves the docs better than it found them.
-- No per-task PR — only the finalize merge goes to main.
+"Task archived, CHANGELOG updated, main branch updated. Epic status: <done/not done>."
