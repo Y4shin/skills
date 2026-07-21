@@ -176,6 +176,8 @@ Read:
 Do NOT change API surfaces that dependents call without user approval.
 Do NOT refactor outside the task's scope.
 
+**Final suite gate:** Run the full project test suite. It must be green before Step 3 is complete. If red, this is emergent cross-slice breakage — breakage that only appears when all slices combine and no single slice owns the fix. Apply small/medium root-cause fixes within the task's scope autonomously (same rules as above); escalate large, ambiguous, or API-surface-touching fixes to the user. This is a safety net behind the per-slice full-suite gate (Step 2's slice-verifier), not a replacement for it.
+
 **Submit feedback:** `submit_workflow_feedback { message: "Coherence refactor complete for {taskSlug}", tags: ["refactoring"] }`
 
 ## Step 4 — Report
