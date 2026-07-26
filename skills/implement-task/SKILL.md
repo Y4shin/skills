@@ -41,7 +41,7 @@ Once approved, write to `docs/tasks/${taskSlug}/arch-spec.md`.
 
 Call `task_dependency_levels <taskSlug>` to get BFS levels.
 
-Each slice runs as a **sequential chain** that shares the repo working directory: `tdd-worker → (slice-verifier ∥ deviation-reporter) → land-worker`. Steps share one cwd, so verify and deviation see tdd-worker's actual code (the prior `parallel` + `worktree` design ran them against empty worktrees). `failFast: true` gates landing on a green verify.
+Each slice runs as a **sequential chain** that shares the repo working directory: `tdd-worker → (slice-verifier ∥ deviation-reporter ∥ ui-noter) → land-worker`. Steps share one cwd, so verify, deviation, and ui-noter see tdd-worker's actual code. `failFast: true` gates landing on verify+deviation. The ui-noter is advisory — it never gates landing.
 
 Slices within a level run **sequentially** (chains share the repo cwd, so parallel slices would clash). Levels remain strict barriers: level N+1 starts only after every slice in level N has landed.
 
@@ -106,9 +106,57 @@ docs/tasks/${taskSlug}/deviation-reports/${slice}.md covering:
 - Any divergence from the slice doc's acceptance criteria
 
 If the task doc's ## Implementation notes needs updating, note it.`
+                        },
+                        {
+                            agent: "ui-noter",
+                            as: "ui-note",
+                            output: `ui-note-${slice}/result.md`,
+                            task: `Detect UI work in slice "${slice}" for task "${taskSlug}".
+
+Implementation: {outputs.tdd}.
+
+Review the diff created by the TDD implementation. Check whether it introduces or modifies any UI surfaces:
+- HTML files (*.html, *.htm)
+- CSS / style files (*.css, *.scss, *.less, *.sass, *.pcss)
+- Component files (*.jsx, *.tsx, *.svelte, *.vue, *.astro)
+- Templates (*.hbs, *.mustache, *.ejs, *.php)
+- Any file under directories named 'views/', 'templates/', 'components/', 'pages/', or 'ui/'
+
+If NO UI work was found, write "no_ui_work" as the result and exit.
+
+If UI work WAS found, write a handoff note to
+docs/tasks/${taskSlug}/impeccable-note-${slice}.md with:
+
+```
+### Impeccable Handoff: ${slice}
+
+The implementation created bare-minimum functional UI for this slice.
+The following surfaces are ready for design refinement:
+
+#### Surfaces
+- \`<path/to/file>\`: <brief description of the surface/component>
+
+#### Suggested commands
+- \`/impeccable <command> <path>\` — <why this command fits>
+
+#### Notes
+- <what is currently bare-bones, what design decisions are missing>
+- <any constraints the designer should know>
+```
+
+For the command, choose from: critique, polish, bolder, quieter, distill,
+harden, layout, typeset, colorize, animate, delight, adapt, clarify, onboard, shape.
+Pick the most appropriate one for the surface. Prefer specific evaluative or refinement
+commands over vague ones.
+
+If multiple surfaces exist, suggest a separate command for each, or a single command
+targeting the broadest surface noting sub-surfaces are contained within.
+
+This note is advisory. The user runs it after landing. Do NOT gate anything on it.
+Do NOT edit any files yourself — only write the note if UI work was found.`
                         }
                     ],
-                    concurrency: 2
+                    concurrency: 3
                 },
                 {
                     agent: "land-worker",
@@ -152,6 +200,9 @@ Set task_set status done on slice.`
     // surfaces changed. If a deviation reveals a workflow/planning problem
     // (ambiguous spec, wrong interface contract), call submit_workflow_feedback.
     // Do NOT call it for the deviation itself — that's a project finding.
+    
+    // Also mention any ui-noter findings to the user, but non-blocking.
+    // If the user wants to act on them now, let them; otherwise continue.
 ```
 
 ## Step 3 — Coherence refactor
@@ -183,4 +234,9 @@ Do NOT refactor outside the task's scope.
 ## Step 4 — Report
 
 Report completed slices, any deviations found and resolved, user interventions.
+
+If any `impeccable-note-*.md` files were created, mention them at the end:
+> "UI surfaces were detected in this task. Run `/impeccable <command> <target>` to refine them.
+> See `docs/tasks/<taskSlug>/impeccable-note-<slice>.md` for suggestions."
+
 "If all slices done: run `/skill:finalize-task <slug>`"
