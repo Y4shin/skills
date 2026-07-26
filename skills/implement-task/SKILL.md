@@ -182,14 +182,25 @@ Set task_set status done on slice.`
                 question: `TDD worker hit uncertainty in slice ${slice}:\n{read docs/tasks/${taskSlug}/.work/uncertainty.md}`
             })
             delete the uncertainty file
-            re-run the chain for this slice, appending the resolution to the tdd task
+            // Re-route to tdd-worker. Do NOT do the work yourself — parent context is expensive.
+            re-run the chain for this slice, increasing maxTurns by 50%,
+            appending the user's resolution to the tdd task prompt
             continue
 
         if chain failed (e.g. verify failed -> failFast aborted before land):
-            // Retry: re-run the chain with a corrective tdd task
-            re-run the chain, prefixing the tdd task with:
+            // Retry by re-routing through subagents. Do NOT fix the code yourself.
+            re-run the chain, increasing maxTurns by 50%, and prefix the tdd task with:
             "Fix these issues: {verify output}. Do NOT redo from scratch."
             continue
+
+        // After two consecutive retries of the same slice still fail, ask the user:
+        // "Two retries for slice {slice} failed. Should I increase budgets further,
+        // relax constraints, or skip this slice?" Do NOT attempt the fix yourself.
+
+        // On any failure: never write code or edit files as the orchestrator parent.
+        // You dispatch work to subagents — that is your only role in the implementation
+        // loop. The parent context is large and expensive; routing through workers is
+        // always cheaper than pulling the fix into your own context.
 
         // success path: slice landed
         task_set <slice-path> status done
@@ -227,7 +238,12 @@ Read:
 Do NOT change API surfaces that dependents call without user approval.
 Do NOT refactor outside the task's scope.
 
-**Final suite gate:** Run the full project test suite. It must be green before Step 3 is complete. If red, this is emergent cross-slice breakage — breakage that only appears when all slices combine and no single slice owns the fix. Apply small/medium root-cause fixes within the task's scope autonomously (same rules as above); escalate large, ambiguous, or API-surface-touching fixes to the user. This is a safety net behind the per-slice full-suite gate (Step 2's slice-verifier), not a replacement for it.
+**Cost note:** these refactors are done directly by you (the parent), which
+means your full context is loaded. Keep them genuinely small — if a refactor
+would require reading more than ~5 files or editing more than ~50 lines,
+consider routing it through a subagent instead.
+
+**Final suite gate:** Run the full project test suite. It must be green before Step 3 is complete. If red, this is emergent cross-slice breakage — breakage that only appears when all slices combine and no single slice owns the fix. Apply small/medium root-cause fixes within the task's scope autonomously (same rules as above); escalate large, ambiguous, or API-surface-touching fixes to the user. For test failures: first try re-routing the fix through a subagent before doing it yourself.
 
 **Submit feedback:** `submit_workflow_feedback { message: "Coherence refactor complete for {taskSlug}", tags: ["refactoring"] }`
 
