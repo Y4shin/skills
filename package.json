@@ -33,6 +33,7 @@
     "skills": [
       "./skills/task-overview",
       "./skills/onboard-workflow",
+      "./skills/refine-idea",
       "./skills/create-task",
       "./skills/implement-task",
       "./skills/finalize-task"
