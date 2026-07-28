@@ -1,6 +1,6 @@
 ---
 name: onboard-workflow
-description: Initialize a repository for the task-workflow. Creates docs/tasks/ directory, state.yaml, and CHANGELOG.md.
+description: Initialize a repository for the task-workflow. Creates docs/tasks/ and docs/ideas/ directories, state.yaml, and CHANGELOG.md.
 ---
 
 # Onboard Workflow
@@ -13,6 +13,7 @@ description: Initialize a repository for the task-workflow. Creates docs/tasks/ 
    ```
    mkdir -p docs/tasks/archive
    mkdir -p docs/tasks/epics/archive
+   mkdir -p docs/ideas
    ```
 
 3. Write `docs/tasks/state.yaml`:
@@ -30,4 +31,4 @@ description: Initialize a repository for the task-workflow. Creates docs/tasks/ 
 
 6. Commit: `chore: initialize task-workflow`.
 
-7. Report: "Ready. Run `/skill:create-task` to start."
+7. Report: "Ready. Run `/skill:refine-idea` to flesh out an idea, or `/skill:create-task` to plan a small, well-understood task directly."
