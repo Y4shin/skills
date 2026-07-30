@@ -2,9 +2,9 @@
 kind: idea
 title: Bug workflow (report, track, fix)
 slug: bug-workflow
-status: in-grilling
+status: ready
 created_at: 2026-07-30T14:05:09Z
-grilled_at:
+grilled_at: 2026-07-30T16:22:39Z
 converted_to:
 ---
 
@@ -31,7 +31,7 @@ support needed initially (ideas work via grep too).
 ```yaml
 ---
 title: Crash on empty config file
-status: reported        # reported → confirmed → fixing → fixed | wontfix | promoted
+status: reported        # reported → confirmed → fixed | wontfix | promoted
 severity: major         # critical | major | minor | trivial
 reported: 2026-07-30
 confirmed_by:           # commit or agent run that reproduced it
@@ -41,7 +41,7 @@ promoted_to:            # task slug, when fix outgrew the lightweight path
 ```
 
 Body sections: Observed / Expected / Reproduction / Suspected area
-(agent-filled from codebase exploration, not user interview) / Root cause /
+(from the report + reproduction findings) / Root cause /
 Fix summary.
 
 Key difference from tasks: a bug doc captures a **defect observation**, not
@@ -180,9 +180,64 @@ by bug kind as a starting point.
 - Task docs gain `type: feature | bug` (absent key = `feature`).
 - `implement-task` becomes a thin wrapper: read `type`, then follow
   `skills/implement-task/resources/feature.md` (current behavior,
-  moved) or `resources/bug.md` (bug-tuned execution, to be designed).
+  moved unchanged) or `resources/bug.md`.
 - Bug tasks are never created via create-task's interview; promotion
   from report-bug is the only path.
+
+### implement-task: `resources/bug.md` (lean single chain)
+
+Approved design:
+
+- Single chain: `tdd-worker → slice-verifier → land-worker`. No
+  dependency levels (one slice by construction), no arch-spec approval
+  conversation, no coherence refactor.
+- The chain's spec = bug doc + repro.md + the single slice doc.
+- tdd-worker's first job: convert repro.md into the regression test,
+  run it against the unfixed code (must be red — the test rule), then
+  fix → green → full suite.
+- slice-verifier and land-worker behave as in the feature flow.
+- Retry/uncertainty routing identical to feature.md: re-dispatch via
+  subagents, the parent never implements.
+
+### finalize-task for `type: bug`
+
+- Same gates as feature tasks (CI green, changelog, archive task).
+- Additionally closes the linked bug doc: `status: fixed`,
+  `fix_commit`, root cause + fix summary (from the task's
+  implementation notes), `git mv` the bug doc to `docs/bugs/archive/`.
+
+### Subagent failure handling (feature.md + bug.md)
+
+Problem observed in practice: when a chain's subagent fails to complete
+within its allotted resources (turn budget / timeout), the parent
+session tends to "just do it itself" and implement in-session. That is
+forbidden — the parent is a coordinator and must keep its context
+clean. Both resource files must state this as a hard rule and give the
+parent a larger toolbelt instead:
+
+1. **Diagnose first, never redo.** On a resource-exhausted chain, the
+   parent reads the worker's outputs (result.md, partial diff,
+   uncertainty notes) to understand *why* it stalled. The parent's
+   only moves are re-dispatch strategies — never implementation.
+2. **First failure → always split.** On the first resource-exhausted
+   chain for a slice, split slice N into ad-hoc sub-slices
+   **Na, Nb, Nc, …** (slice docs `slices/<N>a-<slug>.md` etc., each
+   conforming: acceptance criteria, `## Test plan`, `size`,
+   `blocked_by` — chained Na → Nb → Nc). The task doc's `slices:`
+   list is updated; slice N's doc is marked `status: split`. Then run
+   chains per sub-slice as usual. (Exception: if the diagnosis shows
+   the slice is already atomic — nothing sensible to split off — skip
+   straight to 3.)
+3. **Second attempt → retry with more resources** (+50% turn
+   budget/timeout). Retry-bigger is never the *first* response to a
+   splittable slice.
+4. **Backstop: user escalation.** If it still fails after split and
+   one budget-boosted retry, ask the user (current "two retries
+   failed" behavior).
+5. **Bug-md-specific:** if a bug turns out nasty, a tdd-worker attempt
+   within budget followed by *analysis of why it couldn't finish* is
+   the preferred way to discover the finer slicing — the failed
+   attempt's findings seed the sub-slice breakdown.
 
 ### Integration points
 
@@ -212,6 +267,10 @@ by bug kind as a starting point.
 - [x] fix-bug's fate → **Dissolved**: report-bug owns capture →
   reproduce → triage → promote end-to-end. Resume point for abandoned
   sessions = `status: reported` without `promoted_to`.
+- [x] bug.md shape → **Lean single chain** (approved): tdd-worker →
+  slice-verifier → land-worker; spec = bug doc + repro.md + slice doc;
+  no arch-spec conversation, no levels, no coherence refactor.
+  finalize-task closes the linked bug doc.
 - [x] Promotion threshold → **Strict, sharpened by user**: the gate
   collapses to trivial-vs-not. Truly trivial bugs bypass the workflow
   entirely ("if it is TRULY small, bypassing the workflow is best");
@@ -221,9 +280,10 @@ by bug kind as a starting point.
   `docs/bugs/` before writing. Suspected duplicate → one question
   (duplicate or distinct?). Duplicate → append note + reporter context to
   the existing doc, no new file. Distinct → new doc.
-- [x] Deviation-reporter for bug fixes? → **Resolved by design**:
-  non-trivial fixes go through the full task flow (which has deviation
-  reports); trivial fixes are one-liners where it adds nothing.
+- [x] Deviation-reporter for bug fixes? → **No**: the approved bug.md
+  chain is tdd-worker → slice-verifier → land-worker, no
+  deviation-reporter; the spec (bug doc + repro.md) is small enough
+  that verify alone gates.
 - [x] Trivial fixes → **Doc always required once in the workflow, then
   direct commit to main** (no branch). Below the workflow's floor
   (too small to report), bugs are fixed ad-hoc with no artifacts.
