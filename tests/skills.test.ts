@@ -279,4 +279,34 @@ describe("skill cross-references", () => {
     const content = readFile("skills/finalize-task/SKILL.md");
     expect(content).toContain("bug: <slug>");
   });
+
+  test("onboard-workflow creates docs/bugs/archive directory", () => {
+    const content = readFile("skills/onboard-workflow/SKILL.md");
+    expect(content).toContain("docs/bugs/archive");
+  });
+
+  test("onboard-workflow writes docs/dev-env.md template", () => {
+    const content = readFile("skills/onboard-workflow/SKILL.md");
+    expect(content).toContain("docs/dev-env.md");
+  });
+
+  test("onboard-workflow does not clobber existing docs/dev-env.md", () => {
+    const content = readFile("skills/onboard-workflow/SKILL.md");
+    expect(content).toMatch(/do not clobber|already exists|skip.*docs\/dev-env\.md|preserve.*docs\/dev-env\.md/i);
+  });
+
+  test("task-overview routes report a bug to /skill:report-bug", () => {
+    const content = readFile("skills/task-overview/SKILL.md");
+    expect(content).toContain("/skill:report-bug");
+  });
+
+  test("task-overview lists triage queue query", () => {
+    const content = readFile("skills/task-overview/SKILL.md");
+    expect(content).toContain('grep -l "status: reported" docs/bugs/*.md');
+  });
+
+  test("task-overview mentions docs/bugs as bug list location", () => {
+    const content = readFile("skills/task-overview/SKILL.md");
+    expect(content).toContain("docs/bugs/");
+  });
 });
