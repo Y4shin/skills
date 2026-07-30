@@ -93,3 +93,13 @@ executed by a lean single chain.
    `docs/tasks/<taskSlug>/repro.md` (next to task.md), not under docs/bugs/.
 3. Noted separately (global): `turnBudget` in chain prose is unsupported
    by the subagent runtime — stale in both resources.
+
+- Slice 3 (finalize-bug-closure): `finalize-task/SKILL.md` gained
+  **Step 6 — Bug closure (type: bug only)**: reads task frontmatter
+  (absent `type` → `feature`, no behavior change), resolves the linked
+  bug via `bug: <slug>` (asks the user when absent), sets
+  `status: fixed`, fills `fix_commit` and Root cause / Fix summary from
+  implementation notes, then `git mv` to `docs/bugs/archive/<slug>.md`.
+  Subsequent steps renumbered (Archive → 7, Epic finalization → 8,
+  Report → 9). Five prose assertions added to `tests/skills.test.ts`.
+  Full suite green at land (165/165).
