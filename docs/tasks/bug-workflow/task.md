@@ -84,3 +84,12 @@ executed by a lean single chain.
   and the per-level deviation-report review from the old chain-result
   block — restore or ratify the removal; known doc/runtime mismatch,
   `turnBudget` is unsupported on chain steps.
+
+## Coherence-refactor mandate (user-approved, from slice-2 deviation report)
+
+1. Restore in `resources/feature.md`: uncertainty.md routing,
+   `task_state_set task` bookkeeping, per-level deviation-report review.
+2. Fix `resources/bug.md` Step 0: repro.md lives at
+   `docs/tasks/<taskSlug>/repro.md` (next to task.md), not under docs/bugs/.
+3. Noted separately (global): `turnBudget` in chain prose is unsupported
+   by the subagent runtime — stale in both resources.
