@@ -4,11 +4,11 @@ slug: onboarding-and-routing
 title: onboard-workflow + task-overview bug support
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: s
 blocked_by: []
-started_at:
-completed_at:
+started_at: 2026-07-30T16:35:00Z
+completed_at: 2026-07-30T16:35:00Z
 ---
 
 # Slice 4: onboard-workflow + task-overview bug support

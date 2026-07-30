@@ -6,9 +6,9 @@ type: feature
 description: Add a bug path to the workflow — report-bug skill, type-dispatched implement-task, bug closure in finalize-task, onboarding + routing support
 epic:
 slices: [report-bug-skill, implement-task-wrapper, finalize-bug-closure, onboarding-and-routing]
-status: in-progress
+status: done
 started_at: 2026-07-30T16:35:00Z
-completed_at:
+completed_at: 2026-07-30T16:35:00Z
 ---
 
 # Bug workflow (report, track, fix)
@@ -103,3 +103,15 @@ executed by a lean single chain.
   Subsequent steps renumbered (Archive → 7, Epic finalization → 8,
   Report → 9). Five prose assertions added to `tests/skills.test.ts`.
   Full suite green at land (165/165).
+- Slice 4 (onboarding-and-routing): `onboard-workflow/SKILL.md` now
+  creates `docs/bugs/` + `docs/bugs/archive/` (with `.gitkeep`
+  handling) and writes a `docs/dev-env.md` template (dev-env start,
+  reproduction guidance, or explicit "do not attempt AI reproduction"
+  placeholder) with a no-clobber clause on re-run; final report
+  mentions `/skill:report-bug`. `task-overview/SKILL.md` routes
+  "Report a bug" → `/skill:report-bug`, lists the triage-queue query
+  `grep -l "status: reported" docs/bugs/*.md`, and names `docs/bugs/`
+  as the bug list location. Six prose assertions added to
+  `tests/skills.test.ts`. No divergences from the arch-spec contract
+  (see `deviation-reports/onboarding-and-routing.md`); full suite
+  green at land (171/171).
