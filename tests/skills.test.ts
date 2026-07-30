@@ -274,4 +274,9 @@ describe("skill cross-references", () => {
     const content = readFile("skills/finalize-task/SKILL.md");
     expect(content).toMatch(/ask.{0,80}bug/i);
   });
+
+  test("finalize-task documents bug slug frontmatter convention", () => {
+    const content = readFile("skills/finalize-task/SKILL.md");
+    expect(content).toContain("bug: <slug>");
+  });
 });
