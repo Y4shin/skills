@@ -168,6 +168,35 @@ Set task_set status done on slice.`
             ],
             failFast: true
         })
+
+        // Process the chain result
+        if exists docs/tasks/${taskSlug}/.work/uncertainty.md:
+            // tdd-worker hit uncertainty and stopped (failFast aborted before verify/land)
+            resolution = ask_user_question({
+                header: "Uncertain",
+                question: `TDD worker hit uncertainty in slice ${slice}:\n{read docs/tasks/${taskSlug}/.work/uncertainty.md}`
+            })
+            delete the uncertainty file
+            // Re-route to tdd-worker. Do NOT do the work yourself — parent context is expensive.
+            re-run the chain for this slice,
+            appending the user's resolution to the tdd task prompt
+            continue
+
+        // On chain failure, apply the failure toolbelt below
+        // (diagnose → split → retry +50% → escalate). Never fix code yourself.
+
+        // success path: slice landed
+        task_set <slice-path> status done
+        task_state_set task <taskSlug>
+
+    // After each level: read deviation reports for slices that flagged
+    // user-attention-needed. Update the arch spec for pending slices if API
+    // surfaces changed. If a deviation reveals a workflow/planning problem
+    // (ambiguous spec, wrong interface contract), call submit_workflow_feedback.
+    // Do NOT call it for the deviation itself — that's a project finding.
+
+    // Also mention any ui-noter findings to the user, but non-blocking.
+    // If the user wants to act on them now, let them; otherwise continue.
 ```
 
 ## Step 3 — Coherence refactor

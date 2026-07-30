@@ -4,14 +4,15 @@ Implements the single slice of a bug task. The chain is lean: no architecture sp
 
 ## Step 0 — Prerequisites
 
-Bug task doc exists with `type: bug`, `bug: <slug>`, and a `slices:` list. The slice doc is at `docs/tasks/${taskSlug}/slices/<n>-${slice}.md`. The bug doc lives at `docs/bugs/${bugSlug}.md` and the reproduction at `docs/bugs/${bugSlug}/repro.md`.
+Bug task doc exists with `type: bug`, `bug: <slug>`, and a `slices:` list. The slice doc is at `docs/tasks/${taskSlug}/slices/<n>-${slice}.md`. The bug doc lives at `docs/bugs/${bugSlug}.md` and the reproduction at
+`docs/tasks/${taskSlug}/repro.md` (promotion moved it next to `task.md`).
 
 ```
 const taskSlug = "<task-slug>"
 const taskPath = `docs/tasks/${taskSlug}/task.md`
 const bugSlug = task_get(taskPath, "bug")
 const bugPath = `docs/bugs/${bugSlug}.md`
-const reproPath = `docs/bugs/${bugSlug}/repro.md`
+const reproPath = `docs/tasks/${taskSlug}/repro.md`
 const slice = task_slices(taskSlug)[0]
 ```
 
