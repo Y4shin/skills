@@ -172,29 +172,71 @@ describe("skill cross-references", () => {
     expect(content).toContain("onboard-workflow");
   });
 
-  test("implement-task references task_dependency_levels", () => {
+  test("implement-task wrapper reads type and dispatches to resources", () => {
     const content = readFile("skills/implement-task/SKILL.md");
+    expect(content).toContain("task_get");
+    expect(content).toContain("type");
+    expect(content).toContain("resources/feature.md");
+    expect(content).toContain("resources/bug.md");
+    expect(content).toMatch(/absent.*feature|feature.*default|\btype:\s*feature\b/i);
+  });
+
+  test("implement-task feature resource references task_dependency_levels", () => {
+    const content = readFile("skills/implement-task/resources/feature.md");
     expect(content).toContain("task_dependency_levels");
   });
 
-  test("implement-task references tdd-worker agent", () => {
-    const content = readFile("skills/implement-task/SKILL.md");
+  test("implement-task feature resource references tdd-worker agent", () => {
+    const content = readFile("skills/implement-task/resources/feature.md");
     expect(content).toContain("tdd-worker");
   });
 
-  test("implement-task references slice-verifier agent", () => {
-    const content = readFile("skills/implement-task/SKILL.md");
+  test("implement-task feature resource references slice-verifier agent", () => {
+    const content = readFile("skills/implement-task/resources/feature.md");
     expect(content).toContain("slice-verifier");
   });
 
-  test("implement-task references land-worker agent", () => {
-    const content = readFile("skills/implement-task/SKILL.md");
+  test("implement-task feature resource references land-worker agent", () => {
+    const content = readFile("skills/implement-task/resources/feature.md");
     expect(content).toContain("land-worker");
   });
 
-  test("implement-task references deviation-reporter agent", () => {
-    const content = readFile("skills/implement-task/SKILL.md");
+  test("implement-task feature resource references deviation-reporter agent", () => {
+    const content = readFile("skills/implement-task/resources/feature.md");
     expect(content).toContain("deviation-reporter");
+  });
+
+  test("implement-task bug resource references tdd-worker agent", () => {
+    const content = readFile("skills/implement-task/resources/bug.md");
+    expect(content).toContain("tdd-worker");
+  });
+
+  test("implement-task bug resource references slice-verifier agent", () => {
+    const content = readFile("skills/implement-task/resources/bug.md");
+    expect(content).toContain("slice-verifier");
+  });
+
+  test("implement-task bug resource references land-worker agent", () => {
+    const content = readFile("skills/implement-task/resources/bug.md");
+    expect(content).toContain("land-worker");
+  });
+
+  test("implement-task bug resource uses red-first regression test rule", () => {
+    const content = readFile("skills/implement-task/resources/bug.md");
+    expect(content).toMatch(/red.{0,40}test|test.{0,40}red/i);
+  });
+
+  test("feature and bug resources include failure toolbelt in order", () => {
+    const feature = readFile("skills/implement-task/resources/feature.md");
+    const bug = readFile("skills/implement-task/resources/bug.md");
+    for (const content of [feature, bug]) {
+      const splitIdx = content.indexOf("split");
+      const retryIdx = content.indexOf("retry");
+      expect(splitIdx).toBeGreaterThan(-1);
+      expect(retryIdx).toBeGreaterThan(-1);
+      expect(splitIdx).toBeLessThan(retryIdx);
+      expect(content).toContain("parent never implements");
+    }
   });
 
   test("finalize-task references task_finalizable", () => {
