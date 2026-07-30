@@ -63,4 +63,10 @@ executed by a lean single chain.
 
 ## Implementation notes
 
-(filled during implementation)
+- Slice 1 (report-bug-skill): manifest skill count is 7, not 6 —
+  spec/slice-doc baseline claim was stale (refine-idea made 6 at
+  baseline; +report-bug = 7). Skill promotion frontmatter should
+  enumerate the full task schema (`kind`, `slug`, `slices:`, `type: bug`,
+  `bug: <slug>`) — tighten in coherence refactor. `.gitignore` gained
+  `.pi-subagents/` (out-of-scope but kept). Full suite green at land
+  (154/154).
