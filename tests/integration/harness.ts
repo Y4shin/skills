@@ -26,12 +26,13 @@ import {
 import {
   type AgentSession,
   type AgentSessionEvent,
+  AuthStorage,
   createAgentSession,
   type ExtensionFactory,
   type ExtensionUIContext,
   DefaultResourceLoader,
   type Model,
-  ModelRuntime,
+  ModelRegistry,
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
@@ -132,23 +133,16 @@ export async function createTaskSession(options: TaskSessionOptions = {}): Promi
   });
   await loader.reload();
 
-  // Create a ModelRuntime with a null modelsPath so no models.json is needed, and
-  // an in-memory credential store so no auth files are read.
-  const modelRuntime = await ModelRuntime.create({
-    modelsPath: null,
-    credentials: {
-      get: async () => undefined,
-      set: async () => {},
-      remove: async () => {},
-      list: async () => [],
-      getDefault: async () => undefined,
-    },
-  });
+  // In-memory auth + model registry: no models.json on disk, no auth
+  // files read.
+  const authStorage = AuthStorage.inMemory();
+  const modelRegistry = ModelRegistry.inMemory(authStorage);
 
-  // Register the faux provider on the ModelRuntime so auth checks pass
+  // Register the faux provider on the registry so auth checks pass
   const providerId = (model as any).provider;
-  modelRuntime.registerProvider(providerId, {
+  modelRegistry.registerProvider(providerId, {
     name: providerId,
+    baseUrl: "http://faux.local",
     api: "faux" as any,
     apiKey: "faux-key",
     models: [{
@@ -166,7 +160,7 @@ export async function createTaskSession(options: TaskSessionOptions = {}): Promi
     cwd,
     agentDir: cwd,
     model,
-    modelRuntime,
+    modelRegistry,
     resourceLoader: loader,
     sessionManager: SessionManager.inMemory(cwd),
     settingsManager,

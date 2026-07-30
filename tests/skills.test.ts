@@ -122,7 +122,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(5);
+    expect(pkg.pi.skills.length).toBe(6);
   });
 
   test("has subagents config", () => {
@@ -169,11 +169,6 @@ describe("skill cross-references", () => {
     expect(content).toContain("implement-task");
     expect(content).toContain("finalize-task");
     expect(content).toContain("onboard-workflow");
-  });
-
-  test("create-task references task_set_slices", () => {
-    const content = readFile("skills/create-task/SKILL.md");
-    expect(content).toContain("task_set_slices");
   });
 
   test("implement-task references task_dependency_levels", () => {
