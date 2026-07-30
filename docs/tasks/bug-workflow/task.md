@@ -115,3 +115,18 @@ executed by a lean single chain.
   `tests/skills.test.ts`. No divergences from the arch-spec contract
   (see `deviation-reports/onboarding-and-routing.md`); full suite
   green at land (171/171).
+
+## Architecture lessons (harvested at finalize)
+
+- Skill prose is cheap to drift: cross-reference assertions in
+  tests/skills.test.ts caught none of the slice-2 behavior loss — the
+  deviation-reporter did. Prose tests assert presence of strings, not
+  preservation of behavior blocks; deviation review remains essential.
+- `turnBudget` in chain prose is unsupported by the subagent runtime
+  (rejected at dispatch). Both implement-task resources still mention
+  it — global cleanup candidate.
+- Unquoted `: ` in YAML frontmatter values silently invalidates a doc
+  for the task tools (recorded in docs/testing.md).
+- The failure toolbelt was exercised for real on slice 1 (chain
+  timeout → continuation re-dispatch instead of parent self-fix) and
+  worked as designed.
