@@ -4,11 +4,11 @@ slug: implement-task-wrapper
 title: implement-task wrapper + feature/bug resources
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: l
 blocked_by: []
 started_at:
-completed_at:
+completed_at: 2026-07-30T17:19:00Z
 ---
 
 # Slice 2: implement-task wrapper + resources/{feature,bug}.md

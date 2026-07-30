@@ -70,3 +70,17 @@ executed by a lean single chain.
   `bug: <slug>`) — tighten in coherence refactor. `.gitignore` gained
   `.pi-subagents/` (out-of-scope but kept). Full suite green at land
   (154/154).
+- Slice 2 (implement-task-wrapper): `implement-task/SKILL.md` split
+  into a thin wrapper (reads `type` via `task_get`, absent →
+  `feature`, dispatches to resources) plus `resources/feature.md`
+  (existing chain body + failure toolbelt) and `resources/bug.md`
+  (lean red-first chain). Xref tests retargeted to `resources/*` with
+  new bug.md assertions; 160/160 green at land. Deviation-reporter
+  follow-ups needing user attention (see
+  `deviation-reports/implement-task-wrapper.md`): bug.md Step 0 reads
+  repro.md at the pre-promotion path `docs/bugs/<slug>/repro.md`
+  (promotion contract puts it next to `task.md`); feature.md silently
+  dropped uncertainty.md routing, `task_state_set task <taskSlug>`,
+  and the per-level deviation-report review from the old chain-result
+  block — restore or ratify the removal; known doc/runtime mismatch,
+  `turnBudget` is unsupported on chain steps.
