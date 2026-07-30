@@ -4,11 +4,11 @@ slug: finalize-bug-closure
 title: "finalize-task closes bug docs for type: bug"
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: s
 blocked_by: []
 started_at:
-completed_at:
+completed_at: 2026-07-30T00:00:00Z
 ---
 
 # Slice 3: finalize-task bug closure
