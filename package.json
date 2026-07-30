@@ -36,7 +36,8 @@
       "./skills/refine-idea",
       "./skills/create-task",
       "./skills/implement-task",
-      "./skills/finalize-task"
+      "./skills/finalize-task",
+      "./skills/report-bug"
     ],
     "subagents": {
       "agents": [

@@ -1,6 +1,6 @@
 ---
 name: onboard-workflow
-description: Initialize a repository for the task-workflow. Creates docs/tasks/ and docs/ideas/ directories, state.yaml, and CHANGELOG.md.
+description: Initialize a repository for the task-workflow. Creates docs/tasks/, docs/ideas/, docs/bugs/, state.yaml, CHANGELOG.md, docs/testing.md, and docs/dev-env.md.
 ---
 
 # Onboard Workflow
@@ -14,7 +14,10 @@ description: Initialize a repository for the task-workflow. Creates docs/tasks/ 
    mkdir -p docs/tasks/archive
    mkdir -p docs/tasks/epics/archive
    mkdir -p docs/ideas
+   mkdir -p docs/bugs
+   mkdir -p docs/bugs/archive
    ```
+   Empty directories get a `.gitkeep`.
 
 3. Write `docs/tasks/state.yaml`:
    ```yaml
@@ -29,6 +32,8 @@ description: Initialize a repository for the task-workflow. Creates docs/tasks/ 
 
 5. Write `docs/testing.md` with a template (framework, run commands, mock conventions).
 
-6. Commit: `chore: initialize task-workflow`.
+6. Write `docs/dev-env.md` with a template describing how to start the dev environment, how reproduction should work, or an explicit "do not attempt AI reproduction" placeholder. If `docs/dev-env.md` already exists, do not clobber it — leave the existing file in place.
 
-7. Report: "Ready. Run `/skill:refine-idea` to flesh out an idea, or `/skill:create-task` to plan a small, well-understood task directly."
+7. Commit: `chore: initialize task-workflow`.
+
+8. Report: "Ready. Run `/skill:refine-idea` to flesh out an idea, `/skill:report-bug` to track a defect, or `/skill:create-task` to plan a small, well-understood task directly."

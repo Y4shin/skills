@@ -73,7 +73,24 @@ Read the task doc. If it belongs to an epic (`epic:` field):
 - Check if the epic's description needs updating
 - If deviations found: update the epic doc. If significant: ask user.
 
-## Step 6 — Archive
+## Step 6 — Bug closure (type: bug only)
+
+Read the task doc frontmatter.
+
+- If `type:` is absent or `feature`, skip this step. Feature tasks are unchanged.
+- If `type: bug`:
+  1. Get the linked bug slug from the task doc frontmatter `bug: <slug>`.
+     - If `bug:` is absent, **ask the user which bug doc to close** and do not proceed until answered.
+  2. Read `docs/bugs/<slug>.md`.
+  3. Update the bug doc:
+     - Set `status: fixed`.
+     - Fill `fix_commit` with the SHA of the final fix commit on the task branch (`git rev-parse task/{taskSlug}`).
+     - Fill the **Root cause** and **Fix summary** sections from the task's `## Implementation notes` and deviation reports.
+  4. Commit: `git add docs/bugs/<slug>.md && git commit -m "docs(bug): close <slug>"`
+  5. Archive the bug doc: `git mv docs/bugs/<slug>.md docs/bugs/archive/<slug>.md`
+  6. Commit: `git commit -m "chore(bug): archive <slug>"`
+
+## Step 7 — Archive
 
 ```
 task_epic_tick <epic-slug> {taskSlug}  # if belongs to epic
@@ -87,13 +104,13 @@ git branch -d task/{taskSlug}
 
 If remote exists: `git push origin main`
 
-## Step 7 — Epic finalization (if last child)
+## Step 8 — Epic finalization (if last child)
 
 If the epic's `task_epic_finalizable` returns ready:
 - Summarize the epic to CHANGELOG.md
 - Archive the epic: `git mv docs/tasks/epics/<slug>/ docs/tasks/epics/archive/<slug>/`
 - Finalize epic doc
 
-## Step 8 — Report
+## Step 9 — Report
 
 "Task archived, CHANGELOG updated, main branch updated. Epic status: <done/not done>."

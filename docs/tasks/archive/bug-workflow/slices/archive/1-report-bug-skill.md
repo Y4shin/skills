@@ -4,11 +4,11 @@ slug: report-bug-skill
 title: report-bug skill
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: m
 blocked_by: []
 started_at:
-completed_at:
+completed_at: 2026-07-30T17:10:00Z
 ---
 
 # Slice 1: report-bug skill

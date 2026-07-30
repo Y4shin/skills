@@ -79,6 +79,7 @@ const SKILL_FILES = [
   "skills/create-task/SKILL.md",
   "skills/implement-task/SKILL.md",
   "skills/finalize-task/SKILL.md",
+  "skills/report-bug/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -122,7 +123,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(6);
+    expect(pkg.pi.skills.length).toBe(7);
   });
 
   test("has subagents config", () => {
@@ -171,29 +172,71 @@ describe("skill cross-references", () => {
     expect(content).toContain("onboard-workflow");
   });
 
-  test("implement-task references task_dependency_levels", () => {
+  test("implement-task wrapper reads type and dispatches to resources", () => {
     const content = readFile("skills/implement-task/SKILL.md");
+    expect(content).toContain("task_get");
+    expect(content).toContain("type");
+    expect(content).toContain("resources/feature.md");
+    expect(content).toContain("resources/bug.md");
+    expect(content).toMatch(/absent.*feature|feature.*default|\btype:\s*feature\b/i);
+  });
+
+  test("implement-task feature resource references task_dependency_levels", () => {
+    const content = readFile("skills/implement-task/resources/feature.md");
     expect(content).toContain("task_dependency_levels");
   });
 
-  test("implement-task references tdd-worker agent", () => {
-    const content = readFile("skills/implement-task/SKILL.md");
+  test("implement-task feature resource references tdd-worker agent", () => {
+    const content = readFile("skills/implement-task/resources/feature.md");
     expect(content).toContain("tdd-worker");
   });
 
-  test("implement-task references slice-verifier agent", () => {
-    const content = readFile("skills/implement-task/SKILL.md");
+  test("implement-task feature resource references slice-verifier agent", () => {
+    const content = readFile("skills/implement-task/resources/feature.md");
     expect(content).toContain("slice-verifier");
   });
 
-  test("implement-task references land-worker agent", () => {
-    const content = readFile("skills/implement-task/SKILL.md");
+  test("implement-task feature resource references land-worker agent", () => {
+    const content = readFile("skills/implement-task/resources/feature.md");
     expect(content).toContain("land-worker");
   });
 
-  test("implement-task references deviation-reporter agent", () => {
-    const content = readFile("skills/implement-task/SKILL.md");
+  test("implement-task feature resource references deviation-reporter agent", () => {
+    const content = readFile("skills/implement-task/resources/feature.md");
     expect(content).toContain("deviation-reporter");
+  });
+
+  test("implement-task bug resource references tdd-worker agent", () => {
+    const content = readFile("skills/implement-task/resources/bug.md");
+    expect(content).toContain("tdd-worker");
+  });
+
+  test("implement-task bug resource references slice-verifier agent", () => {
+    const content = readFile("skills/implement-task/resources/bug.md");
+    expect(content).toContain("slice-verifier");
+  });
+
+  test("implement-task bug resource references land-worker agent", () => {
+    const content = readFile("skills/implement-task/resources/bug.md");
+    expect(content).toContain("land-worker");
+  });
+
+  test("implement-task bug resource uses red-first regression test rule", () => {
+    const content = readFile("skills/implement-task/resources/bug.md");
+    expect(content).toMatch(/red.{0,40}test|test.{0,40}red/i);
+  });
+
+  test("feature and bug resources include failure toolbelt in order", () => {
+    const feature = readFile("skills/implement-task/resources/feature.md");
+    const bug = readFile("skills/implement-task/resources/bug.md");
+    for (const content of [feature, bug]) {
+      const splitIdx = content.indexOf("split");
+      const retryIdx = content.indexOf("retry");
+      expect(splitIdx).toBeGreaterThan(-1);
+      expect(retryIdx).toBeGreaterThan(-1);
+      expect(splitIdx).toBeLessThan(retryIdx);
+      expect(content).toContain("parent never implements");
+    }
   });
 
   test("finalize-task references task_finalizable", () => {
@@ -209,5 +252,61 @@ describe("skill cross-references", () => {
   test("finalize-task references task_epic_finalizable", () => {
     const content = readFile("skills/finalize-task/SKILL.md");
     expect(content).toContain("task_epic_finalizable");
+  });
+
+  test("finalize-task has a type: bug branch", () => {
+    const content = readFile("skills/finalize-task/SKILL.md");
+    expect(content).toMatch(/type\s*:\s*bug/i);
+  });
+
+  test("finalize-task bug branch archives bug docs to docs/bugs/archive", () => {
+    const content = readFile("skills/finalize-task/SKILL.md");
+    expect(content).toContain("docs/bugs/archive");
+  });
+
+  test("finalize-task bug branch sets status fixed and fills fix_commit", () => {
+    const content = readFile("skills/finalize-task/SKILL.md");
+    expect(content).toContain("status: fixed");
+    expect(content).toContain("fix_commit");
+  });
+
+  test("finalize-task bug branch asks user when bug field is absent", () => {
+    const content = readFile("skills/finalize-task/SKILL.md");
+    expect(content).toMatch(/ask.{0,80}bug/i);
+  });
+
+  test("finalize-task documents bug slug frontmatter convention", () => {
+    const content = readFile("skills/finalize-task/SKILL.md");
+    expect(content).toContain("bug: <slug>");
+  });
+
+  test("onboard-workflow creates docs/bugs/archive directory", () => {
+    const content = readFile("skills/onboard-workflow/SKILL.md");
+    expect(content).toContain("docs/bugs/archive");
+  });
+
+  test("onboard-workflow writes docs/dev-env.md template", () => {
+    const content = readFile("skills/onboard-workflow/SKILL.md");
+    expect(content).toContain("docs/dev-env.md");
+  });
+
+  test("onboard-workflow does not clobber existing docs/dev-env.md", () => {
+    const content = readFile("skills/onboard-workflow/SKILL.md");
+    expect(content).toMatch(/do not clobber|already exists|skip.*docs\/dev-env\.md|preserve.*docs\/dev-env\.md/i);
+  });
+
+  test("task-overview routes report a bug to /skill:report-bug", () => {
+    const content = readFile("skills/task-overview/SKILL.md");
+    expect(content).toContain("/skill:report-bug");
+  });
+
+  test("task-overview lists triage queue query", () => {
+    const content = readFile("skills/task-overview/SKILL.md");
+    expect(content).toContain('grep -l "status: reported" docs/bugs/*.md');
+  });
+
+  test("task-overview mentions docs/bugs as bug list location", () => {
+    const content = readFile("skills/task-overview/SKILL.md");
+    expect(content).toContain("docs/bugs/");
   });
 });
