@@ -2,9 +2,10 @@
 kind: idea
 title: Bug workflow (report, track, fix)
 slug: bug-workflow
-status: ready
+status: converted
 created_at: 2026-07-30T14:05:09Z
 grilled_at: 2026-07-30T16:22:39Z
+converted_to: bug-workflow
 converted_to:
 ---
 
