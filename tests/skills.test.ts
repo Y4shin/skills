@@ -253,4 +253,25 @@ describe("skill cross-references", () => {
     const content = readFile("skills/finalize-task/SKILL.md");
     expect(content).toContain("task_epic_finalizable");
   });
+
+  test("finalize-task has a type: bug branch", () => {
+    const content = readFile("skills/finalize-task/SKILL.md");
+    expect(content).toMatch(/type\s*:\s*bug/i);
+  });
+
+  test("finalize-task bug branch archives bug docs to docs/bugs/archive", () => {
+    const content = readFile("skills/finalize-task/SKILL.md");
+    expect(content).toContain("docs/bugs/archive");
+  });
+
+  test("finalize-task bug branch sets status fixed and fills fix_commit", () => {
+    const content = readFile("skills/finalize-task/SKILL.md");
+    expect(content).toContain("status: fixed");
+    expect(content).toContain("fix_commit");
+  });
+
+  test("finalize-task bug branch asks user when bug field is absent", () => {
+    const content = readFile("skills/finalize-task/SKILL.md");
+    expect(content).toMatch(/ask.{0,80}bug/i);
+  });
 });
