@@ -101,18 +101,18 @@ Fix it directly on the current branch / main. No feature branch.
 
 ### Non-trivial
 
-Promote to a task without running the create-task interview.
+Promote directly to a `type: bug` task without running the Wayfinder interview.
 
 1. Infer a task doc from the bug doc:
    - Frontmatter: `type: bug`, `bug: <bug-slug>`, title, status, dates.
-   - Body: user stories, boundaries, layers touched, ONE default slice
-     with title, acceptance criteria, `## Test plan`, `size`, `blocked_by`.
-2. Propose the task doc and slice to the user. On agreement:
-   - Write `docs/tasks/<slug>/task.md` and `docs/tasks/<slug>/slices/1-<slug>.md`.
+   - Body: user stories, boundaries, layers touched, acceptance criteria,
+     `## Test plan`, `size`, and `blocked_by`.
+2. Propose the task doc to the user. On agreement:
+   - Write `docs/tasks/<slug>/task.md` with `kind: task` and `type: bug`.
    - Move `repro.md` (and any scripts) next to `task.md`.
    - Update the bug doc: `status: promoted`, `promoted_to: <slug>`.
    - Commit.
-3. Hand off: `/skill:implement-task <slug>`.
+3. Hand off: `/skill:implement-task <slug>` (or add the bug task to a Wayfinder map).
 
 There is no mid-flight escalation path. If a fix surprises you, stop and
 promote.

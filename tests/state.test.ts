@@ -21,7 +21,7 @@ describe("fromObject", () => {
   });
 
   test("parses v1 nested format", () => {
-    const state = fromObject({ active: { task: "login", slice: "login-form", epic: "auth" }, last_action: "x", next_action: "y" });
+    const state = fromObject({ active: { task: "login", slice: "login-form", map: "auth" }, last_action: "x", next_action: "y" });
     expect(state.task).toBe("login");
     expect(state.slice).toBe("login-form");
   });

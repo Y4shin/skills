@@ -76,7 +76,7 @@ describe("agent frontmatter", () => {
 const SKILL_FILES = [
   "skills/task-overview/SKILL.md",
   "skills/onboard-workflow/SKILL.md",
-  "skills/create-task/SKILL.md",
+  "skills/wayfinder/SKILL.md",
   "skills/implement-task/SKILL.md",
   "skills/finalize-task/SKILL.md",
   "skills/report-bug/SKILL.md",
@@ -123,7 +123,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(7);
+    expect(pkg.pi.skills.length).toBe(6);
   });
 
   test("has subagents config", () => {
@@ -166,7 +166,7 @@ describe("all referenced agents exist", () => {
 describe("skill cross-references", () => {
   test("overview references all core skills", () => {
     const content = readFile("skills/task-overview/SKILL.md");
-    expect(content).toContain("create-task");
+    expect(content).toContain("wayfinder");
     expect(content).toContain("implement-task");
     expect(content).toContain("finalize-task");
     expect(content).toContain("onboard-workflow");
@@ -178,7 +178,26 @@ describe("skill cross-references", () => {
     expect(content).toContain("type");
     expect(content).toContain("resources/feature.md");
     expect(content).toContain("resources/bug.md");
+    expect(content).toContain("resources/research.md");
+    expect(content).toContain("resources/prototype.md");
+    expect(content).toContain("resources/grilling.md");
+    expect(content).toContain("resources/manual.md");
     expect(content).toMatch(/absent.*feature|feature.*default|\btype:\s*feature\b/i);
+  });
+
+  test("wayfinder owns task creation and direct handoff", () => {
+    const content = readFile("skills/wayfinder/SKILL.md");
+    expect(content).toContain("`create-task`, `to-spec`, and `to-tickets`");
+    expect(content).toContain("mandatory grilling session");
+    expect(content).toContain("implement-task");
+    expect(content).toContain("blocked_by");
+    expect(content).toContain("## Dynamic growth");
+  });
+
+  test("implement-task re-enters wayfinder after a map frontier", () => {
+    const content = readFile("skills/implement-task/SKILL.md");
+    expect(content).toContain("wayfinder <map-slug>");
+    expect(content).toContain("reassess the map");
   });
 
   test("implement-task feature resource references task_dependency_levels", () => {
@@ -205,6 +224,14 @@ describe("skill cross-references", () => {
     const content = readFile("skills/implement-task/resources/feature.md");
     expect(content).toContain("deviation-reporter");
   });
+
+  for (const resource of ["research", "prototype", "grilling", "manual"]) {
+    test(`implement-task ${resource} resource exists and is non-coding`, () => {
+      const content = readFile(`skills/implement-task/resources/${resource}.md`);
+      expect(content).toContain("Implement Task");
+      expect(content).toContain("Completion evidence");
+    });
+  }
 
   test("implement-task bug resource references tdd-worker agent", () => {
     const content = readFile("skills/implement-task/resources/bug.md");
@@ -244,14 +271,14 @@ describe("skill cross-references", () => {
     expect(content).toContain("task_finalizable");
   });
 
-  test("finalize-task references task_epic_tick", () => {
+  test("finalize-task references task_map_tick", () => {
     const content = readFile("skills/finalize-task/SKILL.md");
-    expect(content).toContain("task_epic_tick");
+    expect(content).toContain("task_map_tick");
   });
 
-  test("finalize-task references task_epic_finalizable", () => {
+  test("finalize-task references task_map_finalizable", () => {
     const content = readFile("skills/finalize-task/SKILL.md");
-    expect(content).toContain("task_epic_finalizable");
+    expect(content).toContain("task_map_finalizable");
   });
 
   test("finalize-task has a type: bug branch", () => {
@@ -293,6 +320,12 @@ describe("skill cross-references", () => {
   test("onboard-workflow does not clobber existing docs/dev-env.md", () => {
     const content = readFile("skills/onboard-workflow/SKILL.md");
     expect(content).toMatch(/do not clobber|already exists|skip.*docs\/dev-env\.md|preserve.*docs\/dev-env\.md/i);
+  });
+
+  test("task-overview routes planning to wayfinder", () => {
+    const content = readFile("skills/task-overview/SKILL.md");
+    expect(content).toContain("/skill:wayfinder");
+    expect(content).toContain("task_frontier");
   });
 
   test("task-overview routes report a bug to /skill:report-bug", () => {

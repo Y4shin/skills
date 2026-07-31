@@ -9,7 +9,7 @@
 - Used/was specified: **yes.** Followed the existing `bug: <slug>` convention from `skills/report-bug/SKILL.md` (slice 1's contract); reused the `tests/skills.test.ts` cross-reference assertion pattern; did not touch `src/` or `agents/*.md`.
 
 ### Out-of-scope changes
-- **Step renumbering** in finalize-task (Archive 6→7, Epic finalization 7→8, Report 8→9) — mechanical consequence of inserting the new step; declared in the worker's "Notable events". Acceptable.
+- **Step renumbering** in finalize-task (Archive 6→7, Map finalization 7→8, Report 8→9) — mechanical consequence of inserting the new step; declared in the worker's "Notable events". Acceptable.
 - One extra assertion beyond the slice doc's single "structure test": five focused assertions instead of one. More thorough, same file, same pattern. Acceptable.
 - Minor: `tests/skills.test.ts` lost its trailing newline ("\ No newline at end of file"). Cosmetic; harmless.
 

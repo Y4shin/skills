@@ -1,6 +1,6 @@
 ---
 name: finalize-task
-description: Autonomous. Run CI gate, harvest knowledge, write changelog, archive task, merge to main. If task belongs to an epic and is the last child, also finalize the epic.
+description: Autonomous. Run CI gate, harvest knowledge, write changelog, archive task, merge to main. If task belongs to a map and is the last child, also finalize the map.
 ---
 
 # Finalize Task
@@ -65,13 +65,13 @@ If there were UI design notes that were acted on, mention this in the changelog 
 
 Commit: `git add docs/tasks/CHANGELOG.md && git commit -m "docs: changelog {taskSlug}"`
 
-## Step 5 — Task deviation → epic (if applicable)
+## Step 5 — Task deviation → map (if applicable)
 
-Read the task doc. If it belongs to an epic (`epic:` field):
+Read the task doc. If it belongs to a map (`map:` field):
 - Compare the task's original scope against what was actually delivered
-- Check if the epic's task list entry needs updating
-- Check if the epic's description needs updating
-- If deviations found: update the epic doc. If significant: ask user.
+- Check if the map's task list entry needs updating
+- Check if the map's description needs updating
+- If deviations found: update the map doc. If significant: ask user.
 
 ## Step 6 — Bug closure (type: bug only)
 
@@ -93,7 +93,7 @@ Read the task doc frontmatter.
 ## Step 7 — Archive
 
 ```
-task_epic_tick <epic-slug> {taskSlug}  # if belongs to epic
+task_map_tick <map-slug> {taskSlug}  # if belongs to map
 git mv docs/tasks/{taskSlug}/ docs/tasks/archive/{taskSlug}/
 task_state_set task null
 task_state_set slice null
@@ -104,13 +104,13 @@ git branch -d task/{taskSlug}
 
 If remote exists: `git push origin main`
 
-## Step 8 — Epic finalization (if last child)
+## Step 8 — Map finalization (if last child)
 
-If the epic's `task_epic_finalizable` returns ready:
-- Summarize the epic to CHANGELOG.md
-- Archive the epic: `git mv docs/tasks/epics/<slug>/ docs/tasks/epics/archive/<slug>/`
-- Finalize epic doc
+If `task_map_finalizable` returns ready for the map:
+- Summarize the map to CHANGELOG.md
+- Archive the map: `git mv docs/tasks/maps/<slug>/ docs/tasks/maps/archive/<slug>/`
+- Finalize map doc
 
 ## Step 9 — Report
 
-"Task archived, CHANGELOG updated, main branch updated. Epic status: <done/not done>."
+"Task archived, CHANGELOG updated, main branch updated. Map status: <done/not done>."

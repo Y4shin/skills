@@ -188,12 +188,12 @@ export function seedTaskTree(cwd: string): void {
   mkdirSync(join(cwd, "docs/tasks/login/slices"), { recursive: true });
   writeFileSync(
     join(cwd, "docs/tasks/login/task.md"),
-    "---\nkind: task\ntitle: Login\nslug: login\nstatus: draft\nslices:\n  - do-thing\n  - other-thing\nepic: auth\n---\n",
+    "---\nkind: task\ntitle: Login\nslug: login\nstatus: draft\nslices:\n  - do-thing\n  - other-thing\nmap: auth\n---\n",
   );
-  mkdirSync(join(cwd, "docs/tasks/epics/auth"), { recursive: true });
+  mkdirSync(join(cwd, "docs/tasks/maps/auth"), { recursive: true });
   writeFileSync(
-    join(cwd, "docs/tasks/epics/auth/epic.md"),
-    "---\nkind: epic\ntitle: Auth epic\nslug: auth\nstatus: draft\n" +
+    join(cwd, "docs/tasks/maps/auth/map.md"),
+    "---\nkind: map\ntitle: Auth map\nslug: auth\nstatus: draft\n" +
       "tasks:\n  - slug: login\n    blocked_by: []\n    done: false\n" +
       "  - slug: sso\n    blocked_by: [login]\n    done: false\n---\n",
   );

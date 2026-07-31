@@ -5,18 +5,33 @@ description: Autonomous. Implements all remaining slices of a task via per-slice
 
 # Implement Task
 
-Reads the task's `type` frontmatter via `task_get` and dispatches to the appropriate resource. If `type:` is absent, default to the feature path so older tasks behave unchanged.
+Reads the task's `type` frontmatter via `task_get` and dispatches to the appropriate resource. If `type:` is absent, default to the existing feature path so older tasks behave unchanged.
 
 ```
 const taskSlug = "<task-slug>"
 const taskPath = `docs/tasks/${taskSlug}/task.md`
 const taskType = task_get(taskPath, "type") || "feature"
 
-if (taskType === "bug") {
-    follow resource "resources/bug.md"
-} else {
-    follow resource "resources/feature.md"
+const resources = {
+  research: "resources/research.md",
+  prototype: "resources/prototype.md",
+  grilling: "resources/grilling.md",
+  manual: "resources/manual.md",
+  feature: "resources/feature.md",
+  bug: "resources/bug.md",
 }
+
+follow resource resources[taskType] || resources.feature
 ```
 
+When invoked with a map, work the ready frontier from `task_frontier`, routing
+each child task by its type. Planning and discovery tasks may add new tasks or
+reveal fog; update the graph and return to Wayfinder when a new decision must be
+made. Do not invent a separate specification or ticket phase.
+
+The `feature` and `bug` resources are the existing implementation pipelines and
+must remain unchanged. New resources are deliberately non-coding pipelines.
+
 If no task type is present, `type` defaults to `feature`.
+
+After the current frontier has been completed, call `/skill:wayfinder <map-slug>` to reassess the map, graduate newly discovered work, update dependencies, and add any newly precise tasks before declaring the initiative complete.

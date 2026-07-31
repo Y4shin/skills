@@ -1,6 +1,6 @@
 ---
 name: onboard-workflow
-description: Initialize a repository for the task-workflow. Creates docs/tasks/, docs/ideas/, docs/bugs/, state.yaml, CHANGELOG.md, docs/testing.md, and docs/dev-env.md.
+description: Initialize a repository for the task-workflow. Creates docs/tasks/, docs/bugs/, state.yaml, CHANGELOG.md, docs/testing.md, and docs/dev-env.md.
 ---
 
 # Onboard Workflow
@@ -12,8 +12,7 @@ description: Initialize a repository for the task-workflow. Creates docs/tasks/,
 2. Create directory structure:
    ```
    mkdir -p docs/tasks/archive
-   mkdir -p docs/tasks/epics/archive
-   mkdir -p docs/ideas
+   mkdir -p docs/tasks/maps/archive
    mkdir -p docs/bugs
    mkdir -p docs/bugs/archive
    ```
@@ -36,4 +35,4 @@ description: Initialize a repository for the task-workflow. Creates docs/tasks/,
 
 7. Commit: `chore: initialize task-workflow`.
 
-8. Report: "Ready. Run `/skill:refine-idea` to flesh out an idea, `/skill:report-bug` to track a defect, or `/skill:create-task` to plan a small, well-understood task directly."
+8. Report: "Ready. Run `/skill:wayfinder` to start with the mandatory grilling pass and grow a dependency-aware work graph, or `/skill:report-bug` to track a defect."

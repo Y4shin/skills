@@ -17,17 +17,17 @@ function mkTmp(): string {
 }
 
 function seedTree(t: string): void {
-  mkdirSync(join(t, "docs/tasks/epics/auth"), { recursive: true });
+  mkdirSync(join(t, "docs/tasks/maps/auth"), { recursive: true });
   mkdirSync(join(t, "docs/tasks/login/slices"), { recursive: true });
   mkdirSync(join(t, "docs/tasks/archive/done-task/slices"), { recursive: true });
   writeFileSync(
-    join(t, "docs/tasks/epics/auth/epic.md"),
-    "---\nkind: epic\ntitle: Auth epic\nslug: auth\nstatus: draft\n" +
+    join(t, "docs/tasks/maps/auth/map.md"),
+    "---\nkind: map\ntitle: Auth map\nslug: auth\nstatus: draft\n" +
       "tasks:\n  - slug: login\n    blocked_by: []\n    done: false\n  - slug: sso\n    blocked_by: [login]\n    done: false\n---\n",
   );
   writeFileSync(
     join(t, "docs/tasks/login/task.md"),
-    "---\nkind: task\ntitle: Login\nslug: login\nstatus: draft\nslices:\n  - do-thing\n  - other-thing\nepic: auth\nstarted_at: 42\n---\n",
+    "---\nkind: task\ntitle: Login\nslug: login\nstatus: draft\nslices:\n  - do-thing\n  - other-thing\nmap: auth\nstarted_at: 42\n---\n",
   );
   writeFileSync(
     join(t, "docs/tasks/login/slices/1-do-thing.md"),
@@ -79,10 +79,10 @@ describe("task-workflow tools", () => {
       expect(out).toContain("slug: login");
     });
 
-    test("shows epic frontmatter", async () => {
+    test("shows map frontmatter", async () => {
       const t = mkTmp(); seedTree(t);
       const out = await tools.task_show.execute({ selector: "auth" }, ctx(t));
-      expect(out).toContain("kind: epic");
+      expect(out).toContain("kind: map");
     });
 
     test("shows slice frontmatter by slug", async () => {
@@ -145,8 +145,8 @@ describe("task-workflow tools", () => {
 
     test("sets null value", async () => {
       const t = mkTmp(); seedTree(t);
-      await tools.task_set.execute({ selector: "login", field: "epic", value: "null" }, ctx(t));
-      const got = await tools.task_get.execute({ selector: "login", field: "epic" }, ctx(t));
+      await tools.task_set.execute({ selector: "login", field: "map", value: "null" }, ctx(t));
+      const got = await tools.task_get.execute({ selector: "login", field: "map" }, ctx(t));
       expect(got).toBe("null");  // task_get returns String(null) = "null"
     });
 
@@ -190,10 +190,10 @@ describe("task-workflow tools", () => {
       expect(out).toContain("login/task.md");
     });
 
-    test("resolves epic slug with kind filter", async () => {
+    test("resolves map slug with kind filter", async () => {
       const t = mkTmp(); seedTree(t);
-      const out = await tools.task_resolve.execute({ selector: "auth", kind: "epic" }, ctx(t));
-      expect(out).toContain("epics/auth/epic.md");
+      const out = await tools.task_resolve.execute({ selector: "auth", kind: "map" }, ctx(t));
+      expect(out).toContain("maps/auth/map.md");
     });
 
     test("resolves slice slug", async () => {
@@ -217,7 +217,7 @@ describe("task-workflow tools", () => {
 
     test("fails on mismatch", async () => {
       const t = mkTmp(); seedTree(t);
-      await expect(tools.task_assert_kind.execute({ selector: "login", kind: "epic" }, ctx(t))).rejects.toThrow(/not/);
+      await expect(tools.task_assert_kind.execute({ selector: "login", kind: "map" }, ctx(t))).rejects.toThrow(/not/);
     });
 
     test("passes for slice kind", async () => {
@@ -239,7 +239,7 @@ describe("task-workflow tools", () => {
 
     test("filters by kind", async () => {
       const t = mkTmp(); seedTree(t);
-      const out = await tools.task_list.execute({ kind: "epic" }, ctx(t));
+      const out = await tools.task_list.execute({ kind: "map" }, ctx(t));
       expect(out).toContain("auth");
       expect(out).not.toContain("login");
     });
@@ -251,9 +251,9 @@ describe("task-workflow tools", () => {
       expect(out).not.toContain("config");
     });
 
-    test("filters by epic", async () => {
+    test("filters by map", async () => {
       const t = mkTmp(); seedTree(t);
-      const out = await tools.task_list.execute({ epic: "auth" }, ctx(t));
+      const out = await tools.task_list.execute({ map: "auth" }, ctx(t));
       expect(out).toContain("login");
       expect(out).not.toContain("config");
     });
@@ -338,47 +338,63 @@ describe("task-workflow tools", () => {
     });
   });
 
-  describe("task_epic_tasks", () => {
+  describe("task_frontier", () => {
+    test("lists unblocked map children by task type", async () => {
+      const t = mkTmp(); seedTree(t);
+      const out = await tools.task_frontier.execute({ selector: "auth" }, ctx(t));
+      expect(out).toContain("login");
+      expect(out).not.toContain("sso");
+    });
+
+    test("returns structured frontier data", async () => {
+      const t = mkTmp(); seedTree(t);
+      const out = await tools.task_frontier.execute({ selector: "auth", json: true }, ctx(t));
+      const parsed = JSON.parse(out);
+      expect(parsed.map((item: any) => item.slug)).toContain("login");
+    });
+  });
+
+  describe("task_map_tasks", () => {
     test("lists children", async () => {
       const t = mkTmp(); seedTree(t);
-      const out = await tools.task_epic_tasks.execute({ selector: "auth" }, ctx(t));
+      const out = await tools.task_map_tasks.execute({ selector: "auth" }, ctx(t));
       expect(out).toContain("login");
       expect(out).toContain("sso");
     });
 
     test("json flag returns structured", async () => {
       const t = mkTmp(); seedTree(t);
-      const out = await tools.task_epic_tasks.execute({ selector: "auth", json: true }, ctx(t));
+      const out = await tools.task_map_tasks.execute({ selector: "auth", json: true }, ctx(t));
       const parsed = JSON.parse(out);
       expect(Array.isArray(parsed)).toBe(true);
       expect(parsed.length).toBe(2);
     });
   });
 
-  describe("task_epic_tick", () => {
+  describe("task_map_tick", () => {
     test("marks a child done", async () => {
       const t = mkTmp(); seedTree(t);
-      const out = await tools.task_epic_tick.execute({ selector: "auth", task_slug: "login" }, ctx(t));
+      const out = await tools.task_map_tick.execute({ selector: "auth", task_slug: "login" }, ctx(t));
       expect(out).toContain("done");
     });
 
     test("throws for nonexistent child", async () => {
       const t = mkTmp(); seedTree(t);
-      await expect(tools.task_epic_tick.execute({ selector: "auth", task_slug: "nope" }, ctx(t))).rejects.toThrow();
+      await expect(tools.task_map_tick.execute({ selector: "auth", task_slug: "nope" }, ctx(t))).rejects.toThrow();
     });
   });
 
-  describe("task_epic_finalizable", () => {
+  describe("task_map_finalizable", () => {
     test("rejects when children remain", async () => {
       const t = mkTmp(); seedTree(t);
-      await expect(tools.task_epic_finalizable.execute({ selector: "auth" }, ctx(t))).rejects.toThrow(/unfinished/);
+      await expect(tools.task_map_finalizable.execute({ selector: "auth" }, ctx(t))).rejects.toThrow(/unfinished/);
     });
 
     test("passes when all children done", async () => {
       const t = mkTmp(); seedTree(t);
-      await tools.task_epic_tick.execute({ selector: "auth", task_slug: "login" }, ctx(t));
-      await tools.task_epic_tick.execute({ selector: "auth", task_slug: "sso" }, ctx(t));
-      const out = await tools.task_epic_finalizable.execute({ selector: "auth" }, ctx(t));
+      await tools.task_map_tick.execute({ selector: "auth", task_slug: "login" }, ctx(t));
+      await tools.task_map_tick.execute({ selector: "auth", task_slug: "sso" }, ctx(t));
+      const out = await tools.task_map_finalizable.execute({ selector: "auth" }, ctx(t));
       expect(out).toContain("ready to finalize");
     });
   });

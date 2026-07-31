@@ -377,8 +377,8 @@ Fixed from v1 (feedback_01.md):
 
 Kept: `task_show`, `task_get`, `task_set`, `task_set_slices`,
 `task_resolve`, `task_assert_kind`, `task_list`, `task_slices`,
-`task_finalizable`, `task_dependency_levels`, `task_epic_tasks`,
-`task_epic_tick`, `task_epic_finalizable`, `task_state`,
+`task_finalizable`, `task_dependency_levels`, `task_map_tasks`,
+`task_map_tick`, `task_map_finalizable`, `task_state`,
 `task_state_set`, `task_context`.
 
 ### notify_user tool
@@ -418,7 +418,7 @@ slice: null    # active slice slug
 ```
 
 Dropped from v1:
-- `active.epic` — redundant (epic field is in task frontmatter)
+- `active.map` — redundant (map field is in task frontmatter)
 - `last_action`, `next_action` — redundant (parent reads frontmatter status)
 
 ---

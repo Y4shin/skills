@@ -1,6 +1,6 @@
 # task-workflow v2
 
-> Idea → task → slices → TDD → finalize — a planning workflow for `docs/ideas/` and `docs/tasks/`.
+> Idea → Wayfinder → task frontier → type-specific execution → finalize — a planning workflow for `docs/tasks/`.
 > Pi package. One `pi install` away.
 
 ## What changed from v1
@@ -10,11 +10,11 @@
 - **3 agents instead of 7** — tdd-worker, slice-verifier, land-worker, deviation-reporter
 - **6 skills instead of 10** (+ 9 archived removed)
 - **Parallel fan-out** with git worktrees instead of sequential loops
-- **`task_dependency_levels` tool** — BFS dependency resolution, not LLM pseudocode
+- **`task_dependency_levels` and `task_frontier` tools** — BFS dependency resolution, not LLM pseudocode
 - **Verifier retry path** — re-dispatches TDD worker with error output
 - **Checkpoint commits** — TDD worker commits after each GREEN
-- **Size-based turn budgets** — S/M/L/XL from slice frontmatter
-- **Slice resolution fixed** — all task_* tools accept slices
+- **Size-based turn budgets** — S/M/L/XL from task frontmatter
+- **Legacy slice resolution preserved** — existing task_* tools still accept slices
 
 ## Install
 
@@ -25,10 +25,17 @@ pi install /path/to/task-workflow
 Then in any repo:
 
 ```
-/skill:onboard-workflow    # creates docs/tasks/ + docs/ideas/
-/skill:refine-idea         # flesh out a rough idea ("grill me")
-/skill:create-task         # start planning (optionally from a refined idea)
+/skill:onboard-workflow    # creates docs/tasks/ + docs/bugs/
+/skill:wayfinder           # grill first, then grow a dependency-aware work graph from an idea
 ```
+
+## Workflow
+
+Wayfinder begins every map with one grilling session, then replaces the former
+refine/create-task/spec/ticket handoff. It creates and grows a map's
+dependency graph directly. `/skill:implement-task` dispatches
+tasks by `type:`: research, prototype, grilling, manual, feature, or bug. The
+existing feature and bug implementation resources remain the TDD pipelines.
 
 ## Development
 

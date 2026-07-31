@@ -35,7 +35,7 @@ export function fromObject(raw: unknown): WorkflowState {
     };
   }
 
-  // v1 format: { active: { task: "login", slice: null, epic: null }, last_action: "...", next_action: "..." }
+  // v1 format: { active: { task: "login", slice: null, map: null }, last_action: "...", next_action: "..." }
   const active = (o.active as Record<string, unknown>) ?? {};
   return {
     task: typeof active.task === "string" ? active.task : null,

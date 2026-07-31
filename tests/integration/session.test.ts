@@ -78,13 +78,13 @@ describe("tool dispatch and filesystem round-trip", () => {
   test("task_assert_kind rejects a mismatch as a tool error", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_assert_kind", { selector: "login", kind: "epic" })]),
+      reply([call("task_assert_kind", { selector: "login", kind: "map" })]),
       (ctx: Context) => {
         const result = latestToolResultText(ctx, "task_assert_kind") ?? "";
         return reply(result.includes("not") ? "mismatch as expected" : "unexpected success");
       },
     ]);
-    await s.session.prompt("Assert login is an epic.");
+    await s.session.prompt("Assert login is a map.");
     const results = toolResultTexts(s.session, "task_assert_kind");
     expect(results.some((t) => /not/.test(t))).toBe(true);
     expect(lastAssistantText(s.session)).toContain("mismatch as expected");
@@ -169,15 +169,15 @@ describe("tool dispatch and filesystem round-trip", () => {
 // ─── 2. Multi-turn conversations ─────────────────────────────────────────────
 
 describe("multi-turn state mutations", () => {
-  test("task_epic_tick + task_epic_finalizable cross-turn", async () => {
+  test("task_map_tick + task_map_finalizable cross-turn", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_epic_tick", { selector: "auth", task_slug: "login" })]),
-      reply([call("task_epic_tick", { selector: "auth", task_slug: "sso" })]),
-      reply([call("task_epic_finalizable", { selector: "auth" })]),
-      (ctx: Context) => reply(latestToolResultText(ctx, "task_epic_finalizable") ?? "?"),
+      reply([call("task_map_tick", { selector: "auth", task_slug: "login" })]),
+      reply([call("task_map_tick", { selector: "auth", task_slug: "sso" })]),
+      reply([call("task_map_finalizable", { selector: "auth" })]),
+      (ctx: Context) => reply(latestToolResultText(ctx, "task_map_finalizable") ?? "?"),
     ]);
-    await s.session.prompt("Tick both children done, then check epic.");
+    await s.session.prompt("Tick both children done, then check map.");
     expect(lastAssistantText(s.session)).toContain("ready to finalize");
   });
 

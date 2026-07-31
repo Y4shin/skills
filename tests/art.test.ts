@@ -13,9 +13,9 @@ describe("fromFrontmatter", () => {
     expect(art.status).toBe("draft");
   });
 
-  test("parses an epic artifact", () => {
-    const art = fromFrontmatter({ kind: "epic", slug: "auth", status: "draft" });
-    expect(art.kind).toBe("epic");
+  test("parses a map artifact", () => {
+    const art = fromFrontmatter({ kind: "map", slug: "auth", status: "draft" });
+    expect(art.kind).toBe("map");
   });
 
   test("parses a slice artifact", () => {

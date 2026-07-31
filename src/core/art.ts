@@ -1,17 +1,26 @@
 /**
- * Artifact model — represents epics, tasks, and slices in the docs/tasks/ tree.
+ * Artifact model — represents maps, tasks, and slices in the docs/tasks/ tree.
  *
  * Pure data — no file I/O. The extension manages reading/writing files.
  */
 
 import type { FrontmatterData } from "./frontmatter.js";
 
-export type ArtifactKind = "epic" | "task" | "slice";
+export type ArtifactKind = "map" | "task" | "slice";
 
 export interface SliceInfo {
   number: number;
   slug: string;
   status: string | null;
+  size: string | null;
+  blocked_by: string[];
+}
+
+/** A dependency-graph node used by maps and the Wayfinder workflow. */
+export interface WorkItemInfo {
+  slug: string;
+  status: string | null;
+  type: string | null;
   size: string | null;
   blocked_by: string[];
 }
@@ -27,7 +36,7 @@ export interface Artifact {
 /** Parse an Artifact from frontmatter data. */
 export function fromFrontmatter(data: FrontmatterData): Artifact {
   const kind = data.kind as string | undefined;
-  if (kind !== "epic" && kind !== "task" && kind !== "slice") {
+  if (kind !== "map" && kind !== "task" && kind !== "slice") {
     throw new Error(`invalid or missing 'kind' in frontmatter: ${kind}`);
   }
   return {
@@ -61,8 +70,8 @@ export function sliceInfoFrom(
   };
 }
 
-/** Extract dependency levels from a list of slices using BFS. */
-export function dependencyLevels(slices: SliceInfo[]): string[][] {
+/** Extract dependency levels from a list of graph nodes using BFS. */
+export function dependencyLevels(slices: Array<SliceInfo | WorkItemInfo>): string[][] {
   const bySlug = new Map(slices.map((s) => [s.slug, s]));
   const slugSet = new Set(slices.map((s) => s.slug));
 

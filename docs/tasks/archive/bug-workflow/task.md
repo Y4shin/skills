@@ -4,7 +4,7 @@ slug: bug-workflow
 title: Bug workflow (report, track, fix)
 type: feature
 description: Add a bug path to the workflow — report-bug skill, type-dispatched implement-task, bug closure in finalize-task, onboarding + routing support
-epic:
+map:
 slices: [report-bug-skill, implement-task-wrapper, finalize-bug-closure, onboarding-and-routing]
 status: done
 started_at: 2026-07-30T16:35:00Z
@@ -100,7 +100,7 @@ executed by a lean single chain.
   bug via `bug: <slug>` (asks the user when absent), sets
   `status: fixed`, fills `fix_commit` and Root cause / Fix summary from
   implementation notes, then `git mv` to `docs/bugs/archive/<slug>.md`.
-  Subsequent steps renumbered (Archive → 7, Epic finalization → 8,
+  Subsequent steps renumbered (Archive → 7, Map finalization → 8,
   Report → 9). Five prose assertions added to `tests/skills.test.ts`.
   Full suite green at land (165/165).
 - Slice 4 (onboarding-and-routing): `onboard-workflow/SKILL.md` now

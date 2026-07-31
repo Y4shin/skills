@@ -19,7 +19,7 @@ import { Type } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
-import { fromFrontmatter, sliceInfoFrom, dependencyLevels, type Artifact, type ArtifactKind, type SliceInfo } from "./core/art.js";
+import { fromFrontmatter, sliceInfoFrom, dependencyLevels, type Artifact, type ArtifactKind, type SliceInfo, type WorkItemInfo } from "./core/art.js";
 import { toObject, fromObject, type WorkflowState } from "./core/state.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 
@@ -89,7 +89,7 @@ function resolveArt(root: string, selector: string, want?: ArtifactKind): { path
 
   if (target) {
     if (isDir(target)) {
-      const ep = join(target, "epic.md");
+      const ep = join(target, "map.md");
       const tp = join(target, "task.md");
       target = isFile(ep) ? ep : isFile(tp) ? tp : target;
     }
@@ -106,7 +106,7 @@ function resolveArt(root: string, selector: string, want?: ArtifactKind): { path
     throw new ResolutionError(`'${selector}' is not a recognised artifact`);
   }
 
-  // Try as slug: scan epics, tasks, then slices
+  // Try as slug: scan maps, tasks, then slices
   const candidates: { path: string; art: Artifact; doc: Document }[] = [];
   const scanFile = (p: string) => {
     if (!isFile(p)) return;
@@ -116,13 +116,13 @@ function resolveArt(root: string, selector: string, want?: ArtifactKind): { path
     } catch { /* skip unparseable */ }
   };
 
-  // Scan epics
-  for (const sub of listSubdirs(join(base, "epics"))) {
-    scanFile(join(base, "epics", sub, "epic.md"));
+  // Scan maps
+  for (const sub of listSubdirs(join(base, "maps"))) {
+    scanFile(join(base, "maps", sub, "map.md"));
   }
 
   // Scan tasks
-  const taskDirs = listSubdirs(base, new Set(["epics", "archive", "state.yaml", "CHANGELOG.md"]));
+  const taskDirs = listSubdirs(base, new Set(["maps", "archive", "state.yaml", "CHANGELOG.md"]));
   for (const sub of taskDirs) {
     scanFile(join(base, sub, "task.md"));
   }
@@ -131,7 +131,7 @@ function resolveArt(root: string, selector: string, want?: ArtifactKind): { path
   const hits = candidates.filter((c) => c.art.slug === selector || basename(dirname(c.path)) === selector);
 
   // If not found and want allows slices, scan slices
-  if (hits.length === 0 && want !== "epic" && want !== "task") {
+  if (hits.length === 0 && want !== "map" && want !== "task") {
     // Try with active task context from state.yaml
     const statePath = join(base, "state.yaml");
     let activeTask: string | null = null;
@@ -196,6 +196,61 @@ function activeSlices(root: string, taskSlug: string): { number: number; slug: s
   return out;
 }
 
+function taskInfoFromPath(path: string): WorkItemInfo | null {
+  try {
+    const { art } = parseArtifactFile(path, "task");
+    const blocked = art.data.blocked_by;
+    return {
+      slug: art.slug,
+      status: art.status,
+      type: typeof art.data.type === "string" ? art.data.type : null,
+      size: typeof art.data.size === "string" ? art.data.size : null,
+      blocked_by: Array.isArray(blocked) ? blocked.map(String) : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function taskPathForSlug(root: string, slug: string): string | null {
+  const base = taskRoot(root);
+  const candidates = [join(base, slug, "task.md")];
+  for (const sub of listSubdirs(base, new Set(["maps", "archive"]))) {
+    candidates.push(join(base, sub, "task.md"));
+  }
+  for (const p of candidates) if (isFile(p)) {
+    const info = taskInfoFromPath(p);
+    if (info?.slug === slug) return p;
+  }
+  return null;
+}
+
+function mapChildInfos(root: string, mapPath: string): WorkItemInfo[] {
+  const { doc } = parseArtifactFile(mapPath, "map");
+  const children = Array.isArray(doc.data.tasks) ? doc.data.tasks : [];
+  const out: WorkItemInfo[] = [];
+  for (const child of children) {
+    if (typeof child === "string") {
+      const p = taskPathForSlug(root, child);
+      const info = p ? taskInfoFromPath(p) : null;
+      if (info) out.push(info);
+      continue;
+    }
+    if (!child || typeof child !== "object") continue;
+    const slug = String((child as any).slug ?? "");
+    if (!slug) continue;
+    const p = taskPathForSlug(root, slug);
+    const info = p ? taskInfoFromPath(p) : null;
+    if (info) {
+      const listedBlocked = (child as any).blocked_by;
+      if (Array.isArray(listedBlocked) && listedBlocked.length > 0) info.blocked_by = listedBlocked.map(String);
+      if ((child as any).done === true && info.status !== "done") info.status = "done";
+      out.push(info);
+    }
+  }
+  return out;
+}
+
 // ─── State helpers ─────────────────────────────────────────────────────────────
 
 function loadState(root: string): WorkflowState {
@@ -221,20 +276,22 @@ function artifactSchemaRef(): string {
     "## Frontmatter schema",
     "",
     "### Task (task.md)",
-    "kind: task | slug: <kebab> | title: <text> | description: <text> | epic: <slug> |",
-    "  slices: [<slug>, ...] | status: draft | slices-planned | in-progress | done |",
-    "  started_at: <ISO> | completed_at: <ISO>",
+    "kind: task | slug: <kebab> | title: <text> | type: research | prototype | grilling | manual | feature | bug |",
+    "  map: <slug> | blocked_by: [<slug>, ...] | status: proposed | blocked | ready | in-progress | done |",
+    "  size: s | m | l | xl | started_at: <ISO> | completed_at: <ISO>",
     "",
-    "### Slice (slices/<n>-<slug>.md)",
+    "### Legacy Slice (slices/<n>-<slug>.md)",
     "kind: slice | slug: <kebab> | title: <text> | task: ../task.md |",
     "  mode: hitl | afk | status: todo | in-progress | done |",
     "  size: s | m | l | xl | blocked_by: [<slug>, ...] |",
     "  started_at: <ISO> | completed_at: <ISO>",
     "",
-    "### Epic (epic.md)",
-    "kind: epic | slug: <kebab> | title: <text> |",
-    "  tasks: [{slug, blocked_by, done}, ...] | status: draft | tasks-planned | in-progress | done |",
+    "### Map (map.md)",
+    "kind: map | slug: <kebab> | title: <text> |",
+    "  tasks: [{slug, blocked_by, done}, ...] | status: draft | active | done |",
     "  started_at: <ISO> | completed_at: <ISO>",
+    "",
+    "The map and task bodies are the specification; there is no separate ticket-generation phase.",
   ].join("\n");
 }
 
@@ -258,7 +315,7 @@ const OptBool = { type: "boolean" as const, optional: true as const };
 export function createTools(): Record<string, Tool> {
   return {
     task_show: def(
-      "Show artifact frontmatter (epic, task, or slice).",
+      "Show artifact frontmatter (map, task, or slice).",
       { selector: Str("Slug or path"), json: OptBool },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
@@ -314,7 +371,7 @@ export function createTools(): Record<string, Tool> {
 
     task_resolve: def(
       "Resolve a slug or path to the artifact's file path.",
-      { selector: Str("Slug or path"), kind: OptStr("epic, task, or slice") },
+      { selector: Str("Slug or path"), kind: OptStr("map, task, or slice") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         return resolveArt(root, p.selector, p.kind as ArtifactKind | undefined).path;
@@ -322,8 +379,8 @@ export function createTools(): Record<string, Tool> {
     ),
 
     task_assert_kind: def(
-      "Assert an artifact's kind (epic/task/slice). Fails on mismatch.",
-      { selector: Str("Slug or path"), kind: { type: "string" as const, enum: ["epic", "task", "slice"] } },
+      "Assert an artifact's kind (map/task/slice). Fails on mismatch.",
+      { selector: Str("Slug or path"), kind: { type: "string" as const, enum: ["map", "task", "slice"] } },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         const { art } = resolveArt(root, p.selector);
@@ -335,16 +392,16 @@ export function createTools(): Record<string, Tool> {
     task_list: def(
       "List artifacts. Excludes archived by default.",
       {
-        kind: { type: "string" as const, optional: true, enum: ["epic", "task"] },
+        kind: { type: "string" as const, optional: true, enum: ["map", "task"] },
         status: OptStr("Status filter"),
-        epic: OptStr("Epic slug filter"),
+        map: OptStr("Map slug filter"),
         json: OptBool,
       },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         if (!isInitialized(root)) return "(no docs/tasks directory)";
         const base = taskRoot(root);
-        const arts: { slug: string; kind: string; status: string | null; epic?: string }[] = [];
+        const arts: { slug: string; kind: string; status: string | null; map?: string }[] = [];
 
         const scanDir = (dir: string, leaf: string, kind: string) => {
           for (const sub of listSubdirs(dir)) {
@@ -352,18 +409,18 @@ export function createTools(): Record<string, Tool> {
             if (!isFile(f)) continue;
             try {
               const { art } = parseArtifactFile(f, kind as ArtifactKind);
-              const epic = art.data.epic as string | undefined;
-              arts.push({ slug: art.slug, kind: art.kind, status: art.status, epic });
+              const map = art.data.map as string | undefined;
+              arts.push({ slug: art.slug, kind: art.kind, status: art.status, map });
             } catch { /* skip */ }
           }
         };
 
-        if (p.kind !== "task") scanDir(join(base, "epics"), "epic.md", "epic");
-        if (p.kind !== "epic") scanDir(base, "task.md", "task");
+        if (p.kind !== "task") scanDir(join(base, "maps"), "map.md", "map");
+        if (p.kind !== "map") scanDir(base, "task.md", "task");
 
         let filtered = arts;
         if (p.status) filtered = filtered.filter((a) => a.status === p.status);
-        if (p.epic) filtered = filtered.filter((a) => a.epic === p.epic);
+        if (p.map) filtered = filtered.filter((a) => a.map === p.map);
 
         if (p.json) return JSON.stringify(filtered, null, 2);
         return filtered.map((a) => `${a.slug} (${a.kind})${a.status ? ` [${a.status}]` : ""}`).join("\n") || "(empty)";
@@ -395,41 +452,55 @@ export function createTools(): Record<string, Tool> {
     ),
 
     task_dependency_levels: def(
-      "Compute BFS dependency levels from a task's remaining slices.",
-      { selector: Str("Task slug") },
+      "Compute BFS dependency levels from a map's unfinished tasks or a legacy task's remaining slices.",
+      { selector: Str("Map or task slug") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
-        const { art } = resolveArt(root, p.selector, "task");
-        const rawSlices = activeSlices(root, art.slug);
+        const resolved = resolveArt(root, p.selector);
+        if (resolved.art.kind === "map") {
+          const children = mapChildInfos(root, resolved.path);
+          const remaining = children.filter((item) => item.status !== "done");
+          const levels = dependencyLevels(remaining);
+          return JSON.stringify({ levels, remaining_count: remaining.length, done_count: children.length - remaining.length }, null, 2);
+        }
+        if (resolved.art.kind !== "task") throw new ResolutionError(`'${p.selector}' must resolve to a map or task`);
+        const rawSlices = activeSlices(root, resolved.art.slug);
         const remaining = rawSlices.filter((s) => s.status !== "done");
         const done = rawSlices.filter((s) => s.status === "done");
-
         const slicesInfo: SliceInfo[] = remaining.map((s) => {
-          const sp = join(dirname(resolveArt(root, p.selector, "task").path), "slices", `${s.number}-${s.slug}.md`);
+          const sp = join(dirname(resolved.path), "slices", `${s.number}-${s.slug}.md`);
           try {
-            const text = readFileSync(sp, "utf-8");
-            const parsed = parse(text);
+            const parsed = parse(readFileSync(sp, "utf-8"));
             return sliceInfoFrom(`${s.number}-${s.slug}.md`, parsed.data);
           } catch {
             return { number: s.number, slug: s.slug, status: s.status, size: null, blocked_by: [] };
           }
         });
-
         const levels = dependencyLevels(slicesInfo);
-        return JSON.stringify({
-          levels,
-          remaining_count: remaining.length,
-          done_count: done.length,
-        }, null, 2);
+        return JSON.stringify({ levels, remaining_count: remaining.length, done_count: done.length }, null, 2);
       },
     ),
 
-    task_epic_tasks: def(
-      "List an epic's planned child tasks with their done state.",
-      { selector: Str("Epic slug or path"), json: OptBool },
+    task_frontier: def(
+      "List a map's unfinished tasks whose blockers are complete.",
+      { selector: Str("Map slug or path"), json: OptBool },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
-        const { doc } = resolveArt(root, p.selector, "epic");
+        const resolved = resolveArt(root, p.selector, "map");
+        const children = mapChildInfos(root, resolved.path);
+        const done = new Set(children.filter((item) => item.status === "done").map((item) => item.slug));
+        const frontier = children.filter((item) => item.status !== "done" && item.blocked_by.every((blocker) => done.has(blocker)));
+        if (p.json) return JSON.stringify(frontier, null, 2);
+        return frontier.length === 0 ? "(empty frontier)" : frontier.map((item) => `${item.slug}${item.type ? ` (${item.type})` : ""}`).join("\n");
+      },
+    ),
+
+    task_map_tasks: def(
+      "List a map's planned child tasks with their done state.",
+      { selector: Str("Map slug or path"), json: OptBool },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const { doc } = resolveArt(root, p.selector, "map");
         const tasks = doc.data["tasks"];
         if (!Array.isArray(tasks)) return "(no child tasks planned yet)";
         const lines = tasks.map((t: any) => `${t.slug}${t.done ? " ✓" : ""}${t.blocked_by?.length ? ` blocked_by: ${t.blocked_by.join(", ")}` : ""}`);
@@ -437,12 +508,12 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_epic_tick: def(
-      "Mark an epic's child task as finalized (done: true).",
-      { selector: Str("Epic slug or path"), task_slug: Str("Child task slug") },
+    task_map_tick: def(
+      "Mark a map's child task as finalized (done: true).",
+      { selector: Str("Map slug or path"), task_slug: Str("Child task slug") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
-        const { path, doc } = resolveArt(root, p.selector, "epic");
+        const { path, doc } = resolveArt(root, p.selector, "map");
         const tasks = Array.isArray(doc.data["tasks"]) ? [...doc.data["tasks"]] : [];
         for (const c of tasks) {
           if ((c as any).slug === p.task_slug) {
@@ -452,16 +523,16 @@ export function createTools(): Record<string, Tool> {
             return `${p.task_slug} → done`;
           }
         }
-        throw new Error(`no task '${p.task_slug}' in epic`);
+        throw new Error(`no task '${p.task_slug}' in map`);
       },
     ),
 
-    task_epic_finalizable: def(
-      "Check every child task of an epic is finalized.",
-      { selector: Str("Epic slug or path") },
+    task_map_finalizable: def(
+      "Check every child task of a map is finalized.",
+      { selector: Str("Map slug or path") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
-        const { doc } = resolveArt(root, p.selector, "epic");
+        const { doc } = resolveArt(root, p.selector, "map");
         const tasks = Array.isArray(doc.data["tasks"]) ? doc.data["tasks"] : [];
         const undone = tasks.filter((t: any) => !t.done).map((t: any) => t.slug || "?");
         if (undone.length === 0) return "ready to finalize — all children done";
