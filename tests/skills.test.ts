@@ -194,6 +194,14 @@ describe("skill cross-references", () => {
     expect(content).toContain("## Dynamic growth");
   });
 
+  test("wayfinder has one planning resource per task type", () => {
+    for (const type of ["feature", "bug", "research", "prototype", "grilling", "manual"]) {
+      const content = readFile(`skills/wayfinder/resources/${type}.md`);
+      expect(content).toContain("Wayfinder Planning Resource");
+      expect(content).toContain(`type: ${type}`);
+    }
+  });
+
   test("implement-task re-enters wayfinder after a map frontier", () => {
     const content = readFile("skills/implement-task/SKILL.md");
     expect(content).toContain("wayfinder <map-slug>");

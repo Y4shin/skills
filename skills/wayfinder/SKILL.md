@@ -74,10 +74,9 @@ The body is the canonical low-resolution map:
 ```
 
 Tasks live at `docs/tasks/<task-slug>/task.md` and are listed in the map's
-`tasks` array. Each task has one execution type. `feature` and `bug` tasks keep
-the existing task pipeline: Wayfinder must create their task doc, slice list,
-and slice docs as part of planning. Research, prototype, grilling, and manual
-tasks are direct task resources and do not need slices.
+`tasks` array. Each task has one planning/execution type. Choose the type using
+this table, then follow the matching planning resource in
+`skills/wayfinder/resources/` before writing the task:
 
 - `research` — gather high-trust evidence;
 - `prototype` — build a cheap artifact to answer a design question;
@@ -86,8 +85,12 @@ tasks are direct task resources and do not need slices.
 - `bug` — reproduce and fix using the existing bug pipeline;
 - `manual` — complete a human or environment prerequisite.
 
-Use `blocked_by` for ordering. A task body must state its question or outcome,
-acceptance/evidence criteria, and what result it should leave for dependents.
+The planning resource defines the task body, acceptance/evidence criteria,
+and required artifacts. Feature and bug planning resources also define the
+slice list and slice docs required by the unchanged implementation resources.
+Execution is later routed by `/skill:implement-task` to its matching resource.
+
+Use `blocked_by` for ordering.
 
 ## Chart the initial graph
 
