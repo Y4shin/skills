@@ -34,6 +34,12 @@ Once approved, write to `docs/tasks/${taskSlug}/arch-spec.md`.
 
 ## Step 2 — Per-slice chain dispatch
 
+> **Async dispatch (hard rule):** launch every chain with `async: true`. Never
+> block on a foreground subagent. After dispatching a slice's chain, call
+> `wait({ id })` to receive its result before moving on — slices within a level
+> run sequentially on a shared repo cwd, so there is no parallel work meanwhile.
+> The run stays tracked, interruptible, and steerable.
+
 Call `task_dependency_levels <taskSlug>` to get BFS levels.
 
 Each slice runs as a **sequential chain** that shares the repo working directory: `tdd-worker → (slice-verifier ∥ deviation-reporter ∥ ui-noter) → land-worker`. Steps share one cwd, so verify, deviation, and ui-noter see tdd-worker's actual code. `failFast: true` gates landing on verify+deviation. The ui-noter is advisory — it never gates landing.
@@ -49,7 +55,8 @@ for each level in levels:
         budgets = { s: [15, 120], m: [30, 300], l: [60, 600], xl: [90, 1200] }
         [maxTurns, timeoutMs] = budgets[size] || budgets.m
 
-        result = subagent({
+        runId = subagent({
+            async: true,
             chain: [
                 {
                     agent: "tdd-worker",
@@ -168,6 +175,10 @@ Set task_set status done on slice.`
             ],
             failFast: true
         })
+
+        // Slices within a level run sequentially (shared repo cwd), so block
+        // for this chain before dispatching the next. No parallel work meanwhile.
+        wait({ id: runId })
 
         // Process the chain result
         if exists docs/tasks/${taskSlug}/.work/uncertainty.md:

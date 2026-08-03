@@ -20,12 +20,18 @@ const slice = task_slices(taskSlug)[0]
 
 Run one sequential chain that shares the repo working directory: `tdd-worker → slice-verifier → land-worker`.
 
+> **Async dispatch (hard rule):** launch this chain with `async: true`. Never
+> run a blocking/foreground subagent. After dispatching, call `wait({ id })` to
+> receive the result while keeping the turn alive; the run is then tracked,
+> interruptible, and steerable.
+
 ```
 size = task_get(<slice-path>, "size")
 budgets = { s: [15, 120], m: [30, 300], l: [60, 600], xl: [90, 1200] }
 [maxTurns, timeoutMs] = budgets[size] || budgets.m
 
-result = subagent({
+runId = subagent({
+    async: true,
     chain: [
         {
             agent: "tdd-worker",
@@ -72,6 +78,10 @@ Set task_set status done on slice.`
     failFast: true
 })
 ```
+
+// No independent work between dispatch and result — block for the chain.
+// wait() keeps the turn alive for notifications and keeps the run steerable.
+wait({ id: runId })
 
 ## Step 2 — Report
 

@@ -16,6 +16,13 @@ metadata:
 > here. Pass `skill_name` explicitly so the metadata correlates to this
 > invocation even when multiple skills run in one turn.
 
+> **Async dispatch (hard rule):** every `subagent(...)` call in this skill's
+> resources — feature chains, bug chains, and any fan-out — MUST be launched
+> with `async: true`. Never run a blocking/foreground subagent. After
+> dispatching, call `wait({ id })` (or `wait()` / `wait({ all: true })`) to
+> receive the result while keeping the turn alive; async runs are tracked,
+> interruptible, and steerable.
+
 Reads the task's `type` frontmatter via `task_get` and dispatches to the appropriate resource. If `type:` is absent, default to the existing feature path so older tasks behave unchanged.
 
 ```
