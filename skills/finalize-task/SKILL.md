@@ -1,9 +1,18 @@
 ---
 name: finalize-task
 description: Autonomous. Run CI gate, harvest knowledge, write changelog, archive task, merge to main. If task belongs to a map and is the last child, also finalize the map.
+metadata:
+  telemetry.capture: "target"
 ---
 
 # Finalize Task
+
+> **Telemetry:** call the `telemetry_skill_context` tool with
+> `{ skill_name: "finalize-task", map }` — `map` = the map slug if the task
+> belongs to a map (else omit). The `target` (task slug) is already captured
+> automatically from your invocation argument, so do NOT pass it here. Pass
+> `skill_name` explicitly so the metadata correlates to this invocation even
+> when multiple skills run in one turn.
 
 ## Step 0 — Prerequisites
 

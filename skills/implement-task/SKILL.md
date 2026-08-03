@@ -1,9 +1,20 @@
 ---
 name: implement-task
 description: Autonomous. Implements all remaining slices of a task via per-slice chains. Routes feature tasks through the full architecture-spec / dependency-level flow and bug tasks through a lean red-first regression chain.
+metadata:
+  telemetry.capture: "target"
 ---
 
 # Implement Task
+
+> **Telemetry:** once you know the slice count for this task, call the
+> `telemetry_skill_context` tool with `{ skill_name: "implement-task",
+> sliceCount, map }` — `sliceCount` = the number of slices in the task (from
+> the task doc's `slices:` list or `task_slices`), `map` = the map slug if the
+> task belongs to a map (else omit). The `target` (task slug) is already
+> captured automatically from your invocation argument, so do NOT pass it
+> here. Pass `skill_name` explicitly so the metadata correlates to this
+> invocation even when multiple skills run in one turn.
 
 Reads the task's `type` frontmatter via `task_get` and dispatches to the appropriate resource. If `type:` is absent, default to the existing feature path so older tasks behave unchanged.
 

@@ -5,6 +5,14 @@ description: Capture, reproduce, and triage a bug. Writes a bug doc under docs/b
 
 # Report Bug
 
+> **Telemetry:** once you have derived the bug slug and written the bug doc,
+> call the `telemetry_skill_context` tool with
+> `{ skill_name: "report-bug", target }` — `target` = the bug slug (the
+> kebab-case name used for `docs/bugs/<slug>.md`). This skill has no static
+> invocation capture (the input is free-form text), so the tool is the only
+> way to record its target. Pass `skill_name` explicitly so the metadata
+> correlates to this invocation even when multiple skills run in one turn.
+
 **Entry point:** `/skill:report-bug "<free-form report>"`
 
 Lightweight bug intake. Never run the feature-task interview. Produce evidence,

@@ -6,6 +6,14 @@ disable-model-invocation: true
 
 # Wayfinder
 
+> **Telemetry:** once you have created the map, call the `telemetry_skill_context`
+> tool with `{ skill_name: "wayfinder", map }` — `map` = the map slug (the
+> directory name under `docs/tasks/maps/`). When you are focused on a specific
+> task or slice, also pass `target` (the task slug) or `slice` (the slice slug).
+> This skill has no static invocation capture, so the tool is the only way to
+> record its target. Pass `skill_name` explicitly so the metadata correlates
+> to this invocation even when multiple skills run in one turn.
+
 Wayfinder is the planning and discovery phase of this workflow. It replaces
 `create-task`, `to-spec`, and `to-tickets`. Its output is a living map and a
 dependency graph of tasks consumed directly by `/skill:implement-task`.
