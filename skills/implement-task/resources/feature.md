@@ -30,8 +30,6 @@ Also record in the task doc's `## Architecture notes` section (if the user adds 
 Present the complete spec to the user. One conversation. Iterate if needed.
 Once approved, write to `docs/tasks/${taskSlug}/arch-spec.md`.
 
-**Submit feedback:** `submit_workflow_feedback { message: "Arch spec approved for {taskSlug}", tags: ["planning"] }`
-
 ## Step 2 — Per-slice chain dispatch
 
 > **Async dispatch (hard rule):** launch every chain with `async: true`. Never
@@ -183,6 +181,8 @@ Set task_set status done on slice.`
         // Process the chain result
         if exists docs/tasks/${taskSlug}/.work/uncertainty.md:
             // tdd-worker hit uncertainty and stopped (failFast aborted before verify/land)
+            // This is a designed-for escape hatch — record that it fired.
+            submit_feedback({ kind: "expected", data: `feature: tdd-worker uncertainty stop on slice ${slice}` })
             resolution = ask_user_question({
                 header: "Uncertain",
                 question: `TDD worker hit uncertainty in slice ${slice}:\n{read docs/tasks/${taskSlug}/.work/uncertainty.md}`
@@ -203,8 +203,8 @@ Set task_set status done on slice.`
     // After each level: read deviation reports for slices that flagged
     // user-attention-needed. Update the arch spec for pending slices if API
     // surfaces changed. If a deviation reveals a workflow/planning problem
-    // (ambiguous spec, wrong interface contract), call submit_workflow_feedback.
-    // Do NOT call it for the deviation itself — that's a project finding.
+    // (ambiguous spec, wrong interface contract), surface it to the user.
+    // Do NOT report the deviation itself — that's a project finding.
 
     // Also mention any ui-noter findings to the user, but non-blocking.
     // If the user wants to act on them now, let them; otherwise continue.
@@ -239,8 +239,6 @@ consider routing it through a subagent instead.
 
 **Final suite gate:** Run the full project test suite. It must be green before Step 3 is complete. If red, this is emergent cross-slice breakage — breakage that only appears when all slices combine and no single slice owns the fix. Apply small/medium root-cause fixes within the task's scope autonomously (same rules as above); escalate large, ambiguous, or API-surface-touching fixes to the user. For test failures: first try re-routing the fix through a subagent before doing it yourself.
 
-**Submit feedback:** `submit_workflow_feedback { message: "Coherence refactor complete for {taskSlug}", tags: ["refactoring"] }`
-
 ## Step 4 — Report
 
 Report completed slices, any deviations found and resolved, user interventions.
@@ -261,3 +259,24 @@ Hard rule: on subagent failure the parent never implements. Its only moves are r
 4. **Backstop → escalate** — after two consecutive retries still fail, ask the user: "Two retries for slice {slice} failed. Should I increase budgets further, relax constraints, or skip this slice?"
 
 Hard rule: the parent context is large and expensive; routing through workers is always cheaper than pulling the fix into the parent. The parent never writes code or edits files as a fix.
+
+Each toolbelt step is a designed-for adjustment, not a snag — but record
+which one fired so its frequency can be correlated. Each time you take a
+toolbelt action, call `submit_feedback({ kind: "expected", data })` with `data`
+naming the step, e.g. `"feature: split slice <slug> after first failure"`
+or `"feature: retry +50% on slice <slug>"` or `"feature: escalate slice <slug>
+(two retries failed)"`. One call per action, right when you take it.
+
+## Workflow feedback
+
+When the *workflow itself* snags — a chain that keeps failing for the same
+reason, a slice that won't split, a worker that lacked a tool it needed, a
+dependency level that blocked unnecessarily, an arch spec that contradicted a
+slice doc, or something that worked notably well — call
+`submit_feedback({ kind, data })` autonomously, without prompting. `kind` is a
+short category (`good`, `bad`, `friction`, `architecture`); `data` is one or two
+specific, actionable sentences about the *workflow*, not the code. The
+tdd-worker, slice-verifier, deviation-reporter, and land-worker agents also
+call this tool themselves; you don't need to relay their friction, only record
+what you observe at the orchestration level. Requires the `pi-telemetry`
+extension (`submit_feedback` tool).

@@ -85,6 +85,11 @@ Read the consuming repo's `docs/dev-env.md`.
   to run them.
 - **If reproduction fails**, ask **one** targeted question. If still stuck,
   set `status: wontfix`, add the rationale, commit, and stop.
+
+  Both are designed-for adjustments — record that either fired. Call
+  `submit_feedback({ kind: "expected", data })` with `data` e.g.
+  `"report-bug: repro failed, asked one question on <slug>"` or, on wontfix,
+  `"report-bug: wontfix on <slug> — <one-line reason>"`.
 - **If reproduced**, set `status: confirmed` and commit the repro artifacts.
 
 Do not write regression tests at this step.
@@ -124,3 +129,16 @@ Promote directly to a `type: bug` task without running the Wayfinder interview.
 
 There is no mid-flight escalation path. If a fix surprises you, stop and
 promote.
+
+Surprise-and-promote is a designed-for escape hatch — record that it fired.
+Call `submit_feedback({ kind: "expected", data })` with `data` e.g.
+`"report-bug: trivial fix surprised, promoting <slug>"`.
+
+> **Feedback:** if triage hits a snag — a duplicate check that missed, a
+> `docs/dev-env.md` that was wrong, a reproduction that failed for
+> workflow reasons, a trivial/non-trivial call that was hard to make, or
+> something that worked notably well — call `submit_feedback({ kind, data })`
+> autonomously to record it. `kind` is a short category (`good`, `bad`,
+> `friction`, `architecture`); `data` is one or two specific, actionable
+> sentences about the *workflow*, not the bug. Requires the `pi-telemetry`
+> extension (`submit_feedback` tool).

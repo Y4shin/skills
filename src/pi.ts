@@ -653,94 +653,6 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  // ── submit_workflow_feedback tool ─────────────────────────────────────
-  pi.registerTool({
-    name: "submit_workflow_feedback",
-    label: "Submit Workflow Feedback",
-    description: "Send structured workflow feedback to the observability backend via OTLP logs.",
-    parameters: Type.Object({
-      message: Type.String({ description: "The feedback text" }),
-      tags: Type.Optional(Type.Array(Type.String(), { description: "Tags: good, bad, architecture, etc." })),
-      details: Type.Optional(Type.String({ description: "Optional structured details" })),
-    }),
-    async execute(_id: string, params: any) {
-      try {
-        // Resolve OTLP endpoint from ObservMe config (env var first, then .pi/observme.yaml)
-        let endpoint = process.env.OBSERVME_LOGS_ENDPOINT || "";
-        let headers: Record<string, string> = { "Content-Type": "application/json" };
-
-        if (!endpoint) {
-          const configPath = join(process.cwd(), ".pi", "observme.yaml");
-          if (existsSync(configPath)) {
-            try {
-              const config = YAML.parse(readFileSync(configPath, "utf-8")) as any;
-              const otlp = config?.observme?.otlp;
-              if (otlp) {
-                endpoint = otlp.signalEndpoints?.logs || (otlp.endpoint ? `${otlp.endpoint.replace(/\/+$/, "")}/v1/logs` : "");
-                if (otlp.headers) {
-                  for (const [k, v] of Object.entries(otlp.headers)) {
-                    if (typeof v === "string") headers[k] = v;
-                  }
-                }
-              }
-            } catch { /* fall through */ }
-          }
-        }
-
-        if (!endpoint) {
-          return { content: [{ type: "text", text: "No OTLP logs endpoint configured (set OBSERVME_LOGS_ENDPOINT or configure .pi/observme.yaml)." }], details: {} };
-        }
-
-        // Resolve session ID
-        const sessionId = process.env.OBSERVME_SESSION_ID || process.env.PI_SESSION_ID || "unknown";
-
-        // Resolve git commit
-        let gitCommit = "unknown";
-        try {
-          const { execSync } = await import("node:child_process");
-          gitCommit = execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
-        } catch { /* ignore */ }
-
-        const nowNs = BigInt(Date.now()) * BigInt(1_000_000);
-        const tags = Array.isArray(params.tags) ? params.tags.join(",") : "";
-
-        const body = {
-          resourceLogs: [{
-            resource: {
-              attributes: [{ key: "service.name", value: { stringValue: "task-workflow" } }],
-            },
-            scopeLogs: [{
-              scope: { name: "workflow-feedback" },
-              logRecords: [{
-                timeUnixNano: String(nowNs),
-                severityNumber: 9,
-                severityText: "INFO",
-                body: { stringValue: params.message },
-                attributes: [
-                  { key: "kind", value: { stringValue: "workflow-feedback" } },
-                  { key: "session_id", value: { stringValue: sessionId } },
-                  { key: "cwd", value: { stringValue: process.cwd() } },
-                  { key: "git_commit", value: { stringValue: gitCommit } },
-                  { key: "message", value: { stringValue: params.message } },
-                  { key: "details", value: { stringValue: params.details || "" } },
-                  { key: "tags", value: { stringValue: tags } },
-                ],
-              }],
-            }],
-          }],
-        };
-
-        const resp = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify(body) });
-        if (!resp.ok) {
-          return { content: [{ type: "text", text: `Feedback submission failed (HTTP ${resp.status}).` }], details: {} };
-        }
-        return { content: [{ type: "text", text: "Feedback submitted." }], details: {} };
-      } catch (e) {
-        return { content: [{ type: "text", text: `Feedback error: ${(e as Error).message}` }], details: {} };
-      }
-    },
-  });
-
   // ── Guidelines tools ──────────────────────────────────────────────────
 
   // Track discovered guidelines in memory
@@ -782,10 +694,13 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     guidelinesCache = discoverGuidelines(ctx.cwd);
     shouldInjectGuidelines = true;
-    // Check pi-subagents
+    // Check required peer extensions
     const tools = pi.getAllTools();
     if (!tools.some((t) => t.name === "subagent")) {
       ctx.ui.notify("pi-subagents is not installed. Install it with: pi install npm:pi-subagents", "warning");
+    }
+    if (!tools.some((t) => t.name === "submit_feedback")) {
+      ctx.ui.notify("pi-telemetry is not installed. Install it with: pi install git:github.com/Y4shin/pi-telemetry@v0.4.0", "warning");
     }
   });
 

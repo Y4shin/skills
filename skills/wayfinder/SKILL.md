@@ -142,6 +142,10 @@ There is no `to-spec` or `to-tickets` step. The map and task documents
 are the specification. If implementation exposes uncertainty, stop that task
 with a clear discovery and return to Wayfinder; do not improvise a hidden plan.
 
+Return-to-Wayfinder is a designed-for escape hatch — record that it fired.
+Call `submit_feedback({ kind: "expected", data })` with `data` e.g.
+`"wayfinder: task <slug> returned with unresolved uncertainty"`.
+
 ## Resuming
 
 On a later Wayfinder session, or when called back after implementation:
@@ -154,3 +158,11 @@ On a later Wayfinder session, or when called back after implementation:
 
 Never mark an implementation task complete from Wayfinder. Never resolve an
 unclear question by pretending it is a feature task.
+
+> **Feedback:** if planning hits a snag — a grilling loop that circled, a
+> dependency that wouldn't wire, a task type that didn't fit, a frontier that
+> stalled, or something that worked notably well — call
+> `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
+> short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
+> two specific, actionable sentences about the *workflow*, not the project
+> work. Requires the `pi-telemetry` extension (`submit_feedback` tool).

@@ -35,3 +35,11 @@ The result must contain:
 - unresolved questions, if any.
 
 Do not modify application code for a research task.
+
+> **Feedback:** if research hits a snag — sources that conflicted, a question
+> that wasn't sharp enough to answer, a dependency that blocked the
+> conclusion, or something that worked notably well — call
+> `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
+> short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
+> two specific, actionable sentences about the *workflow*, not the findings.
+> Requires the `pi-telemetry` extension (`submit_feedback` tool).

@@ -27,6 +27,10 @@ git merge main 2>/dev/null || true
 
 Run the project's CI command (from `task_context` profile or detected from repo tooling). If it fails: STOP. Fix forward on the task branch. Do not merge a red branch.
 
+Fix-forward is a designed-for adjustment — record that it fired so its
+frequency can be correlated. Call `submit_feedback({ kind: "expected", data })`
+with `data` e.g. `"finalize: CI gate red on <taskSlug>, fixing forward"`.
+
 ## Step 2 — Impeccable note check
 
 Check if any `docs/tasks/${taskSlug}/impeccable-note-*.md` files exist.
@@ -123,3 +127,11 @@ If `task_map_finalizable` returns ready for the map:
 ## Step 9 — Report
 
 "Task archived, CHANGELOG updated, main branch updated. Map status: <done/not done>."
+
+> **Feedback:** if finalizing hits a snag — a CI gate that's misconfigured, a
+> knowledge-harvest step with nowhere to fold findings, a bug-closure path
+> that didn't line up, or something that worked notably well — call
+> `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
+> short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
+> two specific, actionable sentences about the *workflow*, not the task.
+> Requires the `pi-telemetry` extension (`submit_feedback` tool).

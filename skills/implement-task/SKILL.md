@@ -53,3 +53,13 @@ must remain unchanged. New resources are deliberately non-coding pipelines.
 If no task type is present, `type` defaults to `feature`.
 
 After the current frontier has been completed, call `/skill:wayfinder <map-slug>` to reassess the map, graduate newly discovered work, update dependencies, and add any newly precise tasks before declaring the initiative complete.
+
+> **Feedback:** if execution hits a snag — a chain that kept failing, a slice
+> that wouldn't split, a worker that needed a tool it lacked, a dependency
+> level that blocked unnecessarily, or something that worked notably well —
+> call `submit_feedback({ kind, data })` autonomously to record it. `kind` is
+> a short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
+> two specific, actionable sentences about the *workflow*, not the code. The
+> tdd-worker, slice-verifier, deviation-reporter, and land-worker agents also
+> call this tool themselves; you don't need to relay their friction. Requires
+> the `pi-telemetry` extension (`submit_feedback` tool).

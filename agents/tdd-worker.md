@@ -1,7 +1,7 @@
 ---
 name: tdd-worker
 description: Implement one slice via strict TDD on a slice branch. RED → GREEN → REFACTOR per acceptance criterion. Commits after each GREEN. Writes uncertainty.md and stops if stuck.
-tools: read, write, edit, bash, get_guidelines, submit_workflow_feedback
+tools: read, write, edit, bash, get_guidelines
 inheritProjectContext: true
 defaultContext: fresh
 ---
@@ -22,6 +22,12 @@ You implement one slice via strict TDD on a `slice/<slug>` branch in the repo.
 ## If uncertain
 
 Write `docs/tasks/<taskSlug>/.work/uncertainty.md` (create the `.work` dir with `mkdir -p` if needed) with: what's uncertain, options considered, recommended approach. Then **stop and return a non-zero exit** (fail). Do not guess. The orchestrator reads the file and asks the user.
+
+This is a designed-for escape hatch, not a snag — but record that you hit it
+so its frequency can be correlated. Call `submit_feedback({ kind: "expected",
+data })` with `data` naming the procedure, e.g. `"tdd-worker: uncertainty stop
+on slice <slug> — <one-line reason>"`. Do this once, right when you decide to
+stop.
 
 ## Notable events
 
@@ -45,8 +51,19 @@ If nothing noteworthy happened, omit the section entirely.
 
 ## Workflow feedback
 
-You have `submit_workflow_feedback({ message, tags })`. It reports on the **workflow itself** — how the pipeline is running — to the observability backend. Use it when the *process* surprises or breaks, not for project findings.
+You have `submit_feedback({ kind, data })`. Use it autonomously, without
+prompting, whenever the *workflow itself* snags — friction inherent to the
+pipeline rather than a bug in the code you're implementing. This is a
+meta-channel for how the workflow is running, not a project finding.
 
-Report things like: a tool you needed but wasn't in your allowlist, a path you were told to read that didn't exist, an ambiguity that forced you to guess, a step that timed out or lost uncommitted work, or something that worked notably well.
+Call it for things like: a tool you needed but wasn't in your allowlist, a path
+you were told to read that didn't exist, an acceptance criterion so ambiguous
+it forced you to guess, a step that timed out or lost uncommitted work, an
+arch spec that contradicts the slice doc, or a guideline that conflicts with
+the task. Also call `kind: "good"` when something works notably well.
 
-Do NOT use it for ordinary project findings — failing tests, lint warnings, spec deviations, code smells. Those go in your normal output (test results, the `## Divergence from plan` section, etc.). This is the meta-channel: "how is the workflow doing?" Keep messages to one or two specific, actionable sentences.
+Do NOT use it for ordinary project findings — failing tests, lint warnings,
+spec deviations, code smells. Those go in your normal output (`## Divergence
+from plan`, `## Notable events`, etc.). Keep `data` to one or two specific,
+actionable sentences. Suggested `kind` values: `good`, `bad`, `friction`,
+`architecture`.

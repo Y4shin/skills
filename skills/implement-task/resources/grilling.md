@@ -29,3 +29,11 @@ The task must contain:
 - remaining fog or newly discovered work.
 
 This resource does not write application code.
+
+> **Feedback:** if grilling hits a snag — a question that circled, a settled
+> decision the doc didn't record, a user who answered for you, or something
+> that worked notably well — call `submit_feedback({ kind, data })`
+> autonomously to record it. `kind` is a short category (`good`, `bad`,
+> `friction`, `architecture`); `data` is one or two specific, actionable
+> sentences about the *workflow*, not the decision. Requires the `pi-telemetry`
+> extension (`submit_feedback` tool).
