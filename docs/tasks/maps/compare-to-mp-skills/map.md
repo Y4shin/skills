@@ -3,7 +3,12 @@ kind: map
 slug: compare-to-mp-skills
 title: Improve workflow and toolkit using mp-skills patterns
 status: active
-tasks: [adopt-mp-skills-patterns]
+tasks:
+  - adopt-mp-skills-patterns
+  - tdd-skill-comparison
+  - code-review-evaluation
+  - improve-architecture-evaluation
+  - bug-workflow-enhancements
 ---
 
 ## Destination
@@ -35,20 +40,32 @@ married to our repo's *automation depth and structural enforcement*.
 - The comparison document (`compare-to-mp-skills.md`) catalogs every gap and
   strength across both repos — this is the shared reference for the effort.
   (Moved into this map directory as a resource artifact.)
+- **Priority order for adoption** (from grilling Q1): (1) reusable primitives,
+  (2) workflow, (3) context management, (4) utility skills.
+- **All three primitives as model-invoked skills** (Q2): grilling,
+  domain-modeling, and codebase-design.
+- **Workflow model** (Q3): two-phase with wayfinder as pure router.
+  Wayfinder delegates all execution (including grilling) to implement-task.
+  Exploration phase: research/prototype/grilling only, with at least one
+  grilling before soft pivot (alignment invariant). Execution phase:
+  implementation tasks stable unless problem discovered. Feedback loop via
+  return-to-wayfinder.
+- **Context management** (Q4): session boundary guidance (close between
+  phases), /handoff skill for unstructured session context, no compact/
+  smart-zone skill.
+- **Utility skills** (Q5): /handoff (build now), /wizard and
+  /resolving-merge-conflicts (model-invoked, low effort), rest deferred.
 
 ## Fog
 
-- Should we create reusable primitive skills (grilling, domain-modeling,
-  codebase-design) alongside the existing task-type resources, or replace
-  them?
-- How should context management work in a Pi-native setting where `/handoff`
-  and `/compact` don't exist?
-- Is a code-review skill worth the agent overhead vs. the existing CI gate +
-  TDD + verification pipeline?
+- How and when to create implementation tasks for the already-decided items
+  (grilling/domain-modeling/codebase-design skills, wayfinder rewrite,
+  wizard, resolving-merge-conflicts, handoff, session boundary guidance)?
+  Awaiting the follow-up grilling tasks to determine sequencing.
 - Should human-facing docs be auto-generated from SKILL.md frontmatter, or
   written separately?
-- What utility skills (wizard, handoff, wait-what, teach, questionnaire) are
-  most valuable in a Pi context?
+- What about the remaining deferred utility skills (wait-what,
+  to-questionnaire, teach) — are they worth a dedicated grilling?
 
 ## Out of scope
 
