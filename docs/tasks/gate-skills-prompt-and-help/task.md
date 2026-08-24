@@ -171,6 +171,32 @@ suite: 221 passed, 16 failed — all in the pre-existing
 error), which is untouched by this branch (empty diff vs. merge base).
 No new failures.
 
+### Slice 3 — gate-explicit-invocation-policy (landed)
+
+Added a `gateSkillInvocation` `input` handler to `src/pi.ts` that
+prevents explicit `/skill:<name>` invocation of the six task-workflow
+skills in a work repo. The handler parses the skill name from `/skill:`
+input using `slice(7, spaceIndex)` (mirroring `_expandSkillCommand`'s
+parser), blocks only the gated six (reusing the shared
+`GATED_SKILL_NAMES` list from slice 1) by calling
+`ctx.ui.notify(\`task-workflow is gated in this work repo; not loading
+${name}\`, "warning")` and returning `{ action: "handled" }`, and passes
+everything else through with `{ action: "continue" }`. The handler is
+registered only when gated: `if (gate.active) pi.on("input",
+gateSkillInvocation)`.
+
+Added 5 integration tests to `tests/gate-factory.test.ts` ("input skill
+invocation gate" describe block): gated + gated name block + notify,
+gated + gated name with trailing args, gated + non-gated skill
+pass-through, gated + non-`/skill:` input pass-through, and personal
+repo (handler not registered).
+
+Verification: slice tests (`gate-factory.test.ts` 22/22,
+`repo-gate.test.ts` 40/40) passed; `npm run typecheck` clean. Full
+suite: 227 passed, 16 failed — all in the pre-existing
+`tests/integration/session.test.ts` (`AuthStorage.inMemory` harness
+error), untouched by this slice. No new regressions.
+
 ### Slice 2 — gate-suppress-help-and-skill-list (landed)
 
 Took the slice doc's documented "no mechanism exists" branch. pi 0.80.10
