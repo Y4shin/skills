@@ -214,7 +214,10 @@ describe("factory gate", () => {
 
     await sessionStartHandlers[0]({ type: "session_start", reason: "startup" }, { cwd: repo, ui: stub.ui });
 
-    expect(stub.notifications).toHaveLength(0);
+    const messages = stub.notifications.map((n) => n.message);
+    expect(messages).toContain("task-workflow gate active: work repo matched disableOnRepo pattern");
+    expect(messages).not.toContain("pi-subagents is not installed. Install it with: pi install npm:pi-subagents");
+    expect(messages).not.toContain("pi-telemetry is not installed. Install it with: pi install git:github.com/Y4shin/pi-telemetry@v0.4.0");
   });
 
   test("personal repo emits session_start peer warnings", async () => {

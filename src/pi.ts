@@ -713,7 +713,10 @@ export default function (pi: ExtensionAPI) {
     for (const diagnostic of gate.diagnostics) {
       ctx.ui.notify(`task-workflow gate: ${diagnostic}`, "info");
     }
-    if (gate.active) return;
+    if (gate.active) {
+      ctx.ui.notify(`task-workflow gate active: ${gate.reason}`, "info");
+      return;
+    }
     // Check required peer extensions
     const tools = pi.getAllTools();
     if (!tools.some((t) => t.name === "subagent")) {
