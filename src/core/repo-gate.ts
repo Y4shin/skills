@@ -41,6 +41,10 @@ export interface ReadGateConfigDeps extends WalkDeps {
 
 export interface ResolveGateDeps extends ReadOriginDeps, ReadGateConfigDeps {}
 
+export interface ResolveGateResult extends GateResult {
+  diagnostics: string[];
+}
+
 /** Cache origin URL lookups per repo root for the process lifetime. */
 const originCache = new Map<string, string | null>();
 
@@ -374,7 +378,7 @@ function validateRegexArray(
 export function resolveGate(
   cwd: string,
   deps: ResolveGateDeps = {},
-): Required<Pick<GateResult, "diagnostics">> & GateResult {
+): ResolveGateResult {
   const origin = readOriginRemote(cwd, deps);
   const config = readGateConfig(cwd, deps);
   const decision = isWorkRepo(origin, config.disableOnRepo, config.enable);
