@@ -4,8 +4,9 @@ type: grilling
 slug: code-review-evaluation
 title: Evaluate mp-skills /code-review for adoption
 map: compare-to-mp-skills
-status: ready
-blocked_by: [adopt-mp-skills-patterns]
+status: done
+blocked_by:
+- adopt-mp-skills-patterns
 ---
 
 ## Decision to settle

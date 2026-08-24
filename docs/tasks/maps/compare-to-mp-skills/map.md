@@ -8,8 +8,12 @@ tasks:
   - tdd-skill-comparison
   - build-tdd-reference-skill
   - code-review-evaluation
+  - build-code-review-skill
   - improve-architecture-evaluation
+  - build-task-workflow-doctor-skill
+  - build-improve-architecture-skill
   - bug-workflow-enhancements
+  - build-diagnosing-bugs-skill
 ---
 
 ## Destination
@@ -96,6 +100,64 @@ married to our repo's *automation depth and structural enforcement*.
   `type: feature` task `build-tdd-reference-skill` to Wayfinder to implement.
   `code-review-evaluation` sibling inherits the test-quality-review home
   question and the `/tdd` skill as its reference.
+- **Improve-architecture deferred** (improve-architecture-evaluation Q1):
+  settle the shape now, build after the three prerequisite skills
+  (codebase-design, grilling, domain-modeling — decided in the map but not
+  yet built). The build task is raised blocked_by those three.
+- **Improve-architecture report** (improve-architecture-evaluation Q2): HTML
+  report in the OS temp dir (visual, Tailwind + Mermaid, before/after
+  diagrams, strength badges), BUT with the CDN dependencies cached/vendored
+  in the repo (~4MB: tailwind + mermaid) so it works offline. First vendored-
+  asset precedent in this repo.
+- **Improve-architecture handoff** (improve-architecture-evaluation Q3): the
+  picked candidate's grilling decision feeds wayfinder (not to-spec/
+  to-tickets — we have neither), which creates the deepening task. Mirrors
+  our two-phase flow.
+- **Improve-architecture scout** (improve-architecture-evaluation Q4): a
+  custom read-only `architecture-scout` agent (tools: read, bash,
+  get_guidelines; passed `skill: "codebase-design"`) walks the codebase for
+  deepening candidates. Custom agent encodes the deletion-test/shallowness
+  heuristic; harness-neutral (not Claude Code's `Agent` tool).
+- **Improve-architecture grilling** (improve-architecture-evaluation Q5):
+  report first, grilling only on an explicit user pick, with a documented
+  no-grill mode. Addresses mp-skills' "10s of questions" complaint.
+- **CONTEXT.md + ADRs + doctor** (improve-architecture-evaluation Q6): adopt
+  repo-root `CONTEXT.md` + `docs/adr/` (mp-skills convention, optional).
+  PLUS a new `task-workflow-doctor` skill (model-invoked) that diagnoses
+  common workflow issues (missing CONTEXT.md/ADRs/docs dirs) and routes to
+  the appropriate skill — separate build task.
+- **Improve-architecture task complete** (improve-architecture-evaluation):
+  grilling done. Decision: build /improve-codebase-architecture (deferred,
+  blocked_by the three prerequisite skills) + a separate
+  build-task-workflow-doctor-skill task. Raised both with Wayfinder.
+- **Diagnosing-bugs skill** (bug-workflow-enhancements Q1): adopt mp-skills'
+  6-phase debugging discipline as a model-invoked `/diagnosing-bugs` skill,
+  passed to the tdd-worker via `skill: "diagnosing-bugs"` on bug tasks
+  (mirrors /tdd + /code-review delivery). report-bug intake unchanged.
+- **Triage** (bug-workflow-enhancements Q2): defer the /triage skill — it's
+  mechanical (frontmatter filtering), not model reasoning, so it should be a
+  tool/script, not a skill. If triage is wanted later, build a `bug_list`/
+  `bug_queue` tool in src/pi.ts (extends the task_* family to docs/bugs/),
+  NOT a skill. Low priority (grep + task-overview cover the common query).
+- **Diagnosing-bugs Phase 6 handoff** (bug-workflow-enhancements Q3): when the
+  tdd-worker finds no correct seam for a regression test, it flags the
+  finding (divergence/uncertainty) for the parent → wayfinder or
+  /improve-codebase-architecture. Flags; does not auto-spawn an architecture
+  task.
+- **Diagnosing-bugs firing** (bug-workflow-enhancements Q4): `skill:
+  "diagnosing-bugs"` is passed on every type: bug task (no dispatch-time
+  judgment; trivial bugs are already spot-fixed by report-bug).
+- **Diagnosing-bugs phases** (bug-workflow-enhancements Q5): 6 phases
+  skippable with a recorded justification; Phase 1 (build a red-capable loop)
+  is non-skippable. Budget fallback = the existing uncertainty hatch.
+- **Diagnosing-bugs bug-signal** (bug-workflow-enhancements Q6): the tdd-
+  worker knows it's on a bug via the skill's presence (bug.md passes
+  `diagnosing-bugs`; feature.md doesn't) + an explicit "You are on a type:
+  bug task" instruction line in the dispatch. Agent prompt stays path-agnostic.
+- **Bug-workflow task complete** (bug-workflow-enhancements): grilling done.
+  Decision: build /diagnosing-bugs skill (unblocked) + defer /triage (if
+  wanted, build a bug_list/bug_queue tool, not a skill). Raised
+  build-diagnosing-bugs-skill with Wayfinder.
 
 ## Fog
 
@@ -105,6 +167,19 @@ married to our repo's *automation depth and structural enforcement*.
   Awaiting the follow-up grilling tasks to determine sequencing.
   - `build-tdd-reference-skill` (feature) is now precise enough to create —
     raised by tdd-skill-comparison.
+  - `build-code-review-skill` (feature) raised by code-review-evaluation —
+    now landed on main.
+  - `build-improve-architecture-skill` (feature, blocked_by the three
+    prerequisite build tasks) raised by improve-architecture-evaluation.
+  - `build-task-workflow-doctor-skill` (feature) raised by
+    improve-architecture-evaluation.
+  - `build-diagnosing-bugs-skill` (feature, unblocked) raised by
+    bug-workflow-enhancements.
+  - `bug_list`/`bug_queue` tool (low priority) — extend src/pi.ts to scan
+    docs/bugs/ by status; not a skill.
+  - The three prerequisite skills the map decided (codebase-design, grilling,
+    domain-modeling) still have no build tasks — Wayfinder must create them
+    before build-improve-architecture-skill can graduate.
 - Should human-facing docs be auto-generated from SKILL.md frontmatter, or
   written separately? (Unaffected by tdd-skill-comparison Q4's companion-doc
   precedent, which is about hand-written reference files a skill author
