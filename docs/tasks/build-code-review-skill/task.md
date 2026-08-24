@@ -4,7 +4,7 @@ type: feature
 slug: build-code-review-skill
 title: Build the /code-review skill, code-reviewer agent, and get_guidelines extension
 map: compare-to-mp-skills
-status: ready
+status: done
 blocked_by:
 - code-review-evaluation
 slices:
@@ -190,3 +190,31 @@ Out of scope:
   suite green except 16 pre-existing `session.test.ts` failures that
   reproduce on main (not a regression). No divergence from plan; no
   `get_guidelines` code touched (owned by slice 3). Slice 3 remains.
+
+### Slice 3 — get-guidelines-standards-extension (done)
+
+- Landed on `task/build-code-review-skill` via `--no-ff` merge of
+  `slice/get-guidelines-standards-extension` (no conflicts; slices 1 and 2
+  had landed, and slice 3 was blocked_by slice 1).
+- Extended `src/pi.ts`: `discoverGuidelines` now also discovers repo-root
+  `AGENTS.md`/`CLAUDE.md`/`CONTEXT.md` and `docs/standards.md` as standards
+  sources (topic `"standards"`), in addition to the existing
+  `docs/*-guidelines.md`/`*-conventions.md`/`*-practices.md`/`testing.md`
+  family. `get_guidelines` returns the 12-smell Fowler baseline as a floor
+  (clearly labelled) when no repo standards match a request; it does NOT
+  append the baseline when repo standards match (repo overrides).
+  `list_guidelines` reports the baseline as a source when the cache is empty
+  (i.e. it would be served as the floor). Added a `GuidelineEntry` type with
+  a `source` field (`"docs"` | `"root"`) and a `guidelineDisplayPath`
+  helper so root files display as `AGENTS.md` rather than `docs/AGENTS.md`.
+  The `SMELL_BASELINE` constant is inlined in `src/pi.ts` with a sync note
+  pointing at `skills/code-review/smells.md` as the single source of truth.
+- Added `tests/guidelines.test.ts` (5 tests, stub-API + tmp-dir fixture
+  pattern): repo-override discovery, baseline floor on no-match, repo
+  overrides suppress the baseline, `list_guidelines` reports the baseline
+  when in effect, and existing `docs/typescript-guidelines.md` regression.
+- Slice-verifier confirmed `npm run typecheck` clean,
+  `tests/guidelines.test.ts` 5/5, `tests/skills.test.ts` 100/100, full
+  suite green except 16 pre-existing `session.test.ts` failures that
+  reproduce on main (not a regression). No divergence from plan.
+- This was the last slice; the task is ready for finalize-task.

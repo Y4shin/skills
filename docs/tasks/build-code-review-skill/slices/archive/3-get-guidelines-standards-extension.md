@@ -4,7 +4,7 @@ slug: get-guidelines-standards-extension
 title: Extend get_guidelines to discover a repo override file and surface the smell baseline floor
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: l
 blocked_by: [code-review-skill-content]
 ---
