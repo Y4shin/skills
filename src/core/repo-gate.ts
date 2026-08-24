@@ -187,7 +187,9 @@ function parseOriginFromConfig(
  * disableOnRepo patterns, and project enable flag.
  *
  * Truth table (from gate-config-mechanics findings.md):
- *   active = (disableOnRepo matches normalized origin) AND (projectEnable !== false)
+ *   active = matches !== (projectEnable === false)
+ *   (i.e. work repos are active unless locally re-enabled; personal repos are
+ *   inactive unless opted out via project.enable=false.)
  *
  * | patterns match | enable | active | meaning |
  * | no             | true   | false  | personal |
@@ -210,7 +212,7 @@ export function isWorkRepo(
 
   const diagnostics: string[] = [];
   let normalized: string | null = null;
-  if (origin) {
+  if (origin && origin.trim().length > 0) {
     normalized = normalizeRemote(origin);
   }
 

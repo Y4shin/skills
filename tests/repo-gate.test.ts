@@ -160,6 +160,12 @@ describe("isWorkRepo", () => {
     expect(result.reason).toContain("personal");
   });
 
+  test("empty string origin -> personal", () => {
+    const result = isWorkRepo("", ["github.com/QNCGmbH"], true);
+    expect(result.active).toBe(false);
+    expect(result.reason).toContain("personal");
+  });
+
   test("invalid regex is skipped and produces a diagnostic", () => {
     const result = isWorkRepo("github.com/QNCGmbH/openai", ["[", "github.com/QNCGmbH"], true);
     expect(result.active).toBe(true);
