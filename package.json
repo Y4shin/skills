@@ -36,7 +36,8 @@
       "./skills/wayfinder",
       "./skills/implement-task",
       "./skills/finalize-task",
-      "./skills/report-bug"
+      "./skills/report-bug",
+      "./skills/tdd"
     ],
     "subagents": {
       "agents": [
