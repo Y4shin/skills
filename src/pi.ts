@@ -620,10 +620,11 @@ export default function (pi: ExtensionAPI) {
   }
 
   // ── notify_user tool ────────────────────────────────────────────────
-  pi.registerTool({
-    name: "notify_user",
-    label: "Notify User",
-    description: "Send a notification to the user's configured ntfy platform.",
+  if (!gate.active) {
+    pi.registerTool({
+      name: "notify_user",
+      label: "Notify User",
+      description: "Send a notification to the user's configured ntfy platform.",
     parameters: Type.Object({
       title: Type.Optional(Type.String({ description: "Notification title" })),
       message: Type.String({ description: "Message body" }),
@@ -656,6 +657,7 @@ export default function (pi: ExtensionAPI) {
       }
     },
   });
+  }
 
   // ── Guidelines tools ──────────────────────────────────────────────────
 
@@ -727,10 +729,11 @@ export default function (pi: ExtensionAPI) {
     return { systemPrompt: event.systemPrompt + "\n\n" + lines.join("\n") };
   });
 
-  pi.registerTool({
-    name: "get_guidelines",
-    label: "Get Guidelines",
-    description: "Fetch coding guidelines for a language or topic.",
+  if (!gate.active) {
+    pi.registerTool({
+      name: "get_guidelines",
+      label: "Get Guidelines",
+      description: "Fetch coding guidelines for a language or topic.",
     parameters: Type.Object({
       language: Type.Optional(Type.String({ description: "Language filter (e.g. typescript)" })),
       topic: Type.Optional(Type.String({ description: "Topic filter (e.g. mocking)" })),
@@ -754,11 +757,13 @@ export default function (pi: ExtensionAPI) {
       return { content: [{ type: "text", text: results.map((r) => `### ${r.file}\n${r.content}`).join("\n\n---\n\n") }], details: {} };
     },
   });
+  }
 
-  pi.registerTool({
-    name: "list_guidelines",
-    label: "List Guidelines",
-    description: "List available coding guideline sources.",
+  if (!gate.active) {
+    pi.registerTool({
+      name: "list_guidelines",
+      label: "List Guidelines",
+      description: "List available coding guideline sources.",
     parameters: Type.Object({}),
     async execute() {
       if (guidelinesCache.size === 0) {
@@ -771,4 +776,5 @@ export default function (pi: ExtensionAPI) {
       return { content: [{ type: "text", text: lines.join("\n") }], details: {} };
     },
   });
+  }
 }

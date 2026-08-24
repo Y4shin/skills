@@ -160,4 +160,34 @@ describe("factory gate", () => {
       expect(names).not.toContain(name);
     }
   });
+
+  test("work repo (gate active) does not register utility tools", () => {
+    globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
+    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
+    const repo = makeRepo("git@github.com:QNCGmbH/openai.git");
+    process.chdir(repo);
+
+    const stub = createStub();
+    factory(stub);
+
+    const names = stub.tools.map((t) => t.name);
+    expect(names).not.toContain("notify_user");
+    expect(names).not.toContain("get_guidelines");
+    expect(names).not.toContain("list_guidelines");
+  });
+
+  test("personal repo registers all gated tools", () => {
+    globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
+    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
+    const repo = makeRepo("https://github.com/Y4shin/skills.git");
+    process.chdir(repo);
+
+    const stub = createStub();
+    factory(stub);
+
+    const names = stub.tools.map((t) => t.name);
+    for (const name of GATED_NAMES) {
+      expect(names).toContain(name);
+    }
+  });
 });
