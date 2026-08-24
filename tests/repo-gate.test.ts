@@ -92,7 +92,7 @@ describe("readOriginRemote", () => {
 
   test("reads origin URL from synthetic .git/config", () => {
     const existsSync = (p: string) => p === "/repo/.git";
-    const isDirectory = () => true;
+    const isDir = () => true;
     const readFileSync = (p: string) => {
       if (p === "/repo/.git/config") {
         return '[remote "origin"]\n\turl = git@github.com:QNCGmbH/openai.git\n';
@@ -100,13 +100,13 @@ describe("readOriginRemote", () => {
       throw new Error(`unexpected read: ${p}`);
     };
     expect(
-      readOriginRemote("/repo", { existsSync, isDirectory, readFileSync }),
+      readOriginRemote("/repo", { existsSync, isDir, readFileSync }),
     ).toBe("git@github.com:QNCGmbH/openai.git");
   });
 
   test("returns null when .git directory has no origin remote", () => {
     const existsSync = (p: string) => p === "/repo/.git";
-    const isDirectory = () => true;
+    const isDir = () => true;
     const readFileSync = (p: string) => {
       if (p === "/repo/.git/config") {
         return '[remote "upstream"]\n\turl = git@github.com:QNCGmbH/openai.git\n';
@@ -114,15 +114,15 @@ describe("readOriginRemote", () => {
       throw new Error(`unexpected read: ${p}`);
     };
     expect(
-      readOriginRemote("/repo", { existsSync, isDirectory, readFileSync }),
+      readOriginRemote("/repo", { existsSync, isDir, readFileSync }),
     ).toBeNull();
   });
 
   test("returns null for gitfile-style .git", () => {
     const existsSync = (p: string) => p === "/repo/.git";
-    const isDirectory = () => false;
+    const isDir = () => false;
     expect(
-      readOriginRemote("/repo", { existsSync, isDirectory }),
+      readOriginRemote("/repo", { existsSync, isDir }),
     ).toBeNull();
   });
 });

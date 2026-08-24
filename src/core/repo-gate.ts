@@ -20,7 +20,7 @@ export interface WalkDeps {
 }
 
 export interface ReadOriginDeps extends WalkDeps {
-  isDirectory?: (p: string) => boolean;
+  isDir?: (p: string) => boolean;
   readFileSync?: (p: string, encoding: "utf-8") => string;
 }
 
@@ -122,7 +122,7 @@ export function readOriginRemote(
   // Avoid cache pollution when callers inject test seams.
   const hasCustomDeps =
     deps.existsSync !== undefined ||
-    deps.isDirectory !== undefined ||
+    deps.isDir !== undefined ||
     deps.readFileSync !== undefined;
 
   if (!hasCustomDeps) {
@@ -132,11 +132,11 @@ export function readOriginRemote(
 
   const exists = deps.existsSync ?? existsSync;
   const gitPath = join(root, ".git");
-  const isDir = deps.isDirectory ?? ((p: string) => statSync(p).isDirectory());
+  const isDirectory = deps.isDir ?? ((p: string) => statSync(p).isDirectory());
 
   let origin: string | null = null;
 
-  if (isDir(gitPath)) {
+  if (isDirectory(gitPath)) {
     const read = deps.readFileSync ?? readFileSync;
     origin = parseOriginFromConfig(join(gitPath, "config"), read);
   } else {
