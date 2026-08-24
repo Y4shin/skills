@@ -124,7 +124,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(7);
+    expect(pkg.pi.skills.length).toBe(8);
   });
 
   test("has subagents config", () => {
