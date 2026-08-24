@@ -1,5 +1,18 @@
 # Task Changelog
 
+## 2026-08-24 — Build the /code-review skill, code-reviewer agent, and get_guidelines extension (build-code-review-skill)
+Added a model-invoked `/code-review` skill (two-axis: Standards + Spec) with
+the 12-smell Fowler baseline as a companion doc, plus a `code-reviewer` fanout
+agent that spawns parallel read-only Standards and Spec reviewers and
+aggregates side by side (never merged, no single winner). Extended our own
+`get_guidelines` tool to discover repo-root standards files
+(`AGENTS.md`/`CLAUDE.md`/`CONTEXT.md`/`docs/standards.md`) and surface the
+smell baseline as a floor when no repo standards match. Wired the review into
+implement-task's feature path (before Step 3 coherence refactor) and bug path
+(after the single chain), advisory — feeds findings to the refactor, does not
+gate. Refactor home stays at implement-task Step 3. 105/105 structure+guidelines
+tests green; 16 pre-existing session.test.ts failures reproduce on main.
+
 ## 2026-08-24 — Build the /tdd reference skill and wire it into the TDD pipeline (build-tdd-reference-skill)
 Added a model-invoked `/tdd` reference skill (`SKILL.md` + `tests.md` +
 `mocking.md`) defining test quality — what a good test is, seams, anti-patterns,
