@@ -729,22 +729,24 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_compact", async () => { shouldInjectGuidelines = true; });
 
-  pi.on("before_agent_start", async (event, _ctx) => {
-    if (!shouldInjectGuidelines) return;
-    shouldInjectGuidelines = false;
-    if (guidelinesCache.size === 0) return;
+  if (!gate.active) {
+    pi.on("before_agent_start", async (event, _ctx) => {
+      if (!shouldInjectGuidelines) return;
+      shouldInjectGuidelines = false;
+      if (guidelinesCache.size === 0) return;
 
-    const lines = ["## Project coding guidelines", ""];
-    lines.push("Available documentation:");
-    for (const [, g] of guidelinesCache) {
-      lines.push(`- \`docs/${g.file}\` — topics: ${g.topics.join(", ")}`);
-    }
-    lines.push("", "Use `get_guidelines(language, topic?)` to fetch detailed guidelines.");
-    lines.push("Use `list_guidelines()` to see all available sources.");
-    lines.push("", "Abide by any conventions defined in these project files when writing code.");
+      const lines = ["## Project coding guidelines", ""];
+      lines.push("Available documentation:");
+      for (const [, g] of guidelinesCache) {
+        lines.push(`- \`docs/${g.file}\` — topics: ${g.topics.join(", ")}`);
+      }
+      lines.push("", "Use `get_guidelines(language, topic?)` to fetch detailed guidelines.");
+      lines.push("Use `list_guidelines()` to see all available sources.");
+      lines.push("", "Abide by any conventions defined in these project files when writing code.");
 
-    return { systemPrompt: event.systemPrompt + "\n\n" + lines.join("\n") };
-  });
+      return { systemPrompt: event.systemPrompt + "\n\n" + lines.join("\n") };
+    });
+  }
 
   if (!gate.active) {
     pi.registerTool({
