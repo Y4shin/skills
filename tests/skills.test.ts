@@ -81,6 +81,7 @@ const SKILL_FILES = [
   "skills/finalize-task/SKILL.md",
   "skills/report-bug/SKILL.md",
   "skills/tdd/SKILL.md",
+  "skills/code-review/SKILL.md",
 ];
 
 describe("skill files", () => {
