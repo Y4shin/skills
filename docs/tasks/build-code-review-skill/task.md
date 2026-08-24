@@ -165,3 +165,28 @@ Out of scope:
   (AuthStorage API drift, not a regression). No divergence from plan; no
   agent files, implement-task wiring, or `get_guidelines` code touched
   (owned by slices 2 and 3).
+
+### Slice 2 — code-review-agent-and-dispatch (done)
+
+- Landed on `task/build-code-review-skill` via `--no-ff` merge of
+  `slice/code-review-agent-and-dispatch` (no conflicts; only slice 1 had
+  landed on the task branch, and slice 2 was blocked_by slice 1).
+- Created `agents/code-reviewer.md` (fanout agent: `tools: read, bash,
+  get_guidelines, subagent`, `defaultContext: fresh`,
+  `inheritProjectContext: true`; prompt spawns two read-only parallel axis
+  reviewers (Standards + Spec), aggregates side by side under `## Standards`
+  and `## Spec` headings with per-axis worst-issue summaries, carries the
+  fanout guard, includes the `## Workflow feedback` section).
+- Added review dispatch to `skills/implement-task/resources/feature.md`
+  (before Step 3 / coherence refactor: `subagent({ agent: "code-reviewer",
+  skill: "code-review", ... })` with `async: true` + `wait({ id })`, advisory)
+  and to `skills/implement-task/resources/bug.md` (after the single chain,
+  before the report/finalize handoff, advisory).
+- Updated `tests/skills.test.ts`: added `agents/code-reviewer.md` to
+  `AGENT_FILES` and xref assertions (`feature.md` and `bug.md` reference
+  `code-reviewer`).
+- Slice-verifier confirmed 100/100 `tests/skills.test.ts` green (was 93 on
+  slice 1, +7 for the new agent + xrefs), `npm run typecheck` clean, full
+  suite green except 16 pre-existing `session.test.ts` failures that
+  reproduce on main (not a regression). No divergence from plan; no
+  `get_guidelines` code touched (owned by slice 3). Slice 3 remains.

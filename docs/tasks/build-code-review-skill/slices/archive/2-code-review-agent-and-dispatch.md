@@ -4,7 +4,7 @@ slug: code-review-agent-and-dispatch
 title: Create the code-reviewer fanout agent and wire it into implement-task
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: l
 blocked_by: [code-review-skill-content]
 ---
