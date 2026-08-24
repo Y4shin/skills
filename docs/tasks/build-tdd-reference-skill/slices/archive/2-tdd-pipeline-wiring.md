@@ -4,7 +4,7 @@ slug: tdd-pipeline-wiring
 title: Wire /tdd into implement-task + narrow tdd-worker to RED→GREEN + own refactor at Step 3
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: m
 blocked_by: [tdd-skill-content]
 ---

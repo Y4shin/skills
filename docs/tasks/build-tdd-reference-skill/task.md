@@ -4,7 +4,7 @@ type: feature
 slug: build-tdd-reference-skill
 title: Build the /tdd reference skill and wire it into the TDD pipeline
 map: compare-to-mp-skills
-status: ready
+status: done
 blocked_by:
 - tdd-skill-comparison
 slices:
@@ -126,3 +126,23 @@ Verification: slice structure tests (`tests/skills.test.ts`) 89/89 green;
 pre-existing `tests/integration/session.test.ts` (`AuthStorage.inMemory`
 harness error) which reproduces identically on `main` and is unrelated to
 this slice. No new regressions.
+
+### Slice 2 — tdd-pipeline-wiring (landed)
+
+Wired the `/tdd` skill into the pipeline and relocated the refactor step.
+`agents/tdd-worker.md` Step 3 narrowed from RED→GREEN→REFACTOR to RED→GREEN
+(checkpoint commit after each GREEN retained); added the consult-`/tdd`-and-
+test-only-at-agreed-seams line to Constraints (frontmatter unchanged).
+`skills/implement-task/resources/feature.md` gained `skill: "tdd"` on the
+tdd-worker chain step, a **Seams** bullet in the Step 1 arch-spec template,
+and an explicit Step 3 coherence-refactor ownership line. 
+`skills/implement-task/resources/bug.md` gained `skill: "tdd"` on the
+tdd-worker chain step (no arch-spec/Seams or Step 3 change — bug path stays
+lean). All three changes landed together so refactor always has a home.
+
+Verification: `tests/skills.test.ts` 89/89 green; `npm run typecheck` clean.
+Full suite: 231 passed, 16 failed — all pre-existing `session.test.ts`
+`AuthStorage.inMemory` failures that reproduce identically on `main` and are
+unrelated to this slice. No new regressions. All slices of this task are now
+landed; the task is ready for finalize-task (Step 3 coherence refactor was
+already part of slice 2's scope; the parent will run the final suite gate).
