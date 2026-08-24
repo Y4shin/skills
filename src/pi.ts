@@ -15,7 +15,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import YAML from "yaml";
 
@@ -70,9 +70,9 @@ const { names: GATED_SKILL_NAMES, diagnostics: SKILL_NAME_DIAGNOSTICS } = loadGa
  * block, log a diagnostic and return the prompt unchanged.
  */
 async function stripSkills(
-  event: { systemPrompt: string },
-  ctx: { ui: { notify: (message: string, level: string) => void } },
-): Promise<{ systemPrompt: string }> {
+  event: BeforeAgentStartEvent,
+  ctx: ExtensionContext,
+): Promise<BeforeAgentStartEventResult> {
   const prompt = event.systemPrompt;
   const blockOpen = "<available_skills>";
   const blockClose = "</available_skills>";
