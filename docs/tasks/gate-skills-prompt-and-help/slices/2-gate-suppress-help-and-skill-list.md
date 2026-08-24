@@ -22,17 +22,12 @@ not, the limitation is documented in the task result and carried into
 
 ## Acceptance criteria
 
-- The mechanism `gate-config-mechanics` confirms for `/help`/skill-list is
-  implemented (e.g. filtering a `resources_discover` result, or whatever
-  the research identifies).
-- An integration test asserts the six names are absent from the surface in
-  the gated case and present in the personal case — **if** a mechanism
-  exists.
-- If no mechanism exists: the task result records "pi 0.80.10 exposes no
-  extension hook to suppress skills from `/help`/skill-list; the gate
-  covers the system prompt only. `/help` will still list the six in a work
-  repo." This note is handed to `gate-config-docs-and-defaults` for the
-  README/docs. A test asserts the limitation note exists.
+- **Confirmed limitation (see `findings.md` V2):** pi 0.80.10 exposes **no** subtractive hook for the loaded skill set. `/help` / skill-list read from `resourceLoader.getSkills().skills` (`interactive-mode.js`), and `resources_discover` is additive-only (`skillPaths` can be added, never removed). So the six **cannot** be hidden from `/help` / skill-list in a work repo.
+- This slice therefore takes the slice doc's "if no mechanism exists" branch:
+  - Write `docs/tasks/gate-skills-prompt-and-help/limitations.md` recording: "pi 0.80.10 exposes no extension hook to suppress skills from `/help`/skill-list; the gate covers the system prompt only. `/help` will still list the six task-workflow skills in a work repo. Explicit `/skill:<name>` is prevented via the `input` event (see slice 3)."
+  - Add a test in `tests/gate-factory.test.ts` asserting the limitations file exists and mentions `/help`.
+  - Hand the limitation text to `gate-config-docs-and-defaults` for the README (recorded in the task result).
+- No suppression code is written (there is no hook to use).
 
 ## Test plan
 

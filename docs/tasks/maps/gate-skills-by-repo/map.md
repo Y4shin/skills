@@ -15,7 +15,7 @@ tasks:
   blocked_by:
   - gate-config-mechanics
   - gate-detection-helper
-  done: false
+  done: true
 - slug: gate-skills-prompt-and-help
   blocked_by:
   - gate-config-mechanics
