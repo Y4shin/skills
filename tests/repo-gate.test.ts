@@ -382,6 +382,38 @@ describe("resolveGate integration", () => {
     });
     rmSync(repo, { recursive: true, force: true });
   });
+
+  test("anwaltde Bitbucket SSH origin is active with its work pattern", () => {
+    const globalSettingsPath = makeGlobalSettings([
+      "^bitbucket\\.org[:/]anwaltde/.*$",
+    ]);
+    const repo = makeRepo("git@bitbucket.org:anwaltde/plai-api.git");
+    const result = resolveGate(repo, { globalSettingsPath });
+    expect(result.active).toBe(true);
+    expect(result.reason).toContain("work repo matched");
+    rmSync(globalSettingsPath.replace(/settings\.json$/, ""), {
+      recursive: true,
+      force: true,
+    });
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  test("anwaltde Bitbucket work repo is re-enabled by project enable:false", () => {
+    const globalSettingsPath = makeGlobalSettings([
+      "^bitbucket\\.org[:/]anwaltde/.*$",
+    ]);
+    const repo = makeRepo("git@bitbucket.org:anwaltde/plai-api.git", {
+      taskWorkflow: { enable: false },
+    });
+    const result = resolveGate(repo, { globalSettingsPath });
+    expect(result.active).toBe(false);
+    expect(result.reason).toContain("re-enabled locally");
+    rmSync(globalSettingsPath.replace(/settings\.json$/, ""), {
+      recursive: true,
+      force: true,
+    });
+    rmSync(repo, { recursive: true, force: true });
+  });
 });
 
 describe("isWorkRepo", () => {
