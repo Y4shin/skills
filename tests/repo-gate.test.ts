@@ -118,11 +118,28 @@ describe("readOriginRemote", () => {
     ).toBeNull();
   });
 
-  test("returns null for gitfile-style .git", () => {
+  test("falls back to git CLI for gitfile-style .git", () => {
     const existsSync = (p: string) => p === "/repo/.git";
     const isDir = () => false;
+    const execSync = (cmd: string, opts?: { cwd?: string }) => {
+      if (cmd === "git remote get-url origin" && opts?.cwd === "/repo") {
+        return "git@github.com:QNCGmbH/openai.git\n";
+      }
+      throw new Error(`unexpected exec: ${cmd}`);
+    };
     expect(
-      readOriginRemote("/repo", { existsSync, isDir }),
+      readOriginRemote("/repo", { existsSync, isDir, execSync }),
+    ).toBe("git@github.com:QNCGmbH/openai.git");
+  });
+
+  test("returns null when git CLI fallback fails", () => {
+    const existsSync = (p: string) => p === "/repo/.git";
+    const isDir = () => false;
+    const execSync = () => {
+      throw new Error("git not found");
+    };
+    expect(
+      readOriginRemote("/repo", { existsSync, isDir, execSync }),
     ).toBeNull();
   });
 });

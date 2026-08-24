@@ -8,6 +8,7 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
+import { execSync } from "node:child_process";
 
 export interface GateResult {
   active: boolean;
@@ -22,6 +23,7 @@ export interface WalkDeps {
 export interface ReadOriginDeps extends WalkDeps {
   isDir?: (p: string) => boolean;
   readFileSync?: (p: string, encoding: "utf-8") => string;
+  execSync?: (command: string, options?: { cwd?: string; encoding?: "utf-8" }) => string;
 }
 
 /** Cache origin URL lookups per repo root for the process lifetime. */
@@ -123,7 +125,8 @@ export function readOriginRemote(
   const hasCustomDeps =
     deps.existsSync !== undefined ||
     deps.isDir !== undefined ||
-    deps.readFileSync !== undefined;
+    deps.readFileSync !== undefined ||
+    deps.execSync !== undefined;
 
   if (!hasCustomDeps) {
     const cached = originCache.get(root);
@@ -140,15 +143,34 @@ export function readOriginRemote(
     const read = deps.readFileSync ?? readFileSync;
     origin = parseOriginFromConfig(join(gitPath, "config"), read);
   } else {
-    // Git worktree: .git is a file pointing elsewhere. Fallback to git CLI
-    // would go here; for slice 1 we leave it as null.
-    origin = null;
+    // Git worktree: .git is a file pointing elsewhere. Fall back to git CLI.
+    const run =
+      deps.execSync ??
+      ((cmd, opts) =>
+        execSync(cmd, opts as Parameters<typeof execSync>[1]) as string);
+    origin = readOriginFromGitCli(root, run);
   }
 
   if (!hasCustomDeps) {
     originCache.set(root, origin);
   }
   return origin;
+}
+
+function readOriginFromGitCli(
+  root: string,
+  execSyncImpl: (command: string, options?: { cwd?: string; encoding?: "utf-8" }) => string,
+): string | null {
+  try {
+    const out = execSyncImpl("git remote get-url origin", {
+      cwd: root,
+      encoding: "utf-8",
+    });
+    const url = out.trim();
+    return url.length > 0 ? url : null;
+  } catch {
+    return null;
+  }
 }
 
 function parseOriginFromConfig(
