@@ -26,10 +26,15 @@
   slices read.
 - **Fail-open:** `resolveGate` already fails open (returns
   `{active:false,...}` on any read/parse error — personal). The factory
-  must **not** add a second try/catch that changes that; it can log
-  `gate.diagnostics` via `ctx.ui.notify(..., "info")` on `session_start` if
-  non-empty, but never throws. If `gate.active` is false, everything
-  registers exactly as today.
+  may add a **defensive outer try/catch** around the `resolveGate(...)` call
+  to catch unexpected throws outside `resolveGate`'s own guarded paths and
+  fall open to `{active:false, reason:"gate detection failed: …",
+  diagnostics:[…]}` — this is recommended (belt-and-suspenders) and does NOT
+  override `resolveGate`'s own fail-open *result*; it only catches what
+  `resolveGate` itself didn't. The factory must never throw at load; it can
+  log `gate.diagnostics` via `ctx.ui.notify(..., "info")` on `session_start`
+  if non-empty. If `gate.active` is false, everything registers exactly as
+  today.
 - **Existing abstractions to use:**
   - `createTools()` (line 315) — the `task_*` tool factory; keep it, wrap
     its registration loop.
