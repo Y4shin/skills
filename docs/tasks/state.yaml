@@ -1,3 +1,3 @@
-task: gate-detection-helper
-slice: null
-task_status: done
+task: gate-tools-and-injection
+slice: gate-skip-injection
+task_status: ready
