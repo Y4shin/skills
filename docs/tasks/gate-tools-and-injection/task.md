@@ -139,3 +139,28 @@ behaviour is explicitly pinned.)
   40 passed, `npm run typecheck` clean, full `npx vitest run` 212 passed;
   the only failure is the pre-existing `tests/integration/session.test.ts`
   harness (`AuthStorage.inMemory undefined`), unrelated to this slice.
+
+### Slice 2 — gate-skip-injection (landed)
+
+- `src/pi.ts` wraps the `pi.on("before_agent_start", …)` registration in
+  `if (!gate.active) { … }`. When the gate is active (work repo), no injection
+  handler is registered and the system prompt receives no guidelines
+  preamble. When personal, the handler registers and behaves identically to
+  pre-gate behaviour.
+- The `session_compact` re-arm handler (`shouldInjectGuidelines = true`) is
+  intentionally left **unguarded** — the arch spec explicitly allows this
+  because, with the injection handler absent in the gated path, the re-arm is
+  a no-op (it only flips a flag the absent handler would read).
+- `tests/gate-factory.test.ts` adds a `before_agent_start guidelines
+  injection` describe block with 4 tests: work repo does not register the
+  handler; personal repo appends the guidelines preamble when a
+  `docs/testing.md` file is discovered; personal repo returns `undefined`
+  when no guideline files are discovered (no empty section appended);
+  personal repo re-arms injection after a `session_compact` event.
+- `docs/tasks/gate-tools-and-injection/arch-spec.md` received a slice-1-era
+  fail-open wording alignment update (committed separately by the TDD worker).
+- Verification: `tests/gate-factory.test.ts` 11 passed (7 from slice 1 + 4
+  from slice 2), `tests/repo-gate.test.ts` 40 passed, `npm run typecheck`
+  clean. Full `npx vitest run` shows only the pre-existing
+  `tests/integration/session.test.ts` harness failures
+  (`AuthStorage.inMemory undefined`); no new regressions.
