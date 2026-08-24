@@ -2,7 +2,7 @@
 kind: map
 slug: gate-skills-by-repo
 title: Gate task-workflow resources by repo (no work-repo config)
-status: active
+status: done
 tasks:
 - slug: gate-config-mechanics
   blocked_by: []
