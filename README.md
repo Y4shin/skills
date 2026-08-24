@@ -44,3 +44,14 @@ npm install
 npm test
 npm run typecheck
 ```
+
+## Repo gating (auto-disable in work repos)
+
+This package is **global**, so it would load in every repo — including work
+repos where it doesn't belong. The gate auto-disables all of the package's
+resources in work repos based on the repo's `git origin`, with **zero
+per-repo config**. See [`docs/repo-gating.md`](docs/repo-gating.md) for the
+full truth table, detection rules, and the one known limitation (the six
+skills still appear on `/help` in a work repo — pi 0.80.10 has no hook to
+suppress them there; explicit `/skill:<name>` is blocked via the `input`
+event instead).

@@ -4,7 +4,7 @@ type: manual
 slug: gate-config-docs-and-defaults
 title: Ship default disableOnRepo patterns, document the gate, and run the manual confirmation matrix
 map: gate-skills-by-repo
-status: ready
+status: done
 blocked_by: []
 ---
 
