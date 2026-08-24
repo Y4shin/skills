@@ -816,7 +816,8 @@ export default function (pi: ExtensionAPI) {
   // ── Guidelines tools ──────────────────────────────────────────────────
 
   // Track discovered guidelines in memory
-  let guidelinesCache = new Map<string, { file: string; content: string; topics: string[] }>();
+  type GuidelineEntry = { file: string; content: string; topics: string[]; source: "docs" | "root" };
+  let guidelinesCache = new Map<string, GuidelineEntry>();
   let shouldInjectGuidelines = true;
 
   const EXT_TO_LANG: Record<string, string> = {
@@ -828,27 +829,130 @@ export default function (pi: ExtensionAPI) {
 
   const SKIP_DIRS = new Set(["node_modules", ".git", ".venv", "dist", "build", "coverage", "__pycache__"]);
 
+  // Single source of truth for the 12 Fowler smells is skills/code-review/smells.md.
+  // This inlined copy is a fallback floor; keep it in sync with that file.
+  const SMELL_BASELINE = `# Smell baseline
+
+Twelve Fowler code smells from _Refactoring_, chapter 3. The Standards axis of \`/code-review\` carries this list as a floor when the repo documents no overriding standard. Each smell is a labelled heuristic — "possible Feature Envy" — never a hard violation.
+
+## Mysterious Name
+
+**What it is:** a function, variable, type, or module whose name does not reveal what it does or holds.
+
+**How to fix:** rename it so the intent is honest and obvious. If no honest name comes to mind, the underlying design is probably still murky — clarify the responsibility first.
+
+## Duplicated Code
+
+**What it is:** the same logical shape appears in more than one hunk or file in the change.
+
+**How to fix:** extract the shared shape into a single place and call it from both sites.
+
+## Feature Envy
+
+**What it is:** a function or method reaches into another object's data more than it uses its own.
+
+**How to fix:** move the behaviour onto the object whose data it envies.
+
+## Data Clumps
+
+**What it is:** the same few fields or parameters keep travelling together, as if they want to become one type.
+
+**How to fix:** bundle them into a single small type and pass that around instead of the loose fields.
+
+## Primitive Obsession
+
+**What it is:** a primitive or string is used to represent a domain concept that deserves its own type.
+
+**How to fix:** give the concept its own small value type or enum so the domain meaning is explicit.
+
+## Repeated Switches
+
+**What it is:** the same \`switch\` or \`if\`-cascade on the same type recurs across the change.
+
+**How to fix:** replace the repeated dispatch with polymorphism, or with one shared map/table both sites use.
+
+## Shotgun Surgery
+
+**What it is:** one logical change forces scattered edits across many files in the diff.
+
+**How to fix:** gather the pieces that change together into one module so the next change has a single home.
+
+## Divergent Change
+
+**What it is:** one file or module is edited for several unrelated reasons.
+
+**How to fix:** split responsibilities so each module changes for only one reason.
+
+## Speculative Generality
+
+**What it is:** abstractions, parameters, or hooks are added for needs the spec does not have.
+
+**How to fix:** delete the unused generality and inline back to the concrete case. Reintroduce abstraction only when a real need appears.
+
+## Message Chains
+
+**What it is:** a caller walks a long chain such as \`a.b().c().d()\`, coupling itself to the intermediate structure.
+
+**How to fix:** hide the walk behind a single method on the object the caller already knows.
+
+## Middle Man
+
+**What it is:** a class or function that mostly just delegates onward without adding value.
+
+**How to fix:** remove the middleman and call the real target directly.
+
+## Refused Bequest
+
+**What it is:** a subclass or implementer ignores or overrides most of what it inherits.
+
+**How to fix:** drop the inheritance and use composition instead.`;
+
   function discoverGuidelines(cwd: string) {
+    const cache = new Map<string, GuidelineEntry>();
     const docsDir = join(cwd, "docs");
-    const cache = new Map<string, { file: string; content: string; topics: string[] }>();
-    if (!existsSync(docsDir)) return cache;
+
+    if (existsSync(docsDir)) {
+      try {
+        for (const entry of readdirSync(docsDir)) {
+          const full = join(docsDir, entry);
+          try {
+            if (!statSync(full).isFile()) continue;
+            const lower = entry.toLowerCase();
+            const topics: string[] = [];
+            if (lower === "testing.md") topics.push("testing");
+            else if (lower.endsWith("-guidelines.md")) topics.push(lower.replace("-guidelines.md", ""));
+            else if (lower.endsWith("-conventions.md")) topics.push(lower.replace("-conventions.md", ""));
+            else if (lower.endsWith("-practices.md")) topics.push(lower.replace("-practices.md", ""));
+            else continue;
+            cache.set(entry, { file: entry, content: readFileSync(full, "utf-8"), topics, source: "docs" });
+          } catch { /* skip */ }
+        }
+      } catch { /* skip */ }
+    }
+
+    // Repo-root standards files + docs/standards.md. These are intentionally
+    // separate from the language/topic docs discovery above.
+    for (const file of ["AGENTS.md", "CLAUDE.md", "CONTEXT.md"]) {
+      const full = join(cwd, file);
+      try {
+        if (existsSync(full) && statSync(full).isFile()) {
+          cache.set(file, { file, content: readFileSync(full, "utf-8"), topics: ["standards"], source: "root" });
+        }
+      } catch { /* skip */ }
+    }
+
+    const docsStandards = join(docsDir, "standards.md");
     try {
-      for (const entry of readdirSync(docsDir)) {
-        const full = join(docsDir, entry);
-        try {
-          if (!statSync(full).isFile()) continue;
-          const lower = entry.toLowerCase();
-          const topics: string[] = [];
-          if (lower === "testing.md") topics.push("testing");
-          else if (lower.endsWith("-guidelines.md")) topics.push(lower.replace("-guidelines.md", ""));
-          else if (lower.endsWith("-conventions.md")) topics.push(lower.replace("-conventions.md", ""));
-          else if (lower.endsWith("-practices.md")) topics.push(lower.replace("-practices.md", ""));
-          else continue;
-          cache.set(entry, { file: entry, content: readFileSync(full, "utf-8"), topics });
-        } catch { /* skip */ }
+      if (existsSync(docsStandards) && statSync(docsStandards).isFile()) {
+        cache.set("docs/standards.md", { file: "standards.md", content: readFileSync(docsStandards, "utf-8"), topics: ["standards"], source: "docs" });
       }
     } catch { /* skip */ }
+
     return cache;
+  }
+
+  function guidelineDisplayPath(g: { file: string; source: "docs" | "root" }): string {
+    return g.source === "docs" ? `docs/${g.file}` : g.file;
   }
 
   pi.on("session_start", async (_event, ctx) => {
@@ -885,7 +989,7 @@ export default function (pi: ExtensionAPI) {
       const lines = ["## Project coding guidelines", ""];
       lines.push("Available documentation:");
       for (const [, g] of guidelinesCache) {
-        lines.push(`- \`docs/${g.file}\` — topics: ${g.topics.join(", ")}`);
+        lines.push(`- \`${guidelineDisplayPath(g)}\` — topics: ${g.topics.join(", ")}`);
       }
       lines.push("", "Use `get_guidelines(language, topic?)` to fetch detailed guidelines.");
       lines.push("Use `list_guidelines()` to see all available sources.");
@@ -910,7 +1014,7 @@ export default function (pi: ExtensionAPI) {
         topic: Type.Optional(Type.String({ description: "Topic filter (e.g. mocking)" })),
       }),
       async execute(_id: string, params: any) {
-        const results: { file: string; content: string; topics: string[] }[] = [];
+        const results: { file: string; content: string; topics: string[]; source: "docs" | "root" }[] = [];
         for (const [, g] of guidelinesCache) {
           if (params.language) {
             const lang = params.language.toLowerCase();
@@ -923,7 +1027,13 @@ export default function (pi: ExtensionAPI) {
           results.push(g);
         }
         if (results.length === 0) {
-          return { content: [{ type: "text", text: "No matching guidelines found." }], details: {} };
+          return {
+            content: [{
+              type: "text",
+              text: `# Smell baseline (floor — no repo standards found for this request)\n\n${SMELL_BASELINE}`,
+            }],
+            details: {},
+          };
         }
         return { content: [{ type: "text", text: results.map((r) => `### ${r.file}\n${r.content}`).join("\n\n---\n\n") }], details: {} };
       },
@@ -938,11 +1048,15 @@ export default function (pi: ExtensionAPI) {
       parameters: Type.Object({}),
       async execute() {
         if (guidelinesCache.size === 0) {
-          return { content: [{ type: "text", text: "No guideline files found in docs/. Create docs/<lang>-guidelines.md files." }], details: {} };
+          const text = [
+            "Available coding guideline sources:",
+            "  - Smell baseline (Fowler 12) — served as the floor when no repo standards match",
+          ].join("\n");
+          return { content: [{ type: "text", text }], details: {} };
         }
         const lines = ["Available coding guideline sources:"];
         for (const [, g] of guidelinesCache) {
-          lines.push(`  - docs/${g.file} (topics: ${g.topics.join(", ")})`);
+          lines.push(`  - ${guidelineDisplayPath(g)} (topics: ${g.topics.join(", ")})`);
         }
         return { content: [{ type: "text", text: lines.join("\n") }], details: {} };
       },
