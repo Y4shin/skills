@@ -75,3 +75,19 @@ None downstream — this is the map's terminal task. When it's done, the map
 is finalizable (all children done). It is blocked on the two feature tasks
 being complete so the docs describe the *actual* shipped behaviour (including
 limitations), not a hoped-for one.
+
+## Implementation notes
+
+- The default `disableOnRepo` patterns were shipped to the NixOS-managed
+  global settings at `~/nixos/modules/home-manager/applications/pi/settings.nix`
+  (`programs.pi-coding-agent.settings.taskWorkflow.disableOnRepo`), not to
+  `~/.pi/agent/settings.json` directly (that file is NixOS-generated). The
+  regex patterns survive Nix string escaping: `^github\.com[:/]QNCGmbH/.*$`,
+  `^bitbucket\.org[:/]anwaltde/.*$`. The user must regenerate the NixOS
+  config to make them live.
+- The gate is documented in `docs/repo-gating.md` (truth table, detection
+  rules, config, the `/help` limitation) and the README's "Repo gating"
+  section.
+- Step 3 (the confirmation matrix) is a template at
+  `docs/tasks/gate-config-docs-and-defaults/confirmation-matrix.md` for the
+  user to fill after regenerating NixOS.

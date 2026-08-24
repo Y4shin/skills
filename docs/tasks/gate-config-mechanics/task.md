@@ -118,3 +118,33 @@ task) recording:
 
 If Q-A returns "stripped", return to Wayfinder: the config home decision (D2)
 must be revised before the feature tasks can be written.
+
+## Implementation notes
+
+### Durable pi-internals facts (verified against pi 0.80.10 source)
+
+These facts grounded all downstream feature tasks and are worth preserving:
+
+- **pi's `Settings` schema keeps unknown top-level keys.** The parse is
+  `JSON.parse` + `migrateSettings` (which only touches known legacy keys),
+  and `getGlobalSettings()`/`getProjectSettings()` return
+  `structuredClone` of the full object. A top-level `taskWorkflow` key
+  survives in `~/.pi/agent/settings.json` and `<cwd>/.pi/settings.json`.
+  (`settings-manager.js:182-185`, `:188-251`, `:253-259`.)
+- **Extensions get NO `SettingsManager`.** Neither the factory's
+  `ExtensionAPI` nor the event handlers' `ExtensionContext` expose one.
+  An extension that needs config must read the files itself with `node:fs`.
+  (`extensions/types.d.ts:839`, `:208-235`; `extensions/loader.js:181`.)
+- **`before_agent_start` can rewrite the full system prompt.** Its event has
+  `systemPrompt` and its result can return `{ systemPrompt }`. Safe for
+  prompt-stripping handlers. (`extensions/types.d.ts:514-520`, `:787`.)
+- **Project settings deep-merge over global.** `CONFIG_DIR_NAME = ".pi"`;
+  project path is `<cwd>/.pi/settings.json`; `deepMergeSettings(global,
+  project)` → project wins (primitives/arrays outright, nested objects
+  per-key). (`config.js:394`; `settings-manager.js:9-30`, `:144`.)
+- **The `input` event can block input.** It fires before
+  `_expandSkillCommand`; `InputEventResult` has `{action:"continue"}`,
+  `{action:"transform", text}`, `{action:"handled"}` (drop). This is how
+  explicit `/skill:<name>` is blocked in a work repo. (`agent-session.js:817-830`; `extensions/types.d.ts:629-636`.)
+
+Full findings with citations: `docs/tasks/gate-config-mechanics/findings.md`.
