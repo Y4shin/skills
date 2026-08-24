@@ -39,6 +39,8 @@ vi.mock("../src/core/repo-gate.js", async (importOriginal) => {
 
 // ─── Test helpers ────────────────────────────────────────────────────────────
 
+const trackedRepos: string[] = [];
+
 const GATED_NAMES = [
   "task_show",
   "task_get",
@@ -102,6 +104,7 @@ function makeRepo(originUrl: string): string {
     join(dir, ".git", "config"),
     `[remote "origin"]\n\turl = ${originUrl}\n`,
   );
+  trackedRepos.push(dir);
   return dir;
 }
 
@@ -128,6 +131,7 @@ describe("factory gate", () => {
   beforeEach(() => {
     previousCwd = process.cwd();
     previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+    trackedRepos.length = 0;
     mockControl.mode = "passthrough";
   });
 
@@ -142,6 +146,10 @@ describe("factory gate", () => {
       globalSettings.cleanup();
       globalSettings = undefined;
     }
+    for (const repo of trackedRepos) {
+      rmSync(repo, { recursive: true, force: true });
+    }
+    trackedRepos.length = 0;
     mockControl.mode = "passthrough";
   });
 
@@ -241,5 +249,26 @@ describe("factory gate", () => {
     await sessionStartHandlers[0]({ type: "session_start", reason: "startup" }, { cwd: process.cwd(), ui: stub.ui });
 
     expect(stub.notifications.some((n) => n.message.includes("gate detection failed"))).toBe(true);
+  });
+
+  test("factory re-detects gate when cwd changes between invocations", () => {
+    globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
+    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
+    const workRepo = makeRepo("git@github.com:QNCGmbH/openai.git");
+    const personalRepo = makeRepo("https://github.com/Y4shin/skills.git");
+
+    const workStub = createStub();
+    process.chdir(workRepo);
+    factory(workStub);
+    expect(workStub.tools.map((t) => t.name)).toHaveLength(0);
+
+    const personalStub = createStub();
+    process.chdir(personalRepo);
+    factory(personalStub);
+    const names = personalStub.tools.map((t) => t.name);
+    expect(names).toHaveLength(GATED_NAMES.length);
+    for (const name of GATED_NAMES) {
+      expect(names).toContain(name);
+    }
   });
 });
