@@ -4,7 +4,7 @@ type: feature
 slug: gate-tools-and-injection
 title: Gate task_* + notify_user + guidelines tools + before_agent_start injection behind isWorkRepo
 map: gate-skills-by-repo
-status: ready
+status: done
 slices:
   - gate-skip-tool-registration
   - gate-skip-injection
