@@ -20,12 +20,12 @@ tasks:
   blocked_by:
   - gate-config-mechanics
   - gate-detection-helper
-  done: false
+  done: true
 - slug: gate-config-docs-and-defaults
   blocked_by:
   - gate-tools-and-injection
   - gate-skills-prompt-and-help
-  done: false
+  done: true
 ---
 
 ## Destination
