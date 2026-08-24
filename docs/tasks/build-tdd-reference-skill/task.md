@@ -146,3 +146,31 @@ Full suite: 231 passed, 16 failed — all pre-existing `session.test.ts`
 unrelated to this slice. No new regressions. All slices of this task are now
 landed; the task is ready for finalize-task (Step 3 coherence refactor was
 already part of slice 2's scope; the parent will run the final suite gate).
+
+## Architecture lessons (knowledge harvest)
+
+- **Reference skill vs. pipeline agent split.** The `/tdd` skill owns test
+  *quality* (what a good test is, seams, anti-patterns, loop rules); the
+  `tdd-worker` agent owns the loop *mechanics* (RED→GREEN, checkpoint commits,
+  uncertainty hatch, divergence reporting). The skill is the single source of
+  truth; the agent prompt references it, never duplicates it.
+- **Seam agreement by task type.** Features agree seams in the arch spec
+  (implement-task Step 1, already user-approved). Bugs use the repro as the
+  implicit seam (the broken observable behavior is at a public interface by
+  definition). No new seam artifact on the lean bug path.
+- **Refactor home.** The tdd-worker loop is RED→GREEN only. Refactoring belongs
+  to implement-task's Step 3 coherence pass (parent-owned, after all slices
+  land) — not the per-slice worker, and not a not-yet-existent `/code-review`
+  skill. When `code-review-evaluation` lands, the refactor home may move.
+- **Skill delivery via the `skill:` subagent param.** A fresh-context worker
+  receives a reference skill through `skill: "tdd"` on the `subagent({...})`
+  call (pi-subagents SKILL.md lines 75–76), not by baking the reference into
+  the agent YAML. Coupling lives at the dispatch site (implement-task
+  resources), keeping the agent file lean.
+- **Verifier stays pass/fail.** Test-quality judgment in review is owned by
+  the `code-review-evaluation` sibling task; the slice-verifier does not
+  consult `/tdd` today. The skill's description must not claim it does.
+- **Companion reference docs are now a precedent.** `/tdd` is the first skill in
+  this repo to ship companion files (`tests.md`, `mocking.md`) alongside
+  `SKILL.md`. The map's human-facing-docs fog (auto-generation) is unaffected —
+  these are hand-written reference files, not generated.
