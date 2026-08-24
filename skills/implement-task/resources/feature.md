@@ -212,11 +212,30 @@ Set task_set status done on slice.`
     // If the user wants to act on them now, let them; otherwise continue.
 ```
 
+## Whole-task code review (advisory)
+
+After all slices have landed, run a two-axis code review over the whole-task diff before the coherence refactor. The review is advisory — it does not gate landing (the slices already landed) and does not gate finalize.
+
+```js
+reviewId = subagent({
+  async: true,
+  agent: "code-reviewer",
+  skill: "code-review",
+  as: "review",
+  output: "review/result.md",
+  task: `Review the whole-task diff for task ${taskSlug}. Fixed point: main. Spec source: task doc + arch spec. Report Standards + Spec findings side by side.`
+})
+
+wait({ id: reviewId })
+```
+
+Read `review/result.md` and surface the findings to the user. Step 3 (coherence refactor) uses these findings to drive refactoring priorities.
+
 ## Step 3 — Coherence refactor
 
 This stage owns refactoring; the tdd-worker loop is RED→GREEN only. Refactor here, not in the per-slice worker.
 
-After all slices landed, review the combined diff and all deviation reports.
+After all slices landed and the advisory code review findings have been surfaced, review the combined diff and all deviation reports.
 
 Read:
 - `docs/tasks/${taskSlug}/deviation-reports/*.md`
