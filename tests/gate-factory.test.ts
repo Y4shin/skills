@@ -6,7 +6,7 @@
  * when the repo gate is active (work repo) and present when inactive (personal).
  */
 
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -429,6 +429,18 @@ describe("factory gate", () => {
       const third = await beforeAgentStartHandlers[0]({ systemPrompt: "BASE" }, { cwd: repo });
       expect(third).toBeDefined();
       expect(third.systemPrompt).toContain("## Project coding guidelines");
+    });
+  });
+
+  describe("help and skill-list limitation", () => {
+    test("limitations.md exists and documents the /help and skill-list gap", () => {
+      const limitationsPath = join(process.cwd(), "docs/tasks/gate-skills-prompt-and-help/limitations.md");
+
+      expect(existsSync(limitationsPath)).toBe(true);
+
+      const content = readFileSync(limitationsPath, "utf-8");
+      expect(content).toContain("/help");
+      expect(content).toContain("skill-list");
     });
   });
 
