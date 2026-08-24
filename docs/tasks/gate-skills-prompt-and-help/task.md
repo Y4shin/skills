@@ -170,3 +170,24 @@ suite: 221 passed, 16 failed — all in the pre-existing
 `tests/integration/session.test.ts` (`AuthStorage.inMemory` harness
 error), which is untouched by this branch (empty diff vs. merge base).
 No new failures.
+
+### Slice 2 — gate-suppress-help-and-skill-list (landed)
+
+Took the slice doc's documented "no mechanism exists" branch. pi 0.80.10
+exposes no subtractive hook for the loaded skill set (`/help`/skill-list
+read from `resourceLoader.getSkills().skills`, `resources_discover` is
+additive-only), so the six task-workflow skills **cannot** be hidden from
+`/help`/skill-list in a work repo. No suppression code was written.
+
+Wrote `docs/tasks/gate-skills-prompt-and-help/limitations.md` (5 lines)
+recording the gap: the gate covers the system prompt only; `/help` will
+still list the six in a work repo; explicit `/skill:<name>` is prevented
+via the `input` event (slice 3). Added a guard test in
+`tests/gate-factory.test.ts` (`help and skill-list limitation` describe
+block) asserting the file exists and mentions `/help` and `skill-list`.
+
+Verification: slice tests (`gate-factory.test.ts` 17/17) passed;
+`npm run typecheck` clean. Full suite: the only failing file is the
+pre-existing `tests/integration/session.test.ts` (16 failures,
+`AuthStorage.inMemory` harness error), untouched by this branch. No
+new failures.
