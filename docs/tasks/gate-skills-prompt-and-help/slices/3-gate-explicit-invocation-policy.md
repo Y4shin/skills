@@ -22,31 +22,24 @@ possible. In a personal repo, explicit invocation is unchanged.
 
 ## Acceptance criteria
 
-- The policy implemented matches the `gate-config-mechanics` verdict:
-  - If a hook exists to prevent the expansion (e.g. an `input` event
-    handler returning a result that blocks the command, or a
-    `tool_call`/`message` refusal): `/skill:implement-task` in a work repo
-    does not load the skill and prints a short "gated here" message.
-  - If only a warning is possible: the skill loads, but a one-line notice
-    ("task-workflow is gated in this work repo; loading on explicit
-    request") is emitted first.
-- Integration test asserts the chosen behaviour for a work repo and the
-  unchanged behaviour for a personal repo.
-- The notice/notice text is a single line, no stack trace, no noise.
+- **Confirmed enforceable (see `findings.md` V3):** the `input` event fires before `_expandSkillCommand` (`agent-session.js:817-830`), and `InputEventResult` supports `{action:"handled"}` (drop) and `{action:"transform", text}` (rewrite) (`types.d.ts:629-636`).
+- The factory registers an `input` handler **only when gated**:
+  `if (gate.active) pi.on("input", gateSkillInvocation)`.
+- The handler: if `event.text` starts with `/skill:`, parse the skill name; if the name is one of the gated six (sourced from `package.json` `pi.skills`, same list as slice 1), call `ctx.ui.notify(\`task-workflow is gated in this work repo; not loading ${name}\`, "warning\`)` and return `{ action: "handled" }` → **prevents** the expansion. Otherwise return `{ action: "continue" }`.
+- Non-gated `/skill:other-skill` input passes through unchanged (the policy is name-scoped to the six).
+- Personal path: the `input` handler is not registered; `/skill:implement-task` expands normally.
+- Integration test (stub `ExtensionAPI` + invoking the recorded `input` handler with `{text:"/skill:implement-task", source:"interactive"}`):
+  - gated + gated name → returns `{action:"handled"}` and a notify was recorded.
+  - gated + non-gated skill name → returns `{action:"continue"}`.
+  - gated + non-`/skill:` input → returns `{action:"continue"}`.
+  - personal → handler not registered.
 
 ## Test plan
 
-- **Seams:** the hook the research identified, with the gate decision
-  injected. A stub command-expansion path or a recorded `input`/`tool_call`
-  event.
-- **Failure modes:** the hook doesn't fire for `/skill:` (only for other
-  commands) — assert the actual behaviour and, if it can't be prevented,
-  ensure the warning path is taken.
-- **Scenarios:** `/skill:implement-task` in work repo (blocked or warned),
-  `/skill:implement-task` in personal repo (loads normally),
-  `/skill:nonexistent` (unchanged — the gate only touches the six).
-- **Edge cases:** a `/skill:` invocation of a non-task-workflow skill in a
-  work repo must be unaffected (the policy is name-scoped to the six).
+- **Seams:** the stub `ExtensionAPI`'s `on("input", h)` records `h`; invoke it with `{text, source:"interactive"}` and a stub `ctx` whose `ui.notify` records. Assert the returned `InputEventResult` and the notify record.
+- **Failure modes:** `/skill:` with no name (pass through), `/skill:` with a name then args (parse name before the first space — match `_expandSkillCommand`'s `slice(7, spaceIndex)`), manifest read failure (pinned fallback list).
+- **Scenarios:** the six gated names each blocked; a non-task-workflow skill (`/skill:oracle`) passes; `/help` passes (not a `/skill:`).
+- **Edge cases:** `/skill:implement-task some args` (name is `implement-task`, args after the space — block on the name), case sensitivity (pi skill names are lowercase; match exact).
 
 ## Constraints and dependencies
 

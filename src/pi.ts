@@ -14,7 +14,8 @@
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve as resolvePath } from "node:path";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { fileURLToPath } from "node:url";
+import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import YAML from "yaml";
 
@@ -23,6 +24,120 @@ import { fromFrontmatter, sliceInfoFrom, dependencyLevels, type Artifact, type A
 import { toObject, fromObject, type WorkflowState } from "./core/state.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
+
+// ─── Gated skill names (shared by strip + invocation gate) ─────────────────────
+
+const FALLBACK_GATED_SKILL_NAMES = [
+  "task-overview",
+  "onboard-workflow",
+  "wayfinder",
+  "implement-task",
+  "finalize-task",
+  "report-bug",
+];
+
+function loadGatedSkillNames(): { names: string[]; diagnostics: string[] } {
+  const diagnostics: string[] = [];
+  try {
+    const pkgPath = resolvePath(
+      dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "package.json",
+    );
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as Record<string, unknown>;
+    const piSection = pkg.pi as Record<string, unknown> | undefined;
+    const skills = piSection?.skills;
+    if (Array.isArray(skills) && skills.every((s) => typeof s === "string")) {
+      return { names: (skills as string[]).map((s) => basename(s)), diagnostics };
+    }
+    diagnostics.push(
+      "skill-strip: package.json pi.skills is missing or not an array of strings; using fallback list",
+    );
+  } catch (e) {
+    diagnostics.push(
+      `skill-strip: failed to read package.json pi.skills: ${(e as Error).message}; using fallback list`,
+    );
+  }
+  return { names: FALLBACK_GATED_SKILL_NAMES, diagnostics };
+}
+
+const { names: GATED_SKILL_NAMES, diagnostics: SKILL_NAME_DIAGNOSTICS } = loadGatedSkillNames();
+
+/**
+ * Strip the gated workflow skills from the system prompt's `<available_skills>`
+ * block when running in a work repo. If the block becomes empty, drop the whole
+ * block including its preamble. If the prompt lacks an `<available_skills>`
+ * block, log a diagnostic and return the prompt unchanged.
+ */
+async function stripSkills(
+  event: BeforeAgentStartEvent,
+  ctx: ExtensionContext,
+): Promise<BeforeAgentStartEventResult> {
+  const prompt = event.systemPrompt;
+  const blockOpen = "<available_skills>";
+  const blockClose = "</available_skills>";
+  const blockStart = prompt.indexOf(blockOpen);
+  if (blockStart === -1) {
+    ctx.ui.notify(
+      "skill-strip: expected an <available_skills> block, found none; format may have changed",
+      "warning",
+    );
+    return { systemPrompt: prompt };
+  }
+  const blockEnd = prompt.indexOf(blockClose, blockStart);
+  if (blockEnd === -1) {
+    ctx.ui.notify(
+      "skill-strip: expected a closing </available_skills> tag; format may have changed",
+      "warning",
+    );
+    return { systemPrompt: prompt };
+  }
+  const blockEndAfter = blockEnd + blockClose.length;
+  const beforeBlock = prompt.slice(0, blockStart);
+  const inner = prompt.slice(blockStart + blockOpen.length, blockEnd);
+  const afterBlock = prompt.slice(blockEndAfter);
+
+  const gatedSet = new Set(GATED_SKILL_NAMES);
+  let remainingSkillCount = 0;
+  const strippedInner = inner.replace(/<skill>([\s\S]*?)<\/skill>/g, (match, content) => {
+    const nameMatch = content.match(/<name>([\s\S]*?)<\/name>/);
+    const name = nameMatch ? nameMatch[1].trim() : "";
+    if (gatedSet.has(name)) {
+      return "";
+    }
+    remainingSkillCount++;
+    return match;
+  });
+
+  if (remainingSkillCount === 0) {
+    // Drop the whole block plus its preamble.
+    const lines = beforeBlock.split("\n");
+    let preambleLineIndex = -1;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].includes("The following skills")) {
+        preambleLineIndex = i;
+        break;
+      }
+    }
+    if (preambleLineIndex === -1) {
+      return { systemPrompt: beforeBlock + afterBlock };
+    }
+    const preambleLineStart =
+      preambleLineIndex === 0
+        ? 0
+        : lines.slice(0, preambleLineIndex).join("\n").length + 1;
+    let blankRunLength = 0;
+    for (let i = preambleLineStart - 1; i >= 0 && prompt[i] === "\n"; i--) {
+      blankRunLength++;
+    }
+    const sectionStart = preambleLineStart - blankRunLength;
+    return { systemPrompt: prompt.slice(0, sectionStart) + afterBlock };
+  }
+
+  return {
+    systemPrompt: beforeBlock + blockOpen + strippedInner + blockClose + afterBlock,
+  };
+}
 
 // ─── File system helpers ──────────────────────────────────────────────────────
 
@@ -713,6 +828,9 @@ export default function (pi: ExtensionAPI) {
     for (const diagnostic of gate.diagnostics) {
       ctx.ui.notify(`task-workflow gate: ${diagnostic}`, "info");
     }
+    for (const diagnostic of SKILL_NAME_DIAGNOSTICS) {
+      ctx.ui.notify(`task-workflow: ${diagnostic}`, "warning");
+    }
     if (gate.active) {
       ctx.ui.notify(`task-workflow gate active: ${gate.reason}`, "info");
       return;
@@ -746,6 +864,10 @@ export default function (pi: ExtensionAPI) {
 
       return { systemPrompt: event.systemPrompt + "\n\n" + lines.join("\n") };
     });
+  }
+
+  if (gate.active) {
+    pi.on("before_agent_start", stripSkills);
   }
 
   if (!gate.active) {
