@@ -11,7 +11,12 @@ import {
   readOriginRemote,
   isWorkRepo,
   walkToGitRoot,
+  readGateConfig,
+  resolveGate,
 } from "../src/core/repo-gate.js";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 describe("normalizeRemote", () => {
   test("normalizes SSH github URL", () => {
@@ -141,6 +146,240 @@ describe("readOriginRemote", () => {
     expect(
       readOriginRemote("/repo", { existsSync, isDir, execSync }),
     ).toBeNull();
+  });
+});
+
+describe("readGateConfig", () => {
+  function notFound() {
+    const err = new Error("ENOENT") as NodeJS.ErrnoException;
+    err.code = "ENOENT";
+    throw err;
+  }
+
+  test("missing settings files returns defaults with no diagnostics", () => {
+    const readFileSync = () => notFound();
+    const result = readGateConfig("/repo", {
+      readFileSync,
+      globalSettingsPath: "/global/settings.json",
+      projectSettingsPath: "/project/.pi/settings.json",
+    });
+    expect(result.disableOnRepo).toEqual([]);
+    expect(result.enable).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  test("reads global disableOnRepo and enable", () => {
+    const files: Record<string, string> = {
+      "/global/settings.json": JSON.stringify({
+        taskWorkflow: {
+          disableOnRepo: ["^github\\.com/QNCGmbH/.*$"],
+          enable: false,
+        },
+      }),
+    };
+    const readFileSync = (p: string) => {
+      if (files[p]) return files[p];
+      notFound();
+    };
+    const result = readGateConfig("/repo", {
+      readFileSync,
+      globalSettingsPath: "/global/settings.json",
+      projectSettingsPath: "/project/.pi/settings.json",
+    });
+    expect(result.disableOnRepo).toEqual(["^github\\.com/QNCGmbH/.*$"]);
+    expect(result.enable).toBe(false);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  test("project overrides global per key", () => {
+    const files: Record<string, string> = {
+      "/global/settings.json": JSON.stringify({
+        taskWorkflow: {
+          disableOnRepo: ["^github\\.com/QNCGmbH/.*$"],
+          enable: true,
+        },
+      }),
+      "/project/.pi/settings.json": JSON.stringify({
+        taskWorkflow: { enable: false },
+      }),
+    };
+    const readFileSync = (p: string) => {
+      if (files[p]) return files[p];
+      notFound();
+    };
+    const result = readGateConfig("/repo", {
+      readFileSync,
+      globalSettingsPath: "/global/settings.json",
+      projectSettingsPath: "/project/.pi/settings.json",
+    });
+    expect(result.disableOnRepo).toEqual(["^github\\.com/QNCGmbH/.*$"]);
+    expect(result.enable).toBe(false);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  test("coerces non-array disableOnRepo to [] with diagnostic", () => {
+    const files: Record<string, string> = {
+      "/global/settings.json": JSON.stringify({
+        taskWorkflow: { disableOnRepo: "oops" },
+      }),
+    };
+    const readFileSync = (p: string) => {
+      if (files[p]) return files[p];
+      notFound();
+    };
+    const result = readGateConfig("/repo", {
+      readFileSync,
+      globalSettingsPath: "/global/settings.json",
+      projectSettingsPath: "/project/.pi/settings.json",
+    });
+    expect(result.disableOnRepo).toEqual([]);
+    expect(result.enable).toBe(true);
+    expect(result.diagnostics.length).toBe(1);
+    expect(result.diagnostics[0]).toContain("not an array");
+  });
+
+  test("defaults non-boolean enable to true with diagnostic", () => {
+    const files: Record<string, string> = {
+      "/global/settings.json": JSON.stringify({
+        taskWorkflow: { enable: "no" },
+      }),
+    };
+    const readFileSync = (p: string) => {
+      if (files[p]) return files[p];
+      notFound();
+    };
+    const result = readGateConfig("/repo", {
+      readFileSync,
+      globalSettingsPath: "/global/settings.json",
+      projectSettingsPath: "/project/.pi/settings.json",
+    });
+    expect(result.enable).toBe(true);
+    expect(result.diagnostics.length).toBe(1);
+    expect(result.diagnostics[0]).toContain("not a boolean");
+  });
+
+  test("skips invalid regex entries and keeps the rest", () => {
+    const files: Record<string, string> = {
+      "/global/settings.json": JSON.stringify({
+        taskWorkflow: { disableOnRepo: ["[", "^github\\.com/QNCGmbH/.*$"] },
+      }),
+    };
+    const readFileSync = (p: string) => {
+      if (files[p]) return files[p];
+      notFound();
+    };
+    const result = readGateConfig("/repo", {
+      readFileSync,
+      globalSettingsPath: "/global/settings.json",
+      projectSettingsPath: "/project/.pi/settings.json",
+    });
+    expect(result.disableOnRepo).toEqual(["^github\\.com/QNCGmbH/.*$"]);
+    expect(result.diagnostics.length).toBe(1);
+    expect(result.diagnostics[0]).toContain("invalid regex");
+  });
+
+  test("reports malformed JSON as a diagnostic", () => {
+    const files: Record<string, string> = {
+      "/global/settings.json": "not json",
+    };
+    const readFileSync = (p: string) => {
+      if (files[p]) return files[p];
+      notFound();
+    };
+    const result = readGateConfig("/repo", {
+      readFileSync,
+      globalSettingsPath: "/global/settings.json",
+      projectSettingsPath: "/project/.pi/settings.json",
+    });
+    expect(result.disableOnRepo).toEqual([]);
+    expect(result.enable).toBe(true);
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+    expect(result.diagnostics[0]).toContain("failed to read settings");
+  });
+});
+
+describe("resolveGate integration", () => {
+  function makeRepo(
+    originUrl: string,
+    projectSettings?: Record<string, unknown>,
+  ): string {
+    const dir = mkdtempSync(join(tmpdir(), "repo-gate-repo-"));
+    mkdirSync(join(dir, ".git"), { recursive: true });
+    writeFileSync(
+      join(dir, ".git", "config"),
+      `[remote "origin"]\n\turl = ${originUrl}\n`,
+    );
+    if (projectSettings) {
+      mkdirSync(join(dir, ".pi"), { recursive: true });
+      writeFileSync(
+        join(dir, ".pi", "settings.json"),
+        JSON.stringify(projectSettings),
+      );
+    }
+    return dir;
+  }
+
+  function makeGlobalSettings(
+    disableOnRepo: string[],
+    enable?: boolean,
+  ): string {
+    const dir = mkdtempSync(join(tmpdir(), "repo-gate-global-"));
+    const path = join(dir, "settings.json");
+    const settings: Record<string, unknown> = {
+      taskWorkflow: { disableOnRepo },
+    };
+    if (enable !== undefined) {
+      (settings.taskWorkflow as Record<string, unknown>).enable = enable;
+    }
+    writeFileSync(path, JSON.stringify(settings));
+    return path;
+  }
+
+  test("QNCGmbH SSH origin is active with global work pattern", () => {
+    const globalSettingsPath = makeGlobalSettings([
+      "^github\\.com[:/]QNCGmbH/.*$",
+    ]);
+    const repo = makeRepo("git@github.com:QNCGmbH/openai.git");
+    const result = resolveGate(repo, { globalSettingsPath });
+    expect(result.active).toBe(true);
+    expect(result.reason).toContain("work repo matched");
+    rmSync(globalSettingsPath.replace(/settings\.json$/, ""), {
+      recursive: true,
+      force: true,
+    });
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  test("personal HTTPS origin is not active with the same work pattern", () => {
+    const globalSettingsPath = makeGlobalSettings([
+      "^github\\.com[:/]QNCGmbH/.*$",
+    ]);
+    const repo = makeRepo("https://github.com/Y4shin/skills.git");
+    const result = resolveGate(repo, { globalSettingsPath });
+    expect(result.active).toBe(false);
+    expect(result.reason).toContain("personal");
+    rmSync(globalSettingsPath.replace(/settings\.json$/, ""), {
+      recursive: true,
+      force: true,
+    });
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  test("project enable:false re-enables a work repo", () => {
+    const globalSettingsPath = makeGlobalSettings([
+      "^github\\.com[:/]QNCGmbH/.*$",
+    ]);
+    const repo = makeRepo("git@github.com:QNCGmbH/openai.git", {
+      taskWorkflow: { enable: false },
+    });
+    const result = resolveGate(repo, { globalSettingsPath });
+    expect(result.active).toBe(false);
+    expect(result.reason).toContain("re-enabled locally");
+    rmSync(globalSettingsPath.replace(/settings\.json$/, ""), {
+      recursive: true,
+      force: true,
+    });
+    rmSync(repo, { recursive: true, force: true });
   });
 });
 

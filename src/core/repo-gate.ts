@@ -7,6 +7,7 @@
  */
 
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { execSync } from "node:child_process";
 
@@ -25,6 +26,20 @@ export interface ReadOriginDeps extends WalkDeps {
   readFileSync?: (p: string, encoding: "utf-8") => string;
   execSync?: (command: string, options?: { cwd?: string; encoding?: "utf-8" }) => string;
 }
+
+export interface GateConfig {
+  disableOnRepo: string[];
+  enable: boolean;
+  diagnostics: string[];
+}
+
+export interface ReadGateConfigDeps extends WalkDeps {
+  globalSettingsPath?: string;
+  projectSettingsPath?: string;
+  readFileSync?: (p: string, encoding: "utf-8") => string;
+}
+
+export interface ResolveGateDeps extends ReadOriginDeps, ReadGateConfigDeps {}
 
 /** Cache origin URL lookups per repo root for the process lifetime. */
 const originCache = new Map<string, string | null>();
@@ -202,6 +217,176 @@ function parseOriginFromConfig(
   } catch {
     return null;
   }
+}
+
+/**
+ * Read gate configuration from global and project settings files.
+ *
+ * Reads:
+ *   global:  $PI_CODING_AGENT_DIR/settings.json  or  ~/.pi/agent/settings.json
+ *   project: <repo-root>/.pi/settings.json
+ *
+ * Project settings override global settings per key. Missing or unreadable
+ * files are treated as empty (fail-open). The returned `diagnostics` array
+ * records malformed JSON or invalid shape, but this function never throws.
+ */
+export function readGateConfig(
+  cwd: string,
+  deps: ReadGateConfigDeps = {},
+): GateConfig {
+  const diagnostics: string[] = [];
+  const readFile = deps.readFileSync ?? readFileSync;
+  const exists = deps.existsSync ?? existsSync;
+
+  const globalPath =
+    deps.globalSettingsPath ??
+    join(
+      process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"),
+      "settings.json",
+    );
+
+  const root = walkToGitRoot(cwd, { existsSync: exists });
+  const projectPath = deps.projectSettingsPath ?? join(root ?? cwd, ".pi", "settings.json");
+
+  const globalSettings = readSettingsJson(globalPath, readFile, diagnostics);
+  const projectSettings = readSettingsJson(projectPath, readFile, diagnostics);
+
+  const globalTaskWorkflow = getTaskWorkflow(globalSettings);
+  const projectTaskWorkflow = getTaskWorkflow(projectSettings);
+
+  // Project overrides global per key, matching pi's deepMergeSettings semantics
+  // for the taskWorkflow object.
+  const disableOnRepo = pickOverride(
+    projectTaskWorkflow,
+    globalTaskWorkflow,
+    "disableOnRepo",
+  );
+  const enable = pickOverride(
+    projectTaskWorkflow,
+    globalTaskWorkflow,
+    "enable",
+  );
+
+  const result: GateConfig = {
+    disableOnRepo: [],
+    enable: true,
+    diagnostics,
+  };
+
+  if (disableOnRepo !== null) {
+    if (Array.isArray(disableOnRepo.value)) {
+      result.disableOnRepo = validateRegexArray(
+        disableOnRepo.value,
+        diagnostics,
+      );
+    } else {
+      diagnostics.push(
+        `taskWorkflow.disableOnRepo is not an array in ${disableOnRepo.source} settings, using []`,
+      );
+    }
+  }
+
+  if (enable !== null) {
+    if (typeof enable.value === "boolean") {
+      result.enable = enable.value;
+    } else {
+      diagnostics.push(
+        `taskWorkflow.enable is not a boolean in ${enable.source} settings, defaulting to true`,
+      );
+    }
+  }
+
+  return result;
+}
+
+interface Override<T> {
+  value: T;
+  source: "project" | "global";
+}
+
+function pickOverride(
+  project: Record<string, unknown> | null,
+  global: Record<string, unknown> | null,
+  key: string,
+): Override<unknown> | null {
+  if (project && key in project) return { value: project[key], source: "project" };
+  if (global && key in global) return { value: global[key], source: "global" };
+  return null;
+}
+
+function readSettingsJson(
+  path: string,
+  readFile: (p: string, encoding: "utf-8") => string,
+  diagnostics: string[],
+): Record<string, unknown> | null {
+  try {
+    const content = readFile(path, "utf-8");
+    return JSON.parse(content) as Record<string, unknown>;
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") {
+      diagnostics.push(`failed to read settings ${path}: ${(e as Error).message}`);
+    }
+    return null;
+  }
+}
+
+function getTaskWorkflow(
+  settings: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!settings) return null;
+  const taskWorkflow = settings.taskWorkflow;
+  if (taskWorkflow && typeof taskWorkflow === "object" && !Array.isArray(taskWorkflow)) {
+    return taskWorkflow as Record<string, unknown>;
+  }
+  return null;
+}
+
+function validateRegexArray(
+  patterns: unknown[],
+  diagnostics: string[],
+): string[] {
+  const valid: string[] = [];
+  for (const pattern of patterns) {
+    if (typeof pattern !== "string") {
+      diagnostics.push(`non-string disableOnRepo entry skipped: ${JSON.stringify(pattern)}`);
+      continue;
+    }
+    try {
+      new RegExp(pattern);
+      valid.push(pattern);
+    } catch (e) {
+      diagnostics.push(
+        `invalid regex skipped: "${pattern}" — ${(e as Error).message}`,
+      );
+    }
+  }
+  return valid;
+}
+
+/**
+ * Convenience entry point: read origin and config, then apply the gate
+ * truth table.
+ *
+ * Returns `{ active, reason, diagnostics }`, merging any config diagnostics
+ * with diagnostics from `isWorkRepo`. Never throws.
+ */
+export function resolveGate(
+  cwd: string,
+  deps: ResolveGateDeps = {},
+): Required<Pick<GateResult, "diagnostics">> & GateResult {
+  const origin = readOriginRemote(cwd, deps);
+  const config = readGateConfig(cwd, deps);
+  const decision = isWorkRepo(origin, config.disableOnRepo, config.enable);
+  const diagnostics = [
+    ...(config.diagnostics ?? []),
+    ...(decision.diagnostics ?? []),
+  ];
+  return {
+    active: decision.active,
+    reason: decision.reason,
+    diagnostics,
+  };
 }
 
 /**
