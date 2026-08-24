@@ -11,6 +11,7 @@ slices:
 - code-review-skill-content
 - code-review-agent-and-dispatch
 - get-guidelines-standards-extension
+- get-guidelines-standards-extension
 ---
 
 ## Decision being implemented
@@ -218,3 +219,36 @@ Out of scope:
   suite green except 16 pre-existing `session.test.ts` failures that
   reproduce on main (not a regression). No divergence from plan.
 - This was the last slice; the task is ready for finalize-task.
+
+## Architecture lessons (knowledge harvest)
+
+- **Review is advisory, not a gate.** `/code-review` surfaces findings to the
+  user; it does not gate landing (slices already landed) or finalize (the CI
+  gate does). This keeps the review honest (it can flag without blocking) and
+  preserves the parent-never-implements discipline.
+- **Fanout agent pattern.** The `code-reviewer` is the first agent in this
+  repo with `tools: subagent` — a fanout child that spawns its own parallel
+  axis reviewers. The fanout is an implementation detail of the agent; the
+  pipeline dispatches one agent and gets one report (honoring the `/tdd`
+  "invoke as one agent" precedent). The mp-skills 50+ agent bug is guarded
+  against in both the SKILL.md and the agent prompt.
+- **Single source of truth for smells — accepted duplication.** The 12-smell
+  baseline is canonical in `skills/code-review/smells.md` and inlined as a
+  `SMELL_BASELINE` constant in `src/pi.ts` (the extension can't read the
+  skill file at runtime). The duplication is noted in a comment; the two
+  must be kept in sync by hand. A future refactor could load the skill file
+  at runtime, but that coupling is not worth it now.
+- **`get_guidelines` is the Pi-native standards source.** Extending our own
+  tool (rather than inventing a parallel discovery path) made repo-standards
+  + the smell-baseline floor available to *every* agent calling
+  `get_guidelines`, not just the reviewer. The `source: "docs"|"root"` field
+  keeps display paths correct for both `docs/*` files and repo-root
+  `AGENTS.md`/`CLAUDE.md`/`CONTEXT.md`.
+- **Two review altitudes coexist.** The deviation-reporter (per-slice,
+  gates landing, forked context, slice doc as spec) and `/code-review`
+  (whole-task, end-of-task, fresh context, task doc + arch spec as spec)
+  do different jobs at different altitudes. Keep both.
+- **Refactor home stays at implement-task Step 3.** `/code-review` feeds
+  findings to Step 3; it does not own refactor — resolving the TDD task's
+  refactor-home handoff. A future `/code-review`-owns-refactor move would
+  be a sibling-task decision, not this one.
