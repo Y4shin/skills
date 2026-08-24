@@ -601,31 +601,31 @@ export default function (pi: ExtensionAPI) {
 
   if (!gate.active) {
     for (const [name, def] of Object.entries(tools)) {
-    const params: Record<string, any> = {};
-    for (const [k, v] of Object.entries(def.args)) {
-      const vv = v as any;
-      if (vv.type === "string") {
-        params[k] = vv.enum
-          ? Type.Union((vv.enum as string[]).map((e: string) => Type.Literal(e)))
-          : Type.String({ description: vv.description ?? "" });
-      } else if (vv.type === "boolean") {
-        params[k] = Type.Boolean({ description: vv.description ?? "" });
-      } else if (vv.type === "array") {
-        params[k] = Type.Array(Type.String({ description: vv.items?.description ?? "" }));
+      const params: Record<string, any> = {};
+      for (const [k, v] of Object.entries(def.args)) {
+        const vv = v as any;
+        if (vv.type === "string") {
+          params[k] = vv.enum
+            ? Type.Union((vv.enum as string[]).map((e: string) => Type.Literal(e)))
+            : Type.String({ description: vv.description ?? "" });
+        } else if (vv.type === "boolean") {
+          params[k] = Type.Boolean({ description: vv.description ?? "" });
+        } else if (vv.type === "array") {
+          params[k] = Type.Array(Type.String({ description: vv.items?.description ?? "" }));
+        }
+        if (vv.optional && params[k]) params[k] = Type.Optional(params[k]);
       }
-      if (vv.optional && params[k]) params[k] = Type.Optional(params[k]);
-    }
 
-    pi.registerTool({
-      name,
-      label: name.replace(/^task_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-      description: def.description,
-      parameters: Type.Object(params),
-      async execute(_id: string, args: any, _sig: any, _upd: any, ctx: any) {
-        const result = await def.execute(args, { directory: ctx.cwd });
-        return { content: [{ type: "text", text: result }], details: {} };
-      },
-    });
+      pi.registerTool({
+        name,
+        label: name.replace(/^task_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        description: def.description,
+        parameters: Type.Object(params),
+        async execute(_id: string, args: any, _sig: any, _upd: any, ctx: any) {
+          const result = await def.execute(args, { directory: ctx.cwd });
+          return { content: [{ type: "text", text: result }], details: {} };
+        },
+      });
     }
   }
 
@@ -635,38 +635,38 @@ export default function (pi: ExtensionAPI) {
       name: "notify_user",
       label: "Notify User",
       description: "Send a notification to the user's configured ntfy platform.",
-    parameters: Type.Object({
-      title: Type.Optional(Type.String({ description: "Notification title" })),
-      message: Type.String({ description: "Message body" }),
-      priority: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("normal"), Type.Literal("high")])),
-    }),
-    async execute(_id: string, params: any) {
-      const cfgPath = join(process.env.HOME || "~", ".unipi", "config", "notify", "config.json");
-      if (!existsSync(cfgPath)) {
-        return { content: [{ type: "text", text: "No ntfy config found." }], details: { sent: false } };
-      }
-      try {
-        const cfg = JSON.parse(readFileSync(cfgPath, "utf-8"));
-        const ntfy = cfg.ntfy;
-        if (!ntfy?.enabled || !ntfy?.topic) {
-          return { content: [{ type: "text", text: "ntfy not enabled or no topic configured." }], details: { sent: false } };
+      parameters: Type.Object({
+        title: Type.Optional(Type.String({ description: "Notification title" })),
+        message: Type.String({ description: "Message body" }),
+        priority: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("normal"), Type.Literal("high")])),
+      }),
+      async execute(_id: string, params: any) {
+        const cfgPath = join(process.env.HOME || "~", ".unipi", "config", "notify", "config.json");
+        if (!existsSync(cfgPath)) {
+          return { content: [{ type: "text", text: "No ntfy config found." }], details: { sent: false } };
         }
-        const url = `${(ntfy.serverUrl || "https://ntfy.sh").replace(/\/+$/, "")}/${encodeURIComponent(ntfy.topic)}`;
-        const headers: Record<string, string> = { "Content-Type": "text/plain" };
-        if (ntfy.token) headers["Authorization"] = `Bearer ${ntfy.token}`;
-        if (params.title) headers["Title"] = params.title;
-        const pMap: Record<string, number> = { low: 2, normal: 3, high: 5 };
-        headers["Priority"] = String(pMap[params.priority] ?? 3);
-        const resp = await fetch(url, { method: "POST", headers, body: params.message });
-        return {
-          content: [{ type: "text", text: resp.ok ? "Notification sent." : `Failed (HTTP ${resp.status}).` }],
-          details: { sent: resp.ok },
-        };
-      } catch (e) {
-        return { content: [{ type: "text", text: `Notification error: ${(e as Error).message}` }], details: { sent: false } };
-      }
-    },
-  });
+        try {
+          const cfg = JSON.parse(readFileSync(cfgPath, "utf-8"));
+          const ntfy = cfg.ntfy;
+          if (!ntfy?.enabled || !ntfy?.topic) {
+            return { content: [{ type: "text", text: "ntfy not enabled or no topic configured." }], details: { sent: false } };
+          }
+          const url = `${(ntfy.serverUrl || "https://ntfy.sh").replace(/\/+$/, "")}/${encodeURIComponent(ntfy.topic)}`;
+          const headers: Record<string, string> = { "Content-Type": "text/plain" };
+          if (ntfy.token) headers["Authorization"] = `Bearer ${ntfy.token}`;
+          if (params.title) headers["Title"] = params.title;
+          const pMap: Record<string, number> = { low: 2, normal: 3, high: 5 };
+          headers["Priority"] = String(pMap[params.priority] ?? 3);
+          const resp = await fetch(url, { method: "POST", headers, body: params.message });
+          return {
+            content: [{ type: "text", text: resp.ok ? "Notification sent." : `Failed (HTTP ${resp.status}).` }],
+            details: { sent: resp.ok },
+          };
+        } catch (e) {
+          return { content: [{ type: "text", text: `Notification error: ${(e as Error).message}` }], details: { sent: false } };
+        }
+      },
+    });
   }
 
   // ── Guidelines tools ──────────────────────────────────────────────────
@@ -751,29 +751,29 @@ export default function (pi: ExtensionAPI) {
       name: "get_guidelines",
       label: "Get Guidelines",
       description: "Fetch coding guidelines for a language or topic.",
-    parameters: Type.Object({
-      language: Type.Optional(Type.String({ description: "Language filter (e.g. typescript)" })),
-      topic: Type.Optional(Type.String({ description: "Topic filter (e.g. mocking)" })),
-    }),
-    async execute(_id: string, params: any) {
-      const results: { file: string; content: string; topics: string[] }[] = [];
-      for (const [, g] of guidelinesCache) {
-        if (params.language) {
-          const lang = params.language.toLowerCase();
-          if (!g.file.toLowerCase().includes(lang) && !g.topics.some((t) => t.toLowerCase() === lang)) continue;
+      parameters: Type.Object({
+        language: Type.Optional(Type.String({ description: "Language filter (e.g. typescript)" })),
+        topic: Type.Optional(Type.String({ description: "Topic filter (e.g. mocking)" })),
+      }),
+      async execute(_id: string, params: any) {
+        const results: { file: string; content: string; topics: string[] }[] = [];
+        for (const [, g] of guidelinesCache) {
+          if (params.language) {
+            const lang = params.language.toLowerCase();
+            if (!g.file.toLowerCase().includes(lang) && !g.topics.some((t) => t.toLowerCase() === lang)) continue;
+          }
+          if (params.topic) {
+            const topic = params.topic.toLowerCase();
+            if (!g.topics.some((t) => t.toLowerCase().includes(topic))) continue;
+          }
+          results.push(g);
         }
-        if (params.topic) {
-          const topic = params.topic.toLowerCase();
-          if (!g.topics.some((t) => t.toLowerCase().includes(topic))) continue;
+        if (results.length === 0) {
+          return { content: [{ type: "text", text: "No matching guidelines found." }], details: {} };
         }
-        results.push(g);
-      }
-      if (results.length === 0) {
-        return { content: [{ type: "text", text: "No matching guidelines found." }], details: {} };
-      }
-      return { content: [{ type: "text", text: results.map((r) => `### ${r.file}\n${r.content}`).join("\n\n---\n\n") }], details: {} };
-    },
-  });
+        return { content: [{ type: "text", text: results.map((r) => `### ${r.file}\n${r.content}`).join("\n\n---\n\n") }], details: {} };
+      },
+    });
   }
 
   if (!gate.active) {
@@ -781,17 +781,17 @@ export default function (pi: ExtensionAPI) {
       name: "list_guidelines",
       label: "List Guidelines",
       description: "List available coding guideline sources.",
-    parameters: Type.Object({}),
-    async execute() {
-      if (guidelinesCache.size === 0) {
-        return { content: [{ type: "text", text: "No guideline files found in docs/. Create docs/<lang>-guidelines.md files." }], details: {} };
-      }
-      const lines = ["Available coding guideline sources:"];
-      for (const [, g] of guidelinesCache) {
-        lines.push(`  - docs/${g.file} (topics: ${g.topics.join(", ")})`);
-      }
-      return { content: [{ type: "text", text: lines.join("\n") }], details: {} };
-    },
-  });
+      parameters: Type.Object({}),
+      async execute() {
+        if (guidelinesCache.size === 0) {
+          return { content: [{ type: "text", text: "No guideline files found in docs/. Create docs/<lang>-guidelines.md files." }], details: {} };
+        }
+        const lines = ["Available coding guideline sources:"];
+        for (const [, g] of guidelinesCache) {
+          lines.push(`  - docs/${g.file} (topics: ${g.topics.join(", ")})`);
+        }
+        return { content: [{ type: "text", text: lines.join("\n") }], details: {} };
+      },
+    });
   }
 }
