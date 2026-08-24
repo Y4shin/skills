@@ -700,6 +700,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     guidelinesCache = discoverGuidelines(ctx.cwd);
     shouldInjectGuidelines = true;
+    if (gate.active) return;
     // Check required peer extensions
     const tools = pi.getAllTools();
     if (!tools.some((t) => t.name === "subagent")) {

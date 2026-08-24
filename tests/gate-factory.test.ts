@@ -190,4 +190,39 @@ describe("factory gate", () => {
       expect(names).toContain(name);
     }
   });
+
+  test("work repo (gate active) skips session_start peer warnings", async () => {
+    globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
+    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
+    const repo = makeRepo("git@github.com:QNCGmbH/openai.git");
+    process.chdir(repo);
+
+    const stub = createStub();
+    factory(stub);
+
+    const sessionStartHandlers = stub.handlers["session_start"];
+    expect(sessionStartHandlers).toBeDefined();
+    expect(sessionStartHandlers.length).toBe(1);
+
+    await sessionStartHandlers[0]({ type: "session_start", reason: "startup" }, { cwd: repo, ui: stub.ui });
+
+    expect(stub.notifications).toHaveLength(0);
+  });
+
+  test("personal repo emits session_start peer warnings", async () => {
+    globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
+    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
+    const repo = makeRepo("https://github.com/Y4shin/skills.git");
+    process.chdir(repo);
+
+    const stub = createStub();
+    factory(stub);
+
+    const sessionStartHandlers = stub.handlers["session_start"];
+    await sessionStartHandlers[0]({ type: "session_start", reason: "startup" }, { cwd: repo, ui: stub.ui });
+
+    const messages = stub.notifications.map((n) => n.message);
+    expect(messages).toContain("pi-subagents is not installed. Install it with: pi install npm:pi-subagents");
+    expect(messages).toContain("pi-telemetry is not installed. Install it with: pi install git:github.com/Y4shin/pi-telemetry@v0.4.0");
+  });
 });
