@@ -6,7 +6,7 @@
  * when the repo gate is active (work repo) and present when inactive (personal).
  */
 
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -41,6 +41,8 @@ vi.mock("../src/core/repo-gate.js", async (importOriginal) => {
 
 const trackedRepos: string[] = [];
 
+let globalSettings: { dir: string; cleanup: () => void } | undefined;
+
 const GATED_NAMES = [
   "task_show",
   "task_get",
@@ -68,6 +70,63 @@ interface StubExtensionAPI extends ExtensionAPI {
   tools: Array<{ name: string }>;
   handlers: Record<string, Array<(...args: any[]) => any>>;
   notifications: Array<{ message: string; level: string }>;
+}
+
+const GATED_SKILL_NAMES = [
+  "task-overview",
+  "onboard-workflow",
+  "wayfinder",
+  "implement-task",
+  "finalize-task",
+  "report-bug",
+];
+
+function buildSkillsXml(skillNames: string[]): string {
+  const preamble = [
+    "The following skills provide specialized instructions for specific tasks.",
+    "Use the read tool to load a skill's file when the task matches its description.",
+    "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.",
+  ].join("\n");
+  const skills = skillNames
+    .map((name) =>
+      [
+        "  <skill>",
+        `    <name>${name}</name>`,
+        `    <description>${name} skill</description>`,
+        `    <location>/path/to/${name}/SKILL.md</location>`,
+        "  </skill>",
+      ].join("\n"),
+    )
+    .join("\n");
+  return [
+    "PREFIX LINE 1",
+    "PREFIX LINE 2",
+    "",
+    preamble,
+    "",
+    "<available_skills>",
+    skills,
+    "</available_skills>",
+    "",
+    "SUFFIX LINE 1",
+    "SUFFIX LINE 2",
+  ].join("\n");
+}
+
+function setupWorkRepo(): string {
+  globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
+  process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
+  const repo = makeRepo("git@github.com:QNCGmbH/openai.git");
+  process.chdir(repo);
+  return repo;
+}
+
+function setupPersonalRepo(): string {
+  globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
+  process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
+  const repo = makeRepo("https://github.com/Y4shin/skills.git");
+  process.chdir(repo);
+  return repo;
 }
 
 function createStub(): StubExtensionAPI {
@@ -126,7 +185,6 @@ function makeGlobalSettings(disableOnRepo: string[]): { dir: string; cleanup: ()
 describe("factory gate", () => {
   let previousCwd: string;
   let previousAgentDir: string | undefined;
-  let globalSettings: { dir: string; cleanup: () => void } | undefined;
 
   beforeEach(() => {
     previousCwd = process.cwd();
@@ -276,16 +334,14 @@ describe("factory gate", () => {
   });
 
   describe("before_agent_start guidelines injection", () => {
-    test("work repo (gate active) does not register before_agent_start handler", () => {
-      globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
-      process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
-      const repo = makeRepo("git@github.com:QNCGmbH/openai.git");
-      process.chdir(repo);
+    test("work repo (gate active) registers the strip handler on before_agent_start", () => {
+      setupWorkRepo();
 
       const stub = createStub();
       factory(stub);
 
-      expect(stub.handlers["before_agent_start"]).toBeUndefined();
+      expect(stub.handlers["before_agent_start"]).toBeDefined();
+      expect(stub.handlers["before_agent_start"].length).toBe(1);
     });
 
     test("personal repo appends guidelines preamble when a guideline file exists", async () => {
@@ -373,6 +429,212 @@ describe("factory gate", () => {
       const third = await beforeAgentStartHandlers[0]({ systemPrompt: "BASE" }, { cwd: repo });
       expect(third).toBeDefined();
       expect(third.systemPrompt).toContain("## Project coding guidelines");
+    });
+  });
+
+  describe("help and skill-list limitation", () => {
+    test("limitations.md exists and documents the /help and skill-list gap", () => {
+      const limitationsPath = join(process.cwd(), "docs/tasks/gate-skills-prompt-and-help/limitations.md");
+
+      expect(existsSync(limitationsPath)).toBe(true);
+
+      const content = readFileSync(limitationsPath, "utf-8");
+      expect(content).toContain("/help");
+      expect(content).toContain("skill-list");
+    });
+  });
+
+  describe("input skill invocation gate", () => {
+    test("work repo blocks /skill:<gated-name> and notifies", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const inputHandlers = stub.handlers["input"];
+      expect(inputHandlers).toBeDefined();
+      expect(inputHandlers.length).toBe(1);
+
+      const result = await inputHandlers[0](
+        { type: "input", text: "/skill:implement-task", source: "interactive" },
+        { ui: stub.ui },
+      );
+
+      expect(result).toEqual({ action: "handled" });
+      expect(stub.notifications).toContainEqual({
+        message: "task-workflow is gated in this work repo; not loading implement-task",
+        level: "warning",
+      });
+    });
+
+    test("work repo blocks /skill:<gated-name> with trailing args", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const inputHandlers = stub.handlers["input"];
+      const result = await inputHandlers[0](
+        { type: "input", text: "/skill:implement-task some args", source: "interactive" },
+        { ui: stub.ui },
+      );
+
+      expect(result).toEqual({ action: "handled" });
+      expect(stub.notifications).toContainEqual({
+        message: "task-workflow is gated in this work repo; not loading implement-task",
+        level: "warning",
+      });
+    });
+
+    test("work repo passes through /skill:<non-gated-name>", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const inputHandlers = stub.handlers["input"];
+      const result = await inputHandlers[0](
+        { type: "input", text: "/skill:oracle", source: "interactive" },
+        { ui: stub.ui },
+      );
+
+      expect(result).toEqual({ action: "continue" });
+      expect(stub.notifications).toHaveLength(0);
+    });
+
+    test("work repo passes through non-/skill: input", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const inputHandlers = stub.handlers["input"];
+      const result = await inputHandlers[0](
+        { type: "input", text: "/help", source: "interactive" },
+        { ui: stub.ui },
+      );
+
+      expect(result).toEqual({ action: "continue" });
+      expect(stub.notifications).toHaveLength(0);
+    });
+
+    test("personal repo does not register the input handler", async () => {
+      setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      expect(stub.handlers["input"]).toBeUndefined();
+    });
+  });
+
+  describe("before_agent_start skill strip", () => {
+    test("work repo strips only the gated six and leaves non-gated skills intact", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const fixture = buildSkillsXml([...GATED_SKILL_NAMES, "oracle"]);
+      const result = await stub.handlers["before_agent_start"][0](
+        { systemPrompt: fixture },
+        { ui: stub.ui },
+      );
+
+      expect(result).toBeDefined();
+      for (const name of GATED_SKILL_NAMES) {
+        expect(result.systemPrompt).not.toContain(`<name>${name}</name>`);
+      }
+      expect(result.systemPrompt).toContain("<name>oracle</name>");
+      expect(result.systemPrompt).toContain("<available_skills>");
+      expect(result.systemPrompt).toContain("PREFIX LINE 1");
+      expect(result.systemPrompt).toContain("SUFFIX LINE 2");
+    });
+
+    test("work repo removes the whole skills block when only the six are present", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const fixture = buildSkillsXml([...GATED_SKILL_NAMES]);
+      const result = await stub.handlers["before_agent_start"][0](
+        { systemPrompt: fixture },
+        { ui: stub.ui },
+      );
+
+      expect(result.systemPrompt).not.toContain("<available_skills>");
+      expect(result.systemPrompt).not.toContain("The following skills");
+      expect(result.systemPrompt).toBe(
+        ["PREFIX LINE 1", "PREFIX LINE 2", "", "SUFFIX LINE 1", "SUFFIX LINE 2"].join("\n"),
+      );
+    });
+
+    test("work repo emits a diagnostic and leaves prompt unchanged when no available_skills block exists", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const fixture = "NO SKILLS BLOCK";
+      const result = await stub.handlers["before_agent_start"][0](
+        { systemPrompt: fixture },
+        { ui: stub.ui },
+      );
+
+      expect(result.systemPrompt).toBe(fixture);
+      expect(
+        stub.notifications.some((n) =>
+          n.message.includes("skill-strip: expected an <available_skills> block"),
+        ),
+      ).toBe(true);
+      expect(stub.notifications.some((n) => n.level === "warning")).toBe(true);
+    });
+
+    test("work repo does not strip skill names that are only substrings of gated names", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const fixture = buildSkillsXml(["way", "task", "oracle"]);
+      const result = await stub.handlers["before_agent_start"][0](
+        { systemPrompt: fixture },
+        { ui: stub.ui },
+      );
+
+      expect(result.systemPrompt).toContain("<name>way</name>");
+      expect(result.systemPrompt).toContain("<name>task</name>");
+      expect(result.systemPrompt).toContain("<name>oracle</name>");
+    });
+
+    test("personal repo does not register the strip handler", async () => {
+      const repo = setupPersonalRepo();
+      mkdirSync(join(repo, "docs"), { recursive: true });
+      writeFileSync(join(repo, "docs", "testing.md"), "# Testing guidelines\n");
+
+      const stub = createStub();
+      factory(stub);
+
+      const sessionStartHandlers = stub.handlers["session_start"];
+      expect(sessionStartHandlers).toBeDefined();
+      await sessionStartHandlers[0](
+        { type: "session_start", reason: "startup" },
+        { cwd: repo, ui: stub.ui },
+      );
+
+      const beforeAgentStartHandlers = stub.handlers["before_agent_start"];
+      expect(beforeAgentStartHandlers).toBeDefined();
+      expect(beforeAgentStartHandlers.length).toBe(1);
+
+      const fixture = buildSkillsXml([...GATED_SKILL_NAMES, "oracle"]);
+      const result = await beforeAgentStartHandlers[0](
+        { systemPrompt: fixture },
+        { cwd: repo },
+      );
+
+      expect(result.systemPrompt).toContain("<name>wayfinder</name>");
+      expect(result.systemPrompt).toContain("<name>oracle</name>");
     });
   });
 });

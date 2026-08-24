@@ -4,7 +4,7 @@ type: feature
 slug: gate-skills-prompt-and-help
 title: Hide the six skills from system prompt + /help/skill-list, and enforce/warn on explicit /skill: in work repos
 map: gate-skills-by-repo
-status: ready
+status: done
 slices:
   - gate-strip-skills-from-prompt
   - gate-suppress-help-and-skill-list
@@ -133,3 +133,87 @@ Implement the D4 policy (prevent preferred, warn fallback) using the
 hook `gate-config-mechanics` confirms. Integration test: in a work repo,
 `/skill:implement-task` is blocked or warned (assert the chosen
 behaviour); in a personal repo, it loads normally.
+
+## Implementation notes
+
+### Slice 1 — gate-strip-skills-from-prompt (landed)
+
+Added an internal `loadGatedSkillNames` helper (reads skill names from
+`package.json` `pi.skills` with a pinned fallback list and a
+diagnostic), a `SKILL_NAME_DIAGNOSTICS` constant, and a `stripSkills`
+`before_agent_start` handler to `src/pi.ts`. The factory registers the
+strip handler only when `gate.active` (`if (gate.active)
+pi.on("before_agent_start", stripSkills)`), mirroring the injection
+handler's `if (!gate.active)` guard from `gate-tools-and-injection` —
+the two are mutually exclusive: exactly one registers per repo type.
+
+The strip handler targets the corrected XML format from `findings.md`
+V1: a single `<available_skills>` block with `<skill>` children, each
+having `<name>`, `<description>`, `<location>` child elements (not the
+older `<skill name="…">` attribute form). It removes `<skill>` blocks
+whose `<name>` child matches one of the gated six; if removal empties
+`<available_skills>`, the whole block (including the "The following
+skills…" preamble) is dropped. On format drift (no
+`<available_skills>` block) it logs a diagnostic and returns the prompt
+unchanged — fail loud, never corrupt.
+
+One existing test (`tests/gate-factory.test.ts`) was updated as an
+intended consequence: the work-repo test previously asserted that a
+work repo registers **no** `before_agent_start` handler. It now
+asserts that a work repo registers exactly one — the new strip
+handler — proving mutual exclusivity with the personal-repo injection
+handler.
+
+Verification: slice tests (`gate-factory.test.ts` 16 tests,
+`repo-gate.test.ts` 40 tests) passed; `npm run typecheck` passed. Full
+suite: 221 passed, 16 failed — all in the pre-existing
+`tests/integration/session.test.ts` (`AuthStorage.inMemory` harness
+error), which is untouched by this branch (empty diff vs. merge base).
+No new failures.
+
+### Slice 3 — gate-explicit-invocation-policy (landed)
+
+Added a `gateSkillInvocation` `input` handler to `src/pi.ts` that
+prevents explicit `/skill:<name>` invocation of the six task-workflow
+skills in a work repo. The handler parses the skill name from `/skill:`
+input using `slice(7, spaceIndex)` (mirroring `_expandSkillCommand`'s
+parser), blocks only the gated six (reusing the shared
+`GATED_SKILL_NAMES` list from slice 1) by calling
+`ctx.ui.notify(\`task-workflow is gated in this work repo; not loading
+${name}\`, "warning")` and returning `{ action: "handled" }`, and passes
+everything else through with `{ action: "continue" }`. The handler is
+registered only when gated: `if (gate.active) pi.on("input",
+gateSkillInvocation)`.
+
+Added 5 integration tests to `tests/gate-factory.test.ts` ("input skill
+invocation gate" describe block): gated + gated name block + notify,
+gated + gated name with trailing args, gated + non-gated skill
+pass-through, gated + non-`/skill:` input pass-through, and personal
+repo (handler not registered).
+
+Verification: slice tests (`gate-factory.test.ts` 22/22,
+`repo-gate.test.ts` 40/40) passed; `npm run typecheck` clean. Full
+suite: 227 passed, 16 failed — all in the pre-existing
+`tests/integration/session.test.ts` (`AuthStorage.inMemory` harness
+error), untouched by this slice. No new regressions.
+
+### Slice 2 — gate-suppress-help-and-skill-list (landed)
+
+Took the slice doc's documented "no mechanism exists" branch. pi 0.80.10
+exposes no subtractive hook for the loaded skill set (`/help`/skill-list
+read from `resourceLoader.getSkills().skills`, `resources_discover` is
+additive-only), so the six task-workflow skills **cannot** be hidden from
+`/help`/skill-list in a work repo. No suppression code was written.
+
+Wrote `docs/tasks/gate-skills-prompt-and-help/limitations.md` (5 lines)
+recording the gap: the gate covers the system prompt only; `/help` will
+still list the six in a work repo; explicit `/skill:<name>` is prevented
+via the `input` event (slice 3). Added a guard test in
+`tests/gate-factory.test.ts` (`help and skill-list limitation` describe
+block) asserting the file exists and mentions `/help` and `skill-list`.
+
+Verification: slice tests (`gate-factory.test.ts` 17/17) passed;
+`npm run typecheck` clean. Full suite: the only failing file is the
+pre-existing `tests/integration/session.test.ts` (16 failures,
+`AuthStorage.inMemory` harness error), untouched by this branch. No
+new failures.
