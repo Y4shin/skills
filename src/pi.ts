@@ -15,7 +15,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext, InputEvent, InputEventResult } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import YAML from "yaml";
 
@@ -62,6 +62,35 @@ function loadGatedSkillNames(): { names: string[]; diagnostics: string[] } {
 }
 
 const { names: GATED_SKILL_NAMES, diagnostics: SKILL_NAME_DIAGNOSTICS } = loadGatedSkillNames();
+
+/**
+ * Block explicit `/skill:<gated-name>` invocations in a work repo. The input
+ * event fires before `_expandSkillCommand`, so returning `{ action: "handled" }`
+ * prevents the skill from being loaded. Non-gated `/skill:` inputs and all
+ * other input pass through unchanged.
+ */
+async function gateSkillInvocation(
+  event: InputEvent,
+  ctx: ExtensionContext,
+): Promise<InputEventResult> {
+  const text = event.text;
+  if (!text.startsWith("/skill:")) {
+    return { action: "continue" };
+  }
+  const spaceIndex = text.indexOf(" ");
+  const name = text.slice(7, spaceIndex === -1 ? undefined : spaceIndex);
+  if (!name) {
+    return { action: "continue" };
+  }
+  if (GATED_SKILL_NAMES.includes(name)) {
+    ctx.ui.notify(
+      `task-workflow is gated in this work repo; not loading ${name}`,
+      "warning",
+    );
+    return { action: "handled" };
+  }
+  return { action: "continue" };
+}
 
 /**
  * Strip the gated workflow skills from the system prompt's `<available_skills>`
@@ -868,6 +897,7 @@ export default function (pi: ExtensionAPI) {
 
   if (gate.active) {
     pi.on("before_agent_start", stripSkills);
+    pi.on("input", gateSkillInvocation);
   }
 
   if (!gate.active) {
