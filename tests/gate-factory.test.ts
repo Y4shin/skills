@@ -433,8 +433,11 @@ describe("factory gate", () => {
   });
 
   describe("help and skill-list limitation", () => {
-    test("limitations.md exists and documents the /help and skill-list gap", () => {
-      const limitationsPath = join(process.cwd(), "docs/tasks/gate-skills-prompt-and-help/limitations.md");
+    test("docs/repo-gating.md documents the /help and skill-list gap", () => {
+      // The /help limitation was originally written to the (now-archived)
+      // task doc; it is durably documented in docs/repo-gating.md, which
+      // lives outside the per-task tree and is the stable reference.
+      const limitationsPath = join(process.cwd(), "docs/repo-gating.md");
 
       expect(existsSync(limitationsPath)).toBe(true);
 
