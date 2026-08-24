@@ -444,6 +444,90 @@ describe("factory gate", () => {
     });
   });
 
+  describe("input skill invocation gate", () => {
+    test("work repo blocks /skill:<gated-name> and notifies", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const inputHandlers = stub.handlers["input"];
+      expect(inputHandlers).toBeDefined();
+      expect(inputHandlers.length).toBe(1);
+
+      const result = await inputHandlers[0](
+        { type: "input", text: "/skill:implement-task", source: "interactive" },
+        { ui: stub.ui },
+      );
+
+      expect(result).toEqual({ action: "handled" });
+      expect(stub.notifications).toContainEqual({
+        message: "task-workflow is gated in this work repo; not loading implement-task",
+        level: "warning",
+      });
+    });
+
+    test("work repo blocks /skill:<gated-name> with trailing args", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const inputHandlers = stub.handlers["input"];
+      const result = await inputHandlers[0](
+        { type: "input", text: "/skill:implement-task some args", source: "interactive" },
+        { ui: stub.ui },
+      );
+
+      expect(result).toEqual({ action: "handled" });
+      expect(stub.notifications).toContainEqual({
+        message: "task-workflow is gated in this work repo; not loading implement-task",
+        level: "warning",
+      });
+    });
+
+    test("work repo passes through /skill:<non-gated-name>", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const inputHandlers = stub.handlers["input"];
+      const result = await inputHandlers[0](
+        { type: "input", text: "/skill:oracle", source: "interactive" },
+        { ui: stub.ui },
+      );
+
+      expect(result).toEqual({ action: "continue" });
+      expect(stub.notifications).toHaveLength(0);
+    });
+
+    test("work repo passes through non-/skill: input", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const inputHandlers = stub.handlers["input"];
+      const result = await inputHandlers[0](
+        { type: "input", text: "/help", source: "interactive" },
+        { ui: stub.ui },
+      );
+
+      expect(result).toEqual({ action: "continue" });
+      expect(stub.notifications).toHaveLength(0);
+    });
+
+    test("personal repo does not register the input handler", async () => {
+      setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      expect(stub.handlers["input"]).toBeUndefined();
+    });
+  });
+
   describe("before_agent_start skill strip", () => {
     test("work repo strips only the gated six and leaves non-gated skills intact", async () => {
       setupWorkRepo();
