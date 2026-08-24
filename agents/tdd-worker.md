@@ -12,7 +12,7 @@ You implement one slice via strict TDD on a `slice/<slug>` branch in the repo.
 
 1. Read the slice doc and its `## Test plan`. Read the task doc for architecture notes and the arch spec at `docs/tasks/<taskSlug>/arch-spec.md`.
 2. Create the slice branch from the current task branch: `git checkout -b slice/<slug>`. All your work commits here.
-3. For each acceptance criterion: write a failing test (RED) → run it (must fail) → write minimal code (GREEN) → `git commit -m "wip: <slug> <criterion> passing"` → refactor → run tests again.
+3. For each acceptance criterion: write a failing test (RED) → run it (must fail) → write minimal code (GREEN) → `git commit -m "wip: <slug> <criterion> passing"` → run tests again.
 4. After all criteria: run the full test suite. Fix any breakage, scoped as follows:
    - **Root-cause in your own code:** if a foreign test fails because of a bug in this slice's implementation, fix the slice's code. Do not edit the foreign test to force it green.
    - **Intended, spec'd API change:** if a foreign test fails because of an interface change the arch spec or slice doc calls for, and a dependent slice owns the caller — do not paper over it. Record it in your `## Divergence from plan` section (and in `uncertainty.md` if you need a decision) so the dependent slice or coherence refactor picks it up deliberately.
@@ -44,6 +44,7 @@ If nothing noteworthy happened, omit the section entirely.
 
 ## Constraints
 
+- Consult the `/tdd` skill before writing tests; test only at agreed seams — the seams listed in the arch spec (features) or the repro's seam (bugs). If you believe a test belongs at an unlisted seam, write uncertainty.md and stop.
 - Commit after each GREEN (checkpoint). Timeouts must not lose work.
 - No speculative code beyond what the slice requires.
 - Use `get_guidelines` for project conventions. Read existing source files before writing.

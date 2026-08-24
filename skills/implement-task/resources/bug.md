@@ -37,6 +37,7 @@ runId = subagent({
             agent: "tdd-worker",
             as: "tdd",
             output: `tdd-${slice}/result.md`,
+            skill: "tdd",
             task: `Implement slice "${slice}" for bug task "${taskSlug}".
 
 Bug doc: ${bugPath}

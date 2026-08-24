@@ -23,6 +23,7 @@ For each pending slice, draft:
 - **Exports:** planned public API surface
 - **Existing abstractions to use:** specific modules/interfaces from the codebase
 - **Do NOT reimplement:** specific utilities/patterns to avoid
+- **Seams:** the public boundaries under test; list them; the user approves them; the tdd-worker tests only at these seams.
 - **Interface contract:** for slices with dependents: what does this slice export that the next slice calls?
 
 Also record in the task doc's `## Architecture notes` section (if the user adds any).
@@ -60,6 +61,7 @@ for each level in levels:
                     agent: "tdd-worker",
                     as: "tdd",
                     output: `tdd-${slice}/result.md`,
+                    skill: "tdd",
                     task: `Implement slice "${slice}" for task "${taskSlug}".
 
 Slice doc: docs/tasks/${taskSlug}/slices/<n>-${slice}.md
@@ -211,6 +213,8 @@ Set task_set status done on slice.`
 ```
 
 ## Step 3 — Coherence refactor
+
+This stage owns refactoring; the tdd-worker loop is RED→GREEN only. Refactor here, not in the per-slice worker.
 
 After all slices landed, review the combined diff and all deviation reports.
 
