@@ -84,7 +84,7 @@ Set task_set status done on slice.`
 // wait() keeps the turn alive for notifications and keeps the run steerable.
 wait({ id: runId })
 
-## Step 2 — Code review (advisory)
+## Code review (advisory)
 
 After the slice lands, run a two-axis code review over the bug-fix diff before finalizing. The review is advisory — it does not gate landing or finalize.
 
@@ -103,7 +103,7 @@ wait({ id: reviewId })
 
 Read `review/result.md` and surface the findings to the user.
 
-## Step 3 — Report
+## Step 2 — Report
 
 Report the landed slice, the regression test added, and any user interventions.
 
