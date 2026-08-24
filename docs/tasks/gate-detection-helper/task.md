@@ -4,7 +4,7 @@ type: feature
 slug: gate-detection-helper
 title: isWorkRepo(cwd, patterns) + remote normalization, unit-tested
 map: gate-skills-by-repo
-status: ready
+status: done
 slices:
   - gate-detection-core
   - gate-config-reader
@@ -158,3 +158,46 @@ Divergence from plan: added `execSync` to the injectable `ReadOriginDeps` seam
 so the gitfile-style `.git` fallback is unit-testable without shelling out; the
 arch spec lists only `existsSync`/`readFileSync`/`isDir`. Also treats empty-string
 `origin` as "no origin → personal" for robustness.
+
+### Slice 2 — `gate-config-reader` (landed)
+
+Landed into `task/gate-detection-helper` via `--no-ff` merge. Slice doc archived
+to `docs/tasks/gate-detection-helper/slices/archive/2-gate-config-reader.md`.
+Deviation report at
+`docs/tasks/gate-detection-helper/deviation-reports/gate-config-reader.md`.
+
+Appended to `src/core/repo-gate.ts` (+189 lines) and `tests/repo-gate.test.ts`
+(+244 lines, now 38 total tests):
+- `readGateConfig(cwd, deps?)` — reads global
+  (`$PI_CODING_AGENT_DIR/settings.json` or `~/.pi/agent/settings.json`) and
+  project (`<repo-root>/.pi/settings.json`) settings, extracts
+  `taskWorkflow.disableOnRepo` and `taskWorkflow.enable` (project overrides
+  global per key), validates regex patterns, returns
+  `{ disableOnRepo, enable, diagnostics }`. Fail-open: missing/malformed files
+  never throw. Does not call `isWorkRepo`/`readOriginRemote`.
+- `resolveGate(cwd, deps?)` — composes `readOriginRemote(cwd)` →
+  `readGateConfig(cwd)` → `isWorkRepo(origin, disableOnRepo, enable)` and merges
+  diagnostics into `{ active, reason, diagnostics }`. Returns a dedicated
+  `ResolveGateResult` interface where `diagnostics` is required.
+- 7 `readGateConfig` unit tests (missing files, global/project override,
+  non-array coercion, non-boolean `enable` default, invalid regex skip,
+  malformed JSON) + 3 `resolveGate` integration tests (QNCGmbH SSH active,
+  personal HTTPS inactive, project `enable:false` re-enables work repo).
+
+Verification: slice tests 38/38 pass; `npm run typecheck` clean. The full
+`npm test` suite shows the same 16 pre-existing failures in
+`tests/integration/session.test.ts` (`AuthStorage.inMemory undefined`),
+reproduced on the base branch and unrelated to this slice.
+
+Divergence from plan: (1) `ReadGateConfigDeps` extends `WalkDeps` to include
+`existsSync` (defaults to real `node:fs.existsSync`) so `readGateConfig` can
+walk from `cwd` to the repo root when `projectSettingsPath` is not injected — the
+arch spec listed only `globalSettingsPath`, `projectSettingsPath`,
+`readFileSync`. (2) `resolveGate` returns a dedicated `ResolveGateResult`
+interface with required `diagnostics`, making the factory contract explicit.
+(3) `validateRegexArray` also emits a diagnostic for non-string array entries,
+consistent with the invalid-regex handling but not explicitly listed in the
+slice doc. (4) The test plan's `anwaltde Bitbucket` scenario was not covered
+(coverage gap, not a correctness risk — patterns are provider-agnostic regex).
+The arch-spec.md slice-2 contract was updated to reflect the actual
+`isWorkRepo(origin, ...)` / `resolveGate` composition before this slice ran.

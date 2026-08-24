@@ -4,7 +4,7 @@ slug: gate-config-reader
 title: config reader (disableOnRepo + enable) + reader→isWorkRepo integration test
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: s
 blocked_by:
   - gate-detection-core

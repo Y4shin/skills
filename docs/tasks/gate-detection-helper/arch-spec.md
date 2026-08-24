@@ -63,19 +63,24 @@
     via `child_process.execSync` (sync, cached per repo root). `null` if no
     `.git` or no `origin`.
   - `walkToGitRoot(start: string, deps?): string | null` — extracted helper.
-  - `isWorkRepo(cwd, globalPatterns: string[], projectEnable: boolean): {
+  - `isWorkRepo(origin: string | null, patterns: string[], projectEnable = true): {
     active: boolean; reason: string; diagnostics?: string[] }` — pure
-    truth-table core; takes already-parsed inputs (no fs). Invalid regex →
-    skipped + diagnostic, never throws. Empty patterns → not active.
+    truth-table core. **NOTE (slice-1 deviation, accepted):** the first arg is
+    the **normalized or raw origin URL** (not `cwd`); callers call
+    `readOriginRemote(cwd)` first and pass its result here. `isWorkRepo`
+    normalizes internally via `normalizeRemote`. Invalid regex → skipped +
+    diagnostic, never throws. Empty patterns → not active. No fs: this is
+    deliberately pure.
   - A module-level origin cache: `Map<repoRoot, string>` keyed by repo root.
 - **Existing abstractions to use:** `findRoot` walk-up pattern (extracted).
 - **Do NOT reimplement:** the config reader (slice 2).
-- **Interface contract (consumed by slice 2):** `isWorkRepo` is pure and
-  takes `globalPatterns` + `projectEnable` directly. Slice 2's
-  `readGateConfig` produces exactly those two inputs and calls `isWorkRepo`.
-  The shapes `(string[], boolean)` and the `{active, reason, diagnostics}`
-  return are the contract — do not change them in slice 2 without updating
-  this slice's tests.
+- **Interface contract (consumed by slice 2):** `isWorkRepo(origin, patterns,
+  enable)` is pure — slice 2's `readGateConfig`/`resolveGate` calls
+  `readOriginRemote(cwd)` to get the origin, then passes it into
+  `isWorkRepo(origin, disableOnRepo, enable)`. The shapes `(string|null,
+  string[], boolean)` and the `{active, reason, diagnostics}` return are the
+  contract. Slice 2 must **not** re-detect the origin; it composes the two
+  helpers.
 - **Tests (`tests/repo-gate.test.ts`):** `normalizeRemote` matrix (SSH/HTTPS
   for github + bitbucket, port, uppercase host, `.git`-less, trailing
   slash); `readOriginRemote` via `fs.mkdtempSync` fixtures (with-origin,
@@ -86,7 +91,7 @@
 
 - **Exports:** from `src/core/repo-gate.ts` (same file, appended):
   - `readGateConfig(cwd: string, deps?: { globalSettingsPath?, projectSettingsPath?, readFileSync }): { disableOnRepo: string[]; enable: boolean; diagnostics: string[] }`
-    — reads:
+    — reads **only config** (no origin, no `isWorkRepo` here):
       - global: `join(process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"), "settings.json")`
         (honors the env override per findings Q-C).
       - project: `join(walkToGitRoot(cwd) ?? cwd, ".pi", "settings.json")`
@@ -97,11 +102,12 @@
     - Extract `taskWorkflow.disableOnRepo` (non-array → `[]` + diagnostic;
       invalid regex inside → that entry skipped + diagnostic, rest kept)
       and `taskWorkflow.enable` (non-bool → `true` + diagnostic). Returns
-      `{ disableOnRepo, enable, diagnostics }`.
+      `{ disableOnRepo, enable, diagnostics }`. **Does not call `isWorkRepo`.**
   - `resolveGate(cwd, deps?): { active, reason, diagnostics }` — the
-    convenience entry point: calls `readGateConfig` then `isWorkRepo`,
-    merging diagnostics. This is what the factory will call in
-    `gate-tools-and-injection`.
+    convenience entry point: reads origin via `readOriginRemote(cwd)`, reads
+    config via `readGateConfig(cwd)`, then calls `isWorkRepo(origin,
+    disableOnRepo, enable)`, merging diagnostics. This composition is what the
+    factory will call in `gate-tools-and-injection`.
 - **Existing abstractions to use:** `walkToGitRoot` (from slice 1);
   `os.homedir()`; `process.env.PI_CODING_AGENT_DIR`.
 - **Do NOT reimplement:** `deepMergeSettings` — we read the two files and
