@@ -84,7 +84,26 @@ Set task_set status done on slice.`
 // wait() keeps the turn alive for notifications and keeps the run steerable.
 wait({ id: runId })
 
-## Step 2 — Report
+## Step 2 — Code review (advisory)
+
+After the slice lands, run a two-axis code review over the bug-fix diff before finalizing. The review is advisory — it does not gate landing or finalize.
+
+```js
+reviewId = subagent({
+  async: true,
+  agent: "code-reviewer",
+  skill: "code-review",
+  as: "review",
+  output: "review/result.md",
+  task: `Review the bug-fix diff for task ${taskSlug}. Fixed point: main. Spec source: bug doc + repro. Report Standards + Spec findings side by side.`
+})
+
+wait({ id: reviewId })
+```
+
+Read `review/result.md` and surface the findings to the user.
+
+## Step 3 — Report
 
 Report the landed slice, the regression test added, and any user interventions.
 

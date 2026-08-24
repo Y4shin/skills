@@ -38,6 +38,7 @@ const AGENT_FILES = [
   "agents/slice-verifier.md",
   "agents/land-worker.md",
   "agents/deviation-reporter.md",
+  "agents/code-reviewer.md",
 ];
 
 describe("agent frontmatter", () => {
@@ -235,6 +236,11 @@ describe("skill cross-references", () => {
     expect(content).toContain("deviation-reporter");
   });
 
+  test("implement-task feature resource references code-reviewer agent", () => {
+    const content = readFile("skills/implement-task/resources/feature.md");
+    expect(content).toContain("code-reviewer");
+  });
+
   for (const resource of ["research", "prototype", "grilling", "manual"]) {
     test(`implement-task ${resource} resource exists and is non-coding`, () => {
       const content = readFile(`skills/implement-task/resources/${resource}.md`);
@@ -256,6 +262,11 @@ describe("skill cross-references", () => {
   test("implement-task bug resource references land-worker agent", () => {
     const content = readFile("skills/implement-task/resources/bug.md");
     expect(content).toContain("land-worker");
+  });
+
+  test("implement-task bug resource references code-reviewer agent", () => {
+    const content = readFile("skills/implement-task/resources/bug.md");
+    expect(content).toContain("code-reviewer");
   });
 
   test("implement-task bug resource uses red-first regression test rule", () => {
