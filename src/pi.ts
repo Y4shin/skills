@@ -22,6 +22,7 @@ import { parse, dump, type Document, type FrontmatterData } from "./core/frontma
 import { fromFrontmatter, sliceInfoFrom, dependencyLevels, type Artifact, type ArtifactKind, type SliceInfo, type WorkItemInfo } from "./core/art.js";
 import { toObject, fromObject, type WorkflowState } from "./core/state.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
+import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 
 // ─── File system helpers ──────────────────────────────────────────────────────
 
@@ -585,9 +586,11 @@ export function createTools(): Record<string, Tool> {
 // ─── Pi extension entry point ──────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
+  const gate: ResolveGateResult = resolveGate(process.cwd());
   const tools = createTools();
 
-  for (const [name, def] of Object.entries(tools)) {
+  if (!gate.active) {
+    for (const [name, def] of Object.entries(tools)) {
     const params: Record<string, any> = {};
     for (const [k, v] of Object.entries(def.args)) {
       const vv = v as any;
@@ -613,6 +616,7 @@ export default function (pi: ExtensionAPI) {
         return { content: [{ type: "text", text: result }], details: {} };
       },
     });
+    }
   }
 
   // ── notify_user tool ────────────────────────────────────────────────
