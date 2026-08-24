@@ -1,8 +1,9 @@
 /**
  * Unit tests for repo-gate — pure gate-detection logic.
  *
- * These tests cover normalizeRemote, readOriginRemote, and isWorkRepo in
- * isolation. No pi runtime, no real git repo required.
+ * These tests cover normalizeRemote, readOriginRemote, isWorkRepo,
+ * readGateConfig, and resolveGate. No pi runtime, no real git repo required
+ * for the unit cases; resolveGate integration uses temp .git/config fixtures.
  */
 
 import { describe, expect, test } from "vitest";
