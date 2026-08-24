@@ -225,4 +225,21 @@ describe("factory gate", () => {
     expect(messages).toContain("pi-subagents is not installed. Install it with: pi install npm:pi-subagents");
     expect(messages).toContain("pi-telemetry is not installed. Install it with: pi install git:github.com/Y4shin/pi-telemetry@v0.4.0");
   });
+
+  test("detection throw falls open and registers all tools", async () => {
+    mockControl.mode = "throw";
+
+    const stub = createStub();
+    factory(stub);
+
+    const names = stub.tools.map((t) => t.name);
+    for (const name of GATED_NAMES) {
+      expect(names).toContain(name);
+    }
+
+    const sessionStartHandlers = stub.handlers["session_start"];
+    await sessionStartHandlers[0]({ type: "session_start", reason: "startup" }, { cwd: process.cwd(), ui: stub.ui });
+
+    expect(stub.notifications.some((n) => n.message.includes("gate detection failed"))).toBe(true);
+  });
 });

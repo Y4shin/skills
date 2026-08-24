@@ -586,7 +586,17 @@ export function createTools(): Record<string, Tool> {
 // ─── Pi extension entry point ──────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
-  const gate: ResolveGateResult = resolveGate(process.cwd());
+  let gate: ResolveGateResult;
+  try {
+    gate = resolveGate(process.cwd());
+  } catch (e) {
+    const message = (e as Error).message;
+    gate = {
+      active: false,
+      reason: `gate detection failed: ${message}`,
+      diagnostics: [message],
+    };
+  }
   const tools = createTools();
 
   if (!gate.active) {
@@ -700,6 +710,9 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     guidelinesCache = discoverGuidelines(ctx.cwd);
     shouldInjectGuidelines = true;
+    for (const diagnostic of gate.diagnostics) {
+      ctx.ui.notify(`task-workflow gate: ${diagnostic}`, "info");
+    }
     if (gate.active) return;
     // Check required peer extensions
     const tools = pi.getAllTools();
