@@ -133,3 +133,40 @@ Implement the D4 policy (prevent preferred, warn fallback) using the
 hook `gate-config-mechanics` confirms. Integration test: in a work repo,
 `/skill:implement-task` is blocked or warned (assert the chosen
 behaviour); in a personal repo, it loads normally.
+
+## Implementation notes
+
+### Slice 1 — gate-strip-skills-from-prompt (landed)
+
+Added an internal `loadGatedSkillNames` helper (reads skill names from
+`package.json` `pi.skills` with a pinned fallback list and a
+diagnostic), a `SKILL_NAME_DIAGNOSTICS` constant, and a `stripSkills`
+`before_agent_start` handler to `src/pi.ts`. The factory registers the
+strip handler only when `gate.active` (`if (gate.active)
+pi.on("before_agent_start", stripSkills)`), mirroring the injection
+handler's `if (!gate.active)` guard from `gate-tools-and-injection` —
+the two are mutually exclusive: exactly one registers per repo type.
+
+The strip handler targets the corrected XML format from `findings.md`
+V1: a single `<available_skills>` block with `<skill>` children, each
+having `<name>`, `<description>`, `<location>` child elements (not the
+older `<skill name="…">` attribute form). It removes `<skill>` blocks
+whose `<name>` child matches one of the gated six; if removal empties
+`<available_skills>`, the whole block (including the "The following
+skills…" preamble) is dropped. On format drift (no
+`<available_skills>` block) it logs a diagnostic and returns the prompt
+unchanged — fail loud, never corrupt.
+
+One existing test (`tests/gate-factory.test.ts`) was updated as an
+intended consequence: the work-repo test previously asserted that a
+work repo registers **no** `before_agent_start` handler. It now
+asserts that a work repo registers exactly one — the new strip
+handler — proving mutual exclusivity with the personal-repo injection
+handler.
+
+Verification: slice tests (`gate-factory.test.ts` 16 tests,
+`repo-gate.test.ts` 40 tests) passed; `npm run typecheck` passed. Full
+suite: 221 passed, 16 failed — all in the pre-existing
+`tests/integration/session.test.ts` (`AuthStorage.inMemory` harness
+error), which is untouched by this branch (empty diff vs. merge base).
+No new failures.
