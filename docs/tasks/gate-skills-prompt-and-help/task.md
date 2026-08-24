@@ -4,7 +4,7 @@ type: feature
 slug: gate-skills-prompt-and-help
 title: Hide the six skills from system prompt + /help/skill-list, and enforce/warn on explicit /skill: in work repos
 map: gate-skills-by-repo
-status: ready
+status: done
 slices:
   - gate-strip-skills-from-prompt
   - gate-suppress-help-and-skill-list
