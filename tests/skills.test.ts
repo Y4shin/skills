@@ -364,4 +364,15 @@ describe("skill cross-references", () => {
     const content = readFile("skills/task-overview/SKILL.md");
     expect(content).toContain("docs/bugs/");
   });
+
+  test("task-workflow-doctor references onboard-workflow", () => {
+    const content = readFile("skills/task-workflow-doctor/SKILL.md");
+    expect(content).toContain("onboard-workflow");
+  });
+
+  test("task-workflow-doctor has not-a-fixer contract", () => {
+    const content = readFile("skills/task-workflow-doctor/SKILL.md");
+    expect(content).toContain("diagnoses");
+    expect(content).toContain("routes");
+  });
 });
