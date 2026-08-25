@@ -83,6 +83,7 @@ const SKILL_FILES = [
   "skills/report-bug/SKILL.md",
   "skills/tdd/SKILL.md",
   "skills/code-review/SKILL.md",
+  "skills/task-workflow-doctor/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -126,7 +127,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(8);
+    expect(pkg.pi.skills.length).toBe(9);
   });
 
   test("has subagents config", () => {

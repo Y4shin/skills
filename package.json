@@ -38,7 +38,8 @@
       "./skills/finalize-task",
       "./skills/report-bug",
       "./skills/tdd",
-      "./skills/code-review"
+      "./skills/code-review",
+      "./skills/task-workflow-doctor"
     ],
     "subagents": {
       "agents": [
