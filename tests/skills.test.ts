@@ -84,6 +84,7 @@ const SKILL_FILES = [
   "skills/tdd/SKILL.md",
   "skills/code-review/SKILL.md",
   "skills/task-workflow-doctor/SKILL.md",
+  "skills/diagnosing-bugs/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -127,7 +128,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(9);
+    expect(pkg.pi.skills.length).toBe(10);
   });
 
   test("has subagents config", () => {
@@ -374,5 +375,17 @@ describe("skill cross-references", () => {
     const content = readFile("skills/task-workflow-doctor/SKILL.md");
     expect(content).toContain("diagnoses");
     expect(content).toContain("routes");
+  });
+
+  test("diagnosing-bugs skill names Phase 1 as non-skippable", () => {
+    const content = readFile("skills/diagnosing-bugs/SKILL.md");
+    expect(content).toContain("Phase 1");
+    expect(content).toContain("non-skippable");
+  });
+
+  test("diagnosing-bugs skill documents skippable phases with recorded justification", () => {
+    const content = readFile("skills/diagnosing-bugs/SKILL.md");
+    expect(content).toContain("skippable");
+    expect(content).toMatch(/justified|recorded/);
   });
 });
