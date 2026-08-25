@@ -377,6 +377,16 @@ describe("skill cross-references", () => {
     expect(content).toContain("routes");
   });
 
+  test("implement-task bug resource references diagnosing-bugs skill", () => {
+    const content = readFile("skills/implement-task/resources/bug.md");
+    expect(content).toContain("diagnosing-bugs");
+  });
+
+  test("tdd-worker agent references diagnosing-bugs skill", () => {
+    const content = readFile("agents/tdd-worker.md");
+    expect(content).toContain("diagnosing-bugs");
+  });
+
   test("diagnosing-bugs skill names Phase 1 as non-skippable", () => {
     const content = readFile("skills/diagnosing-bugs/SKILL.md");
     expect(content).toContain("Phase 1");

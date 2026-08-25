@@ -45,6 +45,7 @@ If nothing noteworthy happened, omit the section entirely.
 ## Constraints
 
 - Consult the `/tdd` skill before writing tests; test only at agreed seams — the seams listed in the arch spec (features) or the repro's seam (bugs). If you believe a test belongs at an unlisted seam, write uncertainty.md and stop.
+- If the dispatch passes `/diagnosing-bugs`, you are on a bug task — follow it for the 6-phase debugging discipline.
 - Commit after each GREEN (checkpoint). Timeouts must not lose work.
 - No speculative code beyond what the slice requires.
 - Use `get_guidelines` for project conventions. Read existing source files before writing.
