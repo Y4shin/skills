@@ -4,7 +4,7 @@ type: feature
 slug: build-diagnosing-bugs-skill
 title: Build the /diagnosing-bugs skill and wire it into the bug pipeline
 map: compare-to-mp-skills
-status: ready
+status: done
 blocked_by:
 - bug-workflow-enhancements
 slices:
@@ -115,3 +115,4 @@ Out of scope:
 ## Implementation notes
 
 - Slice 1 (diagnosing-bugs-skill-content) landed: created `skills/diagnosing-bugs/SKILL.md` (6-phase discipline, Phase 1 non-skippable, 2–6 skippable with recorded reason, redact rule, Phase 6 no-correct-seam handoff); registered `"./skills/diagnosing-bugs"` in `package.json` `pi.skills` (9 → 10); extended `tests/skills.test.ts` with the new SKILL_FILES entry and xref assertions. Structure gate green (112/112), typecheck clean. Slice 2 (pipeline wiring) remains.
+- Slice 2 (diagnosing-bugs-pipeline-wiring) landed: wired `skill: "diagnosing-bugs"` into bug.md's tdd-worker dispatch + explicit type:bug instruction line; added path-agnostic `/diagnosing-bugs` routing line to agents/tdd-worker.md; added two xref assertions to tests/skills.test.ts. Structure gate green (114/114), typecheck clean. No deviations; 3 files changed.

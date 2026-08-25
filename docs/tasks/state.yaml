@@ -1,2 +1,2 @@
 task: build-diagnosing-bugs-skill
-slice: None
+slice: diagnosing-bugs-pipeline-wiring
