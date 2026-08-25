@@ -83,6 +83,7 @@ const SKILL_FILES = [
   "skills/report-bug/SKILL.md",
   "skills/tdd/SKILL.md",
   "skills/code-review/SKILL.md",
+  "skills/task-workflow-doctor/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -126,7 +127,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(8);
+    expect(pkg.pi.skills.length).toBe(9);
   });
 
   test("has subagents config", () => {
@@ -362,5 +363,16 @@ describe("skill cross-references", () => {
   test("task-overview mentions docs/bugs as bug list location", () => {
     const content = readFile("skills/task-overview/SKILL.md");
     expect(content).toContain("docs/bugs/");
+  });
+
+  test("task-workflow-doctor references onboard-workflow", () => {
+    const content = readFile("skills/task-workflow-doctor/SKILL.md");
+    expect(content).toContain("onboard-workflow");
+  });
+
+  test("task-workflow-doctor has not-a-fixer contract", () => {
+    const content = readFile("skills/task-workflow-doctor/SKILL.md");
+    expect(content).toContain("diagnoses");
+    expect(content).toContain("routes");
   });
 });

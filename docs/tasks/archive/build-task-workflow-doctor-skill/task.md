@@ -4,7 +4,7 @@ type: feature
 slug: build-task-workflow-doctor-skill
 title: Build the task-workflow-doctor skill (diagnose workflow issues, route to the right skill)
 map: compare-to-mp-skills
-status: ready
+status: done
 blocked_by: []
 slices:
 - doctor-skill-and-resources
@@ -88,3 +88,14 @@ Out of scope:
   common issues and the skills it routes to) is blocked_by slice 1.
 - The doctor is model-invoked (no `disable-model-invocation`) so it fires when
   workflow-health symptoms come up.
+- Full architecture spec: `docs/tasks/build-task-workflow-doctor-skill/arch-spec.md`.
+
+## Implementation notes
+- slice 1 (doctor-skill-and-resources) landed: task-workflow-doctor SKILL.md + 8 per-issue resources authored, registered in package.json pi.skills (length 8→9), tests/skills.test.ts SKILL_FILES and length assertion updated; npm test -- tests/skills.test.ts green (104/104). No deviations from spec.
+- slice 2 (doctor-routing-tests) landed: added two routing xref assertions to tests/skills.test.ts skill cross-references block (doctor references onboard-workflow; doctor contains 'diagnoses' and 'routes'); npm test -- tests/skills.test.ts green (106/106). No deviations; SKILL.md unchanged.
+
+### Architecture lessons
+- The doctor is a **diagnose-and-route** skill, deliberately not a fixer — it maps symptoms to missing artifacts and points at the owning skill (`onboard-workflow` for the docs/tasks/ + docs/bugs/ tree). This keeps the fix logic in one place (the routed skill) and avoids duplicating `onboard-workflow`'s setup.
+- The not-a-fixer contract is **load-bearing and test-locked**: slice 2 asserts the literal strings `diagnoses`, `routes`, and the `onboard-workflow` reference in the SKILL.md. Any future edit that drops those words will break the xref tests — a cheap guard that the routing contract survives refactors.
+- `CONTEXT.md` and `docs/adr/` are intentionally "note, not route" entries (lazy creation deferred to the future `improve-codebase-architecture` skill). The doctor recommends them as manual steps until that skill exists, rather than routing to a skill that doesn't exist yet.
+

@@ -1,5 +1,16 @@
 # Task Changelog
 
+## 2026-08-25 — Build the task-workflow-doctor skill (build-task-workflow-doctor-skill)
+Added a model-invoked `task-workflow-doctor` skill that diagnoses common
+task-workflow issues (missing `docs/tasks/` tree, `state.yaml`, `docs/bugs/`,
+`docs/dev-env.md`, `docs/testing.md`, `CONTEXT.md`, `docs/adr/`, or a
+misconfigured `package.json` manifest) and routes to the owning skill —
+primarily `/skill:onboard-workflow` — rather than auto-fixing. Backed by 8
+per-issue resource files and a symptom→artifact→route table; the not-a-fixer
+contract (`diagnoses` + `routes` + `onboard-workflow` reference) is locked by
+xref assertions in `tests/skills.test.ts`. Registered in `package.json`
+`pi.skills` (length 8→9); 106/106 structure tests green.
+
 ## 2026-08-24 — Build the /code-review skill, code-reviewer agent, and get_guidelines extension (build-code-review-skill)
 Added a model-invoked `/code-review` skill (two-axis: Standards + Spec) with
 the 12-smell Fowler baseline as a companion doc, plus a `code-reviewer` fanout
