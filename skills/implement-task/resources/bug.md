@@ -37,8 +37,10 @@ runId = subagent({
             agent: "tdd-worker",
             as: "tdd",
             output: `tdd-${slice}/result.md`,
-            skill: "tdd",
+            skill: "diagnosing-bugs",
             task: `Implement slice "${slice}" for bug task "${taskSlug}".
+
+You are on a \`type: bug\` task; consult the \`/diagnosing-bugs\` skill for the 6-phase debugging discipline (Phase 1 non-skippable; others skippable with a recorded reason).
 
 Bug doc: ${bugPath}
 Reproduction: ${reproPath}
