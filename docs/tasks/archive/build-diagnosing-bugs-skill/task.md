@@ -4,7 +4,7 @@ type: feature
 slug: build-diagnosing-bugs-skill
 title: Build the /diagnosing-bugs skill and wire it into the bug pipeline
 map: compare-to-mp-skills
-status: ready
+status: done
 blocked_by:
 - bug-workflow-enhancements
 slices:
@@ -110,3 +110,15 @@ Out of scope:
   invoked standalone too — keep the description general).
 - The bug-signal (Q6) is the skill's *presence* + the explicit instruction
   line; the agent prompt stays path-agnostic.
+- Full architecture spec: `docs/tasks/build-diagnosing-bugs-skill/arch-spec.md`.
+
+## Implementation notes
+
+- Slice 1 (diagnosing-bugs-skill-content) landed: created `skills/diagnosing-bugs/SKILL.md` (6-phase discipline, Phase 1 non-skippable, 2–6 skippable with recorded reason, redact rule, Phase 6 no-correct-seam handoff); registered `"./skills/diagnosing-bugs"` in `package.json` `pi.skills` (9 → 10); extended `tests/skills.test.ts` with the new SKILL_FILES entry and xref assertions. Structure gate green (112/112), typecheck clean. Slice 2 (pipeline wiring) remains.
+- Slice 2 (diagnosing-bugs-pipeline-wiring) landed: wired `skill: "diagnosing-bugs"` into bug.md's tdd-worker dispatch + explicit type:bug instruction line; added path-agnostic `/diagnosing-bugs` routing line to agents/tdd-worker.md; added two xref assertions to tests/skills.test.ts. Structure gate green (114/114), typecheck clean. No deviations; 3 files changed.
+
+### Architecture lessons
+- The bug-signal is the skill's **presence** + an explicit instruction line, not frontmatter sniffing: `bug.md` passes `skill: "diagnosing-bugs"` (feature.md doesn't) and the dispatch prompt says "You are on a `type: bug` task". The tdd-worker agent prompt stays path-agnostic (one line routes on the skill's presence), so the same agent serves both feature and bug paths.
+- The `skill:` subagent param is **single-valued**; the bug dispatch passes `diagnosing-bugs` (the bug-specific discipline) rather than both `tdd` + `diagnosing-bugs`. TDD guidance is preserved because the tdd-worker's `/tdd` consult line in its Constraints section fires regardless of the `skill:` value. This keeps the bug dispatch focused on debugging discipline without losing the TDD reference.
+- The 6-phase content was **adapted** from mp-skills, not ported: delivered via `skill:` to a fresh-context agent (not run as a standalone session); Phase 6 hands to wayfinder / `/improve-codebase-architecture` (not to-spec/to-tickets); no auto-spawn of architecture tasks. The adaptation is locked by xref assertions that catch mp-skills-only references.
+- **Phase placement matters for spec conformance:** the no-correct-seam handoff belongs under Phase 6 — Cleanup (per the arch spec), not Phase 5. The coherence refactor moved it; the xref tests (which assert content, not placement) stayed green, so placement conformance is a review-time concern, not test-locked.

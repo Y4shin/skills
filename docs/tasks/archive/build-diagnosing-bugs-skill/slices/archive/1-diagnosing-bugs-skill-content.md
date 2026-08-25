@@ -4,7 +4,7 @@ slug: diagnosing-bugs-skill-content
 title: Author the /diagnosing-bugs skill and register it
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: m
 blocked_by: []
 ---
