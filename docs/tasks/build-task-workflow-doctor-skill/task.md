@@ -4,7 +4,7 @@ type: feature
 slug: build-task-workflow-doctor-skill
 title: Build the task-workflow-doctor skill (diagnose workflow issues, route to the right skill)
 map: compare-to-mp-skills
-status: ready
+status: done
 blocked_by: []
 slices:
 - doctor-skill-and-resources
