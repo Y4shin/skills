@@ -91,4 +91,5 @@ Out of scope:
 - Full architecture spec: `docs/tasks/build-task-workflow-doctor-skill/arch-spec.md`.
 
 ## Implementation notes
+- slice 1 (doctor-skill-and-resources) landed: task-workflow-doctor SKILL.md + 8 per-issue resources authored, registered in package.json pi.skills (length 8→9), tests/skills.test.ts SKILL_FILES and length assertion updated; npm test -- tests/skills.test.ts green (104/104). No deviations from spec.
 
