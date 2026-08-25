@@ -110,10 +110,6 @@ If a correct seam exists:
 4. Watch it pass.
 5. Re-run the Phase 1 feedback loop against the original (un-minimised) scenario.
 
-### No-correct-seam handoff
-
-If no correct seam exists, that itself is the finding: the codebase architecture is preventing the bug from being locked down. Record the finding in `## Divergence from plan` / `uncertainty.md`, surface it to the parent, and route to **wayfinder** or **`/improve-codebase-architecture`**. Do **not** auto-spawn an architecture task.
-
 ## Phase 6 — Cleanup
 
 Before declaring done:
@@ -123,3 +119,11 @@ Before declaring done:
 - Remove all `[DEBUG-...]` instrumentation (`grep` the prefix).
 - Delete throwaway prototypes (or move them to a clearly-marked debug location).
 - State the winning hypothesis in your commit / PR message so the next debugger learns.
+
+### No-correct-seam handoff
+
+If Phase 5 found no correct seam, that itself is the finding: the codebase
+architecture is preventing the bug from being locked down. Record the finding
+in `## Divergence from plan` / `uncertainty.md`, surface it to the parent, and
+route to **wayfinder** or **`/improve-codebase-architecture`**. Do **not**
+auto-spawn an architecture task.
