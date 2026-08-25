@@ -110,3 +110,7 @@ Out of scope:
   invoked standalone too — keep the description general).
 - The bug-signal (Q6) is the skill's *presence* + the explicit instruction
   line; the agent prompt stays path-agnostic.
+- Full architecture spec: `docs/tasks/build-diagnosing-bugs-skill/arch-spec.md`.
+
+## Implementation notes
+
