@@ -88,3 +88,7 @@ Out of scope:
   common issues and the skills it routes to) is blocked_by slice 1.
 - The doctor is model-invoked (no `disable-model-invocation`) so it fires when
   workflow-health symptoms come up.
+- Full architecture spec: `docs/tasks/build-task-workflow-doctor-skill/arch-spec.md`.
+
+## Implementation notes
+
