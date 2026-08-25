@@ -39,7 +39,8 @@
       "./skills/report-bug",
       "./skills/tdd",
       "./skills/code-review",
-      "./skills/task-workflow-doctor"
+      "./skills/task-workflow-doctor",
+      "./skills/diagnosing-bugs"
     ],
     "subagents": {
       "agents": [
