@@ -1,5 +1,17 @@
 # Task Changelog
 
+## 2026-08-25 — Build the /diagnosing-bugs skill and wire it into the bug pipeline (build-diagnosing-bugs-skill)
+Added a model-invoked `/diagnosing-bugs` skill with the 6-phase debugging
+discipline adapted from mp-skills (Phase 1 build-a-feedback-loop
+**non-skippable** with 10 construction ways + a red-capable completion
+criterion; Phases 2–6 skippable with a recorded reason; redact rule;
+Phase 6 no-correct-seam handoff to wayfinder / `/improve-codebase-architecture`
+with no auto-spawn). Wired it into the bug pipeline: `bug.md`'s tdd-worker
+dispatch now passes `skill: "diagnosing-bugs"` + an explicit "You are on a
+`type: bug` task" instruction line, and `agents/tdd-worker.md` gained a
+path-agnostic routing line. Registered in `package.json` `pi.skills` (9→10);
+114/114 structure tests green.
+
 ## 2026-08-25 — Build the task-workflow-doctor skill (build-task-workflow-doctor-skill)
 Added a model-invoked `task-workflow-doctor` skill that diagnoses common
 task-workflow issues (missing `docs/tasks/` tree, `state.yaml`, `docs/bugs/`,
