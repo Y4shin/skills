@@ -4,7 +4,7 @@ type: feature
 slug: build-domain-modeling-skill
 title: Build the domain-modeling reference skill
 map: compare-to-mp-skills
-status: ready
+status: done
 blocked_by: []
 slices:
   - domain-modeling-skill
@@ -44,3 +44,9 @@ Provide a model-invoked `/domain-modeling` reference skill that helps agents ide
 
 - This is a reusable reference skill, not an autonomous implementation pipeline.
 - It must be Pi-native and avoid assuming a particular application domain.
+
+## Implementation notes
+
+### Slice — domain-modeling-skill (landed)
+
+Added and registered the model-invoked `/domain-modeling` reference skill, covering concepts, relationships, invariants, ownership, terminology, and lifecycle/state transitions with structure and cross-reference test coverage. Verification passed: slice 158/158 and full suite 321/321; no lint script is configured.
