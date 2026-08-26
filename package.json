@@ -40,7 +40,8 @@
       "./skills/tdd",
       "./skills/code-review",
       "./skills/task-workflow-doctor",
-      "./skills/diagnosing-bugs"
+      "./skills/diagnosing-bugs",
+      "./skills/codebase-design"
     ],
     "subagents": {
       "agents": [
