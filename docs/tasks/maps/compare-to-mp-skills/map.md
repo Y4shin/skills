@@ -14,6 +14,9 @@ tasks:
   - build-improve-architecture-skill
   - bug-workflow-enhancements
   - build-diagnosing-bugs-skill
+  - build-codebase-design-skill
+  - build-grilling-skill
+  - build-domain-modeling-skill
 ---
 
 ## Destination
@@ -177,9 +180,10 @@ married to our repo's *automation depth and structural enforcement*.
     bug-workflow-enhancements.
   - `bug_list`/`bug_queue` tool (low priority) — extend src/pi.ts to scan
     docs/bugs/ by status; not a skill.
-  - The three prerequisite skills the map decided (codebase-design, grilling,
-    domain-modeling) still have no build tasks — Wayfinder must create them
-    before build-improve-architecture-skill can graduate.
+  - The three prerequisite skill build tasks are now created and ready:
+    `build-codebase-design-skill`, `build-grilling-skill`, and
+    `build-domain-modeling-skill`. They must land before
+    `build-improve-architecture-skill` can graduate.
 - Should human-facing docs be auto-generated from SKILL.md frontmatter, or
   written separately? (Unaffected by tdd-skill-comparison Q4's companion-doc
   precedent, which is about hand-written reference files a skill author
