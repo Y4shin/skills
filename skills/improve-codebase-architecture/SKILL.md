@@ -19,23 +19,38 @@ Run this periodic, user-invoked survey without changing application code.
    benefits, and a Strong/Worth exploring/Speculative strength.
 3. Have the scout apply the deletion test and use codebase-design vocabulary:
    module, interface, depth, seam, adapter, leverage, and locality.
-4. Write the candidates into `HTML-REPORT.md`'s scaffold as a self-contained
-   report in the operating system temporary directory. Resolve the vendored
-   Tailwind and Mermaid files from this repository by absolute path; never use
-   CDN URLs. Open the generated report for the user.
-5. Stop and ask the user which candidate to pursue. Do not silently pick one.
+4. Generate the report from `HTML-REPORT.md`'s scaffold. For each scout
+   candidate, render its title, strength, files, problem, smallest safe
+   solution, benefits, and before/after Mermaid diagram. Write the completed
+   self-contained HTML to `<tmpdir>/architecture-review-<timestamp>.html`
+   (use the operating system temp directory and a timestamp; do not write the
+   report into the repository). Resolve `vendor/tailwind.min.js` and
+   `vendor/mermaid.min.js` from this repository to absolute paths and replace
+   the scaffold placeholders with those paths. Never use CDN URLs.
+5. Open the generated file with the platform opener (`xdg-open` on Linux,
+   `open` on macOS, or `start` on Windows), and tell the user its absolute
+   path. Then stop and ask exactly: Which of these would you like to explore? Do not silently choose
+   a candidate.
 
 ## Decision and handoff
 
-After an explicit candidate pick, optionally run the existing grilling process
-(one question at a time, following its frontier discipline) to test the design.
-If the user says “don't grill me, just show the report” (or otherwise chooses
-no-grill), preserve that choice and hand the selected candidate directly to
-`wayfinder` as a precise planning decision. Wayfinder owns task creation and
-implementation planning; this skill never auto-fixes architecture.
+Only after the user explicitly picks a candidate, offer the no-grill branch or
+run the existing `/grilling` skill/resource. Grilling uses its established
+one question at a time using the design-tree and frontier discipline: ask a focused
+question with a recommended answer, record the response, and recompute the
+frontier before continuing. Do not invent a new grilling variant. If grilling
+reveals a durable rejection, offer to record the decision as an ADR under
+`docs/adr/`. Update `CONTEXT.md` lazily during grilling only when it is absent
+and the user agrees; never create context during the survey itself.
 
-If grilling reveals a durable rejection, offer to record it as an ADR. During
-that grilling flow, if `CONTEXT.md` is absent, create it lazily only with the
-user's agreement; do not create repository context during a survey.
+If the user says “don't grill me, just show the report” (or invokes this skill
+with the no-grill flag), skip the grilling loop; the report is the whole survey
+output and no design decision is inferred from it. After a candidate is picked,
+pass that picked candidate directly to `/skill:wayfinder` in no-grill mode. In
+normal mode, pass the settled grilling decision (including constraints,
+rejections, and downstream consequences) to `/skill:wayfinder`; hand this
+settled decision to wayfinder. Wayfinder owns
+creating the deepening task and wiring the frontier; this skill never creates
+implementation tasks or auto-fixes application code.
 
 See [HTML-REPORT.md](HTML-REPORT.md) for the report format.
