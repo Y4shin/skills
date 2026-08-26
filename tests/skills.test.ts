@@ -168,6 +168,33 @@ describe("all referenced agents exist", () => {
 
 // ─── Skill references in skills ──────────────────────────────────────
 
+describe("human-mode resource routing", () => {
+  const routers = ["feature", "bug"];
+
+  test.each(routers)("%s router is slim and references both mode resources", (kind) => {
+    const content = readFile(`skills/implement-task/resources/${kind}.md`);
+    expect(content).toContain(`resources/${kind}/autonomous.md`);
+    expect(content).toContain(`resources/${kind}/human.md`);
+    expect(content).toMatch(/ambiguous/i);
+    expect(content).toMatch(/ask_user_question/);
+    expect(content.length).toBeLessThan(2500);
+  });
+
+  test.each(routers)("%s mode resources exist and autonomous copy is substantial", (kind) => {
+    const autonomous = readFile(`skills/implement-task/resources/${kind}/autonomous.md`);
+    const human = readFile(`skills/implement-task/resources/${kind}/human.md`);
+    expect(autonomous.length).toBeGreaterThan(2500);
+    expect(human.length).toBeGreaterThan(100);
+  });
+
+  test.each(routers)("%s router documents clear human phrases, variants, and autonomous fallback", (kind) => {
+    const content = readFile(`skills/implement-task/resources/${kind}.md`);
+    expect(content).toMatch(/implement (the task )?(yourself|manually)|human mode|manual mode/i);
+    expect(content).toMatch(/no prose|no trailing prose|fallback|autonomous/i);
+    expect(content).toMatch(/confirmation|confirm/i);
+  });
+});
+
 describe("skill cross-references", () => {
   test("overview references all core skills", () => {
     const content = readFile("skills/task-overview/SKILL.md");
@@ -214,32 +241,32 @@ describe("skill cross-references", () => {
   });
 
   test("implement-task feature resource references task_dependency_levels", () => {
-    const content = readFile("skills/implement-task/resources/feature.md");
+    const content = readFile("skills/implement-task/resources/feature/autonomous.md");
     expect(content).toContain("task_dependency_levels");
   });
 
   test("implement-task feature resource references tdd-worker agent", () => {
-    const content = readFile("skills/implement-task/resources/feature.md");
+    const content = readFile("skills/implement-task/resources/feature/autonomous.md");
     expect(content).toContain("tdd-worker");
   });
 
   test("implement-task feature resource references slice-verifier agent", () => {
-    const content = readFile("skills/implement-task/resources/feature.md");
+    const content = readFile("skills/implement-task/resources/feature/autonomous.md");
     expect(content).toContain("slice-verifier");
   });
 
   test("implement-task feature resource references land-worker agent", () => {
-    const content = readFile("skills/implement-task/resources/feature.md");
+    const content = readFile("skills/implement-task/resources/feature/autonomous.md");
     expect(content).toContain("land-worker");
   });
 
   test("implement-task feature resource references deviation-reporter agent", () => {
-    const content = readFile("skills/implement-task/resources/feature.md");
+    const content = readFile("skills/implement-task/resources/feature/autonomous.md");
     expect(content).toContain("deviation-reporter");
   });
 
   test("implement-task feature resource references code-reviewer agent", () => {
-    const content = readFile("skills/implement-task/resources/feature.md");
+    const content = readFile("skills/implement-task/resources/feature/autonomous.md");
     expect(content).toContain("code-reviewer");
   });
 
@@ -252,33 +279,33 @@ describe("skill cross-references", () => {
   }
 
   test("implement-task bug resource references tdd-worker agent", () => {
-    const content = readFile("skills/implement-task/resources/bug.md");
+    const content = readFile("skills/implement-task/resources/bug/autonomous.md");
     expect(content).toContain("tdd-worker");
   });
 
   test("implement-task bug resource references slice-verifier agent", () => {
-    const content = readFile("skills/implement-task/resources/bug.md");
+    const content = readFile("skills/implement-task/resources/bug/autonomous.md");
     expect(content).toContain("slice-verifier");
   });
 
   test("implement-task bug resource references land-worker agent", () => {
-    const content = readFile("skills/implement-task/resources/bug.md");
+    const content = readFile("skills/implement-task/resources/bug/autonomous.md");
     expect(content).toContain("land-worker");
   });
 
   test("implement-task bug resource references code-reviewer agent", () => {
-    const content = readFile("skills/implement-task/resources/bug.md");
+    const content = readFile("skills/implement-task/resources/bug/autonomous.md");
     expect(content).toContain("code-reviewer");
   });
 
   test("implement-task bug resource uses red-first regression test rule", () => {
-    const content = readFile("skills/implement-task/resources/bug.md");
+    const content = readFile("skills/implement-task/resources/bug/autonomous.md");
     expect(content).toMatch(/red.{0,40}test|test.{0,40}red/i);
   });
 
   test("feature and bug resources include failure toolbelt in order", () => {
-    const feature = readFile("skills/implement-task/resources/feature.md");
-    const bug = readFile("skills/implement-task/resources/bug.md");
+    const feature = readFile("skills/implement-task/resources/feature/autonomous.md");
+    const bug = readFile("skills/implement-task/resources/bug/autonomous.md");
     for (const content of [feature, bug]) {
       const splitIdx = content.indexOf("split");
       const retryIdx = content.indexOf("retry");
@@ -378,7 +405,7 @@ describe("skill cross-references", () => {
   });
 
   test("implement-task bug resource references diagnosing-bugs skill", () => {
-    const content = readFile("skills/implement-task/resources/bug.md");
+    const content = readFile("skills/implement-task/resources/bug/autonomous.md");
     expect(content).toContain("diagnosing-bugs");
   });
 
