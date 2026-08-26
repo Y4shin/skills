@@ -276,6 +276,70 @@ describe("human-mode bug pipeline", () => {
   });
 });
 
+// ─── Human-mode integration contracts ────────────────────────────────
+
+/**
+ * These assertions intentionally observe resource boundaries and protocol
+ * vocabulary, rather than matching the surrounding explanatory prose. This
+ * keeps the workflow coverage stable when the orchestration text is revised.
+ */
+describe("human-mode integration coverage", () => {
+  const modes = ["autonomous", "human"] as const;
+  const taskKinds = ["feature", "bug"] as const;
+
+  test.each(taskKinds)("%s router is the sole dispatch entry and discovers both modes", (kind) => {
+    const router = readFile(`skills/implement-task/resources/${kind}.md`);
+    expect(router).toContain(`resources/${kind}/autonomous.md`);
+    expect(router).toContain(`resources/${kind}/human.md`);
+    expect(router).toMatch(/no trailing mode prose|no prose/i);
+    expect(router).toMatch(/ambiguous/i);
+    expect(router).toContain("ask_user_question");
+
+    const wrapper = readFile("skills/implement-task/SKILL.md");
+    expect(wrapper).toContain(`resources/${kind}.md`);
+    expect(wrapper).not.toContain(`resources/${kind}/human.md`);
+    expect(wrapper).not.toContain(`resources/${kind}/autonomous.md`);
+  });
+
+  test.each(taskKinds.flatMap((kind) => modes.map((mode) => [kind, mode] as const)))
+    ("%s %s resource exists and is non-empty", (kind, mode) => {
+      const content = readFile(`skills/implement-task/resources/${kind}/${mode}.md`);
+      expect(content.trim().length).toBeGreaterThan(100);
+    });
+
+  test("verification agent permissions are read-only while landing remains separate", () => {
+    const verifier = parseFrontmatter(readFile("agents/slice-verifier.md"));
+    const reviewer = parseFrontmatter(readFile("agents/code-reviewer.md"));
+    expect(verifier.tools).toBe("read, bash");
+    expect(reviewer.tools).not.toMatch(/edit|write|land-worker/);
+
+    for (const kind of taskKinds) {
+      const human = readFile(`skills/implement-task/resources/${kind}/human.md`);
+      expect(human).toMatch(/read[- ]only/i);
+      expect(human).toMatch(/must not edit|cannot edit/i);
+      expect(human).toContain("land-worker");
+      expect(human.indexOf("explicit human approval")).toBeLessThan(human.lastIndexOf("land-worker"));
+    }
+  });
+
+  test.each(taskKinds)("%s human protocol covers verifier failure and approval rejection", (kind) => {
+    const human = readFile(`skills/implement-task/resources/${kind}/human.md`);
+    expect(human).toMatch(/verifier[- ]first/i);
+    expect(human).toMatch(/fast[- ]fail/i);
+    expect(human).toMatch(/failure.*return|return.*failure/i);
+    expect(human).toMatch(/rejected|declined|not approved/i);
+    expect(human).toMatch(/next slice|task completion|declaring task completion/i);
+  });
+
+  test("feature human protocol preserves collaborative post-handoff assistance boundary", () => {
+    const human = readFile("skills/implement-task/resources/feature/human.md");
+    expect(human).toMatch(/after the per[- ]slice handoff|after.*handoff/i);
+    expect(human).toMatch(/explicit request.*code assistance|code assistance.*explicit/i);
+    expect(human).toMatch(/multiple slices|each slice|every slice/i);
+    expect(human).toMatch(/whole-task.*refactor|collaborative.*refactor/i);
+  });
+});
+
 describe("skill cross-references", () => {
   test("overview references all core skills", () => {
     const content = readFile("skills/task-overview/SKILL.md");
