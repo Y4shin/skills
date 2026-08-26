@@ -4,11 +4,8 @@ type: feature
 slug: build-improve-architecture-skill
 title: Build the /improve-codebase-architecture skill (architecture-scout + HTML report + grilling)
 map: compare-to-mp-skills
-status: blocked
-blocked_by:
-- build-codebase-design-skill
-- build-grilling-skill
-- build-domain-modeling-skill
+status: ready
+blocked_by: []
 slices:
 - improve-arch-skill-and-scout
 - improve-arch-report-and-grilling
