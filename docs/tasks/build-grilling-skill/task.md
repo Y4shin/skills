@@ -4,7 +4,7 @@ type: feature
 slug: build-grilling-skill
 title: Build the reusable grilling reference skill
 map: compare-to-mp-skills
-status: ready
+status: done
 blocked_by: []
 slices:
   - grilling-skill
@@ -50,3 +50,9 @@ Provide a model-invoked `/grilling` reference skill that teaches agents how to r
 - The skill is a reusable reference skill, not a replacement for task-type routing.
 - It must be Pi-native and preserve the workflow's human-in-the-loop boundary.
 - Existing task-specific grilling resources may remain operational adapters; this task creates the canonical reusable method skill.
+
+## Implementation notes
+
+### Slice — grilling-skill (landed)
+
+Added and registered the model-invoked `/grilling` reference skill, preserving the canonical design-tree, round/frontier, prerequisite ordering, recommended-answer, and shared-understanding protocols with Pi-specific interaction and Wayfinder handoff guidance. Verification passed: slice 152/152 and full suite 315/315; no lint script is configured.
