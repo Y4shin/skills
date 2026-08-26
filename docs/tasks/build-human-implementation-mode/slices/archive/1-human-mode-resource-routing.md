@@ -4,7 +4,7 @@ slug: human-mode-resource-routing
 title: Split feature and bug resources behind human-mode routers
 task: ../task.md
 mode: hitl
-status: todo
+status: done
 size: m
 blocked_by: []
 ---

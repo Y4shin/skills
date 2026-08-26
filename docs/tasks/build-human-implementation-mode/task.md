@@ -61,3 +61,7 @@ When a user invokes implementation with prose clearly requesting that they imple
 - Landing is separate and approval-gated.
 - Refactoring is a collaborative whole-task phase after landing.
 - Resource layout: top-level routers plus `feature/{autonomous,human}.md` and `bug/{autonomous,human}.md`.
+
+## Implementation notes
+
+- Slice `human-mode-resource-routing` landed: split feature and bug dispatch behind slim top-level routers, preserved autonomous resources byte-for-byte, and added human-mode placeholders plus routing/ambiguity contracts. Structure tests passed (`npx vitest run tests/skills.test.ts`, 120/120). The existing deviation report records no blockers; the full project suite remains a residual risk due to pre-existing dependency/environment failures.
