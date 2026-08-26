@@ -41,7 +41,8 @@
       "./skills/code-review",
       "./skills/task-workflow-doctor",
       "./skills/diagnosing-bugs",
-      "./skills/codebase-design"
+      "./skills/codebase-design",
+      "./skills/grilling"
     ],
     "subagents": {
       "agents": [
