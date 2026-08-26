@@ -222,6 +222,21 @@ describe("improve-codebase-architecture skill references", () => {
   test("has a wayfinder handoff", () => {
     expect(content).toMatch(/hand.*wayfinder|wayfinder.*hand/i);
   });
+
+  test("is explicitly user-invoked and has an offline report scaffold", () => {
+    const fm = parseFrontmatter(content);
+    expect(fm["disable-model-invocation"]).toBe("true");
+    const report = readFile("skills/improve-codebase-architecture/HTML-REPORT.md");
+    expect(report.trim().length).toBeGreaterThan(0);
+    expect(report).toContain("vendor/tailwind.min.js");
+    expect(report).toContain("vendor/mermaid.min.js");
+    expect(report).not.toMatch(/https?:\/\/cdn\./i);
+  });
+
+  test("vendors both report dependencies", () => {
+    expect(readFile("skills/improve-codebase-architecture/vendor/tailwind.min.js").length).toBeGreaterThan(100_000);
+    expect(readFile("skills/improve-codebase-architecture/vendor/mermaid.min.js").length).toBeGreaterThan(1_000_000);
+  });
 });
 
 describe("codebase-design skill references", () => {
