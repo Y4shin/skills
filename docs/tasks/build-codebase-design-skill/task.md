@@ -4,7 +4,7 @@ type: feature
 slug: build-codebase-design-skill
 title: Build the codebase-design reference skill
 map: compare-to-mp-skills
-status: ready
+status: done
 blocked_by: []
 slices:
   - codebase-design-skill
@@ -44,3 +44,9 @@ Provide a model-invoked `/codebase-design` reference skill that gives agents a s
 
 - This is a reusable reference skill, not an autonomous implementation pipeline.
 - It must be Pi-native and may not assume Claude Code or skills.sh behavior.
+
+## Implementation notes
+
+### Slice — codebase-design-skill (landed)
+
+Added and registered the model-invoked `/codebase-design` reference skill, including architecture exploration, boundary and dependency mapping, reuse, and deletion-test guidance, with structure and cross-reference coverage in `tests/skills.test.ts`. Verification passed: slice tests 145/145 and full suite 308/308; no lint script is configured.
