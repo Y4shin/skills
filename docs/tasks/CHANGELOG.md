@@ -1,5 +1,8 @@
 # Task Changelog
 
+## 2026-08-26 — Build the codebase-design reference skill (build-codebase-design-skill)
+Added and registered a Pi-native `/codebase-design` skill covering architecture exploration, boundaries, dependencies, reuse, and deletion-test reasoning. Added structure and cross-reference coverage; the full devenv test suite passes 308/308.
+
 ## 2026-08-26 — Fix integration harness AuthStorage API compatibility (fix-integration-harness-auth-storage)
 Updated the integration harness to use the installed Pi API's `ModelRuntime` with in-memory credentials. The focused integration tests and full devenv suite now pass: 302/302. Closed and archived the follow-up bug report.
 
