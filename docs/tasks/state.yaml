@@ -1,2 +1,3 @@
-task: None
-slice: None
+task: build-human-implementation-mode
+slice: human-mode-integration-coverage
+task_status: done

@@ -12,6 +12,7 @@
 | `npm test` | Run the full test suite |
 | `npm run typecheck` | Type-check without emitting |
 | `npx vitest run <file>` | Run a single test file |
+| `devenv shell -- npm test` | Run the full suite in the reproducible devenv shell |
 
 ## Mock conventions
 
@@ -48,7 +49,9 @@ feature landed since. Until fixed, run the suite with
 `npx vitest run --exclude tests/integration/session.test.ts`, or rely on
 the per-feature unit tests. Do **not** let this block landing new work —
 verify it's not your change by checking the failure is that same
-`AuthStorage.inMemory` line.
+`AuthStorage.inMemory` line. The follow-up bug task
+`fix-integration-harness-auth-storage` tracks updating the harness for the
+installed Pi API.
 
 ## Skill prose testing
 

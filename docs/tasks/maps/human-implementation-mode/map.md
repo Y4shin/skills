@@ -4,8 +4,13 @@ slug: human-implementation-mode
 title: Enable collaborative human implementation with LLM verification
 status: active
 tasks:
+- slug: decide-human-implementation-mode
+  blocked_by: []
+  done: true
+- slug: build-human-implementation-mode
+  blocked_by:
   - decide-human-implementation-mode
-  - build-human-implementation-mode
+  done: true
 ---
 
 ## Destination
