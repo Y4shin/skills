@@ -61,9 +61,10 @@ read-only chain and is the sole agent allowed to merge/archive/commit or change
 state.
 
 After landing, require explicit approval again before moving to the next slice.
-Repeat the handoff, human implementation, verification, findings, and approval
-gates for every slice. A verifier failure always returns promptly to the human
-and never skips ahead.
+If findings or a landing request are rejected, stop at the current gate and return
+control to the human rather than advancing. Repeat the handoff, human
+implementation, verification, findings, and approval gates for every slice. A
+verifier failure always returns promptly to the human and never skips ahead.
 
 ## 5. Whole-task completion and collaborative refactoring
 
