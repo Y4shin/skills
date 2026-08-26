@@ -51,7 +51,9 @@ married to our repo's *automation depth and structural enforcement*.
 - **Priority order for adoption** (from grilling Q1): (1) reusable primitives,
   (2) workflow, (3) context management, (4) utility skills.
 - **All three primitives as model-invoked skills** (Q2): grilling,
-  domain-modeling, and codebase-design.
+  domain-modeling, and codebase-design. The grilling skill uses Matt Pocock's
+  canonical template as its behavioral source:
+  `https://raw.githubusercontent.com/mattpocock/skills/refs/heads/main/skills/productivity/grilling/SKILL.md`.
 - **Workflow model** (Q3): two-phase with wayfinder as pure router.
   Wayfinder delegates all execution (including grilling) to implement-task.
   Exploration phase: research/prototype/grilling only, with at least one
