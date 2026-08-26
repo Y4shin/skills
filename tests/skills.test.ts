@@ -242,6 +242,40 @@ describe("human-mode feature pipeline", () => {
   });
 });
 
+describe("human-mode bug pipeline", () => {
+  const content = readFile("skills/implement-task/resources/bug/human.md");
+
+  test("requires collaborative reproduction and diagnosis planning with consent", () => {
+    expect(content).toMatch(/reproduction|reproduce/i);
+    expect(content).toMatch(/diagnos(e|is)/i);
+    expect(content).toMatch(/cause|regression seam|acceptance criteria|scope/i);
+    expect(content).toMatch(/explicit (user|human) consent|consent.*before/i);
+    expect(content).toMatch(/not.*feature.*architecture|do not.*architecture-spec/i);
+  });
+
+  test("defines human implementation handoff and forbids unrequested edits", () => {
+    expect(content).toMatch(/implementation handoff|hand.*human/i);
+    expect(content).toMatch(/do not write.*(fix|code)|no.*code.*before/i);
+    expect(content).toMatch(/explicit.*request.*code assistance|code assistance.*explicit/i);
+  });
+
+  test("defines read-only verifier-first fast-fail chain and permissions", () => {
+    expect(content).toMatch(/verifier[- ]first/i);
+    expect(content).toMatch(/read[- ]only/i);
+    expect(content).toMatch(/fast[- ]fail/i);
+    expect(content).toContain("slice-verifier");
+    expect(content).toMatch(/must not edit|cannot edit/i);
+    expect(content).toMatch(/failure.*return|return.*failure/i);
+  });
+
+  test("requires findings approval before separate landing and completion", () => {
+    expect(content).toMatch(/present.*findings|findings.*present/i);
+    expect(content).toMatch(/explicit.*approval.*landing|approval.*before.*landing/i);
+    expect(content).toContain("land-worker");
+    expect(content).toMatch(/next slice|task completion|complete/i);
+  });
+});
+
 describe("skill cross-references", () => {
   test("overview references all core skills", () => {
     const content = readFile("skills/task-overview/SKILL.md");
