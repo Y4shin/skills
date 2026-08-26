@@ -10,6 +10,7 @@ The feature adds a model-invoked `/improve-codebase-architecture` workflow that 
 
 - `skills/improve-codebase-architecture/SKILL.md` with survey/report/pick/handoff flow and no-grill mode.
 - `agents/architecture-scout.md`, a read-only candidate scout.
+- `skills/improve-codebase-architecture/HTML-REPORT.md`, the offline report scaffold.
 - Vendored report dependencies under `skills/improve-codebase-architecture/vendor/`.
 - Package registration and structure tests.
 
@@ -33,13 +34,12 @@ The feature adds a model-invoked `/improve-codebase-architecture` workflow that 
 
 ### Interface contract
 
-The report slice consumes scout candidate output and the user-selected candidate; the scout returns candidates and does not write the report.
+The report slice consumes scout candidate output and the user-selected candidate; the scout returns candidates and does not write the report. Slice 1 owns the static HTML report scaffold because it is an explicit slice deliverable; slice 2 owns report generation wiring, candidate selection, and grilling/no-grill behavior.
 
 ## Slice: improve-arch-report-and-grilling
 
 ### Exports
 
-- `HTML-REPORT.md` scaffold with Tailwind/Mermaid vendored references, before/after diagrams, and strength badges.
 - Skill instructions for report generation, explicit candidate selection, optional grilling/no-grill path, and Wayfinder handoff.
 - Structure/xref coverage for the complete flow.
 
