@@ -87,6 +87,7 @@ const SKILL_FILES = [
   "skills/diagnosing-bugs/SKILL.md",
   "skills/codebase-design/SKILL.md",
   "skills/grilling/SKILL.md",
+  "skills/domain-modeling/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -130,8 +131,9 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(12);
+    expect(pkg.pi.skills.length).toBe(13);
     expect(pkg.pi.skills).toContain("./skills/codebase-design");
+    expect(pkg.pi.skills).toContain("./skills/domain-modeling");
   });
 
   test("has subagents config", () => {
@@ -176,6 +178,28 @@ describe("grilling skill references", () => {
     expect(content).toMatch(/frontier is empty|nothing left silently assumed/i);
     expect(content).toContain("ask_user_question");
     expect(content).toMatch(/Wayfinder/i);
+  });
+});
+
+describe("domain-modeling skill references", () => {
+  const content = readFile("skills/domain-modeling/SKILL.md");
+
+  test("is registered as a model-invoked Pi skill", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).toContain("./skills/domain-modeling");
+    expect(content).toMatch(/^name: domain-modeling/m);
+    expect(content).toMatch(/model-invoked|Pi-native/i);
+  });
+
+  test("covers the portable domain modeling vocabulary and output", () => {
+    expect(content).toMatch(/concepts?/i);
+    expect(content).toMatch(/relationships?/i);
+    expect(content).toMatch(/invariants?/i);
+    expect(content).toMatch(/ownership/i);
+    expect(content).toMatch(/terminology/i);
+    expect(content).toMatch(/lifecycle|state transitions?/i);
+    expect(content).toMatch(/uncertaint(y|ies)|open questions?/i);
+    expect(content).toMatch(/output|deliverable/i);
   });
 });
 

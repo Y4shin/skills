@@ -42,7 +42,8 @@
       "./skills/task-workflow-doctor",
       "./skills/diagnosing-bugs",
       "./skills/codebase-design",
-      "./skills/grilling"
+      "./skills/grilling",
+      "./skills/domain-modeling"
     ],
     "subagents": {
       "agents": [

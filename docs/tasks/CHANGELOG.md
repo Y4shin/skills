@@ -1,5 +1,8 @@
 # Task Changelog
 
+## 2026-08-26 — Build the domain-modeling reference skill (build-domain-modeling-skill)
+Added and registered a Pi-native `/domain-modeling` skill covering concepts, relationships, invariants, ownership, terminology, and lifecycle/state modeling. Added structure and cross-reference coverage; the full devenv test suite passes 321/321.
+
 ## 2026-08-26 — Build the reusable grilling reference skill (build-grilling-skill)
 Added and registered a Pi-native `/grilling` skill based on Matt Pocock's canonical design-tree and round/frontier template, adapted for Pi interaction and Wayfinder handoffs. Added protocol structure coverage; the full devenv test suite passes 315/315.
 
