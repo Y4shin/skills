@@ -85,6 +85,7 @@ const SKILL_FILES = [
   "skills/code-review/SKILL.md",
   "skills/task-workflow-doctor/SKILL.md",
   "skills/diagnosing-bugs/SKILL.md",
+  "skills/codebase-design/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -128,7 +129,8 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(10);
+    expect(pkg.pi.skills.length).toBe(11);
+    expect(pkg.pi.skills).toContain("./skills/codebase-design");
   });
 
   test("has subagents config", () => {
@@ -142,6 +144,25 @@ describe("package.json", () => {
 
   test("no skills/archive", () => {
     expect(existsSync(join(PROJECT, "skills", "archive"))).toBe(false);
+  });
+});
+
+describe("codebase-design skill references", () => {
+  const content = readFile("skills/codebase-design/SKILL.md");
+
+  test("documents Pi-native architecture exploration vocabulary", () => {
+    expect(content).toMatch(/CodeGraph/i);
+    expect(content).toMatch(/boundar(y|ies)/i);
+    expect(content).toMatch(/dependenc(y|ies)/i);
+    expect(content).toMatch(/reuse/i);
+    expect(content).toMatch(/deletion[- ]test/i);
+    expect(content).toMatch(/safe extension point/i);
+  });
+
+  test("defines expected architecture output", () => {
+    expect(content).toMatch(/output|report|deliverable/i);
+    expect(content).toMatch(/architecture[- ]scout/i);
+    expect(content).toMatch(/architecture survey/i);
   });
 });
 
