@@ -1,10 +1,10 @@
 ---
 title: Update integration harness for the installed AuthStorage API
-status: promoted
+status: fixed
 severity: major
 reported: 2026-08-26
 confirmed_by: devenv shell -- npm test
-fix_commit:
+fix_commit: e471bfa
 promoted_to: fix-integration-harness-auth-storage
 ---
 
@@ -32,8 +32,8 @@ The failure occurs at `tests/integration/harness.ts:138`; 16 integration tests f
 
 ## Root cause
 
-To be determined by the follow-up bug task.
+The integration harness imported `AuthStorage` and `ModelRegistry` APIs that are not exported by the installed `@earendil-works/pi-coding-agent` 0.80.10 package.
 
 ## Fix summary
 
-Not fixed yet. Promoted to `fix-integration-harness-auth-storage`.
+Updated `tests/integration/harness.ts` to use the exported `ModelRuntime` with in-memory credentials and disabled model networking. The focused integration suite and full suite now pass: 302/302 tests.
