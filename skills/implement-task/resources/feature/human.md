@@ -52,7 +52,7 @@ failure and evidence to the human, and do not invoke later verification,
 landing, or progression. The human decides whether to revise the implementation
 or request assistance and then requests another verification run.
 
-## 4. Findings approval and separate landing
+## 4. Findings approval gate and separate landing
 
 Present all verifier, deviation, and review findings to the human, including
 commands and outcomes. Require explicit human approval before landing. Only

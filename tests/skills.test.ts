@@ -224,6 +224,14 @@ describe("human-mode feature pipeline", () => {
     expect(content).toMatch(/failure.*return|return.*failure/i);
   });
 
+  test("keeps planning, handoff, verification, landing, and refactoring in order", () => {
+    const stages = ["## 1.", "## 2.", "## 3.", "## 4.", "## 5."];
+    const positions = stages.map((stage) => content.indexOf(stage));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(content).toMatch(/approval gate/i);
+  });
+
   test("gates findings, landing, progression, and refactoring on approval", () => {
     expect(content).toMatch(/present.*findings|findings.*present/i);
     expect(content).toMatch(/explicit.*approval.*landing|approval.*before.*landing/i);
