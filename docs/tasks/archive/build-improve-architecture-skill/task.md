@@ -4,7 +4,7 @@ type: feature
 slug: build-improve-architecture-skill
 title: Build the /improve-codebase-architecture skill (architecture-scout + HTML report + grilling)
 map: compare-to-mp-skills
-status: ready
+status: done
 blocked_by: []
 slices:
 - improve-arch-skill-and-scout
@@ -104,9 +104,10 @@ Out of scope:
 
 ## Architecture notes
 
-- Slice 1 (skill + scout agent + vendor deps + manifest + structure tests)
-  has no deps beyond the task's blockers. Slice 2 (HTML report scaffold +
-  grilling/no-grill wiring + xref tests) is blocked_by slice 1.
+- Slice 1 (skill + scout agent + vendor deps + static HTML scaffold +
+  manifest + structure tests) has no deps beyond the task's blockers. Slice 2
+  (report-generation wiring + grilling/no-grill wiring + xref tests) is
+  blocked_by slice 1.
 - The vendored assets are committed once; the HTML template references them
   via absolute path resolved at generation time (the temp file isn't in the
   repo, so it references the repo's vendor/ dir by absolute path).
@@ -114,3 +115,24 @@ Out of scope:
   writes the report.
 - The grilling loop, when invoked, uses the existing grilling resource's
   one-question/frontier discipline (no new grilling variant).
+
+## Implementation notes
+
+### Slice 1 — improve-arch-skill-and-scout (landed)
+
+Landed the `/improve-codebase-architecture` skill, read-only
+`architecture-scout` agent, vendored Tailwind and Mermaid assets, package
+registration, and structure-test coverage. Verification passed: slice tests
+174/174 and the full suite 337/337; no lint command is configured.
+
+Resolved boundary deviation: `HTML-REPORT.md` remains in slice 1 because it is
+listed in that slice's deliverables, and `arch-spec.md` now records slice 1
+ownership of the static scaffold. Slice 2 owns report-generation wiring,
+candidate selection, and grilling/no-grill behavior.
+
+### Slice 2 — improve-arch-report-and-grilling (landed)
+
+Landed report-generation wiring with vendored dependency paths, browser
+opening and candidate selection, grilling/no-grill behavior, wayfinder handoff,
+and cross-reference test assertions. Verification passed: slice 176/176 and
+full suite 339/339; no lint command is configured.

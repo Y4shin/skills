@@ -1,5 +1,8 @@
 # Task Changelog
 
+## 2026-08-26 — Build the codebase architecture improvement survey (build-improve-architecture-skill)
+Added the read-only architecture scout and `/improve-codebase-architecture` survey with vendored offline HTML reporting, candidate selection, optional grilling, ADR awareness, and Wayfinder handoff. Full devenv test suite passes 339/339.
+
 ## 2026-08-26 — Build the domain-modeling reference skill (build-domain-modeling-skill)
 Added and registered a Pi-native `/domain-modeling` skill covering concepts, relationships, invariants, ownership, terminology, and lifecycle/state modeling. Added structure and cross-reference coverage; the full devenv test suite passes 321/321.
 

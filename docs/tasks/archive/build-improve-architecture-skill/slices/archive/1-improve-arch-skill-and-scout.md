@@ -4,7 +4,7 @@ slug: improve-arch-skill-and-scout
 title: Author the /improve-codebase-architecture skill + architecture-scout agent + vendor deps
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: l
 blocked_by: []
 ---

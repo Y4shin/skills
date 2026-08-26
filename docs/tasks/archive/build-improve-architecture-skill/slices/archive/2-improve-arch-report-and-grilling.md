@@ -4,7 +4,7 @@ slug: improve-arch-report-and-grilling
 title: Wire the HTML report generation + grilling/no-grill + wayfinder handoff + xref tests
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: m
 blocked_by: [improve-arch-skill-and-scout]
 ---
