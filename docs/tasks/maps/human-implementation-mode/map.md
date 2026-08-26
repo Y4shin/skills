@@ -2,7 +2,7 @@
 kind: map
 slug: human-implementation-mode
 title: Enable collaborative human implementation with LLM verification
-status: active
+status: done
 tasks:
 - slug: decide-human-implementation-mode
   blocked_by: []

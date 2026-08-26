@@ -3,6 +3,9 @@
 ## 2026-08-26 — Add human-owned implementation mode with read-only verification (build-human-implementation-mode)
 Added permissive human/manual routing for feature and bug workflows, collaborative planning and consent gates, read-only verifier-first checks, approval-gated landing, and collaborative refactoring guidance. Added a reproducible devenv shell; targeted structure tests reached 139/139. Full integration verification remains blocked by the pre-existing AuthStorage API mismatch, tracked in `fix-integration-harness-auth-storage`.
 
+## 2026-08-26 — Complete the human-implementation-mode map
+The initiative is complete: feature and bug implementation now support permissive human/manual routing, collaborative planning gates, read-only fast-fail verification, approval-gated landing, and collaborative refactoring. A devenv shell provides the test environment, and the remaining Pi `AuthStorage` harness incompatibility is tracked as `fix-integration-harness-auth-storage`.
+
 ## 2026-08-25 — Build the /diagnosing-bugs skill and wire it into the bug pipeline (build-diagnosing-bugs-skill)
 Added a model-invoked `/diagnosing-bugs` skill with the 6-phase debugging
 discipline adapted from mp-skills (Phase 1 build-a-feedback-loop
