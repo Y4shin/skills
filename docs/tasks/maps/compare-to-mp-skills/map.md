@@ -4,45 +4,45 @@ slug: compare-to-mp-skills
 title: Improve workflow and toolkit using mp-skills patterns
 status: active
 tasks:
-  - slug: adopt-mp-skills-patterns
-    blocked_by: []
-    done: true
-  - slug: tdd-skill-comparison
-    blocked_by: []
-    done: true
-  - slug: build-tdd-reference-skill
-    blocked_by: []
-    done: true
-  - slug: code-review-evaluation
-    blocked_by: []
-    done: true
-  - slug: build-code-review-skill
-    blocked_by: []
-    done: true
-  - slug: improve-architecture-evaluation
-    blocked_by: []
-    done: true
-  - slug: build-task-workflow-doctor-skill
-    blocked_by: []
-    done: true
-  - slug: build-improve-architecture-skill
-    blocked_by: []
-    done: false
-  - slug: bug-workflow-enhancements
-    blocked_by: []
-    done: true
-  - slug: build-diagnosing-bugs-skill
-    blocked_by: []
-    done: true
-  - slug: build-codebase-design-skill
-    blocked_by: []
-    done: true
-  - slug: build-grilling-skill
-    blocked_by: []
-    done: true
-  - slug: build-domain-modeling-skill
-    blocked_by: []
-    done: true
+- slug: adopt-mp-skills-patterns
+  blocked_by: []
+  done: true
+- slug: tdd-skill-comparison
+  blocked_by: []
+  done: true
+- slug: build-tdd-reference-skill
+  blocked_by: []
+  done: true
+- slug: code-review-evaluation
+  blocked_by: []
+  done: true
+- slug: build-code-review-skill
+  blocked_by: []
+  done: true
+- slug: improve-architecture-evaluation
+  blocked_by: []
+  done: true
+- slug: build-task-workflow-doctor-skill
+  blocked_by: []
+  done: true
+- slug: build-improve-architecture-skill
+  blocked_by: []
+  done: true
+- slug: bug-workflow-enhancements
+  blocked_by: []
+  done: true
+- slug: build-diagnosing-bugs-skill
+  blocked_by: []
+  done: true
+- slug: build-codebase-design-skill
+  blocked_by: []
+  done: true
+- slug: build-grilling-skill
+  blocked_by: []
+  done: true
+- slug: build-domain-modeling-skill
+  blocked_by: []
+  done: true
 ---
 
 ## Destination
