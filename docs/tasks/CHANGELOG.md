@@ -1,5 +1,8 @@
 # Task Changelog
 
+## 2026-08-26 — Build the reusable grilling reference skill (build-grilling-skill)
+Added and registered a Pi-native `/grilling` skill based on Matt Pocock's canonical design-tree and round/frontier template, adapted for Pi interaction and Wayfinder handoffs. Added protocol structure coverage; the full devenv test suite passes 315/315.
+
 ## 2026-08-26 — Build the codebase-design reference skill (build-codebase-design-skill)
 Added and registered a Pi-native `/codebase-design` skill covering architecture exploration, boundaries, dependencies, reuse, and deletion-test reasoning. Added structure and cross-reference coverage; the full devenv test suite passes 308/308.
 
