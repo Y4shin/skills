@@ -4,7 +4,7 @@ type: feature
 slug: build-improve-architecture-skill
 title: Build the /improve-codebase-architecture skill (architecture-scout + HTML report + grilling)
 map: compare-to-mp-skills
-status: ready
+status: done
 blocked_by: []
 slices:
 - improve-arch-skill-and-scout
@@ -129,3 +129,10 @@ Resolved boundary deviation: `HTML-REPORT.md` remains in slice 1 because it is
 listed in that slice's deliverables, and `arch-spec.md` now records slice 1
 ownership of the static scaffold. Slice 2 owns report-generation wiring,
 candidate selection, and grilling/no-grill behavior.
+
+### Slice 2 — improve-arch-report-and-grilling (landed)
+
+Landed report-generation wiring with vendored dependency paths, browser
+opening and candidate selection, grilling/no-grill behavior, wayfinder handoff,
+and cross-reference test assertions. Verification passed: slice 176/176 and
+full suite 339/339; no lint command is configured.
