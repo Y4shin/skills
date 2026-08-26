@@ -4,7 +4,7 @@ slug: codebase-design-skill
 title: Add and register the codebase-design skill
 task: ../task.md
 mode: hitl
-status: todo
+status: done
 size: m
 blocked_by: []
 ---
