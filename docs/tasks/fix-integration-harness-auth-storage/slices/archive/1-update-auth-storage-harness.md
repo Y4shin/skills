@@ -4,7 +4,7 @@ slug: update-auth-storage-harness
 title: Align integration harness with the installed Pi auth API
 task: ../task.md
 mode: hitl
-status: todo
+status: done
 size: m
 blocked_by: []
 ---
