@@ -195,6 +195,53 @@ describe("human-mode resource routing", () => {
   });
 });
 
+describe("human-mode feature pipeline", () => {
+  const content = readFile("skills/implement-task/resources/feature/human.md");
+
+  test("requires collaborative architecture planning and explicit consent before implementation", () => {
+    expect(content).toMatch(/architecture[- ]spec/i);
+    expect(content).toMatch(/collaborat(e|ively).*review|review.*architecture/i);
+    expect(content).toMatch(/explicit (user|human) consent|consent.*before/i);
+    expect(content).toMatch(/no slice (code|implementation).*before.*handoff/i);
+  });
+
+  test("defines per-slice handoff and human-owned implementation boundary", () => {
+    expect(content).toMatch(/per[- ]slice.*handoff/i);
+    expect(content).toMatch(/non[- ]code context/i);
+    expect(content).toMatch(/verification contract/i);
+    expect(content).toMatch(/human.*implement/i);
+    expect(content).toMatch(/explicit.*request.*code assistance|code assistance.*explicit/i);
+  });
+
+  test("defines read-only verifier-first fast-fail chain", () => {
+    expect(content).toMatch(/verifier[- ]first/i);
+    expect(content).toMatch(/read[- ]only/i);
+    expect(content).toMatch(/fast[- ]fail/i);
+    expect(content).toContain("slice-verifier");
+    expect(content).toContain("deviation-reporter");
+    expect(content).toContain("code-reviewer");
+    expect(content).toMatch(/must not edit|cannot edit/i);
+    expect(content).toMatch(/failure.*return|return.*failure/i);
+  });
+
+  test("keeps planning, handoff, verification, landing, and refactoring in order", () => {
+    const stages = ["## 1.", "## 2.", "## 3.", "## 4.", "## 5."];
+    const positions = stages.map((stage) => content.indexOf(stage));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(content).toMatch(/approval gate/i);
+  });
+
+  test("gates findings, landing, progression, and refactoring on approval", () => {
+    expect(content).toMatch(/present.*findings|findings.*present/i);
+    expect(content).toMatch(/explicit.*approval.*landing|approval.*before.*landing/i);
+    expect(content).toContain("land-worker");
+    expect(content).toMatch(/next slice.*approval|approval.*next slice/i);
+    expect(content).toMatch(/whole-task.*refactor|collaborative.*refactor/i);
+    expect(content).toMatch(/consent.*refactor|approval.*refactor/i);
+  });
+});
+
 describe("skill cross-references", () => {
   test("overview references all core skills", () => {
     const content = readFile("skills/task-overview/SKILL.md");
