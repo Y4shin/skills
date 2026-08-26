@@ -223,6 +223,23 @@ describe("improve-codebase-architecture skill references", () => {
     expect(content).toMatch(/hand.*wayfinder|wayfinder.*hand/i);
   });
 
+  test("documents repository context and ADR references", () => {
+    expect(content).toContain("CONTEXT.md");
+    expect(content).toContain("docs/adr");
+  });
+
+  test("documents the complete report and candidate decision flow", () => {
+    expect(content).toMatch(/architecture-review-<timestamp>\.html/);
+    expect(content).toMatch(/xdg-open|open|start/);
+    expect(content).toMatch(/absolute path/i);
+    expect(content).toMatch(/Which of these would you like to explore\?/);
+    expect(content).toMatch(/candidate.*pick|pick.*candidate/i);
+    expect(content).toMatch(/one question at a time/i);
+    expect(content).toMatch(/frontier/i);
+    expect(content).toMatch(/ADR|docs\/adr/i);
+    expect(content).toMatch(/decision.*wayfinder|wayfinder.*decision/i);
+  });
+
   test("is explicitly user-invoked and has an offline report scaffold", () => {
     const fm = parseFrontmatter(content);
     expect(fm["disable-model-invocation"]).toBe("true");
