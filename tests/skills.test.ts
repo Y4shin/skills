@@ -39,6 +39,7 @@ const AGENT_FILES = [
   "agents/land-worker.md",
   "agents/deviation-reporter.md",
   "agents/code-reviewer.md",
+  "agents/architecture-scout.md",
 ];
 
 describe("agent frontmatter", () => {
@@ -88,6 +89,7 @@ const SKILL_FILES = [
   "skills/codebase-design/SKILL.md",
   "skills/grilling/SKILL.md",
   "skills/domain-modeling/SKILL.md",
+  "skills/improve-codebase-architecture/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -131,9 +133,10 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(13);
+    expect(pkg.pi.skills.length).toBe(14);
     expect(pkg.pi.skills).toContain("./skills/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/domain-modeling");
+    expect(pkg.pi.skills).toContain("./skills/improve-codebase-architecture");
   });
 
   test("has subagents config", () => {
@@ -203,6 +206,39 @@ describe("domain-modeling skill references", () => {
   });
 });
 
+describe("improve-codebase-architecture skill references", () => {
+  const content = readFile("skills/improve-codebase-architecture/SKILL.md");
+
+  test("routes the survey through the scout and wayfinder", () => {
+    expect(content).toContain("architecture-scout");
+    expect(content).toContain("wayfinder");
+    expect(content).toContain("codebase-design");
+  });
+
+  test("documents the no-grill mode", () => {
+    expect(content).toMatch(/no-grill|don't grill me/i);
+  });
+
+  test("has a wayfinder handoff", () => {
+    expect(content).toMatch(/hand.*wayfinder|wayfinder.*hand/i);
+  });
+
+  test("is explicitly user-invoked and has an offline report scaffold", () => {
+    const fm = parseFrontmatter(content);
+    expect(fm["disable-model-invocation"]).toBe("true");
+    const report = readFile("skills/improve-codebase-architecture/HTML-REPORT.md");
+    expect(report.trim().length).toBeGreaterThan(0);
+    expect(report).toContain("vendor/tailwind.min.js");
+    expect(report).toContain("vendor/mermaid.min.js");
+    expect(report).not.toMatch(/https?:\/\/cdn\./i);
+  });
+
+  test("vendors both report dependencies", () => {
+    expect(readFile("skills/improve-codebase-architecture/vendor/tailwind.min.js").length).toBeGreaterThan(100_000);
+    expect(readFile("skills/improve-codebase-architecture/vendor/mermaid.min.js").length).toBeGreaterThan(1_000_000);
+  });
+});
+
 describe("codebase-design skill references", () => {
   const content = readFile("skills/codebase-design/SKILL.md");
 
@@ -224,6 +260,23 @@ describe("codebase-design skill references", () => {
 
 // ─── Agent file existence tests ──────────────────────────────────────
 
+describe("architecture scout structure", () => {
+  test("uses the read-only tool allowlist and fresh context", () => {
+    const fm = parseFrontmatter(readFile("agents/architecture-scout.md"));
+    expect(fm.tools).toBe("read, bash, get_guidelines");
+    expect(fm.defaultContext).toBe("fresh");
+    expect(fm.inheritProjectContext).toBe("true");
+  });
+
+  test("documents deletion test and architecture heuristics", () => {
+    const content = readFile("agents/architecture-scout.md");
+    expect(content).toMatch(/deletion test/i);
+    expect(content).toMatch(/shallow modules/i);
+    expect(content).toMatch(/codebase-design/i);
+    expect(content).toMatch(/do not edit|read-only/i);
+  });
+});
+
 describe("all referenced agents exist", () => {
   const pkg = JSON.parse(readFile("package.json"));
 
@@ -236,6 +289,7 @@ describe("all referenced agents exist", () => {
     expect(agentNames).toContain("slice-verifier");
     expect(agentNames).toContain("land-worker");
     expect(agentNames).toContain("deviation-reporter");
+    expect(agentNames).toContain("architecture-scout");
   });
 
   test("agent names are in package subagents path", () => {

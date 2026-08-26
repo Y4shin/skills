@@ -43,7 +43,8 @@
       "./skills/diagnosing-bugs",
       "./skills/codebase-design",
       "./skills/grilling",
-      "./skills/domain-modeling"
+      "./skills/domain-modeling",
+      "./skills/improve-codebase-architecture"
     ],
     "subagents": {
       "agents": [
