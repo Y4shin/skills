@@ -1,5 +1,8 @@
 # Task Changelog
 
+## 2026-08-26 — Fix integration harness AuthStorage API compatibility (fix-integration-harness-auth-storage)
+Updated the integration harness to use the installed Pi API's `ModelRuntime` with in-memory credentials. The focused integration tests and full devenv suite now pass: 302/302. Closed and archived the follow-up bug report.
+
 ## 2026-08-26 — Add human-owned implementation mode with read-only verification (build-human-implementation-mode)
 Added permissive human/manual routing for feature and bug workflows, collaborative planning and consent gates, read-only verifier-first checks, approval-gated landing, and collaborative refactoring guidance. Added a reproducible devenv shell; targeted structure tests reached 139/139. Full integration verification remains blocked by the pre-existing AuthStorage API mismatch, tracked in `fix-integration-harness-auth-storage`.
 
