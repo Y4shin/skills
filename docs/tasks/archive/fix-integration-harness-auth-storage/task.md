@@ -3,7 +3,7 @@ kind: task
 type: bug
 slug: fix-integration-harness-auth-storage
 title: Fix integration harness AuthStorage API compatibility
-status: ready
+status: done
 bug: integration-harness-auth-storage-export
 slices:
   - update-auth-storage-harness
@@ -43,3 +43,8 @@ Out of scope:
 ## Root cause and suspected seam
 
 The harness assumes `AuthStorage.inMemory()` is exported from the installed Pi coding-agent package, but that export is undefined in the currently installed API. The regression seam is `createTaskSession()` in `tests/integration/harness.ts`.
+
+## Implementation notes
+
+- Landed slice `update-auth-storage-harness`: migrated the integration harness from the unavailable `AuthStorage`/`ModelRegistry` APIs to `ModelRuntime` with an in-memory credential store and disabled model networking.
+- Verification passed: focused integration suite 16/16 and full suite 302/302 in the devenv shell. The generated `.devenv/` directory was removed; no lint script/config exists.
