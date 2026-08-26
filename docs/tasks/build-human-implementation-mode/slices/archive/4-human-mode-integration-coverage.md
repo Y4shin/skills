@@ -4,7 +4,7 @@ slug: human-mode-integration-coverage
 title: Integrate and regression-test human implementation mode
 task: ../task.md
 mode: hitl
-status: todo
+status: done
 blocked_by:
   - human-mode-feature-pipeline
   - human-mode-bug-pipeline
