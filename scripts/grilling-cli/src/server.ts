@@ -3,11 +3,10 @@
 // For tests, createInProcessServer({stateDir, html}) returns the http.Server
 // instance + url (NOT detached) so the test can close it.
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
-import { loadState, saveState, type GrillingState } from "./state.js";
-import { join } from "node:path";
-import { spawn } from "node:child_process";
+import { loadState, saveState } from "./state.js";
+import { spawn, type ChildProcess } from "node:child_process";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 export interface StartServerInput {
   stateDir: string;
@@ -128,32 +127,6 @@ export async function startServerInProcess(input: StartServerInput): Promise<{ s
 export async function startServer(input: StartServerInput): Promise<StartServerResult> {
   // Write the server entry script into the state dir, then spawn detached.
   const serverScript = join(input.stateDir, "server-runner.mjs");
-  const scriptContent = `
-import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-
-const stateDir = ${JSON.stringify(input.stateDir)};
-const html = ${JSON.stringify(input.html)};
-
-// Inline the handler logic (cannot import TS modules in a standalone .mjs).
-function loadState(dir) {
-  const raw = await readFile(join(dir, "state.json"), "utf-8");
-  return JSON.parse(raw);
-}
-// ... (the detached process re-implements the handler inline)
-`;
-
-  // Actually, the cleanest approach: spawn node with an inline script that
-  // imports from the grilling-cli.mjs (which has the handler bundled).
-  // But the .mjs entrypoint expects argv, not a programmatic API.
-  //
-  // Better approach: write a small .mjs runner that uses the bundled .mjs's
-  // exported handler. But the .mjs is built as a CLI entry, not a lib.
-  //
-  // Simplest reliable approach: write a standalone .mjs that contains the
-  // full server logic inline (no imports from TS). The HTML is passed as
-  // an env var or file.
   const runnerScript = buildRunnerScript(input.stateDir, input.html);
   writeFileSync(serverScript, runnerScript, "utf-8");
 
@@ -303,4 +276,45 @@ function waitForPortFile(portFile: string, timeoutMs: number): Promise<number> {
     };
     check();
   });
+}
+
+// --- xdg-open: cross-platform browser open ---
+
+export type Platform = "linux" | "darwin" | "win32" | string;
+
+/**
+ * Returns the browser-open binary name for the given platform.
+ * linux → xdg-open, darwin → open, win32 → start.
+ */
+export function openBinaryForPlatform(platform: Platform): string {
+  switch (platform) {
+    case "darwin":
+      return "open";
+    case "win32":
+      return "start";
+    case "linux":
+      return "xdg-open";
+    default:
+      return "xdg-open";
+  }
+}
+
+/**
+ * Open a URL in the default browser using the platform-appropriate binary.
+ * Returns true if the spawn succeeded, false otherwise.
+ * Never throws — xdg-open failure must not crash start.
+ */
+export function openBrowser(url: string, platform: Platform = process.platform): boolean {
+  const binary = openBinaryForPlatform(platform);
+  try {
+    if (platform === "win32") {
+ // 'start' is a cmd builtin on Windows; spawn via cmd.
+      spawn("cmd", ["/c", binary, url], { detached: true, stdio: "ignore" });
+    } else {
+      spawn(binary, [url], { detached: true, stdio: "ignore" }).unref();
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
