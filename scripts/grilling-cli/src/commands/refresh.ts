@@ -1,8 +1,10 @@
-// Refresh command — stub (no server yet). Validates the state dir and exits.
-// Slice 3 makes this signal the real server via the .pid.
+// Refresh command — signals the server to re-render / re-read the current JSON.
+// Writes a refresh.flag file (timestamp) that the server/SPA can observe, and
+// sends SIGHUP to the server process (if a real pid exists in grilling.pid).
 import { loadState } from "../state.js";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { kill } from "node:os";
 
 export async function refresh(dir: string): Promise<void> {
   // Validate the state dir exists and has valid state.
@@ -11,5 +13,21 @@ export async function refresh(dir: string): Promise<void> {
   }
   // Loading validates the JSON schema.
   loadState(dir);
-  // No server to signal in this slice — stub.
+
+  // Write a refresh flag file (timestamp) as the signal artifact.
+  writeFileSync(join(dir, "refresh.flag"), String(Date.now()), "utf-8");
+
+  // If a real server pid exists, send SIGHUP to trigger re-read.
+  const pidFile = join(dir, "grilling.pid");
+  if (existsSync(pidFile)) {
+    const pidStr = readFileSync(pidFile, "utf-8").trim();
+    const pid = parseInt(pidStr, 10);
+    if (pid > 0) {
+      try {
+        kill(pid, "SIGHUP");
+      } catch {
+        // Process may be dead or not ours — ignore.
+      }
+    }
+  }
 }
