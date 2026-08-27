@@ -1,9 +1,10 @@
 // Finalize command — checks coast-clear (empty frontier, all answered, no
-// unresolved contradictions); if clear, emits markdown + exits 0; else non-zero.
-import { loadState, saveState, type GrillingState } from "../state.js";
+// unresolved contradictions); if clear, emits markdown, stops the server,
+// removes the temp dir + .grilling.json entry.
+import { loadState, type GrillingState } from "../state.js";
 import { computeFrontier } from "./get.js";
-import { writeFile } from "node:fs/promises";
-import { existsSync, readFileSync } from "node:fs";
+import { writeFile, rm } from "node:fs/promises";
+import { writeFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export interface FinalizeInput {
@@ -15,7 +16,7 @@ export interface FinalizeResult {
   markdownPath: string;
 }
 
-export async function finalize(dir: string, cwd: string): Promise<FinalizeResult> {
+export async function finalize(dir: string, cwd: string, key?: string): Promise<FinalizeResult> {
   const state = loadState(dir);
 
   // Check 1: empty grilling = not clear.
@@ -52,11 +53,46 @@ export async function finalize(dir: string, cwd: string): Promise<FinalizeResult
     );
   }
 
-  // Coast is clear — emit markdown.
+  // Coast is clear — emit markdown (before cleanup, so we can still read state).
   const markdown = renderMarkdown(state);
   const slug = "grilling";
   const mdPath = join(cwd, `${slug}-grilling-summary.md`);
   await writeFile(mdPath, markdown, "utf-8");
+
+  // Stop the server process if a real pid exists.
+  const pidFile = join(dir, "grilling.pid");
+  if (existsSync(pidFile)) {
+    const pidStr = readFileSync(pidFile, "utf-8").trim();
+    const pid = parseInt(pidStr, 10);
+    if (pid > 0) {
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch {
+        // Process may already be dead — ignore.
+      }
+    }
+  }
+
+  // Remove the .grilling.json key entry if a key was provided.
+  if (key) {
+    const mapPath = join(cwd, ".grilling.json");
+    if (existsSync(mapPath)) {
+      try {
+        const map = JSON.parse(readFileSync(mapPath, "utf-8")) as Record<string, string>;
+        delete map[key];
+        writeFileSync(mapPath, JSON.stringify(map, null, 2), "utf-8");
+      } catch {
+        // Corrupt map file — best effort, don't block finalize.
+      }
+    }
+  }
+
+  // Remove the temp dir.
+  try {
+    await rm(dir, { recursive: true, force: true });
+  } catch {
+    // Best effort — don't block finalize if cleanup fails.
+  }
 
   return { exitCode: 0, markdownPath: mdPath };
 }
