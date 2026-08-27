@@ -156,3 +156,14 @@ ones for implementation:
   - `wait --state <key> <target>`   (positional target)
   Also: `scripts/build.ts` now externals `node:*` builtins (needed for slice 3's
   `node:http` / `node:child_process`).
+- Slice 3 (server-and-spa) landed — persistent detached HTTP server (node:http,
+  no framework), real Svelte graph SPA (rows=rounds, 5-word ids, black/red/gray
+  edges, upcoming section, summary sidebar, per-round answer inputs + feedback),
+  xdg-open auto-open all 3 platforms + --no-open, refresh signals server via
+  .pid, finalize stops server + cleans up. 483 tests green.
+  Key fix: startServer calls child.unref() and index.ts main() calls process.exit(0)
+  after start, so the parent node process exits deterministically (the detached
+  server stays alive). Without this, spawnSync in integration tests hung forever.
+  Interface contract for slice 4: CLI surface is complete & stable. Slice 4
+  rewires skill prose to drive it. Note set-state target is positional:
+  `update set-state --state <key> <target-state>`.
