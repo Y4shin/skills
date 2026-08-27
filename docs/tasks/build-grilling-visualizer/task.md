@@ -146,3 +146,13 @@ ones for implementation:
   v3 is used). The `.mjs` loads and runs with no further build step. Build
   driver is `scripts/build.ts` (two-step: SPA → inlined `index.html`, then
   CLI TS → `.mjs` with the HTML embedded via `?raw` import).
+- Slice 2 (cli-core-and-state) landed — real CLI modules (state/key/transitions
+  + start/get/update/refresh-stub/wait/finalize), 7-state machine enforced,
+  drivable from bash, 450 tests green.
+  IMPORTANT for slice 4 (skill-rewire): the `--state <key>` flag collided with
+  `set-state --state <target>`, so the target values are POSITIONAL args:
+  - `update set-state --state <key> <target-state>`   (positional, NOT `--state <target>`)
+  - `update add-edge --state <key> --id <edge-id> --from <id> --to <id> --type <type>`   (includes `--id` for edge)
+  - `wait --state <key> <target>`   (positional target)
+  Also: `scripts/build.ts` now externals `node:*` builtins (needed for slice 3's
+  `node:http` / `node:child_process`).
