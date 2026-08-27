@@ -4,7 +4,6 @@
 import { loadState } from "../state.js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { kill } from "node:os";
 
 export async function refresh(dir: string): Promise<void> {
   // Validate the state dir exists and has valid state.
@@ -24,7 +23,7 @@ export async function refresh(dir: string): Promise<void> {
     const pid = parseInt(pidStr, 10);
     if (pid > 0) {
       try {
-        kill(pid, "SIGHUP");
+        process.kill(pid, "SIGHUP");
       } catch {
         // Process may be dead or not ours — ignore.
       }

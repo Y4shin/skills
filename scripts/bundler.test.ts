@@ -78,12 +78,12 @@ describe("seam 2 — --help exits 0 and prints usage", () => {
 
 /**
  * Seam 3: the produced .mjs contains the inlined SPA HTML (string match for
- * the placeholder text).
+ * the real SPA text).
  */
 describe("seam 3 — .mjs contains inlined SPA HTML", () => {
-  it("contains the placeholder text 'grilling visualizer'", async () => {
+  it("contains the real SPA text 'Grilling Visualizer'", async () => {
     const contents = await readFile(cliMjs, "utf-8");
-    expect(contents).toContain("grilling visualizer");
+    expect(contents).toContain("Grilling Visualizer");
   });
 });
 

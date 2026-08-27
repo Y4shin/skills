@@ -136,6 +136,9 @@ export async function startServer(input: StartServerInput): Promise<StartServerR
     env: { ...process.env },
   });
 
+  // Detach the child from the parent's event loop so the parent can exit.
+  child.unref();
+
   // Wait for the child to write the port file.
   const portFile = join(input.stateDir, "server.port");
   const pid = child.pid!;

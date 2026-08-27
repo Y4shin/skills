@@ -4,7 +4,7 @@ slug: cli-core-and-state
 title: "CLI core + hidden JSON state + 7-state machine: start/get/wait/refresh, drivable from bash"
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: m
 blocked_by:
 - bundler-subproject

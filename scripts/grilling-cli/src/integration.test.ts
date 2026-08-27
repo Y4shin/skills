@@ -4,6 +4,7 @@
 // finalize emits markdown.
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -61,37 +62,64 @@ function runCli(
   };
 }
 
+// Extract the state dir from the .grilling.json map (start no longer prints
+// just the dir — it prints <url>\nopened: <bool>).
+function getStateDir(cwd: string): string {
+  const map = JSON.parse(readFileSync(join(cwd, ".grilling.json"), "utf-8"));
+  const keys = Object.keys(map);
+  expect(keys.length).toBeGreaterThanOrEqual(1);
+  return map[keys[0]];
+}
+
+function getKey(cwd: string): string {
+  const map = JSON.parse(readFileSync(join(cwd, ".grilling.json"), "utf-8"));
+  return Object.keys(map)[0];
+}
+
+// Kill the server process if a real pid exists, then remove the dir.
+function cleanupServer(stateDir: string): void {
+  if (stateDir && existsSync(join(stateDir, "grilling.pid"))) {
+    try {
+      const pid = parseInt(readFileSync(join(stateDir, "grilling.pid"), "utf-8").trim(), 10);
+      if (pid > 0) {
+        try { process.kill(pid, "SIGTERM"); } catch { /* dead */ }
+      }
+    } catch { /* no pid file */ }
+  }
+  rmSync(stateDir, { recursive: true, force: true });
+}
+
 describe("seam 8 — end-to-end bash loop (integration)", () => {
   let cwd: string;
   let stateDir: string;
-  let key: string;
 
   beforeEach(() => {
     cwd = mkdtempSync(join(tmpdir(), "grilling-e2e-"));
+    stateDir = "";
   });
 
   afterEach(() => {
-    rmSync(cwd, { recursive: true, force: true });
     if (stateDir) {
-      rmSync(stateDir, { recursive: true, force: true });
+      cleanupServer(stateDir);
     }
+    rmSync(cwd, { recursive: true, force: true });
   });
 
   it("full loop: start → add-question ×2 → add-edge → promote → set-state → answers → get → finalize", () => {
-    // 1. start
-    const startResult = runCli(["start"], cwd);
+    // 1. start (with --no-open to suppress browser)
+    const startResult = runCli(["start", "--no-open"], cwd);
     expect(startResult.exitCode, startResult.stderr).toBe(0);
-    stateDir = startResult.stdout.trim();
+    // start now prints <url>\nopened: <bool>
+    expect(startResult.stdout).toMatch(/^http:\/\/127\.0\.0\.1:\d+/);
+    expect(startResult.stdout).toMatch(/opened: false/);
+
+    stateDir = getStateDir(cwd);
     expect(stateDir).toMatch(new RegExp(`^${tmpdir()}/grilling-`));
     expect(existsSync(join(stateDir, "state.json"))).toBe(true);
     expect(existsSync(join(stateDir, "grilling.pid"))).toBe(true);
 
-    // Read the .grilling.json to get the key.
-    const map = JSON.parse(readFileSync(join(cwd, ".grilling.json"), "utf-8"));
-    const keys = Object.keys(map);
-    expect(keys).toHaveLength(1);
-    key = keys[0];
-    expect(map[key]).toBe(stateDir);
+    const key = getKey(cwd);
+    expect(getStateDir(cwd)).toBe(stateDir);
 
     // 2. add-question ×2
     const aq1 = runCli(
@@ -136,7 +164,6 @@ describe("seam 8 — end-to-end bash loop (integration)", () => {
       "what-framework-to-use": "Use React",
       "what-state-lib-to-use": "Use Zustand",
     };
-    const { writeFileSync } = require("node:fs") as typeof import("node:fs");
     writeFileSync(join(stateDir, "state.json"), JSON.stringify(state, null, 2));
 
     // 7. set-state round-done
@@ -170,7 +197,7 @@ describe("seam 8 — end-to-end bash loop (integration)", () => {
     runCli(["update", "set-state", "--state", key, "accepted"], cwd);
     runCli(["update", "set-state", "--state", key, "done"], cwd);
 
-    // 11. finalize emits markdown
+    // 11. finalize emits markdown (and stops server + cleans up)
     const finalizeResult = runCli(
       ["finalize", "--state", key],
       cwd,
@@ -187,14 +214,16 @@ describe("seam 8 — end-to-end bash loop (integration)", () => {
     expect(md).toContain("Use React");
     expect(md).toContain("State lib?");
     expect(md).toContain("Use Zustand");
+
+    // finalize removes the temp dir.
+    expect(existsSync(stateDir)).toBe(false);
   });
 
   it("get never exposes the real dir path", () => {
     // Start
-    const startResult = runCli(["start"], cwd);
-    stateDir = startResult.stdout.trim();
-    const map = JSON.parse(readFileSync(join(cwd, ".grilling.json"), "utf-8"));
-    key = Object.keys(map)[0];
+    runCli(["start", "--no-open"], cwd);
+    stateDir = getStateDir(cwd);
+    const key = getKey(cwd);
 
     // get full state
     const getFull = runCli(["get", "--state", key], cwd);
@@ -206,15 +235,12 @@ describe("seam 8 — end-to-end bash loop (integration)", () => {
     const getSub = runCli(["get", "--state", key, "questions"], cwd);
     expect(getSub.exitCode).toBe(0);
     expect(getSub.stdout).not.toContain(stateDir);
-
-    rmSync(stateDir, { recursive: true, force: true });
   });
 
   it("disallowed state transition exits non-zero with clear error", () => {
-    const startResult = runCli(["start"], cwd);
-    stateDir = startResult.stdout.trim();
-    const map = JSON.parse(readFileSync(join(cwd, ".grilling.json"), "utf-8"));
-    key = Object.keys(map)[0];
+    runCli(["start", "--no-open"], cwd);
+    stateDir = getStateDir(cwd);
+    const key = getKey(cwd);
 
     // view → done is not allowed
     const result = runCli(
@@ -225,21 +251,21 @@ describe("seam 8 — end-to-end bash loop (integration)", () => {
     expect(result.stderr).toMatch(/transition/i);
   });
 
-  it("refresh validates state dir and exits 0 (stub)", () => {
-    const startResult = runCli(["start"], cwd);
-    stateDir = startResult.stdout.trim();
-    const map = JSON.parse(readFileSync(join(cwd, ".grilling.json"), "utf-8"));
-    key = Object.keys(map)[0];
+  it("refresh signals the server and exits 0", () => {
+    runCli(["start", "--no-open"], cwd);
+    stateDir = getStateDir(cwd);
+    const key = getKey(cwd);
 
     const result = runCli(["refresh", "--state", key], cwd);
     expect(result.exitCode, result.stderr).toBe(0);
+    // refresh writes a refresh.flag file.
+    expect(existsSync(join(stateDir, "refresh.flag"))).toBe(true);
   });
 
   it("add-question with duplicate id exits non-zero", () => {
-    const startResult = runCli(["start"], cwd);
-    stateDir = startResult.stdout.trim();
-    const map = JSON.parse(readFileSync(join(cwd, ".grilling.json"), "utf-8"));
-    key = Object.keys(map)[0];
+    runCli(["start", "--no-open"], cwd);
+    stateDir = getStateDir(cwd);
+    const key = getKey(cwd);
 
     const aq1 = runCli(
       ["update", "add-question", "--state", key, "--id", "duplicate-id-here-now", "--title", "T", "--body", "B", "--rec", "R", "--round", "1", "--deps", ""],
@@ -256,10 +282,9 @@ describe("seam 8 — end-to-end bash loop (integration)", () => {
   });
 
   it("add-edge with unknown node id exits non-zero", () => {
-    const startResult = runCli(["start"], cwd);
-    stateDir = startResult.stdout.trim();
-    const map = JSON.parse(readFileSync(join(cwd, ".grilling.json"), "utf-8"));
-    key = Object.keys(map)[0];
+    runCli(["start", "--no-open"], cwd);
+    stateDir = getStateDir(cwd);
+    const key = getKey(cwd);
 
     runCli(
       ["update", "add-question", "--state", key, "--id", "existing-id-one-here", "--title", "T", "--body", "B", "--rec", "R", "--round", "1", "--deps", ""],

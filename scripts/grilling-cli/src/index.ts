@@ -26,7 +26,7 @@ Subcommands:
   start                              Start a grilling session
   update <sub>                       Mutate grilling state
   get [subset]                       Read grilling state
-  refresh                            Signal the server to re-render (stub)
+  refresh                            Signal the server to re-render
   wait <state>                       Block until page-state matches
   finalize                           Check coast-clear, emit summary
 
@@ -87,6 +87,8 @@ async function main(): Promise<void> {
     process.stderr.write(`${(e as Error).message}\n`);
     process.exit(1);
   }
+
+  process.exit(0);
 }
 
 function requireStateKey(rest: string[]): string {
