@@ -26,7 +26,7 @@ Subcommands:
   start                              Start a grilling session
   update <sub>                       Mutate grilling state
   get [subset]                       Read grilling state
-  refresh                            Signal the server to re-render (stub)
+  refresh                            Signal the server to re-render
   wait <state>                       Block until page-state matches
   finalize                           Check coast-clear, emit summary
 
@@ -87,6 +87,8 @@ async function main(): Promise<void> {
     process.stderr.write(`${(e as Error).message}\n`);
     process.exit(1);
   }
+
+  process.exit(0);
 }
 
 function requireStateKey(rest: string[]): string {
@@ -107,10 +109,18 @@ function requireStateKey(rest: string[]): string {
 
 async function cmdStart(rest: string[]): Promise<void> {
   // start doesn't need --state; it creates one.
-  const result = await start({ cwd: process.cwd() });
-  // start() already prints the real dir to stdout.
-  // Store key for potential future use.
-  void result;
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      "no-open": { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+  });
+  await start({
+    cwd: process.cwd(),
+    noOpen: values["no-open"] === true,
+    html: spaHtml,
+  });
 }
 
 async function cmdUpdate(rest: string[]): Promise<void> {
@@ -306,8 +316,9 @@ async function cmdFinalize(rest: string[]): Promise<void> {
     },
     allowPositionals: true,
   });
-  const dir = resolveKey(process.cwd(), values.state!);
-  const result = await finalize(dir, process.cwd());
+  const key = values.state!;
+  const dir = resolveKey(process.cwd(), key);
+  const result = await finalize(dir, process.cwd(), key);
   process.stdout.write(`Finalized: ${result.markdownPath}\n`);
 }
 
