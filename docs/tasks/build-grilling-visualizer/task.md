@@ -167,3 +167,6 @@ ones for implementation:
   Interface contract for slice 4: CLI surface is complete & stable. Slice 4
   rewires skill prose to drive it. Note set-state target is positional:
   `update set-state --state <key> <target-state>`.
+- Slice 4 (skill-rewire) landed — grilling SKILL.md + wayfinder grilling.md rewritten to drive the CLI end-to-end (start --open, update, set-state + refresh, wait, get, final-review, finalize); never mentions hidden files. src/pi.ts registers the grilling temp dir as a Pi-protected path (tool_call handler blocks write/edit into os.tmpdir()/grilling-* + .grilling.json). 46 skill-rewire tests + 528 full suite green.
+  Browser-spawn footgun fix (folded in): open-browser.test.ts no longer calls the real openBrowser() (was spawning xdg-open -> real tabs every run); start default inverted to opt-in --open so bare start never opens a browser.
+  Interface contract for slice 5: the skill drives the CLI end-to-end. Slice 5's eval runs non-interactive pi against this skill + a modified CLI (wait returns immediately).
