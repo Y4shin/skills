@@ -1,6 +1,4 @@
 task: build-grilling-visualizer
-slice: null
+slice: eval-discover-update-set
 remaining:
-  - server-and-spa
-  - skill-rewire
   - eval-discover-update-set
