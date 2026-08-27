@@ -1,7 +1,8 @@
 // Slice 5 — scenarios: 3 synthetic grilling scenarios, each trivial-to-moderate
 // and ≤12 questions. Written down in the slice/task artifacts.
 import { describe, expect, it } from "vitest";
-import { SCENARIOS, type Scenario } from "./scenarios.js";
+import { SCENARIOS } from "./scenarios.js";
+import type { Scenario } from "./harness.js";
 
 describe("scenarios — 3 synthetic grilling scenarios", () => {
   it("defines exactly 3 scenarios", () => {
