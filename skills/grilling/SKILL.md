@@ -24,24 +24,165 @@ unblocked frontier in one round, rather than enforcing one question per
 assistant turn. A question that depends on another question still open in this
 round belongs to a later round.
 
-For every frontier question, be focused and provide a concrete recommended
-answer. Use Pi's `ask_user_question` interaction for decisions, with numbered
-questions and choices where useful, then wait for the user's answers. Do not
-answer on the user's behalf.
+For every frontier question, be focused and provide a concrete recommended answer (with the rationale and any rejected alternatives). Do not answer on the user's behalf.
 
-Format a round like this:
+## Driving the grilling visualizer (CLI)
 
-```text
-❓ **Q1** — **<question title>**: <focused question and choices>
+A grilling is driven end-to-end through the grilling CLI
+(`skills/grilling/grilling-cli.mjs`). The CLI manages a visual graph that the
+user sees in their browser: rows = rounds, nodes = questions, edges =
+dependencies/contradictions/references, plus a running summary sidebar. The
+user answers in the browser per round; you read answers back and continue.
 
-➡️ Recommended answer: <concrete recommendation and why>
+You interact with the CLI exclusively through bash. You never touch the
+internal state files or the state directory directly — always use the
+`--state <key>` handle returned by `start`.
 
----
+### Launching a session
 
-❓ **Q2** — **<question title>**: <focused question and choices>
+At the beginning of a grilling, start the visualizer (the `--open` flag opens
+the browser for the human at the desk; omit it for a headless/agent-only run):
 
-➡️ Recommended answer: <concrete recommendation and why>
+```bash
+node skills/grilling/grilling-cli.mjs start --open
 ```
+
+This prints the server URL (the browser auto-opens) and returns a `--state <key>`
+handle. **You only ever hold the `--state <key>` string** — never the underlying
+state directory path. Use this key for every subsequent command.
+
+### Building the graph (update)
+
+As you identify questions and their dependencies, add them to the graph using
+`update` subcommands. These mutate the graph state safely; they do not trigger
+a browser re-render on their own (use `refresh` for that).
+
+Add a question to the graph (the id is a 5-word slug):
+
+```bash
+node skills/grilling/grilling-cli.mjs update add-question --state <key> \
+  --id <five-word-slug> --title "<question title>" --body "<focused question and choices>" \
+  --rec "<concrete recommendation and why>" --round <n> --deps <comma-separated-ids>
+```
+
+Add an edge between questions (dependency, contradiction, or reference):
+
+```bash
+node skills/grilling/grilling-cli.mjs update add-edge --state <key> \
+  --id <edge-id> --from <question-id> --to <question-id> --type dep|contra|ref
+```
+
+Promote a question to a later round:
+
+```bash
+node skills/grilling/grilling-cli.mjs update promote --state <key> \
+  --id <question-id> --to-round <n>
+```
+
+Maintain the running summary sidebar after each round:
+
+```bash
+node skills/grilling/grilling-cli.mjs update set-summary --state <key> \
+  --text "running summary of decisions, trade-offs, and open questions so far"
+```
+
+Resolve a contradiction edge when the conflict is settled:
+
+```bash
+node skills/grilling/grilling-cli.mjs update resolve-contradiction --state <key> \
+  --edge <edge-id>
+```
+
+### The round loop
+
+Each round follows this sequence:
+
+1. **Build**: use `update add-question` and `update add-edge` to register the
+   current frontier questions for this round (and `update promote` to move
+   questions between rounds if needed).
+
+2. **Open the round**: transition the page state to `in-round` and signal the
+   browser to re-render:
+
+   ```bash
+   node skills/grilling/grilling-cli.mjs update set-state --state <key> in-round
+   node skills/grilling/grilling-cli.mjs refresh --state <key>
+   ```
+
+3. **Block on the user**: wait until the user has submitted their answers for
+   the round (the page state transitions to `round-done` when they submit):
+
+   ```bash
+   node skills/grilling/grilling-cli.mjs wait --state <key> round-done
+   ```
+
+4. **Read answers**: retrieve the user's answers and the current state:
+
+   ```bash
+   node skills/grilling/grilling-cli.mjs get --state <key> answers
+   ```
+
+   You can also read subsets: `get --state <key> frontier`, `get --state <key>
+   summary`, `get --state <key> questions`, `get --state <key> state`, or
+   `get --state <key> edges`.
+
+5. **Record and recompute**: record each answer in the relevant task or
+   planning artifact in the user's terms. Update the running summary with
+   `update set-summary`. Recompute the frontier — settle parent decisions
+   before dependent choices. If the frontier is non-empty, go to step 1 for
+   the next round.
+
+### Completion gate
+
+Continue until the frontier is empty: every branch of the design tree has been
+visited, every prerequisite is settled, and nothing remains silently assumed.
+
+Then drive the completion gate:
+
+1. Transition to `final-review` and signal the browser:
+
+   ```bash
+   node skills/grilling/grilling-cli.mjs update set-state --state <key> final-review
+   node skills/grilling/grilling-cli.mjs refresh --state <key>
+   ```
+
+2. Wait for the user's verdict on the shared understanding:
+
+   ```bash
+   node skills/grilling/grilling-cli.mjs wait --state <key> accepted
+   ```
+
+   Or, if the user rejects:
+
+   ```bash
+   node skills/grilling/grilling-cli.mjs wait --state <key> rejected
+   ```
+
+3. **On `accepted`**: the shared understanding is confirmed. Emit the markdown
+   summary and stop the server:
+
+   ```bash
+   node skills/grilling/grilling-cli.mjs finalize --state <key>
+   ```
+
+   If `finalize` returns non-zero (the coast is not clear — there are still
+   unanswered questions, unresolved contradictions, or a non-empty frontier),
+   report to the user what is still unresolved and continue grilling.
+
+4. **On `rejected`**: the user has identified a gap in the shared
+   understanding. The transition is `rejected` → `in-round`: resume `in-round`
+   to address the gap named in the rejection feedback, then re-reach
+   `final-review`:
+
+   ```bash
+   node skills/grilling/grilling-cli.mjs update set-state --state <key> in-round
+   node skills/grilling/grilling-cli.mjs refresh --state <key>
+   ```
+
+   Address the gap, then re-enter the completion gate from step 1.
+
+Do not act on the plan, mark a grilling task complete, or hand off
+implementation until the user explicitly accepts the shared understanding.
 
 ## Facts, ordering, and recording
 

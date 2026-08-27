@@ -179,7 +179,10 @@ describe("grilling skill references", () => {
     expect(content).toMatch(/downstream consequences|consequences/i);
     expect(content).toMatch(/shared understanding/i);
     expect(content).toMatch(/frontier is empty|nothing left silently assumed/i);
-    expect(content).toContain("ask_user_question");
+    // Slice 4 (skill-rewire): the grilling skill now drives the grilling CLI
+    // end-to-end instead of ask_user_question. Assert the CLI surface is present.
+    expect(content).toMatch(/grilling-cli\.mjs/);
+    expect(content).toMatch(/--state/);
     expect(content).toMatch(/Wayfinder/i);
   });
 });

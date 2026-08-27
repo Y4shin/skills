@@ -42,7 +42,8 @@ Options:
   --help, -h                        Show this help message
   --state <key>                     State key (required for all subcommands except start)
   --timeout <ms>                     Timeout for wait (default: 30 min)
-  --no-open                          Do not auto-open the browser (used with start)
+  --open                            Auto-open the browser (opt-in; default: no open)
+  --no-open                         (deprecated, no-op) kept for back-compat
 
 The inlined SPA HTML is embedded in this bundle (${spaHtml.length} bytes).
 `;
@@ -109,16 +110,23 @@ function requireStateKey(rest: string[]): string {
 
 async function cmdStart(rest: string[]): Promise<void> {
   // start doesn't need --state; it creates one.
+  // Browser auto-open is OPT-IN (--open). The default is NOT to open a
+  // browser, because this CLI is agent-driven and silent auto-open is a
+  // footgun when the agent hand-runs `start` during testing or grilling.
   const { values } = parseArgs({
     args: rest,
     options: {
+      "open": { type: "boolean", default: false },
       "no-open": { type: "boolean", default: false },
     },
     allowPositionals: true,
   });
+  // --open forces open; otherwise default to NOT opening.
+  // (--no-open is kept for back-compat but is now a no-op since the default is already no-open.)
+  const noOpen = values["open"] !== true;
   await start({
     cwd: process.cwd(),
-    noOpen: values["no-open"] === true,
+    noOpen,
     html: spaHtml,
   });
 }

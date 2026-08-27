@@ -594,7 +594,8 @@ Options:
   --help, -h                        Show this help message
   --state <key>                     State key (required for all subcommands except start)
   --timeout <ms>                     Timeout for wait (default: 30 min)
-  --no-open                          Do not auto-open the browser (used with start)
+  --open                            Auto-open the browser (opt-in; default: no open)
+  --no-open                         (deprecated, no-op) kept for back-compat
 
 The inlined SPA HTML is embedded in this bundle (${spaHtml.length} bytes).
 `;
@@ -643,13 +644,15 @@ async function cmdStart(rest) {
   const { values } = parseArgs({
     args: rest,
     options: {
+      "open": { type: "boolean", default: false },
       "no-open": { type: "boolean", default: false }
     },
     allowPositionals: true
   });
+  const noOpen = values["open"] !== true;
   await start({
     cwd: process.cwd(),
-    noOpen: values["no-open"] === true,
+    noOpen,
     html: spaHtml
   });
 }
