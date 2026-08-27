@@ -61,7 +61,8 @@ async function main(): Promise<void> {
           entryFileNames: "grilling-cli.mjs",
         },
         // Allow ?raw import of the built SPA HTML.
-        external: [],
+        // Mark node: builtins as external — they resolve at runtime.
+        external: (id: string) => id.startsWith("node:"),
       },
       assetsInlineLimit: Infinity,
       cssCodeSplit: false,
