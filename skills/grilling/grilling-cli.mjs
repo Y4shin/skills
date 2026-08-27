@@ -234,7 +234,7 @@ process.on("SIGHUP", () => {
 `;
 }
 function waitForPortFile(portFile, timeoutMs) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve, reject2) => {
     const deadline = Date.now() + timeoutMs;
     const check = () => {
       if (existsSync(portFile)) {
@@ -245,7 +245,7 @@ function waitForPortFile(portFile, timeoutMs) {
         }
       }
       if (Date.now() > deadline) {
-        reject(new Error("Server failed to start: port file not written in time"));
+        reject2(new Error("Server failed to start: port file not written in time"));
         return;
       }
       setTimeout(check, 50);
@@ -413,6 +413,14 @@ async function finalize(dir, cwd, key) {
   const slug = "grilling";
   const mdPath = join(cwd, `${slug}-grilling-summary.md`);
   await writeFile(mdPath, markdown, "utf-8");
+  stopServer(dir, cwd, key);
+  try {
+    await rm(dir, { recursive: true, force: true });
+  } catch {
+  }
+  return { exitCode: 0, markdownPath: mdPath };
+}
+function stopServer(dir, cwd, key) {
   const pidFile = join(dir, "grilling.pid");
   if (existsSync(pidFile)) {
     const pidStr = readFileSync(pidFile, "utf-8").trim();
@@ -435,11 +443,6 @@ async function finalize(dir, cwd, key) {
       }
     }
   }
-  try {
-    await rm(dir, { recursive: true, force: true });
-  } catch {
-  }
-  return { exitCode: 0, markdownPath: mdPath };
 }
 function renderMarkdown(state) {
   const lines = [];
@@ -489,8 +492,8 @@ function renderQuestion(lines, state, q) {
   lines.push("");
   lines.push(`**Body:** ${q.body}`);
   lines.push("");
-  const answer = (_a = state.answers) == null ? void 0 : _a[q.id];
-  lines.push(`**Answer:** ${answer ?? "(not answered)"}`);
+  const answer2 = (_a = state.answers) == null ? void 0 : _a[q.id];
+  lines.push(`**Answer:** ${answer2 ?? "(not answered)"}`);
   lines.push("");
 }
 const ALLOWED = /* @__PURE__ */ new Set([
@@ -585,6 +588,54 @@ async function resolveContradiction(dir, input) {
   edge.resolved = true;
   await saveState(dir, state);
 }
+async function answer(dir, input) {
+  const state = loadState(dir);
+  const question = state.questions.find((q) => q.id === input.id);
+  if (!question) {
+    throw new Error(`Unknown question id: "${input.id}" not found`);
+  }
+  question.answered = true;
+  state.answers[input.id] = input.value;
+  if (state["page-state"] === "in-round") {
+    assertTransition(state["page-state"], "round-done");
+    state["page-state"] = "round-done";
+  }
+  await saveState(dir, state);
+}
+async function setDeps(dir, input) {
+  const state = loadState(dir);
+  const question = state.questions.find((q) => q.id === input.id);
+  if (!question) {
+    throw new Error(`Unknown question id: "${input.id}" not found`);
+  }
+  const knownIds = new Set(state.questions.map((q) => q.id));
+  for (const dep of input.deps) {
+    if (dep && !knownIds.has(dep)) {
+      throw new Error(`Unknown dep id: "${dep}" does not match any question`);
+    }
+  }
+  question.deps = input.deps;
+  await saveState(dir, state);
+}
+async function accept(dir) {
+  const state = loadState(dir);
+  assertTransition(state["page-state"], "accepted");
+  state["page-state"] = "accepted";
+  await saveState(dir, state);
+}
+async function reject(dir, input) {
+  const state = loadState(dir);
+  assertTransition(state["page-state"], "rejected");
+  state["page-state"] = "rejected";
+  assertTransition("rejected", "in-round");
+  state["page-state"] = "in-round";
+  const feedbackLine = `
+
+[REJECTION FEEDBACK]: ${input.feedback}
+`;
+  state.summary = (state.summary || "") + feedbackLine;
+  await saveState(dir, state);
+}
 const USAGE = `Usage: grilling-cli.mjs <subcommand> [flags]
 
 Subcommands:
@@ -593,7 +644,8 @@ Subcommands:
   get [subset]                       Read grilling state
   refresh                            Signal the server to re-render
   wait <state>                       Block until page-state matches
-  finalize                           Check coast-clear, emit summary
+  stop                               Stop the server + clean up the key entry
+  finalize                           Check coast-clear, emit summary, stop, clean up
 
 Update subcommands:
   add-question --id <5-word> --title --body --rec --round <n> --deps <ids>
@@ -602,6 +654,10 @@ Update subcommands:
   set-state --state <one of 7>
   set-summary --text "running summary"
   resolve-contradiction --edge <id>
+  answer --id <qid> --value <text>            (record a user's answer)
+  set-deps --id <qid> --deps <ids>           (rewrite a question's deps)
+  accept                                     (record final-review acceptance)
+  reject --feedback <text>                   (record rejection, resume in-round)
 
 Options:
   --help, -h                        Show this help message
@@ -639,6 +695,9 @@ async function main() {
         break;
       case "finalize":
         await cmdFinalize(rest);
+        break;
+      case "stop":
+        await cmdStop(rest);
         break;
       default:
         process.stderr.write(`Unknown subcommand: ${subcommand}
@@ -693,6 +752,18 @@ async function cmdUpdate(rest) {
       break;
     case "resolve-contradiction":
       await cmdResolveContradiction(subArgs);
+      break;
+    case "answer":
+      await cmdAnswer(subArgs);
+      break;
+    case "set-deps":
+      await cmdSetDeps(subArgs);
+      break;
+    case "accept":
+      await cmdAccept(subArgs);
+      break;
+    case "reject":
+      await cmdReject(subArgs);
       break;
     default:
       throw new Error(`Unknown update subcommand: ${sub}. See --help.`);
@@ -852,6 +923,69 @@ async function cmdFinalize(rest) {
   const result = await finalize(dir, process.cwd(), key);
   process.stdout.write(`Finalized: ${result.markdownPath}
 `);
+}
+async function cmdStop(rest) {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      state: { type: "string" }
+    },
+    allowPositionals: true
+  });
+  const key = values.state;
+  const dir = resolveKey(process.cwd(), key);
+  stopServer(dir, process.cwd(), key);
+  process.stdout.write("Stopped.\n");
+}
+async function cmdAnswer(rest) {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      state: { type: "string" },
+      id: { type: "string" },
+      value: { type: "string" }
+    },
+    allowPositionals: true
+  });
+  const dir = resolveKey(process.cwd(), values.state);
+  await answer(dir, { id: values.id, value: values.value ?? "" });
+}
+async function cmdSetDeps(rest) {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      state: { type: "string" },
+      id: { type: "string" },
+      deps: { type: "string" }
+    },
+    allowPositionals: true
+  });
+  const dir = resolveKey(process.cwd(), values.state);
+  const deps = values.deps ? values.deps.split(",").map((d) => d.trim()).filter(Boolean) : [];
+  await setDeps(dir, { id: values.id, deps });
+}
+async function cmdAccept(rest) {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      state: { type: "string" }
+    },
+    allowPositionals: true
+  });
+  const dir = resolveKey(process.cwd(), values.state);
+  await accept(dir);
+}
+async function cmdReject(rest) {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      state: { type: "string" },
+      feedback: { type: "string" }
+    },
+    allowPositionals: true
+  });
+  const dir = resolveKey(process.cwd(), values.state);
+  await reject(dir, { feedback: values.feedback ?? "" });
 }
 main().catch((e) => {
   process.stderr.write(`${e.message}

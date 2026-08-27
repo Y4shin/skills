@@ -104,12 +104,24 @@ Missing operations:
     expect(result.missingCommands[0].name).toBe("remove-question");
   });
 
-  it("handles command names without 'update ' prefix", () => {
+  it("requires the 'update' prefix to avoid false positives (e.g. 'Round 1')", () => {
     const report = `
 Missing operations:
-- remove-question: reason
+- update remove-question: reason
 `;
     const result = parseGapReport(report);
     expect(result.missingCommands[0].name).toBe("remove-question");
+  });
+
+  it("does NOT misparse prose like 'Round 1' or 'R1' as a missing command", () => {
+    const report = `
+Round 1: opened via set-state in-round.
+- R1: user chose monorepo.
+Missing operations report:
+- update answer: no CLI verb to record answers.
+`;
+    const result = parseGapReport(report);
+    expect(result.missingCommands.length).toBe(1);
+    expect(result.missingCommands[0].name).toBe("answer");
   });
 });

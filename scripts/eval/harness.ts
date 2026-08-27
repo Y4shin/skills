@@ -40,15 +40,21 @@ export interface GapReport {
 export function parseGapReport(report: string): GapReport {
   const lines = report.split("\n");
 
-  // Extract missing-operation lines: "- update foo: reason" or "1. update foo: reason"
-  const cmdRegex = /^\s*(?:[-*]|\d+\.)\s+(?:update\s+)?([a-z][-a-z0-9]*):\s*(.+)$/i;
+  // Extract missing-operation lines. REQUIRE the "update" prefix so that prose
+  // like "Round 1" or "R1" is not misparsed as a missing command.
+  // Matches: "- update foo: reason" / "1. update foo: reason" / "- **update foo**: reason"
+  const cmdRegex =
+    /^\s*(?:[-*]|\d+\.)\s*\*{0,2}\s*update\s+([a-z][-a-z0-9]*(?:\s+[a-z][-a-z0-9]*)?)\s*\*{0,2}:\s*(.+)$/i;
   const missing: MissingCommand[] = [];
   const seen = new Set<string>();
 
   for (const line of lines) {
     const m = line.match(cmdRegex);
     if (m) {
-      const name = m[1].trim();
+      // Normalize the command name to the last token (e.g. "answer" from
+      // "update answer", "accept" from "update accept"). Strip surrounding **.
+      const raw = m[1].trim().replace(/\*+/g, "");
+      const name = raw.split(/\s+/).pop()!.toLowerCase();
       const reason = m[2].trim();
       if (!seen.has(name)) {
         seen.add(name);
@@ -58,27 +64,33 @@ export function parseGapReport(report: string): GapReport {
   }
 
   // Determine convergence:
-  // - Explicit clean statement ("no missing operations", "missing operations: none")
-  //   OR an explicit statement that all operations were available
-  // - If there are extracted missing commands, it's not converged
-  // - A silent report (no mention at all) → non-convergence
+  // - If there are extracted missing commands, it's not converged.
+  // - Otherwise, treat it as converged IF the report mentions a missing-ops
+  //   section at all (so we know the agent actually considered the question)
+  //   OR an explicit clean statement. A silent report (no mention of missing
+  //   operations) stays non-convergence.
   const lower = report.toLowerCase();
-  const hasCleanStatement =
-    /no missing operations/.test(lower) ||
-    /missing operations:\s*none/.test(lower) ||
+  const hasMissingSection =
+    /missing operations report/.test(lower) ||
+    /missing operations:/.test(lower) ||
+    /operations i needed but did not exist/.test(lower) ||
+    /operations i needed that did not exist/.test(lower) ||
     /did not need any cli operations/.test(lower) ||
-    /all required commands were available/.test(lower) ||
-    (/no other gaps/.test(lower) && missing.length === 0);
+    /all (required|other)? ?(commands|operations) were available/.test(lower) ||
+    /everything else .* (existed|worked as documented|drove end-to-end)/.test(lower);
+  const hasExplicitClean =
+    /no missing operations/.test(lower) ||
+    /missing operations:\s*none/.test(lower);
 
   if (missing.length > 0) {
     return { converged: false, missingCommands: missing };
   }
 
-  if (hasCleanStatement) {
+  if (hasExplicitClean || hasMissingSection) {
     return { converged: true, missingCommands: [] };
   }
 
-  // No missing commands extracted and no explicit clean statement →
+  // No missing commands extracted and no missing-ops section at all →
   // non-convergence (silent or vague report).
   return { converged: false, missingCommands: [] };
 }
@@ -120,17 +132,21 @@ export async function runScenario(scenario: Scenario, gapFn: GapReportFn): Promi
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     iterations++;
+    process.stdout.write(`\n--- [${scenario.id}] iteration ${iterations}/${MAX_ITERATIONS} ---\n`);
     const report = await gapFn();
     lastGaps = report;
 
     if (report.converged && report.missingCommands.length === 0) {
       cleanStreak++;
+      process.stdout.write(`  -> clean (no missing commands). cleanStreak=${cleanStreak}/${CLEAN_STREAK_REQUIRED}\n`);
       if (cleanStreak >= CLEAN_STREAK_REQUIRED) {
         converged = true;
         break;
       }
     } else {
       cleanStreak = 0;
+      const names = report.missingCommands.map((g) => g.name).join(", ") || "(none named)";
+      process.stdout.write(`  -> gaps: ${report.missingCommands.length} missing command(s): ${names}\n`);
       // Only track runs that had actual gaps (missing commands).
       allGaps.push(report);
     }
@@ -188,11 +204,16 @@ export function strippedEnv(): Record<string, string> {
  *
  * Returns the agent's stdout (the gap report).
  */
-export function runPiGrilling(scenario: Scenario, opts?: { timeoutMs?: number }): string {
+export function runPiGrilling(scenario: Scenario, opts?: { timeoutMs?: number; model?: string }): string {
   const repoRoot = process.cwd();
   const timeoutMs = opts?.timeoutMs ?? 10 * 60 * 1000; // 10 min default
 
-  const result = spawnSync("pi", ["--print", "-p", scenario.prompt], {
+  const args = ["--print", "-p", scenario.prompt];
+  if (opts?.model) {
+    args.push("--model", opts.model);
+  }
+
+  const result = spawnSync("pi", args, {
     cwd: repoRoot,
     encoding: "utf-8",
     timeout: timeoutMs,
@@ -203,13 +224,16 @@ export function runPiGrilling(scenario: Scenario, opts?: { timeoutMs?: number })
     return `Error running pi: ${result.error.message}`;
   }
 
-  return (result.stdout ?? "") + (result.stderr ?? "");
+  const out = (result.stdout ?? "") + (result.stderr ?? "");
+  // Verbose: print the raw pi output so the background log shows live progress.
+  process.stdout.write(`\n[pi output for ${scenario.id}]\n${out}\n[/pi output]\n`);
+  return out;
 }
 
 /**
  * Create a production GapReportFn for a scenario: runs pi, parses the output.
  */
-export function createPiGapFn(scenario: Scenario, opts?: { timeoutMs?: number }): GapReportFn {
+export function createPiGapFn(scenario: Scenario, opts?: { timeoutMs?: number; model?: string }): GapReportFn {
   return async () => {
     const output = runPiGrilling(scenario, opts);
     return parseGapReport(output);

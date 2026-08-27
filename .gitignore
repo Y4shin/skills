@@ -4,3 +4,6 @@ dist
 .work/
 .pi-subagents/
 .devenv/
+.grilling.json
+grilling-grilling-summary.md
+skills/grilling/.grilling.json

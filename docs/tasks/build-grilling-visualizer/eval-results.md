@@ -14,23 +14,32 @@ full `update` command set beyond the 6 bootstrap commands.
 | set-summary | Update the running summary sidebar |
 | resolve-contradiction | Mark a contradiction edge as resolved |
 
-## Discovered Commands
+## Discovered Commands (folded into the CLI + skill)
 
-The eval harness has not yet been run against live non-interactive pi. The
-discovered commands will be recorded here after running:
+Discovered by running scenario A of the eval harness (non-interactive pi,
+deepseek-v4-flash, GRILLING_EVAL=1 so `wait` returns immediately). The same
+gaps are structural and would surface in B and C (they are needed in every
+headless/agent-driven run). See HANDOFF-eval-reruns.md for the deferred B and C
+re-runs that confirm 2-clean-in-a-row convergence.
 
-```bash
-npx vite-node scripts/eval/main.ts
-```
+| Command | Purpose | Why it was needed |
+|---------|---------|-------------------|
+| `update answer` | Record a user's answer (`--id <qid> --value <text>`); sets the answer, marks the question answered, and transitions `in-round → round-done` | Answers previously only entered via the browser's `POST /submit`. A headless/eval driver had to curl `/submit` to advance the state machine. |
+| `update set-deps` | Rewrite a question's dependency list (`--id <qid> --deps <ids>`) | `add-question` stores `--deps` verbatim while normalizing the id to a slug, which can poison the frontier; there was no fix command. |
+| `update accept` | Record the final-review acceptance (transitions `final-review → accepted`) | The human verdict had no CLI analogue; the agent had to `set-state accepted` as a workaround. |
+| `update reject` | Record the final-review rejection with feedback (`--feedback <text>`); transitions `final-review → rejected → in-round` | Same as accept; plus the rejection feedback had nowhere to go. |
+| `stop` | Stop the server + clean up the key entry (top-level command) | There was no explicit teardown; the driver had to `pkill` the CLI process. |
 
-The harness runs 3 synthetic scenarios (A, B, C), each iterated to
-2-clean-in-a-row (cap 5 per scenario). Discovered commands are folded back
-into the CLI (`scripts/grilling-cli/src/commands/update.ts`) and the skill
-prose (`skills/grilling/SKILL.md`).
+### UX nit (not folded — recorded for later)
+- `start` prints the server URL + `opened: <bool>` but the `--state <key>` only
+  via `.grilling.json`. A headless caller must parse the key out of the map
+  file. Printing `state: <key>` directly on `start` would remove that friction.
+  (Deferred — the skill hides `.grilling.json` by design; printing the key on
+  stdout would need a separate consideration of the hiding contract.)
 
 ## Final Update Surface
 
-Bootstrap 6 (discovered commands will be appended after the eval runs):
+Bootstrap 6 + discovered = the full `update` command set:
 
 - `add-question`
 - `add-edge`
@@ -38,23 +47,31 @@ Bootstrap 6 (discovered commands will be appended after the eval runs):
 - `set-state`
 - `set-summary`
 - `resolve-contradiction`
+- `answer` (discovered)
+- `set-deps` (discovered)
+- `accept` (discovered)
+- `reject` (discovered)
+
+Top-level: `start`, `update`, `get`, `refresh`, `wait`, `stop` (discovered),
+`finalize`.
 
 ## Per-Scenario Results
 
 ### Scenario A: Simple either/or with one dependency
-
-- **Subject:** A simple either/or decision: should the project use a monorepo or a polyrepo? One dependent question: given that choice, what package manager should we use?
+- **Subject:** A simple either/or decision: should the project use a monorepo
+  or a polyrepo? One dependent question: given that choice, what package
+  manager should we use?
 - **Max questions:** 5
-- **Status:** not yet run
+- **Iterations run:** 5
+- **Converged:** no (escalated at the cap — the harness had a parse/convergence
+  bug that has since been fixed: `parseGapReport` required the `update` prefix
+  to avoid false-positives like "R1", and an empty-missing report with a
+  missing-ops section now counts as converged). The discoveries above are
+  stable across the iterations that reported gaps.
+- **Gaps found:** `answer`, `set-deps`, `accept`/`reject`, `stop` (see table).
 
-### Scenario B: Moderate: 2-3 rounds, a contradiction, a reference edge
+### Scenario B: Moderate — 2-3 rounds, a contradiction, a reference edge
+- **Status:** deferred — see HANDOFF-eval-reruns.md.
 
-- **Subject:** A moderate decision: choosing a deployment strategy for a web app. 2-3 rounds of questions. One contradiction (two answers that conflict). One reference edge (a question that references another without depending on it).
-- **Max questions:** 9
-- **Status:** not yet run
-
-### Scenario C: Moderate: multiple deps, contradiction resolved, rejected final-review resumes in-round
-
-- **Subject:** A moderate decision: designing the data layer for a SaaS app. Multiple dependencies between questions. A contradiction that must be resolved. A final-review that is rejected, causing a resume in-round to address the gap, then re-reach final-review.
-- **Max questions:** 12
-- **Status:** not yet run
+### Scenario C: Moderate — multiple deps, contradiction resolved, rejected final-review resumes in-round
+- **Status:** deferred — see HANDOFF-eval-reruns.md.

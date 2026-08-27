@@ -93,6 +93,24 @@ node skills/grilling/grilling-cli.mjs update resolve-contradiction --state <key>
   --edge <edge-id>
 ```
 
+Record a user's answer to a question (for headless/agent-driven rounds; the
+browser's Send-all-answers button is the primary path for a human at the desk):
+
+```bash
+node skills/grilling/grilling-cli.mjs update answer --state <key> \
+  --id <question-id> --value "the user's answer"
+```
+
+This sets the answer, marks the question answered, and (if in-round)
+transitions `in-round → round-done` — the same effect as the browser submit.
+
+Rewrite a question's dependency list (correct a poisoned frontier):
+
+```bash
+node skills/grilling/grilling-cli.mjs update set-deps --state <key> \
+  --id <question-id> --deps <comma-separated-ids>
+```
+
 ### The round loop
 
 Each round follows this sequence:
@@ -165,6 +183,9 @@ Then drive the completion gate:
    node skills/grilling/grilling-cli.mjs finalize --state <key>
    ```
 
+   (For an agent-driven verdict without the browser, use `update accept` — it
+   transitions `final-review → accepted` directly.)
+
    If `finalize` returns non-zero (the coast is not clear — there are still
    unanswered questions, unresolved contradictions, or a non-empty frontier),
    report to the user what is still unresolved and continue grilling.
@@ -172,7 +193,9 @@ Then drive the completion gate:
 4. **On `rejected`**: the user has identified a gap in the shared
    understanding. The transition is `rejected` → `in-round`: resume `in-round`
    to address the gap named in the rejection feedback, then re-reach
-   `final-review`:
+   `final-review`. For an agent-driven verdict, use `update reject --feedback
+   <text>` — it transitions `final-review → rejected → in-round` and records
+   the feedback in the summary:
 
    ```bash
    node skills/grilling/grilling-cli.mjs update set-state --state <key> in-round
@@ -183,6 +206,12 @@ Then drive the completion gate:
 
 Do not act on the plan, mark a grilling task complete, or hand off
 implementation until the user explicitly accepts the shared understanding.
+
+To stop the server without finalizing (e.g. to abort a grilling), use `stop`:
+
+```bash
+node skills/grilling/grilling-cli.mjs stop --state <key>
+```
 
 ## Facts, ordering, and recording
 

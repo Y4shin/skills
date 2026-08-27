@@ -27,12 +27,36 @@ const resultsPath = join(
 );
 
 async function main(): Promise<void> {
+  // CLI: npx vite-node scripts/eval/main.ts [--scenario <id>] [--model <model-id>]
+  //   --scenario <id>  run only one scenario (e.g. A, B, C) — for spiking.
+  //   --model <id>     model id for the non-interactive pi child (e.g. a cheap model).
+  const argv = process.argv.slice(2);
+  const scenarioFilter = (() => {
+    const i = argv.indexOf("--scenario");
+    return i >= 0 ? argv[i + 1]?.toUpperCase() : undefined;
+  })();
+  const model = (() => {
+    const i = argv.indexOf("--model");
+    return i >= 0 ? argv[i + 1] : undefined;
+  })();
+
+  const scenarios = scenarioFilter
+    ? SCENARIOS.filter((s) => s.id === scenarioFilter)
+    : SCENARIOS;
+  if (scenarios.length === 0) {
+    process.stderr.write(`No scenario matching --scenario ${scenarioFilter}\n`);
+    process.exit(2);
+  }
+  if (model) {
+    process.stdout.write(`Using model: ${model}\n`);
+  }
+
   const results: RunResult[] = [];
   const allDiscovered: Map<string, string> = new Map();
 
-  for (const scenario of SCENARIOS) {
+  for (const scenario of scenarios) {
     process.stdout.write(`\n=== Scenario ${scenario.id}: ${scenario.name} ===\n`);
-    const gapFn = createPiGapFn(scenario, { timeoutMs: 10 * 60 * 1000 });
+    const gapFn = createPiGapFn(scenario, { timeoutMs: 10 * 60 * 1000, model });
     const result = await runScenario(scenario, gapFn);
     results.push(result);
 
