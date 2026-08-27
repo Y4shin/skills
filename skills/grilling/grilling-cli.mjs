@@ -278,13 +278,16 @@ function openBrowser(url, platform = process.platform) {
     return false;
   }
 }
+function isEvalMode$1() {
+  return process.env.GRILLING_EVAL === "1";
+}
 async function start(input) {
   const stateDir = createStateDir();
   const key = randomBytes(8).toString("hex");
   writeKey(input.cwd, key, stateDir);
   const { url, pid } = await startServer({ stateDir, html: input.html });
   let opened = false;
-  if (!input.noOpen) {
+  if (!input.noOpen && !isEvalMode$1()) {
     opened = openBrowser(url);
   }
   process.stdout.write(`${url}
@@ -349,7 +352,17 @@ async function refresh(dir) {
 }
 const POLL_INTERVAL_MS = 100;
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1e3;
+function isEvalMode() {
+  return process.env.GRILLING_EVAL === "1";
+}
 async function wait(dir, target, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  if (isEvalMode()) {
+    process.stdout.write(
+      `[eval] wait returning immediately — hand back to the user (target was "${target}").
+`
+    );
+    return 0;
+  }
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
