@@ -102,3 +102,95 @@ export async function resolveContradiction(dir: string, input: ResolveContradict
   edge.resolved = true;
   await saveState(dir, state);
 }
+
+// ── Discovered commands (from the eval harness, slice 5) ──────────────────────
+// These were surfaced by running non-interactive pi grilling sessions against
+// the CLI and recording the operations the agent needed but did not exist.
+// See docs/tasks/build-grilling-visualizer/eval-results.md.
+
+/**
+ * update answer --id <qid> --value <text>
+ * Records a user's answer to a question. Sets state.answers[qid], marks the
+ * question answered, and (if currently in-round) transitions in-round → round-done.
+ * This lets an agent/eval driver submit answers without the browser's POST /submit.
+ */
+export interface AnswerInput {
+  id: string;
+  value: string;
+}
+
+export async function answer(dir: string, input: AnswerInput): Promise<void> {
+  const state = loadState(dir);
+  const question = state.questions.find((q) => q.id === input.id);
+  if (!question) {
+    throw new Error(`Unknown question id: "${input.id}" not found`);
+  }
+  question.answered = true;
+  state.answers[input.id] = input.value;
+  // If we are in-round, transition to round-done (mirrors the browser POST /submit).
+  if (state["page-state"] === "in-round") {
+    assertTransition(state["page-state"], "round-done");
+    state["page-state"] = "round-done";
+  }
+  await saveState(dir, state);
+}
+
+/**
+ * update set-deps --id <qid> --deps <ids>
+ * Rewrites a question's dependency list and recomputes the frontier. Surfaces
+ * because add-question stores --deps verbatim while normalizing the id, which
+ * can poison the frontier; this lets the driver correct it.
+ */
+export interface SetDepsInput {
+  id: string;
+  deps: string[];
+}
+
+export async function setDeps(dir: string, input: SetDepsInput): Promise<void> {
+  const state = loadState(dir);
+  const question = state.questions.find((q) => q.id === input.id);
+  if (!question) {
+    throw new Error(`Unknown question id: "${input.id}" not found`);
+  }
+  const knownIds = new Set(state.questions.map((q) => q.id));
+  for (const dep of input.deps) {
+    if (dep && !knownIds.has(dep)) {
+      throw new Error(`Unknown dep id: "${dep}" does not match any question`);
+    }
+  }
+  question.deps = input.deps;
+  await saveState(dir, state);
+}
+
+/**
+ * update accept — record the user's final-review acceptance. Transitions
+ * final-review → accepted (guarded). The CLI analogue of the human verdict.
+ */
+export async function accept(dir: string): Promise<void> {
+  const state = loadState(dir);
+  assertTransition(state["page-state"], "accepted");
+  state["page-state"] = "accepted";
+  await saveState(dir, state);
+}
+
+/**
+ * update reject --feedback <text> — record the user's final-review rejection.
+ * Transitions final-review → rejected → in-round (per D9t), capturing the
+ * rejection feedback so the agent can address the gap.
+ */
+export interface RejectInput {
+  feedback: string;
+}
+
+export async function reject(dir: string, input: RejectInput): Promise<void> {
+  const state = loadState(dir);
+  assertTransition(state["page-state"], "rejected");
+  state["page-state"] = "rejected";
+  // Per the transition table, rejected → in-round so the agent resumes grilling.
+  assertTransition("rejected", "in-round");
+  state["page-state"] = "in-round";
+  // Record the rejection feedback in the summary so the agent sees the gap.
+  const feedbackLine = `\n\n[REJECTION FEEDBACK]: ${input.feedback}\n`;
+  state.summary = (state.summary || "") + feedbackLine;
+  await saveState(dir, state);
+}

@@ -9,7 +9,7 @@ import { start } from "./commands/start.js";
 import { get } from "./commands/get.js";
 import { refresh } from "./commands/refresh.js";
 import { wait } from "./commands/wait.js";
-import { finalize } from "./commands/finalize.js";
+import { finalize, stopServer } from "./commands/finalize.js";
 import {
   addQuestion,
   addEdge,
@@ -17,6 +17,10 @@ import {
   setState,
   setSummary,
   resolveContradiction,
+  answer,
+  setDeps,
+  accept,
+  reject,
 } from "./commands/update.js";
 
 const USAGE = `\
@@ -28,7 +32,8 @@ Subcommands:
   get [subset]                       Read grilling state
   refresh                            Signal the server to re-render
   wait <state>                       Block until page-state matches
-  finalize                           Check coast-clear, emit summary
+  stop                               Stop the server + clean up the key entry
+  finalize                           Check coast-clear, emit summary, stop, clean up
 
 Update subcommands:
   add-question --id <5-word> --title --body --rec --round <n> --deps <ids>
@@ -37,6 +42,10 @@ Update subcommands:
   set-state --state <one of 7>
   set-summary --text "running summary"
   resolve-contradiction --edge <id>
+  answer --id <qid> --value <text>            (record a user's answer)
+  set-deps --id <qid> --deps <ids>           (rewrite a question's deps)
+  accept                                     (record final-review acceptance)
+  reject --feedback <text>                   (record rejection, resume in-round)
 
 Options:
   --help, -h                        Show this help message
@@ -78,6 +87,9 @@ async function main(): Promise<void> {
         break;
       case "finalize":
         await cmdFinalize(rest);
+        break;
+      case "stop":
+        await cmdStop(rest);
         break;
       default:
         process.stderr.write(`Unknown subcommand: ${subcommand}\n`);
@@ -156,6 +168,18 @@ async function cmdUpdate(rest: string[]): Promise<void> {
       break;
     case "resolve-contradiction":
       await cmdResolveContradiction(subArgs);
+      break;
+    case "answer":
+      await cmdAnswer(subArgs);
+      break;
+    case "set-deps":
+      await cmdSetDeps(subArgs);
+      break;
+    case "accept":
+      await cmdAccept(subArgs);
+      break;
+    case "reject":
+      await cmdReject(subArgs);
       break;
     default:
       throw new Error(`Unknown update subcommand: ${sub}. See --help.`);
@@ -328,6 +352,76 @@ async function cmdFinalize(rest: string[]): Promise<void> {
   const dir = resolveKey(process.cwd(), key);
   const result = await finalize(dir, process.cwd(), key);
   process.stdout.write(`Finalized: ${result.markdownPath}\n`);
+}
+
+async function cmdStop(rest: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      state: { type: "string" },
+    },
+    allowPositionals: true,
+  });
+  const key = values.state!;
+  const dir = resolveKey(process.cwd(), key);
+  stopServer(dir, process.cwd(), key);
+  process.stdout.write("Stopped.\n");
+}
+
+async function cmdAnswer(rest: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      state: { type: "string" },
+      id: { type: "string" },
+      value: { type: "string" },
+    },
+    allowPositionals: true,
+  });
+  const dir = resolveKey(process.cwd(), values.state!);
+  await answer(dir, { id: values.id!, value: values.value ?? "" });
+}
+
+async function cmdSetDeps(rest: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      state: { type: "string" },
+      id: { type: "string" },
+      deps: { type: "string" },
+    },
+    allowPositionals: true,
+  });
+  const dir = resolveKey(process.cwd(), values.state!);
+  const deps = values.deps
+    ? values.deps.split(",").map((d) => d.trim()).filter(Boolean)
+    : [];
+  await setDeps(dir, { id: values.id!, deps });
+}
+
+async function cmdAccept(rest: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      state: { type: "string" },
+    },
+    allowPositionals: true,
+  });
+  const dir = resolveKey(process.cwd(), values.state!);
+  await accept(dir);
+}
+
+async function cmdReject(rest: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      state: { type: "string" },
+      feedback: { type: "string" },
+    },
+    allowPositionals: true,
+  });
+  const dir = resolveKey(process.cwd(), values.state!);
+  await reject(dir, { feedback: values.feedback ?? "" });
 }
 
 main().catch((e) => {

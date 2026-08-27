@@ -59,7 +59,26 @@ export async function finalize(dir: string, cwd: string, key?: string): Promise<
   const mdPath = join(cwd, `${slug}-grilling-summary.md`);
   await writeFile(mdPath, markdown, "utf-8");
 
-  // Stop the server process if a real pid exists.
+  // Stop the server + clean up the key entry (shared with the `stop` command).
+  stopServer(dir, cwd, key);
+
+  // Remove the temp dir.
+  try {
+    await rm(dir, { recursive: true, force: true });
+  } catch {
+    // Best effort — don't block finalize if cleanup fails.
+  }
+
+  return { exitCode: 0, markdownPath: mdPath };
+}
+
+/**
+ * Stop the grilling server process (if running) and remove the .grilling.json
+ * key entry. Used by `finalize` and the top-level `stop` command. Does NOT
+ * emit markdown, check the coast-clear gate, or remove the temp dir — for the
+ * full teardown use `finalize`.
+ */
+export function stopServer(dir: string, cwd: string, key?: string): void {
   const pidFile = join(dir, "grilling.pid");
   if (existsSync(pidFile)) {
     const pidStr = readFileSync(pidFile, "utf-8").trim();
@@ -82,19 +101,10 @@ export async function finalize(dir: string, cwd: string, key?: string): Promise<
         delete map[key];
         writeFileSync(mapPath, JSON.stringify(map, null, 2), "utf-8");
       } catch {
-        // Corrupt map file — best effort, don't block finalize.
+        // Corrupt map file — best effort, don't block.
       }
     }
   }
-
-  // Remove the temp dir.
-  try {
-    await rm(dir, { recursive: true, force: true });
-  } catch {
-    // Best effort — don't block finalize if cleanup fails.
-  }
-
-  return { exitCode: 0, markdownPath: mdPath };
 }
 
 function renderMarkdown(state: GrillingState): string {
