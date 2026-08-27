@@ -105,17 +105,41 @@ Read the task doc frontmatter.
 
 ## Step 7 — Archive
 
-```
-task_map_tick <map-slug> {taskSlug}  # if belongs to map
-git mv docs/tasks/{taskSlug}/ docs/tasks/archive/{taskSlug}/
-task_state_set task null
-task_state_set slice null
-git checkout main
-git merge --no-ff task/{taskSlug} -m "task: finalize {taskSlug}"
-git branch -d task/{taskSlug}
-```
+Step 7 interleaves **Pi tool calls** with shell commands. `task_map_tick` and
+`task_state_set` are tools you invoke as functions, **not** shell binaries —
+wrapping them in a `set -e` block makes them fail with `command not found`
+(exit 127) and abort the sequence. Call them as tools, and run the shell steps
+in a separate bash block.
 
-If remote exists: `git push origin main`
+1. **If the task belongs to a map**, call the Pi tool:
+
+   ```
+   task_map_tick <map-slug> {taskSlug}  # Pi tool — not a shell command
+   ```
+
+   (If the map has no matching child task, it errors harmlessly; fall back to
+   editing the map doc directly.)
+
+2. **Call the Pi tool** to clear workflow state:
+
+   ```
+   task_state_set task null   # Pi tool — not a shell command
+   task_state_set slice null  # Pi tool — not a shell command
+   ```
+
+3. **Archive the task directory and merge the branch** (shell — safe under
+   `set -e`, contains no Pi tools):
+
+   ```bash
+   set -e
+   git mv docs/tasks/{taskSlug}/ docs/tasks/archive/{taskSlug}/
+   git commit -m "chore(task): archive {taskSlug}"
+   git checkout main
+   git merge --no-ff task/{taskSlug} -m "task: finalize {taskSlug}"
+   git branch -d task/{taskSlug}
+   ```
+
+   If remote exists: `git push origin main`
 
 ## Step 8 — Map finalization (if last child)
 

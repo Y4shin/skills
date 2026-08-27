@@ -619,6 +619,37 @@ describe("skill cross-references", () => {
     expect(content).toContain("task_map_tick");
   });
 
+  test("finalize-task Step 7 separates Pi tool calls from the shell archive block", () => {
+    const content = readFile("skills/finalize-task/SKILL.md");
+    const step7Start = content.indexOf("## Step 7");
+    expect(step7Start).toBeGreaterThan(-1);
+    const step8Start = content.indexOf("## Step 8", step7Start);
+    const step7 = step8Start > -1 ? content.slice(step7Start, step8Start) : content.slice(step7Start);
+
+    // The git shell block (containing `git merge --no-ff`) must not interleave
+    // Pi tool calls (task_state_set / task_map_tick) as if they were shell
+    // binaries — under `set -e` that aborts the archive mid-sequence (see
+    // docs/bugs/finalize-task-set-e-tool-confusion.md).
+    const fence = /```[^\n]*\n([\s\S]*?)```/g;
+    let shellBlock: string | null = null;
+    let m: RegExpExecArray | null;
+    while ((m = fence.exec(step7)) !== null) {
+      if (/git\s+merge\s+--no-ff/.test(m[1])) {
+        shellBlock = m[1];
+        break;
+      }
+    }
+    expect(shellBlock).not.toBeNull();
+    expect(shellBlock!).not.toMatch(/task_state_set/);
+    expect(shellBlock!).not.toMatch(/task_map_tick/);
+
+    // The Pi tool calls must still appear in Step 7, clearly marked as tool
+    // invocations rather than shell commands.
+    expect(step7).toContain("task_state_set");
+    expect(step7).toContain("task_map_tick");
+    expect(step7).toMatch(/Pi tool|tool call|tool invocation|invoke .*tool|not .*shell command/i);
+  });
+
   test("finalize-task references task_map_finalizable", () => {
     const content = readFile("skills/finalize-task/SKILL.md");
     expect(content).toContain("task_map_finalizable");

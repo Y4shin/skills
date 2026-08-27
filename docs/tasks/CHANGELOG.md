@@ -1,5 +1,8 @@
 # Task Changelog
 
+## 2026-08-27 — Fix finalize-task Step 7 set -e tool/binary confusion (finalize-task-set-e-tool-confusion)
+`finalize-task` Step 7 mixed Pi tool calls (`task_map_tick`, `task_state_set`) into the same shell block as `git` commands, so an agent running it under `set -e` aborted mid-archive at `task_state_set` (exit 127, command not found) and had to recover manually on every finalize touching `docs/tasks/state.yaml`. Split the tool calls out of the shell block into clearly-labeled Pi-tool steps, and kept the `git` archive/merge sequence in its own `set -e`-safe shell block. Added a regression assertion in `tests/skills.test.ts` that the Step 7 `git merge --no-ff` block no longer contains Pi tool calls; full devenv suite passes 324/324 (pre-existing integration-harness failure excluded).
+
 ## 2026-08-26 — Build the codebase architecture improvement survey (build-improve-architecture-skill)
 Added the read-only architecture scout and `/improve-codebase-architecture` survey with vendored offline HTML reporting, candidate selection, optional grilling, ADR awareness, and Wayfinder handoff. Full devenv test suite passes 339/339.
 
