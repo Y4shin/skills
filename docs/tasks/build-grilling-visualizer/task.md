@@ -135,3 +135,14 @@ ones for implementation:
    returns immediately), non-interactive pi, iterated to 2-clean-in-a-row per
    scenario (cap 5), record discovered update commands.
    blocked_by: [skill-rewire].
+
+## Implementation notes
+
+- Slice 1 (bundler-subproject) landed — Vite+Svelte5 single-file pipeline,
+  committed `skills/grilling/grilling-cli.mjs` with inlined HTML, `scripts/` has
+  its own `tsconfig.json` (root `include` stays `src/**`). DevDeps pinned:
+  `@sveltejs/vite-plugin-svelte@^3`, `vite-plugin-singlefile@^2`, `svelte@^5`
+  (Vite 5.4.21 compat — the latest `vite-plugin-svelte@7` requires Vite 8, so
+  v3 is used). The `.mjs` loads and runs with no further build step. Build
+  driver is `scripts/build.ts` (two-step: SPA → inlined `index.html`, then
+  CLI TS → `.mjs` with the HTML embedded via `?raw` import).
