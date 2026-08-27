@@ -4,7 +4,7 @@ status: fixed
 severity: minor
 reported: 2026-08-27
 confirmed_by: regression test (tests/skills.test.ts, red on unfixed prose)
-fix_commit:
+fix_commit: dbfe99359c4c2116f5943ef7bf65e4d137dcf449
 promoted_to:
 skill: finalize-task
 ---
