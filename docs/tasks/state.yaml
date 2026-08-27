@@ -1,2 +1,7 @@
-task: null
+task: build-grilling-visualizer
 slice: null
+remaining:
+  - cli-core-and-state
+  - server-and-spa
+  - skill-rewire
+  - eval-discover-update-set
