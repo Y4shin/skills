@@ -1,10 +1,10 @@
 ---
 kind: slice
 slug: server-and-spa
-title: "Persistent detached HTTP server + inlined Svelte SPA + xdg-open auto-open"
+title: Persistent detached HTTP server + inlined Svelte SPA + xdg-open auto-open
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: l
 blocked_by:
 - cli-core-and-state
