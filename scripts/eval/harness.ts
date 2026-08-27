@@ -2,7 +2,6 @@
 // runScenario(scenario, gapFn) iterates per scenario until 2-clean-in-a-row
 // (cap 5), escalates near cap.
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
 
 // --- Scenario type ---
 
@@ -62,8 +61,7 @@ export function parseGapReport(report: string): GapReport {
   // - Explicit clean statement ("no missing operations", "missing operations: none")
   //   OR an explicit statement that all operations were available
   // - If there are extracted missing commands, it's not converged
-  // - If the report mentions missing operations but lists none → not converged
-  // - A silent report (no mention at all) → not converged
+  // - A silent report (no mention at all) → non-convergence
   const lower = report.toLowerCase();
   const hasCleanStatement =
     /no missing operations/.test(lower) ||
@@ -71,8 +69,6 @@ export function parseGapReport(report: string): GapReport {
     /did not need any cli operations/.test(lower) ||
     /all required commands were available/.test(lower) ||
     (/no other gaps/.test(lower) && missing.length === 0);
-  const hasMissingStatement =
-    /missing operations|needed.*but did not exist|gaps/i.test(report);
 
   if (missing.length > 0) {
     return { converged: false, missingCommands: missing };
