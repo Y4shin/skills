@@ -120,7 +120,6 @@ describe("seam 5 — single inlined index.html", () => {
  */
 describe("seam 4 — root typecheck ignores scripts/", () => {
   it("root tsconfig.json include is only src/**", async () => {
-    const { readFile } = await import("node:fs/promises");
     const tsconfigRaw = await readFile(join(repoRoot, "tsconfig.json"), "utf-8");
     const tsconfig = JSON.parse(tsconfigRaw);
     expect(tsconfig.include).toEqual(["src/**/*.ts"]);
