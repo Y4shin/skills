@@ -2,6 +2,7 @@
 // runScenario(scenario, gapFn) iterates per scenario until 2-clean-in-a-row
 // (cap 5), escalates near cap.
 import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
 
 // --- Scenario type ---
 
@@ -158,5 +159,63 @@ export async function runScenario(scenario: Scenario, gapFn: GapReportFn): Promi
     lastGaps,
     escalated,
     escalationMessage,
+  };
+}
+
+// --- Pi invocation (production gapFn) ---
+
+/**
+ * Strip the environment of display variables so a stray xdg-open cannot
+ * find a browser. Belt-and-suspenders backstop against browser-spawn leaks.
+ * Exported for testing.
+ */
+export function strippedEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value === undefined) continue;
+    // Remove display-related variables so xdg-open cannot find a browser.
+    if (key === "DISPLAY" || key === "WAYLAND_DISPLAY" || key === "XDG_SESSION_TYPE") {
+      continue;
+    }
+    env[key] = value;
+  }
+  // Force eval mode so the CLI's wait returns immediately and start forces no-open.
+  env.GRILLING_EVAL = "1";
+  return env;
+}
+
+/**
+ * Run non-interactive pi on a grilling scenario. Shells out to `pi --print`
+ * (non-interactive mode) with a prompt that tells the agent to grill the
+ * scenario subject using the grilling skill + modified CLI, and report any
+ * CLI operations it needed but did not exist.
+ *
+ * Returns the agent's stdout (the gap report).
+ */
+export function runPiGrilling(scenario: Scenario, opts?: { timeoutMs?: number }): string {
+  const repoRoot = process.cwd();
+  const timeoutMs = opts?.timeoutMs ?? 10 * 60 * 1000; // 10 min default
+
+  const result = spawnSync("pi", ["--print", "-p", scenario.prompt], {
+    cwd: repoRoot,
+    encoding: "utf-8",
+    timeout: timeoutMs,
+    env: strippedEnv(),
+  });
+
+  if (result.error) {
+    return `Error running pi: ${result.error.message}`;
+  }
+
+  return (result.stdout ?? "") + (result.stderr ?? "");
+}
+
+/**
+ * Create a production GapReportFn for a scenario: runs pi, parses the output.
+ */
+export function createPiGapFn(scenario: Scenario, opts?: { timeoutMs?: number }): GapReportFn {
+  return async () => {
+    const output = runPiGrilling(scenario, opts);
+    return parseGapReport(output);
   };
 }
