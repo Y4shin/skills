@@ -1,7 +1,17 @@
 // Eval harness — discovers the full update command set beyond the 6 bootstrap.
-// runScenario(scenario, cliPath) -> gap report; iterates per scenario until
-// 2-clean-in-a-row (cap 5), escalates near cap.
+// runScenario(scenario, gapFn) iterates per scenario until 2-clean-in-a-row
+// (cap 5), escalates near cap.
 import { spawnSync } from "node:child_process";
+
+// --- Scenario type ---
+
+export interface Scenario {
+  id: string;
+  name: string;
+  subject: string;
+  maxQuestions: number;
+  prompt: string;
+}
 
 // --- Gap report parsing (seam 1) ---
 
@@ -59,9 +69,9 @@ export function parseGapReport(report: string): GapReport {
     /missing operations:\s*none/.test(lower) ||
     /did not need any cli operations/.test(lower) ||
     /all required commands were available/.test(lower) ||
-    /no other gaps/.test(lower) && missing.length === 0;
+    (/no other gaps/.test(lower) && missing.length === 0);
   const hasMissingStatement =
-    /missing operations|missing operations|needed.*but did not exist|gaps/i.test(report);
+    /missing operations|needed.*but did not exist|gaps/i.test(report);
 
   if (missing.length > 0) {
     return { converged: false, missingCommands: missing };
@@ -74,4 +84,79 @@ export function parseGapReport(report: string): GapReport {
   // No missing commands extracted and no explicit clean statement →
   // non-convergence (silent or vague report).
   return { converged: false, missingCommands: [] };
+}
+
+// --- Iteration (seam 2) ---
+
+/** A function that runs one iteration and returns a gap report. */
+export type GapReportFn = () => Promise<GapReport>;
+
+export interface RunResult {
+  scenario: Scenario;
+  converged: boolean;
+  iterations: number;
+  allGaps: GapReport[];
+  lastGaps?: GapReport;
+  escalated: boolean;
+  escalationMessage: string;
+}
+
+const MAX_ITERATIONS = 5;
+const CLEAN_STREAK_REQUIRED = 2;
+
+/**
+ * Run a scenario to convergence or cap.
+ *
+ * Iterates: run → collect gaps → (add missing commands) → re-run, until the
+ * agent reports no missing commands 2 times in a row (convergence), capped at
+ * 5 iterations. If the cap is reached without convergence, escalates.
+ *
+ * The gapFn abstraction lets us test the iteration logic with a mock.
+ * In production, gapFn shells out to non-interactive pi.
+ */
+export async function runScenario(scenario: Scenario, gapFn: GapReportFn): Promise<RunResult> {
+  const allGaps: GapReport[] = [];
+  let cleanStreak = 0;
+  let iterations = 0;
+  let lastGaps: GapReport | undefined;
+  let converged = false;
+
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
+    iterations++;
+    const report = await gapFn();
+    lastGaps = report;
+
+    if (report.converged && report.missingCommands.length === 0) {
+      cleanStreak++;
+      if (cleanStreak >= CLEAN_STREAK_REQUIRED) {
+        converged = true;
+        break;
+      }
+    } else {
+      cleanStreak = 0;
+      // Only track runs that had actual gaps (missing commands).
+      allGaps.push(report);
+    }
+  }
+
+  const escalated = !converged;
+  let escalationMessage = "";
+  if (escalated) {
+    const lastGapNames =
+      lastGaps?.missingCommands.map((g) => g.name).join(", ") ||
+      "(silent — no gaps reported)";
+    escalationMessage =
+      `Scenario "${scenario.id}" did not converge after ${iterations} iterations. ` +
+      `Last gaps: ${lastGapNames}. Manual triage required.`;
+  }
+
+  return {
+    scenario,
+    converged,
+    iterations,
+    allGaps,
+    lastGaps,
+    escalated,
+    escalationMessage,
+  };
 }
