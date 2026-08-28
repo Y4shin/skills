@@ -1,5 +1,8 @@
 # Task Changelog
 
+## 2026-08-28 — Complete the grilling-visualizer map
+The initiative is complete: a detached grilling CLI + inlined Svelte SPA renders a live design-tree graph (rounds, 5-word-id nodes, dependency/contradiction/reference edges, summary sidebar, per-round answers), with a hidden temp-dir state file, CLI-enforced 7-state machine, and xdg-open auto-open across 3 platforms. The grilling skill + wayfinder resource drive it end-to-end, and an eval harness confirmed the full 11-command `update` surface (6 bootstrap + 5 discovered: answer, set-deps, accept, reject, stop). 5 slices landed; 566 tests green; typecheck clean.
+
 ## 2026-08-28 — Grilling visualizer: detached CLI + browser SPA + skill rewire + eval (build-grilling-visualizer)
 Built a detached grilling CLI (`skills/grilling/grilling-cli.mjs`) that drives a persistent local HTTP server serving an inlined Svelte 5 SPA — a live graph of the design tree (rows=rounds, 5-word-id nodes, black/red/gray dependency/contradiction/reference edges, upcoming section, summary sidebar, per-round answer inputs) — with a hidden random temp-dir state file, the 7-state machine enforced in the CLI, and xdg-open auto-open across 3 platforms. Rewired the grilling SKILL.md + wayfinder resource to drive it end-to-end. An eval harness (3 synthetic scenarios, non-interactive pi, `GRILLING_EVAL=1` eval mode, 2-clean-in-a-row iteration) discovered 5 missing `update` commands (answer, set-deps, accept, reject, stop) beyond the 6 bootstrap, folded into the CLI + skill; all 3 scenarios converge 2-clean-in-a-row, confirming the 11-command surface is complete. A `/impeccable typeset` pass established base type roles on the SPA shell. 5 slices, 566 tests green, typecheck clean.
 
