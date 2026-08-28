@@ -25,6 +25,15 @@
   broken. See `tests/gate-factory.test.ts` (the repo-gate factory tests) for
   the pattern — it asserts which tool names register and which `on(event)`
   handlers fire under different gate decisions._
+- **Iteration-loop seams (function-as-dependency):** when a loop shells out
+  to an external process and parses its output, inject the step as a
+  `() => Promise<Result>` function so the loop logic (convergence, caps,
+  escalation) is unit-testable with a mock, independent of the real
+  subprocess. See `scripts/eval/harness.ts` `runScenario(scenario, gapFn)` +
+  `GapReportFn` + `scripts/eval/harness-iteration.test.ts`: the production
+  `createPiGapFn` shells out to `pi --print`, but the tests feed a mock that
+  returns a scripted sequence of gap reports to assert 2-clean-in-a-row,
+  cap, and escalation behavior with zero subprocess calls.
 
 ## Integration harness (tests/integration/)
 
