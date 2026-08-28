@@ -6,8 +6,8 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdir, rm } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { mkdir, rm, writeFile, chmod } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..");
@@ -71,6 +71,14 @@ async function main(): Promise<void> {
     clearScreen: false,
     logLevel: "warn",
   });
+  // Make the committed .mjs directly executable: prepend a Node shebang and set
+  // the executable bit so `./skills/grilling/grilling-cli.mjs` works (not just
+  // `node skills/grilling/grilling-cli.mjs`). The esbuild output has no shebang.
+  const built = readFileSync(cliMjs, "utf-8");
+  if (!built.startsWith("#!")) {
+    await writeFile(cliMjs, `#!/usr/bin/env node\n${built}`, "utf-8");
+  }
+  await chmod(cliMjs, 0o755);
 }
 
 main().catch((err) => {

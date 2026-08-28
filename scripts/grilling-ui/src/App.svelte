@@ -25,7 +25,7 @@
       }
       // Only show answer inputs for current-round questions when in-round.
       if (state["page-state"] === "in-round") {
-        const currentRound = model.rows.length > 0 ? model.rows[model.rows.length - 1].round : 1;
+        const currentRound = activeRound(model);
         for (const row of model.rows) {
           if (row.round === currentRound) {
             for (const node of row.nodes) {
@@ -67,6 +67,17 @@
     if (pollTimer) clearInterval(pollTimer);
   });
 
+  // activeRound — the lowest round that still has unanswered questions (the
+  // active frontier round). Falls back to the last round when every question is
+  // answered (so final-review/round-done still highlight something sensible).
+  function activeRound(model: GraphModel): number {
+    if (model.rows.length === 0) return 0;
+    for (const row of model.rows) {
+      if (row.nodes.some((n) => !n.answered)) return row.round;
+    }
+    return model.rows[model.rows.length - 1].round;
+  }
+
   // Edge style helper
   function edgeStyle(type: string): string {
     switch (type) {
@@ -86,8 +97,11 @@
     }
   }
 
-  // Current round = last row's round
-  $: currentRound = model.rows.length > 0 ? model.rows[model.rows.length - 1].round : 0;
+  // Current round = the lowest round that still has unanswered questions (the
+  // active frontier round). Falls back to the last round when all are answered.
+  // The previous logic used rows[length-1] — the highest round — which made only
+  // the LAST round editable and left the real current round read-only.
+  $: currentRound = activeRound(model);
   $: isInProgress = state?.["page-state"] === "in-round";
 </script>
 

@@ -1,7 +1,7 @@
 // Start command — creates a random temp dir, writes state.json + grilling.pid,
 // writes .grilling.json key map in CWD, starts the detached HTTP server,
-// writes the real pid, prints <url>\nopened: <bool>, and auto-opens the
-// browser via xdg-open unless --no-open.
+// writes the real pid, prints <url>\nopened: <bool>\nstate: <key>, and auto-opens
+// the browser via xdg-open unless --no-open.
 // Under GRILLING_EVAL=1, the browser is NEVER opened (forces noOpen=true).
 import { createStateDir } from "../state.js";
 import { writeFileSync } from "node:fs";
@@ -44,8 +44,10 @@ export async function start(input: StartInput): Promise<StartResult> {
     opened = openBrowser(url);
   }
 
-  // Print <url>\nopened: <bool> to stdout.
-  process.stdout.write(`${url}\nopened: ${opened}\n`);
+  // Print <url>\nopened: <bool>\nstate: <key> to stdout. The state key is the
+  // agent's handle for every subsequent command; printing it here means a
+  // headless/agent driver does not have to parse .grilling.json to get it.
+  process.stdout.write(`${url}\nopened: ${opened}\nstate: ${key}\n`);
 
   return { stateDir, key, url, opened };
 }
