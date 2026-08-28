@@ -6,7 +6,7 @@ status: active
 tasks:
 - slug: build-grilling-visualizer
   blocked_by: []
-  done: false
+  done: true
 ---
 
 ## Destination

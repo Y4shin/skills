@@ -39,6 +39,12 @@ async function main(): Promise<void> {
     const i = argv.indexOf("--model");
     return i >= 0 ? argv[i + 1] : undefined;
   })();
+  const maxIterations = (() => {
+    const i = argv.indexOf("--max-iterations");
+    if (i < 0) return undefined;
+    const n = Number(argv[i + 1]);
+    return Number.isFinite(n) && n >= 1 ? Math.floor(n) : undefined;
+  })();
 
   const scenarios = scenarioFilter
     ? SCENARIOS.filter((s) => s.id === scenarioFilter)
@@ -50,6 +56,9 @@ async function main(): Promise<void> {
   if (model) {
     process.stdout.write(`Using model: ${model}\n`);
   }
+  if (maxIterations) {
+    process.stdout.write(`Spike mode: max ${maxIterations} iteration(s) per scenario\n`);
+  }
 
   const results: RunResult[] = [];
   const allDiscovered: Map<string, string> = new Map();
@@ -57,7 +66,7 @@ async function main(): Promise<void> {
   for (const scenario of scenarios) {
     process.stdout.write(`\n=== Scenario ${scenario.id}: ${scenario.name} ===\n`);
     const gapFn = createPiGapFn(scenario, { timeoutMs: 10 * 60 * 1000, model });
-    const result = await runScenario(scenario, gapFn);
+    const result = await runScenario(scenario, gapFn, { maxIterations });
     results.push(result);
 
     // Collect discovered commands across all scenarios.
@@ -78,11 +87,19 @@ async function main(): Promise<void> {
     }
   }
 
-  // Write eval-results.md.
-  const md = renderResultsMarkdown(results, allDiscovered);
-  mkdirSync(dirname(resultsPath), { recursive: true });
-  writeFileSync(resultsPath, md, "utf-8");
-  process.stdout.write(`\nResults written to ${resultsPath}\n`);
+  // Only write eval-results.md when running all scenarios. A --scenario-filtered
+  // spike must NOT clobber the accumulated multi-scenario record (a single
+  // filtered run has incomplete data).
+  if (!scenarioFilter) {
+    const md = renderResultsMarkdown(results, allDiscovered);
+    mkdirSync(dirname(resultsPath), { recursive: true });
+    writeFileSync(resultsPath, md, "utf-8");
+    process.stdout.write(`\nResults written to ${resultsPath}\n`);
+  } else {
+    process.stdout.write(
+      `\nSpike (single scenario ${scenarioFilter}) — results NOT written to eval-results.md (filtered runs don't clobber the accumulated record).\n`,
+    );
+  }
 
   // If any scenario escalated, exit non-zero so the caller knows.
   const anyEscalated = results.some((r) => r.escalated);

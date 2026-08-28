@@ -18,9 +18,7 @@ full `update` command set beyond the 6 bootstrap commands.
 
 Discovered by running scenario A of the eval harness (non-interactive pi,
 deepseek-v4-flash, GRILLING_EVAL=1 so `wait` returns immediately). The same
-gaps are structural and would surface in B and C (they are needed in every
-headless/agent-driven run). See HANDOFF-eval-reruns.md for the deferred B and C
-re-runs that confirm 2-clean-in-a-row convergence.
+gaps are structural and surface in every headless/agent-driven run.
 
 | Command | Purpose | Why it was needed |
 |---------|---------|-------------------|
@@ -57,21 +55,53 @@ Top-level: `start`, `update`, `get`, `refresh`, `wait`, `stop` (discovered),
 
 ## Per-Scenario Results
 
+Each scenario was run with `--max-iterations 2` (2-clean-in-a-row against the
+fixed harness, with the 5 discovered commands already folded into the CLI +
+skill). The folding happens **between** runs, not within the in-process loop:
+the loop is only a non-determinism guard ("does the agent report clean twice
+in a row against the same prompt").
+
 ### Scenario A: Simple either/or with one dependency
 - **Subject:** A simple either/or decision: should the project use a monorepo
   or a polyrepo? One dependent question: given that choice, what package
   manager should we use?
 - **Max questions:** 5
-- **Iterations run:** 5
-- **Converged:** no (escalated at the cap — the harness had a parse/convergence
-  bug that has since been fixed: `parseGapReport` required the `update` prefix
-  to avoid false-positives like "R1", and an empty-missing report with a
-  missing-ops section now counts as converged). The discoveries above are
-  stable across the iterations that reported gaps.
-- **Gaps found:** `answer`, `set-deps`, `accept`/`reject`, `stop` (see table).
+- **Iterations:** 2
+- **Converged:** yes (2-clean-in-a-row on the first run — no folding needed)
+- **Gaps found:** none. Both iterations used the folded commands (`answer`,
+  `accept`) and reported "No missing operations."
 
 ### Scenario B: Moderate — 2-3 rounds, a contradiction, a reference edge
-- **Status:** deferred — see HANDOFF-eval-reruns.md.
+- **Subject:** A moderate decision: choosing a deployment strategy for a web
+  app. 2-3 rounds of questions. One contradiction (two answers that conflict).
+  One reference edge (a question that references another without depending
+  on it).
+- **Max questions:** 9
+- **Iterations:** 2
+- **Converged:** yes (2-clean-in-a-row on the first run — no folding needed)
+- **Gaps found:** none. Both iterations used the folded commands (`set-deps`,
+  `resolve-contradiction`, `answer`, `accept`) and reported "No missing
+  operations."
 
 ### Scenario C: Moderate — multiple deps, contradiction resolved, rejected final-review resumes in-round
-- **Status:** deferred — see HANDOFF-eval-reruns.md.
+- **Subject:** A moderate decision: designing the data layer for a SaaS app.
+  Multiple dependencies between questions. A contradiction that must be
+  resolved. A final-review that is rejected, causing a resume in-round to
+  address the gap, then re-reach final-review.
+- **Max questions:** 12
+- **Iterations:** 2
+- **Converged:** yes (2-clean-in-a-row on the first run — no folding needed)
+- **Gaps found:** none. Both iterations exercised the full rejection/resume
+  flow (`reject --feedback` → resume in-round → `accept`) plus `answer`,
+  `set-deps`, `resolve-contradiction`, and reported "No missing operations."
+- **Minor observation (not a missing op):** `add-question` errors on
+  duplicate IDs but the message is quiet (no output shown for success cases;
+  the duplicate error appeared only via the frontier read). Recorded for later,
+  not folded.
+
+## Verdict
+
+All 3 scenarios converge with the **bootstrap 6 + 5 discovered = 11-command**
+surface. No further commands surfaced from B or C beyond the 5 already folded
+from A. The eval confirms the folded command set is complete for the grilling
+round loop, contradiction resolution, and the final-review reject/resume flow.

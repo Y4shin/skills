@@ -4,7 +4,7 @@ slug: eval-discover-update-set
 title: "Eval harness: 3 synthetic scenarios discover the full update command set"
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: m
 blocked_by:
 - skill-rewire

@@ -110,29 +110,41 @@ export interface RunResult {
   escalationMessage: string;
 }
 
-const MAX_ITERATIONS = 5;
+const DEFAULT_MAX_ITERATIONS = 5;
 const CLEAN_STREAK_REQUIRED = 2;
+
+/** Options for runScenario. */
+export interface RunScenarioOptions {
+  /** Override the iteration cap (default 5). Lower for spiking. */
+  maxIterations?: number;
+}
 
 /**
  * Run a scenario to convergence or cap.
  *
  * Iterates: run → collect gaps → (add missing commands) → re-run, until the
  * agent reports no missing commands 2 times in a row (convergence), capped at
- * 5 iterations. If the cap is reached without convergence, escalates.
+ * 5 iterations (overridable via opts.maxIterations). If the cap is reached
+ * without convergence, escalates.
  *
  * The gapFn abstraction lets us test the iteration logic with a mock.
  * In production, gapFn shells out to non-interactive pi.
  */
-export async function runScenario(scenario: Scenario, gapFn: GapReportFn): Promise<RunResult> {
+export async function runScenario(
+  scenario: Scenario,
+  gapFn: GapReportFn,
+  opts?: RunScenarioOptions,
+): Promise<RunResult> {
+  const maxIterations = opts?.maxIterations ?? DEFAULT_MAX_ITERATIONS;
   const allGaps: GapReport[] = [];
   let cleanStreak = 0;
   let iterations = 0;
   let lastGaps: GapReport | undefined;
   let converged = false;
 
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
+  for (let i = 0; i < maxIterations; i++) {
     iterations++;
-    process.stdout.write(`\n--- [${scenario.id}] iteration ${iterations}/${MAX_ITERATIONS} ---\n`);
+    process.stdout.write(`\n--- [${scenario.id}] iteration ${iterations}/${maxIterations} ---\n`);
     const report = await gapFn();
     lastGaps = report;
 
