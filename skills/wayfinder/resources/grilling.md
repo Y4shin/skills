@@ -25,11 +25,5 @@ The task body must state:
 - the recommended starting answer;
 - what downstream work the answer may create.
 
-The execution resource drives the grilling CLI
-(`skills/grilling/grilling-cli.mjs`) end-to-end: it starts the visualizer, builds
-the design-tree graph via `update`, opens each round via `set-state` + `refresh`,
-blocks on the user via `wait`, reads answers via `get`, recomputes the frontier,
-and repeats. The completion gate uses `final-review` + `wait accepted`/`rejected`
-+ `finalize`. The user answers in the browser; the agent drives the loop. The
-agent only ever holds the `--state <key>` handle and must not answer on the
-user's behalf.
+The execution resource will ask one question at a time and must not answer on
+the user's behalf.

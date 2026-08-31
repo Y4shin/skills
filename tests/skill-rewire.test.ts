@@ -1,12 +1,19 @@
 /**
- * Slice 4 (skill-rewire) — structural & grep tests for the rewritten grilling
- * skill prose and the Pi path-protection backstop.
+ * Structural & grep tests for the grilling-with-ui skill prose, the reverted
+ * text-based grilling skill, the Wayfinder text resource, and the Pi
+ * path-protection backstop.
  *
- * These tests observe the three seams from the arch spec:
- *  1. Grep: SKILL.md and wayfinder grilling.md contain NO .grilling.json,
- *     tmpdir, or temp-dir path references.
- *  2. Structural: the skill describes the full round loop using the CLI
- *     surface (start, update, refresh, wait, get, finalize).
+ * After splitting the visualizer out of /grilling:
+ *  - skills/grilling/SKILL.md is the text-based skill (ask_user_question),
+ *    and skills/wayfinder/resources/grilling.md drives that text path.
+ *  - skills/grilling-with-ui/SKILL.md is the browser-visualized variant that
+ *    drives the grilling CLI (skills/grilling-with-ui/grilling-cli.mjs).
+ *
+ * These tests observe three seams:
+ *  1. Grep: grilling-with-ui SKILL.md contains NO .grilling.json, tmpdir, or
+ *     temp-dir path references (the hiding contract).
+ *  2. Structural: grilling-with-ui SKILL.md describes the full round loop using
+ *     the CLI surface (start, update, refresh, wait, get, finalize).
  *  3. src/pi.ts registers the grilling temp dir as a protected path.
  *
  * The tests are intentionally at the prose/structural level — they verify
@@ -30,8 +37,7 @@ function readFile(relativePath: string): string {
 
 describe("seam 1 — hiding contract: no .grilling.json or temp-dir refs", () => {
   const files = [
-    "skills/grilling/SKILL.md",
-    "skills/wayfinder/resources/grilling.md",
+    "skills/grilling-with-ui/SKILL.md",
   ];
 
   describe.each(files)("%s", (file) => {
@@ -65,8 +71,8 @@ describe("seam 1 — hiding contract: no .grilling.json or temp-dir refs", () =>
 
 // ─── Seam 2: structural — full round loop via CLI surface ─────────────
 
-describe("seam 2 — SKILL.md describes the full round loop via CLI", () => {
-  const content = readFile("skills/grilling/SKILL.md");
+describe("seam 2 — grilling-with-ui SKILL.md describes the full round loop via CLI", () => {
+  const content = readFile("skills/grilling-with-ui/SKILL.md");
 
   test("mentions start (launch the session)", () => {
     expect(content).toMatch(/\bstart\b/);
@@ -126,8 +132,8 @@ describe("seam 2 — SKILL.md describes the full round loop via CLI", () => {
 
 // ─── Seam 2b: core semantics preserved ────────────────────────────────
 
-describe("seam 2b — core grilling semantics preserved in SKILL.md", () => {
-  const content = readFile("skills/grilling/SKILL.md");
+describe("seam 2b — core grilling semantics preserved in grilling-with-ui SKILL.md", () => {
+  const content = readFile("skills/grilling-with-ui/SKILL.md");
 
   test("preserves design tree concept", () => {
     expect(content).toMatch(/design tree/i);
@@ -178,13 +184,34 @@ describe("seam 2b — core grilling semantics preserved in SKILL.md", () => {
   });
 });
 
-// ─── Seam 2c: wayfinder grilling.md updated ──────────────────────────
+// ─── Seam 2c: text-based grilling skill does not drive the CLI ────────
 
-describe("seam 2c — wayfinder grilling.md drives the CLI", () => {
+describe("seam 2c — text-based grilling skill uses ask_user_question, not the CLI", () => {
+  const content = readFile("skills/grilling/SKILL.md");
+
+  test("drives rounds through ask_user_question", () => {
+    expect(content).toMatch(/ask_user_question/);
+  });
+
+  test("does not reference the grilling CLI / visualizer", () => {
+    expect(content).not.toMatch(/grilling-cli\.mjs/);
+    expect(content).not.toMatch(/--state/);
+    expect(content).not.toMatch(/visualizer/i);
+  });
+});
+
+// ─── Seam 2d: wayfinder grilling.md reverted to the text path ─────────
+
+describe("seam 2d — wayfinder grilling.md drives the text path, not the CLI", () => {
   const content = readFile("skills/wayfinder/resources/grilling.md");
 
-  test("mentions the CLI / driving the visualizer", () => {
-    expect(content).toMatch(/CLI|visualizer|grilling-cli/i);
+  test("asks one question at a time and does not answer for the user", () => {
+    expect(content).toMatch(/one question at a time/i);
+    expect(content).toMatch(/must not answer on[\s\S]*the user's behalf/i);
+  });
+
+  test("does not mention the CLI / visualizer", () => {
+    expect(content).not.toMatch(/CLI|visualizer|grilling-cli/i);
   });
 
   test("still requires the task body to state the decision", () => {

@@ -1,6 +1,6 @@
 // Eval scenarios — 3 synthetic grilling subjects, each trivial-to-moderate,
 // ≤12 questions. The harness runs non-interactive pi on each, asking the
-// agent to grill the subject using the grilling skill + modified CLI, and
+// agent to grill the subject using the grilling-with-ui skill + modified CLI, and
 // report any CLI operations it needed but did not exist.
 import type { Scenario } from "./harness.js";
 
@@ -18,8 +18,8 @@ You are grilling a synthetic subject. The subject is:
 "A simple either/or decision: should the project use a monorepo or a polyrepo?
 One dependent question: given that choice, what package manager should we use?"
 
-Use the grilling skill (skills/grilling/SKILL.md) and the grilling CLI
-(skills/grilling/grilling-cli.mjs) to drive the grilling end-to-end. The CLI
+Use the grilling-with-ui skill (skills/grilling-with-ui/SKILL.md) and the grilling CLI
+(skills/grilling-with-ui/grilling-cli.mjs) to drive the grilling end-to-end. The CLI
 is running in eval mode (GRILLING_EVAL=1) — the wait command returns
 immediately, so do NOT block waiting for a human; just proceed as if the user
 has submitted their answers.
@@ -50,8 +50,8 @@ You are grilling a synthetic subject. The subject is:
 2-3 rounds of questions. One contradiction (two answers that conflict).
 One reference edge (a question that references another without depending on it)."
 
-Use the grilling skill (skills/grilling/SKILL.md) and the grilling CLI
-(skills/grilling/grilling-cli.mjs) to drive the grilling end-to-end. The CLI
+Use the grilling-with-ui skill (skills/grilling-with-ui/SKILL.md) and the grilling CLI
+(skills/grilling-with-ui/grilling-cli.mjs) to drive the grilling end-to-end. The CLI
 is running in eval mode (GRILLING_EVAL=1) — the wait command returns
 immediately, so do NOT block waiting for a human; just proceed as if the user
 has submitted their answers.
@@ -85,8 +85,8 @@ Multiple dependencies between questions. A contradiction that must be resolved.
 A final-review that is rejected, causing a resume in-round to address the gap,
 then re-reach final-review."
 
-Use the grilling skill (skills/grilling/SKILL.md) and the grilling CLI
-(skills/grilling/grilling-cli.mjs) to drive the grilling end-to-end. The CLI
+Use the grilling-with-ui skill (skills/grilling-with-ui/SKILL.md) and the grilling CLI
+(skills/grilling-with-ui/grilling-cli.mjs) to drive the grilling end-to-end. The CLI
 is running in eval mode (GRILLING_EVAL=1) — the wait command returns
 immediately, so do NOT block waiting for a human; just proceed as if the user
 has submitted their answers. When you reach final-review, simulate a

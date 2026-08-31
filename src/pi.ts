@@ -957,7 +957,7 @@ Twelve Fowler code smells from _Refactoring_, chapter 3. The Standards axis of \
   }
 
   // ── Path protection: block writes/edits into the grilling visualizer temp dir ──
-  // The grilling CLI (skills/grilling/grilling-cli.mjs) hides its state in a
+  // The grilling CLI (skills/grilling-with-ui/grilling-cli.mjs) hides its state in a
   // random dir under os.tmpdir() prefixed "grilling-". The skill prose forbids
   // the agent from touching it; this handler is a mechanical backstop that
   // blocks `write`/`edit` tool calls whose target path falls inside that dir,

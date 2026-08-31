@@ -1,6 +1,6 @@
 // Build driver — two-step Vite build:
 //   (a) Svelte 5 SPA → one inlined index.html (vite-plugin-singlefile + assetsInlineLimit: Infinity)
-//   (b) CLI TS → skills/grilling/grilling-cli.mjs with the HTML embedded as a raw string
+//   (b) CLI TS → skills/grilling-with-ui/grilling-cli.mjs with the HTML embedded as a raw string
 import { build } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { viteSingleFile } from "vite-plugin-singlefile";
@@ -14,7 +14,7 @@ const repoRoot = join(__dirname, "..");
 const spaDir = join(__dirname, "grilling-ui");
 const cliDir = join(__dirname, "grilling-cli");
 const spaOutDir = join(spaDir, "dist");
-const cliOutDir = join(repoRoot, "skills", "grilling");
+const cliOutDir = join(repoRoot, "skills", "grilling-with-ui");
 const cliMjs = join(cliOutDir, "grilling-cli.mjs");
 
 async function main(): Promise<void> {
@@ -72,8 +72,8 @@ async function main(): Promise<void> {
     logLevel: "warn",
   });
   // Make the committed .mjs directly executable: prepend a Node shebang and set
-  // the executable bit so `./skills/grilling/grilling-cli.mjs` works (not just
-  // `node skills/grilling/grilling-cli.mjs`). The esbuild output has no shebang.
+  // the executable bit so `./skills/grilling-with-ui/grilling-cli.mjs` works (not just
+  // `node skills/grilling-with-ui/grilling-cli.mjs`). The esbuild output has no shebang.
   const built = readFileSync(cliMjs, "utf-8");
   if (!built.startsWith("#!")) {
     await writeFile(cliMjs, `#!/usr/bin/env node\n${built}`, "utf-8");

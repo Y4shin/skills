@@ -88,6 +88,7 @@ const SKILL_FILES = [
   "skills/diagnosing-bugs/SKILL.md",
   "skills/codebase-design/SKILL.md",
   "skills/grilling/SKILL.md",
+  "skills/grilling-with-ui/SKILL.md",
   "skills/domain-modeling/SKILL.md",
   "skills/improve-codebase-architecture/SKILL.md",
 ];
@@ -133,10 +134,12 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(14);
+    expect(pkg.pi.skills.length).toBe(15);
     expect(pkg.pi.skills).toContain("./skills/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/improve-codebase-architecture");
+    expect(pkg.pi.skills).toContain("./skills/grilling");
+    expect(pkg.pi.skills).toContain("./skills/grilling-with-ui");
   });
 
   test("has subagents config", () => {
@@ -179,7 +182,47 @@ describe("grilling skill references", () => {
     expect(content).toMatch(/downstream consequences|consequences/i);
     expect(content).toMatch(/shared understanding/i);
     expect(content).toMatch(/frontier is empty|nothing left silently assumed/i);
-    // Slice 4 (skill-rewire): the grilling skill now drives the grilling CLI
+  });
+
+  test("uses ask_user_question interaction, not the CLI/visualizer", () => {
+    // The text-based grilling skill drives rounds through Pi's ask_user_question
+    // interaction. It must NOT reference the grilling CLI/visualizer.
+    expect(content).toMatch(/ask_user_question/);
+    expect(content).not.toMatch(/grilling-cli\.mjs/);
+    expect(content).not.toMatch(/--state/);
+  });
+});
+
+describe("grilling-with-ui skill references", () => {
+  const content = readFile("skills/grilling-with-ui/SKILL.md");
+
+  test("is registered as the reusable Pi grilling-with-ui skill", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).toContain("./skills/grilling-with-ui");
+    expect(content).toMatch(/^name: grilling-with-ui/m);
+    expect(content).toMatch(/model-invoked|Pi-native/i);
+    expect(content).toContain("https://raw.githubusercontent.com/mattpocock/skills/refs/heads/main/skills/productivity/grilling/SKILL.md");
+  });
+
+  test("preserves canonical design-tree and round frontier protocol", () => {
+    expect(content).toMatch(/design tree/i);
+    expect(content).toMatch(/round/i);
+    expect(content).toMatch(/frontier/i);
+    expect(content).toMatch(/whole frontier|every decision.*prerequisites/i);
+    expect(content).toMatch(/prerequisite|depends on/i);
+    expect(content).toMatch(/recommended answer/i);
+    expect(content).toMatch(/fact(s| finding).*job|finding facts/i);
+  });
+
+  test("records decisions and requires shared-understanding completion", () => {
+    expect(content).toMatch(/settled decision|settled decisions/i);
+    expect(content).toMatch(/downstream consequences|consequences/i);
+    expect(content).toMatch(/shared understanding/i);
+    expect(content).toMatch(/frontier is empty|nothing left silently assumed/i);
+  });
+
+  test("drives the grilling CLI end-to-end instead of ask_user_question", () => {
+    // Slice 4 (skill-rewire): the grilling-with-ui skill drives the grilling CLI
     // end-to-end instead of ask_user_question. Assert the CLI surface is present.
     expect(content).toMatch(/grilling-cli\.mjs/);
     expect(content).toMatch(/--state/);

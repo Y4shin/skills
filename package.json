@@ -46,6 +46,7 @@
       "./skills/diagnosing-bugs",
       "./skills/codebase-design",
       "./skills/grilling",
+      "./skills/grilling-with-ui",
       "./skills/domain-modeling",
       "./skills/improve-codebase-architecture"
     ],

@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 // vitest runs from the repo root; import.meta.url is unreliable under vitest's
 // module transformation. Use process.cwd() to locate the repo root.
 const repoRoot = process.cwd();
-const cliMjs = join(repoRoot, "skills", "grilling", "grilling-cli.mjs");
+const cliMjs = join(repoRoot, "skills", "grilling-with-ui", "grilling-cli.mjs");
 
 /**
  * Run the build driver via vite-node so TS imports resolve at runtime without
@@ -65,7 +65,7 @@ describe("seam 1 — build emits grilling-cli.mjs", () => {
 });
 
 /**
- * Seam 2: node skills/grilling/grilling-cli.mjs --help exits 0 and prints a
+ * Seam 2: node skills/grilling-with-ui/grilling-cli.mjs --help exits 0 and prints a
  * usage line.
  */
 describe("seam 2 — --help exits 0 and prints usage", () => {

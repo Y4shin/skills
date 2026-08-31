@@ -211,7 +211,7 @@ export function strippedEnv(): Record<string, string> {
 /**
  * Run non-interactive pi on a grilling scenario. Shells out to `pi --print`
  * (non-interactive mode) with a prompt that tells the agent to grill the
- * scenario subject using the grilling skill + modified CLI, and report any
+ * scenario subject using the grilling-with-ui skill + modified CLI, and report any
  * CLI operations it needed but did not exist.
  *
  * Returns the agent's stdout (the gap report).

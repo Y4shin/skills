@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
 const repoRoot = process.cwd();
-const cliMjs = join(repoRoot, "skills", "grilling", "grilling-cli.mjs");
+const cliMjs = join(repoRoot, "skills", "grilling-with-ui", "grilling-cli.mjs");
 
 // Ensure the .mjs exists before running integration tests. The bundler
 // test removes and rebuilds it; if it runs concurrently, the file may be
