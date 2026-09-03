@@ -4,7 +4,7 @@ type: prototype
 slug: bundle-script-template
 title: Pick a bundle template (Python zipapp + JS/TS bundler) AND smoke-test the 17-slot default stack
 map: portable-skill-authoring
-status: ready
+status: done
 blocked_by:
 - support-script-conventions
 ---

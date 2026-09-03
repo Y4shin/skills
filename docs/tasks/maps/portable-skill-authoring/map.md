@@ -10,10 +10,14 @@ tasks:
 - slug: build-skill-creator-skill
   blocked_by:
   - support-script-conventions
-  done: false
+  done: true
 - slug: bundle-script-template
   blocked_by:
   - support-script-conventions
+  done: true
+- slug: fold-bundle-templates-into-refs
+  blocked_by:
+  - build-skill-creator-skill
   done: false
 ---
 
@@ -207,6 +211,25 @@ generalization review) is complete.
   is license-compatible, in which case the slot carries two alternatives).
   The fills live in the per-language references; the standards in the shared one.
   The library fills are being chosen now (Q7).
+- **`bundle-script-template` prototype settled (Q3-deferred, now resolved).**
+  The prototype picked the per-language bundle template — **Python: `zipapp`
+  (stdlib)** over `shiv` (which needs a wheel + console-script + fights
+  externally-managed pythons); **JS/TS: the project's existing bundler if it has
+  one (Vite lib-mode in this repo, per `scripts/build.ts`), else `esbuild`**
+  over `rollup` (which needs 3 plugins for CJS interop). It also smoke-tested
+  all 17 Q7 picks at the floor (Python 3.10 / Node 20 LTS): **all 17 pass per
+  language**, bundled into a self-contained artifact that runs on the bare floor
+  runtime. Findings at `docs/tasks/bundle-script-template/findings.md`; folded
+  into the references by `fold-bundle-templates-into-refs` (blocked on
+  `build-skill-creator-skill`).
+- **Floor is a target, not a recommendation (clarified post-prototype).** The
+  floor stays Python 3.10 / Node 20 LTS: it is a *minimum-compatibility target*,
+  not a recommendation, so a produced skill still runs on EOL-but-widely-
+  installed runtimes (long-tail machines, locked CI, conda, Ubuntu LTS, Apple's
+  Xcode CLT python). nixpkgs dropping the *packaging* of both is a test-tooling
+  pin (use `nixos-25.05`), NOT a floor change. The references target the floor
+  without recommending it; the min-version contract already says "install at
+  least X" with the agent-must-consult-user-before-installing remark.
 
 ## Fog
 
@@ -217,10 +240,11 @@ generalization review) is complete.
 - skill-creator's own Node/TS helper scripts reduce its *own* run-anywhere
   portability vs sentient's stdlib-Python choice (a harness without Node falls
   back to by-hand). Known, accepted; the by-hand fallback is the escape hatch.
-- The Python `zipapp` reference + the JS/TS bundler/template are provided by
-  the `bundle-script-template` prototype; if it's delayed, slice 5 ships
-  policy-level guidance + a pointer and the template lands in a later
-  follow-up.
+- (Graduated to `fold-bundle-templates-into-refs`.) The Python `zipapp` template
+  + the JS/TS bundler/template are now provided by the `bundle-script-template`
+  prototype (done) and folded into the references by that follow-up feature
+  task, blocked on `build-skill-creator-skill`'s `references-support-scripts`
+  slice. Until then, slice 5 ships policy-level guidance + a pointer.
 
 ## Out of scope
 
