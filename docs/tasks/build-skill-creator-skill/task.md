@@ -368,3 +368,42 @@ metadata`) was cross-checked against the spec digest's optional-field list.
 Frontmatter unchanged (still spec-pure). The tdd-worker reported zero
 deviations; both files match the slice-3 references index. Full suite green at
 handoff (602/602).
+
+### Slice 6 — self-review-and-finalize (landed)
+
+Slice 6 (the last slice) ran the adversarial self-review — all four lenses
+pass: **trigger test** — the 3 should-trigger requests ("create a skill for
+reviewing Go API changes"; "turn this deploy runbook into a skill"; "this
+skill isn't triggering reliably — fix it") match literal words in the final
+`description`, and the 2 near-misses ("write a README for my project";
+"explain how PDFs work") share vocabulary but describe a different job that the
+"Do NOT use for" line excludes; **execution dry-run** of "create a skill for
+reviewing Go API changes" + "improve this SKILL.md" + "make this Claude-oriented
+skill portable" completes understand → discover → plan → scaffold → write →
+validate with no stalls, missing info, ambiguous decisions, undiscoverable
+references, or hidden harness assumptions; **context review** — every
+substantial section earns its tokens (a capable agent would do worse if any
+were removed), none needed moving to a reference; **generalization review** —
+the skill teaches the reusable workflow for the class of task, not its own
+creation story (nothing strip-able that only makes sense for skill-creator's
+build).
+
+**Both validators pass:** dogfood `node
+skills/skill-creator/scripts/validate_skill.mjs skills/skill-creator` = OK, and
+official `skills-ref` v0.1.5 = "Valid skill".
+
+**Two polish fixes** (not redesign — no return-to-Wayfinder hatch triggered):
+(1) renamed the misleading slice-2 test from "rejects description containing a
+colon" to "accepts description containing a colon" (the test was already an
+accept-PATH test — the old name contradicted what it asserted); (2) clarified
+the slice-3 `SKILL.md` progressive-disclosure example from `api-errors.md` (a
+specific filename that doesn't exist in the skill) to a `<topic>-errors.md`
+placeholder with a "This is a hypothetical example, not a real file in this
+skill." note, so a reader doesn't go looking for a nonexistent reference.
+
+**No placeholder/TODO/scaffolding/auxiliary-doc files remain** in
+`skills/skill-creator/` (no `README`, `CHANGELOG`, install guide, dev diary, or
+`TODO`-only files; no empty resource dirs). `SKILL.md` is 356 lines / ~3657
+tokens (≤500 / ≲5000 — lean). Frontmatter unchanged (still only
+`name: skill-creator` + the trigger-designed `description`). The tdd-worker
+reported zero deviations. `npm test` green at handoff (602/602).
