@@ -91,6 +91,8 @@ const SKILL_FILES = [
   "skills/grilling-with-ui/SKILL.md",
   "skills/domain-modeling/SKILL.md",
   "skills/improve-codebase-architecture/SKILL.md",
+  "skills/wait-what/SKILL.md",
+  "skills/skill-creator/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -134,12 +136,14 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(15);
+    expect(pkg.pi.skills.length).toBe(17);
     expect(pkg.pi.skills).toContain("./skills/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/improve-codebase-architecture");
     expect(pkg.pi.skills).toContain("./skills/grilling");
     expect(pkg.pi.skills).toContain("./skills/grilling-with-ui");
+    expect(pkg.pi.skills).toContain("./skills/wait-what");
+    expect(pkg.pi.skills).toContain("./skills/skill-creator");
   });
 
   test("has subagents config", () => {

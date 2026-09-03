@@ -101,3 +101,14 @@ tests pass for the new skill.
   skeleton.
 - Single source of truth: do not duplicate the spec digest here; link it
   (placeholder ok until slice 4).
+
+## Trigger-test seeds
+
+Should-trigger (≥3, slice 6 executes these against the final description):
+1. "create a skill for reviewing Go API changes"
+2. "turn this deploy runbook into a skill"
+3. "this skill isn't triggering reliably — fix it"
+
+Near-miss (≥2, should NOT trigger):
+1. "write a README for my project"
+2. "explain how PDFs work"
