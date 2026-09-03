@@ -50,7 +50,7 @@ with two names. User-invoked skills cannot be reached this way; phrase them
 as instructions for the human ("tell the user to run
 `/skill:setup-matt-pocock-skills`").
 
-[`task-overview`](./skills/engineering/task-overview/SKILL.md) is the router
+[`task-overview`](./skills/engineering/task-workflow-overview/SKILL.md) is the router
 that maps every user-reachable skill and how they relate. Whenever you add,
 rename, remove, or change how a user-reachable skill fits the flows, re-read
 `task-overview`'s `SKILL.md` and update it so the map stays accurate: a new

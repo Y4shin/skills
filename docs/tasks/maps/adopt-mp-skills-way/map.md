@@ -18,11 +18,11 @@ tasks:
 - slug: run-adoption-migration
   blocked_by:
   - design-migration-skill
-  done: false
+  done: true
 - slug: build-migration-skill
   blocked_by:
   - run-adoption-migration
-  done: false
+  done: true
 ---
 
 ## Destination

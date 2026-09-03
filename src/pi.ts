@@ -28,7 +28,7 @@ import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 // ─── Gated skill names (shared by strip + invocation gate) ─────────────────────
 
 const FALLBACK_GATED_SKILL_NAMES = [
-  "task-overview",
+  "task-workflow-overview",
   "setup-workflow",
   "wayfinder",
   "implement-task",

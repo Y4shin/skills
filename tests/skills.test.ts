@@ -76,7 +76,7 @@ describe("agent frontmatter", () => {
 // ─── Skill SKILL.md structure tests ──────────────────────────────────
 
 const SKILL_FILES = [
-  "skills/engineering/task-overview/SKILL.md",
+  "skills/engineering/task-workflow-overview/SKILL.md",
   "skills/engineering/setup-workflow/SKILL.md",
   "skills/engineering/wayfinder/SKILL.md",
   "skills/engineering/implement-task/SKILL.md",
@@ -527,7 +527,7 @@ describe("human-mode integration coverage", () => {
 
 describe("skill cross-references", () => {
   test("overview references all core skills", () => {
-    const content = readFile("skills/engineering/task-overview/SKILL.md");
+    const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
     expect(content).toContain("wayfinder");
     expect(content).toContain("implement-task");
     expect(content).toContain("finalize-task");
@@ -741,18 +741,18 @@ describe("skill cross-references", () => {
   });
 
   test("task-overview routes planning to wayfinder", () => {
-    const content = readFile("skills/engineering/task-overview/SKILL.md");
+    const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
     expect(content).toContain("/skill:wayfinder");
     expect(content).toContain("task_frontier");
   });
 
   test("task-overview lists triage queue query", () => {
-    const content = readFile("skills/engineering/task-overview/SKILL.md");
+    const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
     expect(content).toContain('grep -l "status: reported" docs/bugs/*.md');
   });
 
   test("task-overview mentions docs/bugs as bug list location", () => {
-    const content = readFile("skills/engineering/task-overview/SKILL.md");
+    const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
     expect(content).toContain("docs/bugs/");
   });
 

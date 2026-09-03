@@ -34,7 +34,7 @@
       "./src/pi.ts"
     ],
     "skills": [
-      "./skills/engineering/task-overview",
+      "./skills/engineering/task-workflow-overview",
       "./skills/engineering/setup-workflow",
       "./skills/engineering/wayfinder",
       "./skills/engineering/implement-task",
