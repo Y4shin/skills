@@ -10,7 +10,7 @@ tasks:
 - slug: build-skill-creator-skill
   blocked_by:
   - support-script-conventions
-  done: false
+  done: true
 - slug: bundle-script-template
   blocked_by:
   - support-script-conventions

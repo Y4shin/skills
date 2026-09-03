@@ -1,13 +1,2 @@
-task: build-skill-creator-skill
+task: None
 slice: None
-landed:
-  build-skill-creator-skill:
-    - scaffold-and-register
-    - support-scripts-node
-    - core-skill-body
-    - references-portable-and-pi
-    - references-support-scripts
-    - self-review-and-finalize
-done:
-  build-skill-creator-skill: true
-
