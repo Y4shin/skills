@@ -1,5 +1,5 @@
 ---
-"task-workflow": minor
+"task-workflow": major
 ---
 
 Largely adopt Matt Pocock's skills repo way (v2.10.0 to v3.0.0).
