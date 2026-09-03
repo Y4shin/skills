@@ -8,3 +8,6 @@ dist
 .agents/
 .codex/
 grilling-grilling-summary.md
+
+# Throwaway bundle-script-template prototype (code is not committed; only findings).
+prototype-bundle/

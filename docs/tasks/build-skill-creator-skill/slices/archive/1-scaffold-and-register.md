@@ -4,7 +4,7 @@ slug: scaffold-and-register
 title: Scaffold skill-creator, design the trigger description, and register it in the package + tests
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: s
 blocked_by: []
 ---
