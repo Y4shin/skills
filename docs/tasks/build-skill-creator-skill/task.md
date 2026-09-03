@@ -4,7 +4,7 @@ type: feature
 slug: build-skill-creator-skill
 title: Build the skill-creator Agent Skill (portable + capability-conditional, Pi-packaged)
 map: portable-skill-authoring
-status: ready
+status: done
 blocked_by:
 - support-script-conventions
 slices:
