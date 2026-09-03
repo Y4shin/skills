@@ -212,7 +212,7 @@ describe("validate_skill.mjs", () => {
     }
   });
 
-  test("rejects description containing a colon (robust YAML parse)", () => {
+  test("accepts description containing a colon (robust YAML parse)", () => {
     const dir = makeTempSkillDir(
       "test-skill",
       `name: test-skill\ndescription: "A skill: with a colon"`,
