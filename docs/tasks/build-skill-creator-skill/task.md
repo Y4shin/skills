@@ -212,3 +212,39 @@ The merge also carried the parent-side commit `chore: commit untracked
 wait-what skill` (`skills/wait-what/SKILL.md`), which slice 1 registered in
 the manifest but hadn't committed on the task branch — needed for the
 task-branch tests to pass. Full suite green at handoff (602/602).
+
+### Slice 3 — core-skill-body (landed)
+
+Replaced the slice-1 skeleton body with the full synthesized core in
+`skills/skill-creator/SKILL.md`: the capability-ceiling default (assume only
+that the agent can read the body + optionally call MCP tools) + the four
+capability-conditional rules (filesystem → reference/inspect/update-over-
+create; bash/exec → bundle+run a script; network/specific-MCP → express as a
+tool call or documented dependency; harness-specific frontmatter → keep the
+portable core intact and add the bit as an explicit extension) with the
+"Portable vs harness-specific extension" distinction; the 8-phase workflow
+(understand → discover/update-over-create → plan → scaffold → write
+frontmatter+body → validate → adversarial self-review → iterate), each with a
+concrete reason; produced-skill frontmatter guidance (`name`/`description` rules
++ 4 optional spec fields — `license`, `compatibility`, `allowed-tools`,
+`metadata` — each with a justification, and the rule that harness-specific
+fields like a vendor `disable-model-invocation` stay out of the portable core);
+the core principles (assume capable, match rigidity to fragility, progressive
+disclosure body <500 lines ≲5k tokens / references one level deep, single-source
+each fact, explain the why, favor procedures, provide defaults not menus,
+gotchas are highest-value); the "choose a script language" decision rule (bundle
+only for exact/fragile/repeated ops; match the target repo's canonical language;
+default Python; Bash supported but discouraged for cross-platform; self-contained
+at runtime; safety-first by-hand fallback) pointing to the 5 support-script
+references; "what not to include / no surprise"; and a one-level-deep references
+index (the 6 reference files + the optional `trigger-design.md`), each with a
+when-to-read note.
+
+**Size:** 354 lines / ~3550 tokens (≤500 / ≲5000 — lean). **Frontmatter**
+unchanged (still only `name: skill-creator` + the slice-1 trigger-designed
+`description` ≤1024 — spec-pure, no `disable-model-invocation`/`license`/
+`metadata`). The slice-2 "Helper scripts" section is preserved (unchanged).
+**No references written** — the body names the 6 reference files + optional
+`trigger-design.md` that slices 4–5 will create; this slice's acceptance is
+naming presence, not file presence. The tdd-worker reported zero deviations.
+Full suite green at handoff (602/602).
