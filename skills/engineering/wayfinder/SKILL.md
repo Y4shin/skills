@@ -1,13 +1,13 @@
 ---
 name: wayfinder
-description: Build and evolve a dependency-aware work graph from an uncertain idea, creating research, prototype, grilling, bug, and implementation tasks that implement-task can execute directly.
+description: Plan a huge chunk of work as a shared map of decision tasks (research, prototype, grilling, manual), resolving them one at a time until the way to the destination is clear. Produces decisions, not deliverables; hands off to to-spec and to-tickets for implementation.
 disable-model-invocation: true
 ---
 
 # Wayfinder
 
 > **Telemetry:** once you have created the map, call the `telemetry_skill_context`
-> tool with `{ skill_name: "wayfinder", map }` — `map` = the map slug (the
+> tool with `{ skill_name: "wayfinder", map }` where `map` is the map slug (the
 > directory name under `docs/tasks/maps/`). When you are focused on a specific
 > task or slice, also pass `target` (the task slug) or `slice` (the slice slug).
 > This skill has no static invocation capture, so the tool is the only way to
@@ -16,20 +16,31 @@ disable-model-invocation: true
 
 Wayfinder is the planning and discovery phase of this workflow. It replaces
 `create-task`, `to-spec`, and `to-tickets`. Its output is a living map and a
-dependency graph of tasks consumed directly by `/skill:implement-task`.
+dependency graph of **decision tasks** consumed by `to-spec` and `to-tickets`,
+which then produce the implementation tasks that `implement-task` executes.
+
+## Plan, don't do
+
+Wayfinder is **planning by default**: each task resolves a decision, and the
+map is done when the way is clear, with nothing left to decide before someone
+goes and does the thing. The pull to just do the work is usually the signal
+you've reached the edge of the map and it's time to hand off. An effort can
+override this in its **Notes**, carrying execution into the map itself, but
+absent that, produce **decisions, not deliverables**.
 
 ## Boundary
 
 Wayfinder owns:
 
 - the destination and scope;
-- the map/map and its task graph;
-- task creation, dependencies, and the frontier;
+- the map and its decision-task graph;
+- task creation (planning types only), dependencies, and the frontier;
 - resolving ambiguity into concrete task bodies;
 - adding newly discovered work and recording out-of-scope work.
 
-`implement-task` owns completing tasks. There is no intermediate specification
-or ticket-generation step.
+`to-spec` and `to-tickets` own collapsing the decisions into a buildable plan
+(spec + implementation tickets). `implement-task` owns completing tickets.
+There is no separate specification or ticket-generation step inside Wayfinder.
 
 ## Entry
 
@@ -82,21 +93,22 @@ The body is the canonical low-resolution map:
 ```
 
 Tasks live at `docs/tasks/<task-slug>/task.md` and are listed in the map's
-`tasks` array. Each task has one planning/execution type. Choose the type using
-this table, then follow the matching planning resource in
+`tasks` array. Each task has one planning type. Choose the type using this
+table, then follow the matching planning resource in
 `skills/engineering/wayfinder/resources/` before writing the task:
 
-- `research` — gather high-trust evidence;
-- `prototype` — build a cheap artifact to answer a design question;
-- `grilling` — resolve a human decision through conversation;
-- `feature` — implement behavior using the existing feature pipeline;
-- `bug` — reproduce and fix using the existing bug pipeline;
-- `manual` — complete a human or environment prerequisite.
+- `research`: gather high-trust evidence;
+- `prototype`: build a cheap artifact to answer a design question;
+- `grilling`: resolve a human decision through conversation;
+- `manual`: complete a human or environment prerequisite.
+
+Feature and bug tasks are **not** created by Wayfinder. They are created by
+`to-tickets` after the decisions are clear. Wayfinder produces decisions, not
+deliverables.
 
 The planning resource defines the task body, acceptance/evidence criteria,
-and required artifacts. Feature and bug planning resources also define the
-slice list and slice docs required by the unchanged implementation resources.
-Execution is later routed by `/skill:implement-task` to its matching resource.
+and required artifacts. Execution is later routed by `implement-task` to its
+matching resource.
 
 Use `blocked_by` for ordering.
 
@@ -105,8 +117,7 @@ Use `blocked_by` for ordering.
 1. Explore the codebase and existing project documents.
 2. Run one mandatory grilling session to establish and confirm the destination,
    constraints, scope boundary, and first task frontier.
-3. Create the map only after that grilling has produced shared
-   understanding.
+3. Create the map only after that grilling has produced shared understanding.
 4. Create only tasks whose question or outcome is precise enough to state now.
 5. Put the rest in `## Fog` rather than inventing speculative tasks.
 6. Wire dependencies after all initial task slugs exist.
@@ -116,35 +127,28 @@ Use `blocked_by` for ordering.
 A task is ready when every task in its `blocked_by` list is done. The frontier
 is the ready, unfinished task set.
 
-## Dynamic growth
+## Hand off, don't build
 
-The graph is deliberately allowed to grow. When a research, prototype,
-grilling, manual, feature, or bug task discovers new work:
-
-1. Record the discovery in the task's result or notes.
-2. Create a new task if the work is required and can now be stated precisely.
-3. Add it to the map's `tasks` list and wire `blocked_by` in a second pass.
-4. Graduate newly sharp items from `## Fog` into tasks.
-5. Put ruled-out work in `## Out of scope`.
-6. Recompute the frontier.
-
-Do not silently expand a task's acceptance criteria. Add a task instead.
-
-## Handoff to execution
-
-When the current frontier is meaningful, hand directly to:
+When the current frontier is meaningful, hand off to:
 
 ```text
-/skill:implement-task <map-slug>
+/skill:to-spec <map-slug>
 ```
 
-There is no `to-spec` or `to-tickets` step. The map and task documents
-are the specification. If implementation exposes uncertainty, stop that task
-with a clear discovery and return to Wayfinder; do not improvise a hidden plan.
+The map's decisions collapse into a spec (`to-spec`), which breaks into
+tracer-bullet implementation tickets (`to-tickets`), which `implement-task`
+executes. Looping the map straight into `implement-task` skips that collapse
+and throws the linked detail away, so go to `implement-task` directly only
+when the effort turned out genuinely small.
 
-Return-to-Wayfinder is a designed-for escape hatch — record that it fired.
-Call `submit_feedback({ kind: "expected", data })` with `data` e.g.
+If implementation exposes uncertainty, stop that task with a clear discovery
+and return to Wayfinder for a **new planning task** (not a re-open of the old
+one). This is a designed-for escape hatch: record that it fired by calling
+`submit_feedback({ kind: "expected", data })` with `data` e.g.
 `"wayfinder: task <slug> returned with unresolved uncertainty"`.
+
+Do not improvise a hidden plan. Do not silently expand a task's acceptance
+criteria. Add a task instead.
 
 ## Resuming
 
@@ -154,14 +158,14 @@ On a later Wayfinder session, or when called back after implementation:
 2. Inspect the current frontier with `task_frontier`.
 3. Read task details only as needed.
 4. Claim or select one planning question at a time when human input is needed.
-5. Update the map and dependencies, then hand back to execution.
+5. Update the map and dependencies, then hand back to `to-spec`.
 
 Never mark an implementation task complete from Wayfinder. Never resolve an
 unclear question by pretending it is a feature task.
 
-> **Feedback:** if planning hits a snag — a grilling loop that circled, a
+> **Feedback:** if planning hits a snag (a grilling loop that circled, a
 > dependency that wouldn't wire, a task type that didn't fit, a frontier that
-> stalled, or something that worked notably well — call
+> stalled, or something that worked notably well), call
 > `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
 > short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
 > two specific, actionable sentences about the *workflow*, not the project

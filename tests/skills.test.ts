@@ -101,6 +101,8 @@ const SKILL_FILES = [
   "skills/productivity/teach/SKILL.md",
   "skills/productivity/writing-for-agents/SKILL.md",
   "skills/productivity/grill-me/SKILL.md",
+  "skills/engineering/to-spec/SKILL.md",
+  "skills/engineering/to-tickets/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -144,7 +146,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(25);
+    expect(pkg.pi.skills.length).toBe(27);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
@@ -544,13 +546,20 @@ describe("skill cross-references", () => {
     expect(content).toMatch(/absent.*feature|feature.*default|\btype:\s*feature\b/i);
   });
 
-  test("wayfinder owns task creation and direct handoff", () => {
+  test("wayfinder owns planning task creation and direct handoff", () => {
     const content = readFile("skills/engineering/wayfinder/SKILL.md");
     expect(content).toContain("`create-task`, `to-spec`, and `to-tickets`");
     expect(content).toContain("mandatory grilling session");
-    expect(content).toContain("implement-task");
     expect(content).toContain("blocked_by");
-    expect(content).toContain("## Dynamic growth");
+    expect(content).toMatch(/decisions, not deliverables|hand off, don't build/i);
+  });
+
+  test("to-tickets owns implementation task creation", () => {
+    const content = readFile("skills/engineering/to-tickets/SKILL.md");
+    expect(content).toContain("feature");
+    expect(content).toContain("bug");
+    expect(content).toContain("blocked_by");
+    expect(content).toMatch(/task_dependency_levels|task_frontier/);
   });
 
   test("wayfinder has one planning resource per task type", () => {

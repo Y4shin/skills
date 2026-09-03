@@ -55,7 +55,9 @@
       "./skills/productivity/to-questionnaire",
       "./skills/productivity/teach",
       "./skills/productivity/writing-for-agents",
-      "./skills/productivity/grill-me"
+      "./skills/productivity/grill-me",
+      "./skills/engineering/to-spec",
+      "./skills/engineering/to-tickets"
     ],
     "subagents": {
       "agents": [
