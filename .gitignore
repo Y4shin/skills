@@ -9,5 +9,9 @@ dist
 .codex/
 grilling-grilling-summary.md
 
+# Matt Pocock skills repo clone for the adopt-mp-skills-way map (pinned commit,
+# reproducible on other machines). Not committed.
+docs/tasks/mp-skills-current-state-report/matt-skills/
+
 # Throwaway bundle-script-template prototype (code is not committed; only findings).
 prototype-bundle/
