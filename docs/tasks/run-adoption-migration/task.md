@@ -4,7 +4,7 @@ type: feature
 slug: run-adoption-migration
 title: Run the largely-adopt-Matt adoption on this repo (v2.10.0 → v3.0.0), the actual migration, whose proven steps the migration skill is later built from
 map: adopt-mp-skills-way
-status: ready
+status: done
 blocked_by:
 - design-migration-skill
 slices:
@@ -117,3 +117,4 @@ into a reusable migration skill.
   with-ui out), Q17 (out-of-scope at docs/tasks/out-of-scope/), Q18 (claude-
   handoff as inspiration only), Q19 (no misc), Q20 (changesets into release.sh).
 - Grilling #2: the migration skill design (build task, blocked by this one).
+completed_at: 2026-09-03T20:00:00Z
