@@ -1,0 +1,257 @@
+# Target-state spec for the task-workflow migration (schema_version 3)
+#
+# This file is the durable, machine-readable distillation of grilling #1's
+# 20 adoption decisions (Q1-Q20), verified against what the adoption ACTUALLY
+# did on disk (the proven 9-step run on this repo, v2.10.0 -> v3.0.0).
+# The grilling #1 decision table (docs/tasks/map-mp-skills-onto-this-repo/
+# task.md) is the SOURCE; this spec is the DISTILLATION.
+#
+# The setup-workflow skill reads this spec as its target-state source.
+# Versioned with the package: corresponds to schema_version 3.
+#
+# Where this spec disagrees with grilling #1 (a deviation from the designed
+# steps that the actual run surfaced), the deviation is recorded here as the
+# truth, with a `deviation:` note.
+
+schema_version: 3
+package_version: "2.10.0"
+title: "Largely adopt Matt Pocock's skills repo way"
+
+# ── Skill buckets ──────────────────────────────────────────────────────
+
+buckets:
+  engineering:
+    promoted: true
+    docs_prefix: "docs/engineering"
+  productivity:
+    promoted: true
+    docs_prefix: "docs/productivity"
+  misc:
+    promoted: false
+  in-progress:
+    promoted: false
+  deprecated:
+    promoted: false
+
+promotion_rules:
+  - "Only engineering/ + productivity/ skills are promoted (shipped in
+    package.json pi.skills + get a human-facing docs page)."
+  - "misc/, in-progress/, deprecated/ skills are kept in the repo but NOT
+    shipped (absent from pi.skills, no docs page)."
+  - "Every promoted skill has an entry in package.json pi.skills and a
+    docs/<bucket>/<name>.md page."
+  - "A retired skill is kept in deprecated/ (content preserved, not
+    deleted) with a note naming its replacement."
+
+# ── Promoted skills (verified from package.json pi.skills) ────────────
+
+promoted_skills:
+  engineering:
+    # Router + workflow spine
+    - task-overview      # ask-matt-style intent router (Q7, name kept)
+    - setup-workflow     # replaces onboard-workflow (Q6 superseded by R1Q1)
+    - wayfinder          # decisions-only (Q1)
+    - implement-task     # borrows implement-spec graph/concurrency (Q11.7)
+    - finalize-task      # keep, drop CI gate, add human changelog (Q11.3)
+    - to-spec            # two-phase handoff: spec (Q5)
+    - to-tickets         # two-phase handoff: tickets (Q5)
+    # Discipline skills
+    - tdd                # re-aligned: refactor-out-of-loop (Q13)
+    - code-review        # re-aligned: 12-smell baseline (Q13)
+    - task-workflow-doctor
+    - diagnosing-bugs
+    - codebase-design
+    - grilling           # re-aligned: terser, plain text (Q13, consult-first)
+    - domain-modeling    # re-aligned: companion docs + 3-criteria ADR (Q16)
+    - improve-codebase-architecture
+    - skill-creator      # kept; coexists with writing-for-agents (Q4)
+    # Utility skills added (Q8)
+    - prototype
+    - research
+    - resolving-merge-conflicts
+    - wizard
+    - triage             # subsumes report-bug intake (Q12)
+  productivity:
+    - wait-what          # pre-existing
+    # Utility skills added (Q8)
+    - handoff            # borrows claude-handoff bg-agent pattern (Q18)
+    - to-questionnaire
+    - teach
+    - writing-for-agents # + SKILL-MECHANICS.md (Q4)
+    - grill-me           # thin wrapper around grilling (Q15)
+
+# ── Deprecated skills (kept, not shipped) ──────────────────────────────
+
+deprecated_skills:
+  - create-task         # replaced by wayfinder
+  - onboard-workflow    # replaced by setup-workflow (grilling #2 R1Q1)
+  - report-bug          # retired in favor of triage (Q12)
+
+# ── Repo-root docs (Q2 + Q17) ──────────────────────────────────────────
+
+repo_root_docs:
+  AGENTS.md:
+    purpose: "Pi-adapted agent conventions: bucket layout, promotion rules,
+      invocation split, no-em-dashes, skill-tool invocation convention."
+    decision: "Q2"
+  CONTEXT.md:
+    purpose: "This repo's workflow ubiquitous language (map, task, slice,
+      frontier, blocked_by, schema_version, the 6 task types, buckets,
+      decision ticket, triage role, etc.). This repo IS the workflow
+      package, so its vocabulary is the domain."
+    decision: "Q2"
+    deviation: "Scope expanded from domain-only to full workflow glossary
+      (user clarified mid-run: this repo's CONTEXT.md holds the workflow
+      vocabulary since the repo is the workflow package; downstream repos'
+      CONTEXT.md holds their project domain terms instead)."
+  docs/adr/:
+    purpose: "Repo-level ADRs (seeded with 0001-largely-adopt-mp-skills.md)."
+    decision: "Q2"
+  docs/agents/:
+    purpose: "Per-repo config the skills read (seeded minimal; setup-workflow
+      populates it on onboarding)."
+    decision: "Q2"
+  docs/tasks/out-of-scope/:
+    purpose: "Rejected-requests KB; triage checks it for prior rejection."
+    decision: "Q17"
+    location: "docs/tasks/out-of-scope/ (not repo root, per user)"
+
+# ── Planning flow (Q1 + Q5 + Q7) ───────────────────────────────────────
+
+planning_flow:
+  model: "strict two-phase (Q1)"
+  phases:
+    - step: "wayfinder"
+      role: "produces decisions only (research/prototype/grilling/manual
+        tasks); no feature/bug task creation; hand off, don't build."
+    - step: "to-spec"
+      role: "synthesizes the conversation/map into docs/tasks/<slug>/spec.md;
+        no interview."
+    - step: "to-tickets"
+      role: "breaks spec into tracer-bullet feature/bug tasks with
+        blocked_by edges using task_* tools + the map's tasks array;
+        includes wide-refactor expand-contract exception."
+    - step: "implement-task"
+      role: "executes the frontier by type; borrows implement-spec's
+        task-graph/concurrent-implementer language."
+  router: "task-overview (ask-matt-style intent router + PHASE-BOUNDARIES.md;
+    name kept per Q7)"
+  escape_hatch: "removed (replaced by Matt's 'hand off, don't build' boundary)"
+  deviation: "Router entry point uses grilling (grill-with-docs is not yet a
+    separate skill; references grilling + domain-modeling together for now)."
+
+# ── Task type system (Q11.1) ───────────────────────────────────────────
+
+task_types:
+  total: 6
+  scoped_by_phase: true
+  planning_types:  # from wayfinder
+    - research
+    - prototype
+    - grilling
+    - manual
+  implementation_types:  # from to-tickets
+    - feature
+    - bug
+  note: "A feature/bug task from to-tickets is not re-typed as research.
+    Task type and standalone skill COEXIST for research/prototype (task type
+    is the planning artifact with acceptance criteria; skill is the reusable
+    discipline; delegating to the skill does not replace the task doc).
+    Grilling/manual have no standalone skill; run inline."
+
+# ── Conventions (Q10, Q14, telemetry) ─────────────────────────────────
+
+conventions:
+  no_em_dashes: true  # Q10, repo-wide prose
+  invocation_split:
+    mechanism: "frontmatter only (name, description, disable-model-invocation)"
+    no_openai_yaml: true  # Q14: concept yes, file no
+    skill_tool_wording: "adapt 'Call the Skill tool with <name>' to Pi's
+      invocation convention where operative; user-invoked skills phrased as
+      human instructions."
+  telemetry:
+    maintained: true  # map constraint: maintain or extend, never remove
+    tools: ["telemetry_skill_context", "submit_feedback"]
+
+# ── Keep-as-ours (no Matt equivalent; concrete reason recorded) ────────
+
+keep_as_ours:
+  - item: "dependency graph + task_* tools (task_dependency_levels,
+      task_frontier, task_map_tick)"
+    reason: "no Matt equivalent; we use docs/tasks/ files, not a tracker"
+    decision: "Q11.2"
+  - item: "finalization pipeline"
+    reason: "no Matt equivalent; our automation depth"
+    decision: "Q11.3"
+    modifications:
+      - "DROP the CI gate (Step 1)"
+      - "ADD human changelog (incorporate alongside the automated one)"
+      - "KEEP knowledge harvest, bug closure, archive, map finalization"
+  - item: "failure toolbelt (diagnose, split, retry +50%, escalate) +
+      parent-never-implements rule"
+    reason: "no Matt equivalent; load-bearing automation safety"
+    decision: "Q11.4"
+  - item: "sub-agents (tdd-worker, slice-verifier, deviation-reporter,
+      land-worker, architecture-scout, code-reviewer)"
+    reason: "no Matt equivalent; formalized with YAML frontmatter, tool
+      allowlists, context isolation"
+    decision: "Q11.5"
+    deviation: "No new agent definitions were needed in practice (the adopted
+      utility skills don't use subagents; the ones that do, like code-review,
+      already had their agents defined)."
+  - item: "telemetry instrumentation"
+    reason: "map constraint; no Matt equivalent"
+    decision: "Q11.6"
+  - item: "Pi extension (src/pi.ts) + repo-gate (src/core/repo-gate.ts)"
+    reason: "foundational; no Matt equivalent"
+    decision: "map constraint"
+
+# ── Changesets (Q20) ──────────────────────────────────────────────────
+
+changesets:
+  adopted: true
+  integrated_into: "scripts/release.sh"
+  not_replacing: true
+  config: ".changeset/config.json"
+  description: "release.sh runs changeset versioning/generation then publishes;
+    .changeset/ added with config.json + seed changeset."
+
+# ── Deviations from grilling #1 (recorded as truth) ────────────────────
+
+deviations:
+  - id: 1
+    description: "Eval harness (scripts/eval/) dropped with grilling-with-ui"
+    reason: "not in grilling #1 design; surfaced as a real dependency during
+      slice 2 (the eval harness drove grilling-with-ui's CLI; with
+      grilling-with-ui gone, it had no driver)"
+    source: "slice 2 step-summary"
+  - id: 2
+    description: "validate_skill.mjs fix: allow disable-model-invocation +
+      argument-hint frontmatter keys"
+    reason: "the validator was too strict; every user-invoked skill uses
+      disable-model-invocation; the test codifying the bug was flipped to
+      assert acceptance"
+    source: "slice 3 step-summary"
+  - id: 3
+    description: "CONTEXT.md scope = full workflow glossary (not domain-only)"
+    reason: "user clarified mid-run: this repo IS the workflow package, so
+      its vocabulary is the domain"
+    source: "slice 6 step-summary"
+  - id: 4
+    description: "Router entry point uses grilling (grill-with-docs not yet a
+      separate skill)"
+    reason: "grill-with-docs was not added as a skill in this adoption; the
+      router references grilling + domain-modeling together for now"
+    source: "slice 7 step-summary"
+  - id: 5
+    description: "Grilling re-aligned with plain text, not ask_user_question"
+    reason: "user decision (Q13 consult-first): drop ask_user_question
+      specificity, use plain text from the user; keep completion gate +
+      decision-recording"
+    source: "slice 8 step-summary"
+  - id: 6
+    description: "No new agent definitions needed (Q11.5 extend did not
+      produce new agents)"
+    reason: "the adopted utility skills don't use subagents; the ones that
+      do (code-review) already had their agents defined"
+    source: "slice 9 step-summary"

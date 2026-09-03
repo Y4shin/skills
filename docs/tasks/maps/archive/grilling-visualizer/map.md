@@ -1,7 +1,7 @@
 ---
 kind: map
 slug: grilling-visualizer
-title: Grilling visualizer — a detached CLI + browser SPA for tracking long grillings
+title: Grilling visualizer, a detached CLI + browser SPA for tracking long grillings
 status: active
 tasks:
 - slug: build-grilling-visualizer
@@ -23,11 +23,11 @@ rewired to drive the CLI end-to-end, and an eval harness discovers the full
 ## Constraints
 
 - Works on all 3 platforms (xdg-open auto-open must work on Linux/macOS/Windows).
-- The agent must never see the raw JSON or the temp dir path — hidden via key
+- The agent must never see the raw JSON or the temp dir path, hidden via key
   indirection (`--state <key>` → `.grilling.json` in CWD → random temp dir), Pi
   path protection, and a random temp path.
 - The `.grilling.json` filename is never mentioned in the skill prose.
-- CLI state transitions are enforced — only allowed transitions succeed.
+- CLI state transitions are enforced, only allowed transitions succeed.
 - The committed `skills/grilling/grilling-cli.mjs` must work without a build
   step in normal use; the bundler is run by maintainers.
 - Grilling is always interactive; headless/non-TUI behavior is out of scope for
@@ -47,7 +47,7 @@ rewired to drive the CLI end-to-end, and an eval harness discovers the full
   CLI carries the inlined SPA).
 - D-FE UI architecture = Svelte SPA (no meta-framework) inlined as single HTML
   into the CLI; the CLI's Node server serves it at `/` + a state API. No
-  `+server.ts`, no adapter, no SSR — one page, client-side, fetch()es same-origin.
+  `+server.ts`, no adapter, no SSR, one page, client-side, fetch()es same-origin.
 - D13 svelte-flavor = plain Svelte + Vite, NOT SvelteKit (one-page client SPA,
   our own Node API; the meta-framework's adapter/routing/SSR are unneeded).
 - D7 cli-handle = `--state <key>` → `.grilling.json` in CWD → random temp dir,
@@ -76,18 +76,18 @@ rewired to drive the CLI end-to-end, and an eval harness discovers the full
 
 ## Fog
 
-- `.grilling.json` exact schema/location — resolves during implementation.
-- `refresh`→server signaling (SIGHUP vs file touch) — implementation detail.
-- SPA update transport (poll ~1-2s vs SSE) — implementation detail; round
+- `.grilling.json` exact schema/location, resolves during implementation.
+- `refresh`→server signaling (SIGHUP vs file touch), implementation detail.
+- SPA update transport (poll ~1-2s vs SSE), implementation detail; round
   cadence makes polling fine.
-- 5-word id representation (slug vs free text) — minor.
-- D8x full update set — discovered by the eval at execution time, not a
+- 5-word id representation (slug vs free text), minor.
+- D8x full update set, discovered by the eval at execution time, not a
   planning decision.
 
 ## Out of scope
 
-- Headless / non-TUI fallback (D4) — deferred until grilling-in-headless becomes
+- Headless / non-TUI fallback (D4), deferred until grilling-in-headless becomes
   real.
-- A live SSE push transport — polling ~1-2s is sufficient for round cadence.
-- A `finalizing` intermediate page state — `finalize` is a CLI call, not a page
+- A live SSE push transport, polling ~1-2s is sufficient for round cadence.
+- A `finalizing` intermediate page state, `finalize` is a CLI call, not a page
   state.

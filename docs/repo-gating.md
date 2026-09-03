@@ -1,11 +1,11 @@
 # Repo gating (auto-disable in work repos)
 
 `task-workflow` is a **global** pi package, so by default it would load in every
-repo — including work repos where it doesn't belong (the work repo has its own
+repo, including work repos where it doesn't belong (the work repo has its own
 canon; the `task_*` tools write to a `docs/tasks/` tree the work repo doesn't
 use; the injected guidelines clutter the system prompt). The gate auto-disables
 all of the package's resources in work repos based on the repo's `git origin`
-remote, with **zero per-repo config** — the gate lives on the global/personal
+remote, with **zero per-repo config**, the gate lives on the global/personal
 side.
 
 ## What gets gated in a work repo
@@ -33,7 +33,7 @@ Explicit `/skill:<name>` is prevented via the `input` event (see above).
 
 ## Configuration
 
-Two layers — both read by the extension at startup (it reads the files itself;
+Two layers, both read by the extension at startup (it reads the files itself;
 pi gives extensions no `SettingsManager`):
 
 - **Global** (`~/.pi/agent/settings.json`, or `PI_CODING_AGENT_DIR`): a top-level
@@ -65,11 +65,11 @@ pi gives extensions no `SettingsManager`):
 
 | `disableOnRepo` matches? | `project.taskWorkflow.enable` | gate active? | meaning |
 | --- | --- | --- | --- |
-| no | `true` / absent | **no** | personal — load everything |
+| no | `true` / absent | **no** | personal, load everything |
 | no | `false` | **yes** | personal repo opting out (escape hatch) |
-| yes | `true` / absent | **yes** | work repo — gate everything (primary case) |
+| yes | `true` / absent | **yes** | work repo, gate everything (primary case) |
 | yes | `false` | **no** | work-org repo re-enabled locally |
-| empty / absent | * | **no** | gate disabled globally — current behaviour |
+| empty / absent | * | **no** | gate disabled globally, current behaviour |
 
 ## Detection rules
 
@@ -84,7 +84,7 @@ against the regexes. Normalization:
 - strips a trailing `.git`;
 - lowercases the host.
 
-A repo with **no** `origin` remote (or no `.git`) is treated as personal — the
+A repo with **no** `origin` remote (or no `.git`) is treated as personal, the
 gate opt-ins on the remote, not on the absence of one. Invalid regexes in
 `disableOnRepo` are skipped with a diagnostic (the extension never throws at
 load; it fails open to personal on any detection error).
@@ -94,12 +94,12 @@ load; it fails open to personal on any detection error).
 Design and decisions: `docs/tasks/maps/gate-skills-by-repo/map.md`. Research
 findings that grounded the implementation:
 
-- `docs/tasks/gate-config-mechanics/findings.md` — pi's `Settings` schema keeps
+- `docs/tasks/gate-config-mechanics/findings.md`, pi's `Settings` schema keeps
   unknown top-level keys; the extension factory gets no `SettingsManager` and
   reads the files itself; the `before_agent_start` result can rewrite the full
   system prompt.
-- `docs/tasks/gate-skills-prompt-and-help/findings.md` — the real skills-XML
+- `docs/tasks/gate-skills-prompt-and-help/findings.md`, the real skills-XML
   format (`<available_skills>` with `<skill><name>` children); no subtractive
   `/help` hook; the `input` event can prevent `/skill:` expansion.
-- `docs/tasks/gate-skills-prompt-and-help/limitations.md` — the `/help`
+- `docs/tasks/gate-skills-prompt-and-help/limitations.md`, the `/help`
   limitation note.

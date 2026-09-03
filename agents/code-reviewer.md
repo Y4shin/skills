@@ -27,7 +27,7 @@ You run a two-axis review of the diff between a fixed point and `HEAD`. Consult 
 
    - **Standards reviewer** (`tools: read, bash, get_guidelines`)
      - Discover repo standards with `get_guidelines` and read repo override files (`AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `docs/standards.md`).
-     - Read the smell baseline in `skills/code-review/smells.md`.
+     - Read the smell baseline in `skills/engineering/code-review/smells.md`.
      - Report documented-standard breaches, citing the guideline source and rule.
      - Report baseline smells, naming the smell and quoting the relevant hunk.
      - Label smells as judgement calls, not hard violations.

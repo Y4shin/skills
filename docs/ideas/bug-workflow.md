@@ -12,7 +12,7 @@ converted_to:
 # Bug workflow (report, track, fix)
 
 The workflow can plan and execute ideas/features/tasks, but has no way to
-report, maintain a list of, or fix bugs — except creating a standalone
+report, maintain a list of, or fix bugs, except creating a standalone
 task, whose interview asks questions irrelevant to bugs (user stories,
 boundaries, slice breakdown, per-slice testing strategy). Vague bug reports
 get bounced to refine-idea, and implement-task demands arch-spec + slice
@@ -26,7 +26,7 @@ skips arch-spec/chain ceremony for small fixes).
 
 ### New artifact: `docs/bugs/<slug>.md`
 
-Plain markdown + frontmatter, same pattern as ideas — no `task_*` tool
+Plain markdown + frontmatter, same pattern as ideas, no `task_*` tool
 support needed initially (ideas work via grep too).
 
 ```yaml
@@ -52,7 +52,7 @@ a **change plan**. No user stories, no boundaries, no slices.
 with at least one test that is red when the bug is present (verify by
 running it against the unfixed code) and green after the fix. Sole
 exception: defects no test can sensibly capture ("the color was off")
-— the bug doc must then explicitly record why no test exists. The
+- the bug doc must then explicitly record why no test exists. The
 exception is documented, never silent.
 
 ### New skill: `report-bug` (capture → reproduce → spot-fix/promote)
@@ -69,7 +69,7 @@ implement-task's bug.md consumes it. Never interrogate the reporter.
 3. Write `docs/bugs/<slug>.md`, `status: reported`, commit.
 4. **Reproduce**, governed by **`docs/dev-env.md`** in the consuming
    repo: how to start the dev environment, how reproduction should
-   work — and it may validly instruct *not* to attempt AI-based
+   work, and it may validly instruct *not* to attempt AI-based
    reproduction (then: record the skip, continue to triage).
    Reproduction writes **no test cases**; it produces a **`repro.md`**
    artifact (next to the bug doc) describing the steps, plus any
@@ -88,7 +88,7 @@ implement-task's bug.md consumes it. Never interrogate the reporter.
      bug doc (title, user stories, boundaries, layers touched, ONE
      slice with acceptance criteria, testing strategy), proposes it to
      the user, and on agreement writes `docs/tasks/<slug>/` with
-     `type: bug` — repro.md (and its scripts) move next to `task.md`.
+     `type: bug`, repro.md (and its scripts) move next to `task.md`.
      Bug doc: `status: promoted`, `promoted_to: <slug>`.
      Hand off: `/skill:implement-task <slug>`.
 
@@ -97,7 +97,7 @@ implement-task's bug.md consumes it. Never interrogate the reporter.
 
    **Below the workflow's floor:** if a bug is too small to warrant
    even a report (spotted and fixable in passing), deal with it ad-hoc
-   — no doc, no artifacts.
+  , no doc, no artifacts.
 
 **Reproduction schemas** (follow-up): the package can ship pre-made
 repro templates under `skills/report-bug/resources/repro-schemas/`
@@ -115,7 +115,7 @@ by bug kind as a starting point.
               │ fields EN-BLOC; user corrects │ observed/expected/repro/severity
               └───────────────┬───────────────┘ (no codebase exploration)
                               ▼
-                  grep docs/bugs/ — duplicate?
+                  grep docs/bugs/, duplicate?
                               │
               ┌───────────────┴───────────────┐
               ▼ suspected                     ▼ none
@@ -194,7 +194,7 @@ Approved design:
   conversation, no coherence refactor.
 - The chain's spec = bug doc + repro.md + the single slice doc.
 - tdd-worker's first job: convert repro.md into the regression test,
-  run it against the unfixed code (must be red — the test rule), then
+  run it against the unfixed code (must be red, the test rule), then
   fix → green → full suite.
 - slice-verifier and land-worker behave as in the feature flow.
 - Retry/uncertainty routing identical to feature.md: re-dispatch via
@@ -212,22 +212,22 @@ Approved design:
 Problem observed in practice: when a chain's subagent fails to complete
 within its allotted resources (turn budget / timeout), the parent
 session tends to "just do it itself" and implement in-session. That is
-forbidden — the parent is a coordinator and must keep its context
+forbidden, the parent is a coordinator and must keep its context
 clean. Both resource files must state this as a hard rule and give the
 parent a larger toolbelt instead:
 
 1. **Diagnose first, never redo.** On a resource-exhausted chain, the
    parent reads the worker's outputs (result.md, partial diff,
    uncertainty notes) to understand *why* it stalled. The parent's
-   only moves are re-dispatch strategies — never implementation.
+   only moves are re-dispatch strategies, never implementation.
 2. **First failure → always split.** On the first resource-exhausted
    chain for a slice, split slice N into ad-hoc sub-slices
    **Na, Nb, Nc, …** (slice docs `slices/<N>a-<slug>.md` etc., each
    conforming: acceptance criteria, `## Test plan`, `size`,
-   `blocked_by` — chained Na → Nb → Nc). The task doc's `slices:`
+   `blocked_by`, chained Na → Nb → Nc). The task doc's `slices:`
    list is updated; slice N's doc is marked `status: split`. Then run
    chains per sub-slice as usual. (Exception: if the diagnosis shows
-   the slice is already atomic — nothing sensible to split off — skip
+   the slice is already atomic, nothing sensible to split off, skip
    straight to 3.)
 3. **Second attempt → retry with more resources** (+50% turn
    budget/timeout). Retry-bigger is never the *first* response to a
@@ -237,7 +237,7 @@ parent a larger toolbelt instead:
    failed" behavior).
 5. **Bug-md-specific:** if a bug turns out nasty, a tdd-worker attempt
    within budget followed by *analysis of why it couldn't finish* is
-   the preferred way to discover the finer slicing — the failed
+   the preferred way to discover the finer slicing, the failed
    attempt's findings seed the sub-slice breakdown.
 
 ### Integration points
@@ -254,7 +254,7 @@ parent a larger toolbelt instead:
 ### Non-goals (v1)
 
 - No severity automation, SLAs, assignment.
-- No `task_*` tool / state.yaml extension — bugs live outside the planning
+- No `task_*` tool / state.yaml extension, bugs live outside the planning
   tree until promoted. Add a `bug` kind later only if grep gets painful.
 
 ## Open questions
@@ -264,7 +264,7 @@ parent a larger toolbelt instead:
   resumable); bug-specific execution lives in
   `implement-task/resources/bug.md`, selected via task `type:`
   frontmatter. Open: does fix-bug still exist as a resume point?
-  (Recommendation: no — make report-bug resumable on existing slug.)
+  (Recommendation: no, make report-bug resumable on existing slug.)
 - [x] fix-bug's fate → **Dissolved**: report-bug owns capture →
   reproduce → triage → promote end-to-end. Resume point for abandoned
   sessions = `status: reported` without `promoted_to`.
@@ -275,7 +275,7 @@ parent a larger toolbelt instead:
 - [x] Promotion threshold → **Strict, sharpened by user**: the gate
   collapses to trivial-vs-not. Truly trivial bugs bypass the workflow
   entirely ("if it is TRULY small, bypassing the workflow is best");
-  everything else promotes. No mid-flight escalation mechanism — direct
+  everything else promotes. No mid-flight escalation mechanism, direct
   fixes are capped at trivial, so surprises stop and promote.
 - [x] Duplicate handling → **Ask once, fold in**: report-bug greps
   `docs/bugs/` before writing. Suspected duplicate → one question

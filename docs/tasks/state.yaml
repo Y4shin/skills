@@ -1,2 +1,3 @@
 task: run-adoption-migration
 slice: None
+schema_version: 3
