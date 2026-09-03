@@ -177,3 +177,38 @@ frontmatter remains spec-pure (`wait-what` is a separate Pi-only skill with
 `disable-model-invocation`). `pi.skills.length === 17`; the assertion is
 `toBe(17)`; `SKILL_FILES` gained both rows. Full suite was green at handoff
 (580/580).
+
+### Slice 2 — support-scripts-node (landed)
+
+Added the three Node helper scripts to `skills/skill-creator/scripts/`:
+`validate_skill.mjs` (uses the repo's existing `yaml` ^2.6.1 dep for robust
+parsing rather than a hand-rolled minimal parser — the smaller-risk option
+flagged in the slice doc; accepts a skill *directory* path, matching the
+arch spec's `<skill-dir>` interface), `scaffold_skill.mjs` (normalize-name →
+create folder → write `SKILL.md` template + selected resource dirs; refuses to
+overwrite an existing skill), and `discover_skill.mjs` (scan immediate
+subdirs for `SKILL.md`, rank by name-similarity + token overlap-coefficient on
+the smaller set, print candidates ≥ threshold with an "UPDATE over create"
+hint). Each script carries a by-hand fallback in its header comment.
+
+Fixed the `compatibility`-omission bug: `validate_skill.mjs`'s allowed
+frontmatter keys = `name, description, license, compatibility,
+allowed-tools, metadata` — it **accepts** a skill carrying `compatibility:`
+and **rejects** `disable-model-invocation` (and any other unknown key).
+
+Added 22 vitest cases in `tests/skill-creator-scripts.test.ts` covering:
+validate PASS/FAIL paths (bad name, missing description, >1024 description,
+unknown field, `compatibility`-accepted, `disable-model-invocation`-rejected,
+1024-boundary PASS / 1025 FAIL, trailing-hyphen FAIL, description-with-colon);
+scaffold create + refuse-overwrite; discover ranking above threshold; and the
+dogfood assertion (`validate_skill.mjs skills/skill-creator` → PASS).
+
+Added a "Helper scripts" section to `skills/skill-creator/SKILL.md` stating
+when to run each (validate before finishing; discover before scaffolding a
+new skill; scaffold only for new skills) with the by-hand fallback
+one-liners.
+
+The merge also carried the parent-side commit `chore: commit untracked
+wait-what skill` (`skills/wait-what/SKILL.md`), which slice 1 registered in
+the manifest but hadn't committed on the task branch — needed for the
+task-branch tests to pass. Full suite green at handoff (602/602).
