@@ -4,7 +4,7 @@ type: feature
 slug: fold-bundle-templates-into-refs
 title: Fold the bundle templates + verified 17-slot stack into the support-script references
 map: portable-skill-authoring
-status: ready
+status: done
 blocked_by:
 - build-skill-creator-skill
 slices:
@@ -125,3 +125,48 @@ Out of scope:
   you control the runtime" guidance is allowed). The nixpkgs-packaging-drop
   is a test-tooling pin carried by the follow-up that sets up the references'
   own floor-test devenv (if any), not by this task.
+
+## Implementation notes
+
+### Slice 1: fold-templates-and-stack
+
+Folded the concrete bundle templates + verified 17-slot stack tables + API
+gotchas from the `bundle-script-template` findings into the two per-language
+reference files and resolved the stale "template comes later" pointer in the
+shared backbone.
+
+- `skills/skill-creator/references/support-scripts-python.md` (+77/-12):
+  added the `zipapp` 3-step build sequence (vendor via
+  `uv pip install --python "$(command -v python3)" --target` to pin the floor
+  3.10 → compose zip root → `python -m zipapp -m "pkg.cli:main" -o helper.pyz
+  -c`), the keep-readable-source note, the min-version contract
+  (`sys.version_info` check + "install at least 3.10" + agent-consults-user
+  remark), the bare-floor run invocation, the `shiv`/`pex` rejected-with-
+  friction-reason note, and the verified 17-slot Python stack table (Q7
+  Python column; 18 rows with the 13a/13b split) with the "verified at Python
+  3.10 via the `bundle-script-template` prototype" note + findings link.
+- `skills/skill-creator/references/support-scripts-js-ts.md` (+127/-12):
+  added the esbuild programmatic-API build (conditional `createRequire`
+  banner via a `import * as _nodeModule from "node:module"` namespace import
+  alias to avoid the collision; `external: ["node:"]`; `format: "esm"`), the
+  "existing-bundler-else-esbuild" heuristic (citing `scripts/build.ts` as the
+  Vite precedent in this repo), the `.ts`-only-with-committed-`.mjs` rule, the
+  min-version contract (`process.versions.node` check + "install at least Node
+  20"), the keep-readable-source note, the three API gotchas
+  (`diff_match_patch` lowercase class; `tinyexec` `exec`/`x` not `execa`;
+  `createRequire` collision + namespace-alias fix), and the verified 17-slot
+  JS/TS stack table (Q7 JS/TS column; 18 rows) with the same verification note
+  + findings link.
+- `skills/skill-creator/references/support-scripts.md` (+4/-7): resolved the
+  stale "template comes later from the prototype" / "fold-bundle-templates-
+  into-refs folds the verified template" pointer to instead point at the
+  per-language files ("the concrete build recipe is now folded into
+  `support-scripts-python.md` and `support-scripts-js-ts.md` — each carries
+  the verified bundle template + the verified 17-slot stack table for its
+  language").
+
+No floor change (still Python 3.10 / Node 20 LTS — a minimum-compatibility
+target, not a recommendation). No library re-pick (all 17 pass at the floor).
+No `SKILL.md`, script, `package.json`, or test changes — only the three
+reference markdown files. Deviation report recorded zero deviations from the
+spec. Full suite 602/602 green, typecheck clean, validate-dogfood PASS.

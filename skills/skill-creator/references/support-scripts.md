@@ -54,12 +54,9 @@ are an **authoring concern** (the skill-author commits them at authoring
 time), not run by the end user.
 
 The concrete build recipe (one-file build command, entrypoint, where the
-committed artifact lives) is provided by the `bundle-script-template`
-prototype — its findings live at
-`docs/tasks/bundle-script-template/findings.md`. This reference states the
-path at the **policy level** and points there for the concrete template. The
-follow-up task `fold-bundle-templates-into-refs` folds the verified template
-into the per-language files.
+committed artifact lives) is now folded into the per-language reference files
+(`support-scripts-python.md` and `support-scripts-js-ts.md`) — each carries the
+verified bundle template + the verified 17-slot stack table for its language.
 
 > **Verification note:** the `bundle-script-template` prototype smoke-tested
 > all 17 default-stack library picks at the floor runtimes (Python 3.10 / Node
