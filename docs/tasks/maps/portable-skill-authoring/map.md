@@ -18,7 +18,7 @@ tasks:
 - slug: fold-bundle-templates-into-refs
   blocked_by:
   - build-skill-creator-skill
-  done: false
+  done: true
 ---
 
 ## Destination
