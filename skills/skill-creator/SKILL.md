@@ -45,8 +45,33 @@ when the target's capabilities are known.
 
 ## Helper scripts
 
-<!-- Slice 2 populates this section: validate_skill.mjs, scaffold_skill.mjs,
-     discover_skill.mjs. -->
+Three Node scripts in `scripts/` automate the repetitive parts of skill
+authoring. Each has a by-hand fallback if you can't run Node.
+
+- **`validate_skill.mjs`** — `node scripts/validate_skill.mjs <skill-dir>`.
+  Run it **before finishing** a skill. Checks frontmatter (`name` hyphen-case
+  ≤64 == folder, `description` ≤1024 no angle brackets, only allowed keys:
+  `name`, `description`, `license`, `compatibility`, `allowed-tools`,
+  `metadata`). Exits 0 + `OK` on pass, 1 + first-error on fail.
+  *By-hand fallback:* open `SKILL.md` and confirm the frontmatter opens with
+  `---`, has a `name` in hyphen-case ≤64 == folder, a `description` ≤1024
+  with no angle brackets, and no keys outside the allowed set.
+
+- **`scaffold_skill.mjs`** — `node scripts/scaffold_skill.mjs <name>
+  [--path <dir>] [--resources scripts,references,assets]`. Run it **for new
+  skills only**. Normalizes the name, creates the folder + `SKILL.md`
+  template. Refuses to overwrite — to UPDATE, edit in place.
+  *By-hand fallback:* create the directory, write a `SKILL.md` with
+  `name: <normalized-name>` and `description: TODO`, then add resource dirs.
+
+- **`discover_skill.mjs`** — `node scripts/discover_skill.mjs "<intent>"
+  --skills-dir <dir> [--threshold 0.4] [--json]`. Run it **before creating**
+  a new skill to avoid near-duplicates. Ranks existing skills by name +
+  description token overlap; candidates ≥ threshold get an "UPDATE over
+  create" hint.
+  *By-hand fallback:* list the skills directory, read each `SKILL.md`
+  frontmatter, and judge by name + description relevance to your intent.
+  Prefer updating over creating a duplicate.
 
 ## References
 
