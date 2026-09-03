@@ -672,7 +672,7 @@ describe("skill cross-references", () => {
 
     // The git shell block (containing `git merge --no-ff`) must not interleave
     // Pi tool calls (task_state_set / task_map_tick) as if they were shell
-    // binaries — under `set -e` that aborts the archive mid-sequence (see
+    // binaries, under `set -e` that aborts the archive mid-sequence (see
     // docs/bugs/finalize-task-set-e-tool-confusion.md).
     const fence = /```[^\n]*\n([\s\S]*?)```/g;
     let shellBlock: string | null = null;
@@ -787,5 +787,51 @@ describe("skill cross-references", () => {
     const content = readFile("skills/engineering/diagnosing-bugs/SKILL.md");
     expect(content).toContain("skippable");
     expect(content).toMatch(/justified|recorded/);
+  });
+});
+
+// ─── setup-workflow / migration skill references ─────────────────────
+
+describe("setup-workflow / migration skill references", () => {
+  test("is registered as a promoted Pi skill", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).toContain("./skills/engineering/setup-workflow");
+  });
+
+  test("SKILL.md references the upgrade-2-to-3 resource", () => {
+    const content = readFile("skills/engineering/setup-workflow/SKILL.md");
+    expect(content).toMatch(/upgrade-2-to-3/);
+  });
+
+  test("SKILL.md references the target-state spec", () => {
+    const content = readFile("skills/engineering/setup-workflow/SKILL.md");
+    expect(content).toMatch(/migration-target\.yaml/);
+  });
+
+  test("SKILL.md mentions schema_version detection", () => {
+    const content = readFile("skills/engineering/setup-workflow/SKILL.md");
+    expect(content).toMatch(/schema_version/);
+  });
+
+  test("SKILL.md mentions dry-run safety", () => {
+    const content = readFile("skills/engineering/setup-workflow/SKILL.md");
+    expect(content).toMatch(/dry-run/i);
+  });
+
+  test("SKILL.md mentions backup branch safety", () => {
+    const content = readFile("skills/engineering/setup-workflow/SKILL.md");
+    expect(content).toMatch(/backup/i);
+  });
+
+  test("SKILL.md mentions idempotence", () => {
+    const content = readFile("skills/engineering/setup-workflow/SKILL.md");
+    expect(content).toMatch(/idempoten/i);
+  });
+
+  test("upgrade-2-to-3 resource exists and lists 9 steps", () => {
+    const content = readFile("skills/engineering/setup-workflow/resources/upgrade-2-to-3.md");
+    for (let i = 1; i <= 9; i++) {
+      expect(content).toMatch(new RegExp(`## Step ${i}`));
+    }
   });
 });

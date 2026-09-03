@@ -4,7 +4,7 @@ slug: migration-tests
 title: Add structure assertions for the migration skill in tests/skills.test.ts (+ spawnSync CLI test if helper scripts ship)
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: s
 blocked_by:
 - skill-and-detection-and-upgrade-resource
