@@ -203,8 +203,10 @@ Concise guidance for what to put in a produced skill's body:
   `description`) loads at startup; the body (<500 lines, ≲5000 tokens)
   loads on activation; resources load on demand. Keep the body lean — move
   detail to `references/`. References are one level deep (no chains). Tell
-  the agent *when* to read each reference: "Read `references/api-errors.md`
-  if the API returns a non-200 status" beats "see references/ for details."
+  the agent *when* to read each reference: "Read
+  `references/<topic>-errors.md` if the API returns a non-200 status" beats
+  "see references/ for details." (This is a hypothetical example, not a real
+  file in this skill.)
 - **Single-source each fact.** Each piece of knowledge has one home. Don't
   paraphrase the spec into the body — link `references/agent-skills-spec.md`.
   Don't list Pi specifics inline — link `references/target-pi.md`. Don't
