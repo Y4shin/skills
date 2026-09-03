@@ -48,7 +48,9 @@
       "./skills/grilling",
       "./skills/grilling-with-ui",
       "./skills/domain-modeling",
-      "./skills/improve-codebase-architecture"
+      "./skills/improve-codebase-architecture",
+      "./skills/wait-what",
+      "./skills/skill-creator"
     ],
     "subagents": {
       "agents": [
