@@ -1,6 +1,6 @@
 {
   "name": "task-workflow",
-  "version": "2.9.0",
+  "version": "2.10.0",
   "description": "Wayfinder grilling → task frontier → type-specific execution — a planning workflow for docs/tasks/. Pi extension.",
   "keywords": [
     "pi-package"
