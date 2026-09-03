@@ -4,7 +4,7 @@ slug: core-skill-body
 title: Write the synthesized core SKILL.md body (workflow + principles + capability-conditional model + references index)
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: l
 blocked_by:
 - support-scripts-node
