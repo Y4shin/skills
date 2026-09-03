@@ -248,3 +248,53 @@ unchanged (still only `name: skill-creator` + the slice-1 trigger-designed
 `trigger-design.md` that slices 4–5 will create; this slice's acceptance is
 naming presence, not file presence. The tdd-worker reported zero deviations.
 Full suite green at handoff (602/602).
+
+### Slice 4 — references-portable-and-pi (landed)
+
+Added the two always-true reference files to
+`skills/skill-creator/references/`:
+
+- **`agent-skills-spec.md`** — the portable Agent Skills format digest,
+  single-sourced from the live spec at agentskills.io/specification (with a
+  recheck-at-authoring-time note). Covers directory structure (`SKILL.md`
+  required + optional `scripts/`/`references/`/`assets/`); frontmatter rules —
+  `name` (≤64, lowercase a-z/0-9 + hyphens, no leading/trailing/consecutive,
+  must match parent dir) and `description` (≤1024, no angle brackets, what +
+  when) required, with exactly the four optional fields (`license`,
+  `compatibility` ≤500, `metadata` string→string map, `allowed-tools`
+  space-separated + experimental), and **no others** spec-valid; body has no
+  format restrictions but the whole file loads on activation so keep it lean;
+  progressive disclosure (metadata ~100 tokens always, body <5000 tokens /
+  <500 lines on activation, resources as needed); file refs relative and one
+  level deep (no nested reference chains); validation via `skills-ref` with a
+  manual-checklist fallback. Opens with "Read when authoring frontmatter or
+  deciding structure" matching the slice-3 references index.
+
+- **`target-pi.md`** — authoring a skill for a Pi package (the one first-class
+  named target). Covers where Pi skills live (`skills/<name>/SKILL.md`,
+  registered in `package.json` `pi.skills` as `"./skills/<name>"`,
+  conventionally covered by `tests/skills.test.ts` via the `SKILL_FILES` array
+  + a `pi.skills.length` assertion); the repo gate (task-workflow + so
+  skill-creator auto-disables in work repos, and a produced Pi skill inherits
+  that gating — stated so the author isn't surprised); the companion-doc
+  precedent (the `tdd` skill ships `tests.md` + `mocking.md` alongside
+  `SKILL.md`, encouraged when it keeps the main file lean, one level deep);
+  the Pi-specific frontmatter **`disable-model-invocation: true`** and
+  **`metadata.telemetry.capture: "target"`** as explicit harness-specific
+  extensions **not in the portable core** — both fail external validators like
+  `skills-ref`; if a produced Pi skill uses either it is a deliberate opt-in
+  extension (per the map's Portable-vs-extension distinction) and the
+  portable core stays spec-pure (name + description + the 4 optional spec
+  fields), with recommendations to add them only when there is a real reason;
+  and a worked mini-example (scaffold `lint-fixer`, register in `package.json`,
+  bump the manifest length, add a structure-test row, run tests). Opens with
+  "Read when the target is Pi" matching the slice-3 references index.
+
+**Single-source:** no duplication with `SKILL.md` — the spec digest is the
+only place the full frontmatter rules live (the body links it and says *when*
+to read it); the Pi specifics live only in `target-pi.md`. The validator's
+allowed-key set (`name, description, license, compatibility, allowed-tools,
+metadata`) was cross-checked against the spec digest's optional-field list.
+Frontmatter unchanged (still spec-pure). The tdd-worker reported zero
+deviations; both files match the slice-3 references index. Full suite green at
+handoff (602/602).
