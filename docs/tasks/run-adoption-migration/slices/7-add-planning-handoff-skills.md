@@ -4,7 +4,7 @@ slug: add-planning-handoff-skills
 title: Add to-spec + to-tickets (the two-phase handoff on docs/tasks/), reshaping wayfinder to decisions-only
 task: ../task.md
 mode: hitl
-status: todo
+status: done
 size: m
 blocked_by:
 - reorganize-into-buckets
