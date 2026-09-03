@@ -40,6 +40,7 @@ const AGENT_FILES = [
   "agents/deviation-reporter.md",
   "agents/code-reviewer.md",
   "agents/architecture-scout.md",
+  "agents/skill-reviewer.md",
 ];
 
 describe("agent frontmatter", () => {
@@ -93,6 +94,7 @@ const SKILL_FILES = [
   "skills/improve-codebase-architecture/SKILL.md",
   "skills/wait-what/SKILL.md",
   "skills/skill-creator/SKILL.md",
+  "skills/skill-review/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -136,7 +138,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(17);
+    expect(pkg.pi.skills.length).toBe(18);
     expect(pkg.pi.skills).toContain("./skills/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/improve-codebase-architecture");
@@ -144,6 +146,7 @@ describe("package.json", () => {
     expect(pkg.pi.skills).toContain("./skills/grilling-with-ui");
     expect(pkg.pi.skills).toContain("./skills/wait-what");
     expect(pkg.pi.skills).toContain("./skills/skill-creator");
+    expect(pkg.pi.skills).toContain("./skills/skill-review");
   });
 
   test("has subagents config", () => {
@@ -356,8 +359,7 @@ describe("all referenced agents exist", () => {
     expect(agentNames).toContain("slice-verifier");
     expect(agentNames).toContain("land-worker");
     expect(agentNames).toContain("deviation-reporter");
-    expect(agentNames).toContain("architecture-scout");
-  });
+    expect(agentNames).toContain("architecture-scout");  });
 
   test("agent names are in package subagents path", () => {
     expect(pkg.pi.subagents.agents).toContain("./agents");
@@ -800,3 +802,56 @@ describe("skill cross-references", () => {
     expect(content).toMatch(/justified|recorded/);
   });
 });
+// ─── Skill-review wiring ─────────────────────────────────────────────
+
+describe("skill-review wiring", () => {
+  const skill = readFile("skills/skill-review/SKILL.md");
+  const reviewer = readFile("agents/skill-reviewer.md");
+  const creator = readFile("skills/skill-creator/SKILL.md");
+
+  test("skill-review is registered and names axes with stage-0 triage", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).toContain("./skills/skill-review");
+    expect(skill).toMatch(/^name: skill-review/m);
+    expect(skill).toMatch(/audience fit/i);
+    expect(skill).toMatch(/trigger behavior/i);
+    expect(skill).toMatch(/spec \/ portability|portability/i);
+    expect(skill).toMatch(/triage/i);
+  });
+
+  test("skill-review fixes the plan up front with no mid-run escalation", () => {
+    expect(skill).toMatch(/final once fixed|before any reviewer runs/);
+    expect(skill).toMatch(/no reviewer consumes another axis|no reviewer.*another axis|request another axis later/);
+    expect(skill).toMatch(/at most \*{0,2}5 axes\*{0,2}/);
+    expect(skill).toMatch(/parallel sub-agent|parallel.*fresh context/);
+  });
+
+  test("skill-review defines core and optional axes with triggers", () => {
+    expect(skill).toMatch(/progressive disclosure \/ token budget|progressive disclosure/i);
+    expect(skill).toMatch(/accessibility.*UI|UI.*accessibility/i);
+    expect(skill).toMatch(/safety.*destructive|destructive.*safety|consequential ops/i);
+    expect(skill).toMatch(/reference integrity/i);
+  });
+
+  test("skill-reviewer agent mirrors code-reviewer conventions", () => {
+    const fm = parseFrontmatter(reviewer);
+    expect(fm.name).toBe("skill-reviewer");
+    expect(fm.inheritProjectContext).toBe("true");
+    expect(fm.defaultContext).toBe("fresh");
+    expect(fm.tools).toBeDefined();
+    expect(reviewer).toMatch(/fanout guard|do not invoke/);
+  });
+
+  test("skill-creator invokes the reviewer and teaches meta-noise pruning", () => {
+    expect(creator).toMatch(/skill-reviewer|skill-review/);
+    expect(creator).toMatch(/meta-level narrative/i);
+    expect(creator).toMatch(/reader-agent/);
+    expect(creator).toMatch(/author-facing rationale/i);
+  });
+
+  test("skill-reviewer agent does stage-0 triage before spawning", () => {
+    expect(reviewer).toMatch(/triage the axis set before spawning/i);
+    expect(reviewer).toMatch(/final once fixed/);
+    expect(reviewer).toMatch(/at most \*{0,2}5 axes\*{0,2}/);
+    expect(reviewer).toMatch(/Aggregate.*Include the review-plan|review-plan preamble/);
+  });});

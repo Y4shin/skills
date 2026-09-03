@@ -50,7 +50,8 @@
       "./skills/domain-modeling",
       "./skills/improve-codebase-architecture",
       "./skills/wait-what",
-      "./skills/skill-creator"
+      "./skills/skill-creator",
+      "./skills/skill-review"
     ],
     "subagents": {
       "agents": [
