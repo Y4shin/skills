@@ -81,14 +81,12 @@ const SKILL_FILES = [
   "skills/engineering/wayfinder/SKILL.md",
   "skills/engineering/implement-task/SKILL.md",
   "skills/engineering/finalize-task/SKILL.md",
-  "skills/engineering/report-bug/SKILL.md",
   "skills/engineering/tdd/SKILL.md",
   "skills/engineering/code-review/SKILL.md",
   "skills/engineering/task-workflow-doctor/SKILL.md",
   "skills/engineering/diagnosing-bugs/SKILL.md",
   "skills/engineering/codebase-design/SKILL.md",
   "skills/engineering/grilling/SKILL.md",
-  "skills/engineering/grilling-with-ui/SKILL.md",
   "skills/engineering/domain-modeling/SKILL.md",
   "skills/engineering/improve-codebase-architecture/SKILL.md",
   "skills/productivity/wait-what/SKILL.md",
@@ -136,12 +134,11 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(17);
+    expect(pkg.pi.skills.length).toBe(15);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
     expect(pkg.pi.skills).toContain("./skills/engineering/grilling");
-    expect(pkg.pi.skills).toContain("./skills/engineering/grilling-with-ui");
     expect(pkg.pi.skills).toContain("./skills/productivity/wait-what");
     expect(pkg.pi.skills).toContain("./skills/engineering/skill-creator");
   });
@@ -210,42 +207,6 @@ describe("grilling skill references", () => {
   });
 });
 
-describe("grilling-with-ui skill references", () => {
-  const content = readFile("skills/engineering/grilling-with-ui/SKILL.md");
-
-  test("is registered as the reusable Pi grilling-with-ui skill", () => {
-    const pkg = JSON.parse(readFile("package.json"));
-    expect(pkg.pi.skills).toContain("./skills/engineering/grilling-with-ui");
-    expect(content).toMatch(/^name: grilling-with-ui/m);
-    expect(content).toMatch(/model-invoked|Pi-native/i);
-    expect(content).toContain("https://raw.githubusercontent.com/mattpocock/skills/refs/heads/main/skills/productivity/grilling/SKILL.md");
-  });
-
-  test("preserves canonical design-tree and round frontier protocol", () => {
-    expect(content).toMatch(/design tree/i);
-    expect(content).toMatch(/round/i);
-    expect(content).toMatch(/frontier/i);
-    expect(content).toMatch(/whole frontier|every decision.*prerequisites/i);
-    expect(content).toMatch(/prerequisite|depends on/i);
-    expect(content).toMatch(/recommended answer/i);
-    expect(content).toMatch(/fact(s| finding).*job|finding facts/i);
-  });
-
-  test("records decisions and requires shared-understanding completion", () => {
-    expect(content).toMatch(/settled decision|settled decisions/i);
-    expect(content).toMatch(/downstream consequences|consequences/i);
-    expect(content).toMatch(/shared understanding/i);
-    expect(content).toMatch(/frontier is empty|nothing left silently assumed/i);
-  });
-
-  test("drives the grilling CLI end-to-end instead of ask_user_question", () => {
-    // Slice 4 (skill-rewire): the grilling-with-ui skill drives the grilling CLI
-    // end-to-end instead of ask_user_question. Assert the CLI surface is present.
-    expect(content).toMatch(/grilling-cli\.mjs/);
-    expect(content).toMatch(/--state/);
-    expect(content).toMatch(/Wayfinder/i);
-  });
-});
 
 describe("domain-modeling skill references", () => {
   const content = readFile("skills/engineering/domain-modeling/SKILL.md");
@@ -763,11 +724,6 @@ describe("skill cross-references", () => {
     const content = readFile("skills/engineering/task-overview/SKILL.md");
     expect(content).toContain("/skill:wayfinder");
     expect(content).toContain("task_frontier");
-  });
-
-  test("task-overview routes report a bug to /skill:report-bug", () => {
-    const content = readFile("skills/engineering/task-overview/SKILL.md");
-    expect(content).toContain("/skill:report-bug");
   });
 
   test("task-overview lists triage queue query", () => {

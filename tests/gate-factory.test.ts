@@ -78,7 +78,6 @@ const GATED_SKILL_NAMES = [
   "wayfinder",
   "implement-task",
   "finalize-task",
-  "report-bug",
 ];
 
 function buildSkillsXml(skillNames: string[]): string {
@@ -532,7 +531,7 @@ describe("factory gate", () => {
   });
 
   describe("before_agent_start skill strip", () => {
-    test("work repo strips only the gated six and leaves non-gated skills intact", async () => {
+    test("work repo strips only the gated five and leaves non-gated skills intact", async () => {
       setupWorkRepo();
 
       const stub = createStub();
@@ -554,7 +553,7 @@ describe("factory gate", () => {
       expect(result.systemPrompt).toContain("SUFFIX LINE 2");
     });
 
-    test("work repo removes the whole skills block when only the six are present", async () => {
+    test("work repo removes the whole skills block when only the five are present", async () => {
       setupWorkRepo();
 
       const stub = createStub();

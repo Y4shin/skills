@@ -14,7 +14,6 @@
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve as resolvePath } from "node:path";
-import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext, InputEvent, InputEventResult } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -34,7 +33,6 @@ const FALLBACK_GATED_SKILL_NAMES = [
   "wayfinder",
   "implement-task",
   "finalize-task",
-  "report-bug",
 ];
 
 function loadGatedSkillNames(): { names: string[]; diagnostics: string[] } {
@@ -956,33 +954,6 @@ Twelve Fowler code smells from _Refactoring_, chapter 3. The Standards axis of \
     return g.source === "docs" ? `docs/${g.file}` : g.file;
   }
 
-  // ── Path protection: block writes/edits into the grilling visualizer temp dir ──
-  // The grilling CLI (skills/grilling-with-ui/grilling-cli.mjs) hides its state in a
-  // random dir under os.tmpdir() prefixed "grilling-". The skill prose forbids
-  // the agent from touching it; this handler is a mechanical backstop that
-  // blocks `write`/`edit` tool calls whose target path falls inside that dir,
-  // even if the agent ignores the instruction.
-  pi.on("tool_call", async (event, ctx) => {
-    if (event.toolName !== "write" && event.toolName !== "edit") {
-      return undefined;
-    }
-    const path = String(event.input?.path ?? "");
-    if (!path) return undefined;
-    const tmp = tmpdir();
-    // Block any path under os.tmpdir() that contains the grilling- prefix.
-    // Covers e.g. /tmp/grilling-<rand>/state.json and the .grilling.json map.
-    const isGrillingTemp =
-      (path.startsWith(tmp) && path.includes("grilling-")) ||
-      path.endsWith(".grilling.json") ||
-      path.includes(".grilling.json");
-    if (isGrillingTemp) {
-      if (ctx.hasUI) {
-        ctx.ui.notify(`Blocked write to grilling state path: ${path}`, "warning");
-      }
-      return { block: true, reason: `Path "${path}" is grilling state — use the grilling CLI, not direct edits.` };
-    }
-    return undefined;
-  });
 
   pi.on("session_start", async (_event, ctx) => {
     guidelinesCache = discoverGuidelines(ctx.cwd);

@@ -40,11 +40,9 @@ Model- or user-reachable.
   domain's concepts, relationships, invariants, and lifecycle states.
 - **[grilling](./grilling/SKILL.md)**: Relentlessly stress-test a plan,
   decision, or idea through focused questions.
-- **[grilling-with-ui](./grilling-with-ui/SKILL.md)**: Browser-visualized
-  grilling (drives a live design-tree graph).
 - **[skill-creator](./skill-creator/SKILL.md)**: Scaffold, build, or fix an
   Agent Skill.
 
-> Note: `report-bug`, `grilling-with-ui`, and the two-phase planning reshape
-> are in flight under the `adopt-mp-skills-way` map; this README reflects the
-> current state and is re-synced as those slices land.
+> Note: `report-bug` and the two-phase planning reshape are in flight under
+> the `adopt-mp-skills-way` map; this README reflects the current state and is
+> re-synced as those slices land.

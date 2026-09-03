@@ -37,7 +37,6 @@ deps + script into one **committed** runnable artifact via a build step:
 **Bundler heuristic:** use the target project's existing bundler if it has
 one; if none, `esbuild` is the lean default (one binary, ~zero config,
 fastest). In this repo, the existing bundler is **Vite** (`scripts/build.ts`
-already emits a single committed `.mjs` for `grilling-with-ui` via Vite
 lib-mode), so for skills produced *in this repo* the template is Vite
 lib-mode. For a produced skill whose target repo has no bundler, **esbuild**
 is the lean default.

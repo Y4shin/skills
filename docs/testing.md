@@ -29,11 +29,8 @@
   to an external process and parses its output, inject the step as a
   `() => Promise<Result>` function so the loop logic (convergence, caps,
   escalation) is unit-testable with a mock, independent of the real
-  subprocess. See `scripts/eval/harness.ts` `runScenario(scenario, gapFn)` +
-  `GapReportFn` + `scripts/eval/harness-iteration.test.ts`: the production
-  `createPiGapFn` shells out to `pi --print`, but the tests feed a mock that
-  returns a scripted sequence of gap reports to assert 2-clean-in-a-row,
-  cap, and escalation behavior with zero subprocess calls.
+  subprocess. _(The former `scripts/eval/` harness that illustrated this was
+  removed with the grilling-with-ui CLI it drove; the pattern stands.)_
 
 ## Integration harness (tests/integration/)
 
