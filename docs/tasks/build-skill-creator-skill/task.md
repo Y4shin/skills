@@ -249,6 +249,76 @@ unchanged (still only `name: skill-creator` + the slice-1 trigger-designed
 naming presence, not file presence. The tdd-worker reported zero deviations.
 Full suite green at handoff (602/602).
 
+### Slice 5 — references-support-scripts (landed)
+
+Added the four support-script reference files to
+`skills/skill-creator/references/`, seeded from the
+`support-script-conventions` grilling decisions (Q1–Q7):
+
+- **`support-scripts.md`** (shared backbone, read first) — the cross-cutting
+  policy stated once: when to ship a script (only for fragile/exact/repeated/
+  numeric ops); language choice (match the target repo's canonical language;
+  default Python; JS/TS when the host project is JS/TS; **Bash supported but
+  discouraged** — not reliably cross-platform, Windows portability varies by
+  agent, tiny pure-shell glue only); self-contained at the end-user runtime
+  (stdlib-only lightest, or libraries + a **build step** bundling deps+script
+  into one **committed** file — Python `zipapp` / JS-TS bundler; network calls
+  are an acceptable dependency, what's avoided is requiring CLI tools present
+  or end-user library installs; the build step + committed artifact are an
+  authoring concern, not run by the end user); **by-hand fallback — a
+  considered, safety-first choice, not a default** (omit for
+  dangerous/irreversible/non-obvious ops such as a Forgejo API mutation or
+  destructive ops — an agent fumbling a dangerous op by hand from outdated
+  docs is worse than no fallback; the skill should stop and require the
+  script; provide a by-hand fallback only when the path is safe,
+  deterministic, and within the agent's reliable capability); shape (clear
+  inputs + single output + helpful errors, runnable AND readable); testing
+  (run on a worked example with a known answer — the per-language file names
+  the runner); the **Q7 17-slot default-stack table** (the recommended default
+  dependency stack with selection standards + the axios/pydantic/jsonschema
+  caveats: axios for HTTP, pydantic/jsonschema for input validation, all
+  bundleable and broadly available); and a verification note citing the
+  bundle-script-template findings (the concrete bundle templates come from
+  the follow-up `bundle-script-template` prototype and are **not folded**
+  here).
+- **`support-scripts-python.md`** — shebang (`#!/usr/bin/env python3`);
+  stdlib-only OR `zipapp` bundling when libraries are used (the build step
+  produces a committed `__main__.zip`/zipapp the end user runs with `python
+  script.zipapp`) — stated at the policy level with a pointer to the
+  forthcoming template (the concrete zipapp recipe is deferred to
+  `bundle-script-template`); `argparse`/stdin inputs; exit codes; the
+  **known-good-literal vs recomputed-value anti-pattern** for numeric
+  scripts; testing on a worked example; by-hand fallback per the shared
+  safety decision (points back — does not restate it).
+- **`support-scripts-js-ts.md`** — the **Node-runtime portability trade-off**
+  (a Node/TS script needs a runtime the target harness may not have — a
+  non-default by-hand/stop fallback per the shared decision); **bundling
+  endorsed** — when a helper needs libraries, bundle deps+script into one
+  **committed** runnable artifact and **keep the readable source** for
+  patching; `.ts` is fine **iff** a committed runnable artifact
+  (`.mjs`/`.js`) is produced (never ship a `.ts` needing `tsc`/`tsx` at the
+  end-user runtime); use the target project's existing bundler if it has one,
+  else an **esbuild** heuristic — stated at the policy level with a pointer
+  to the forthcoming template (the specific bundler + build setup + artifact
+  shape are deferred to `bundle-script-template`). Testing per Q4.
+- **`support-scripts-bash.md`** — **discouraged, Windows-fragile** (states
+  the Windows caveat); only tiny pure-shell glue; the Q2 default (`bash` +
+  `set -euo pipefail`, or `#!/bin/sh` for max POSIX when the script stays
+  POSIX); POSIX-vs-GNU coreutils portability; quoting/word-splitting pitfalls;
+  keep to stdlib coreutils only (avoid requiring external CLI tools such as
+  `jq` — **prefer Python for JSON/structured data**, which also sidesteps
+  Bash's Windows fragility); shellcheck testing; the by-hand fallback per the
+  shared safety decision.
+
+**Single-source:** the cross-cutting policy lives in the shared file once;
+per-language files carry only their specifics and point back. The by-hand-
+fallback safety stance appears in the shared file and is concisely present in
+`SKILL.md` (slice 3), not duplicated in each per-language file. Concrete bundle
+templates **not folded** — deferred to the `fold-bundle-templates-into-refs`
+follow-up task. No `SKILL.md` change needed (slice 3 already wired the cross-
+refs). The tdd-worker reported zero deviations; all four files match the
+slice-3 references index. Full suite green at handoff (602/602).
+
 ### Slice 4 — references-portable-and-pi (landed)
 
 Added the two always-true reference files to

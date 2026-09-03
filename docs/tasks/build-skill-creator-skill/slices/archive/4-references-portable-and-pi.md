@@ -4,7 +4,7 @@ slug: references-portable-and-pi
 title: Write references/agent-skills-spec.md (portable format) + references/target-pi.md (Pi target)
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: m
 blocked_by:
 - core-skill-body
