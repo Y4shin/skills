@@ -4,7 +4,7 @@ slug: target-state-spec
 title: Distill grilling #1's 20 decisions into the versioned target-state spec file, verified against the actual adoption
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: m
 blocked_by:
 - skill-and-detection-and-upgrade-resource
