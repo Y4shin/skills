@@ -190,7 +190,6 @@ describe("grilling skill references", () => {
     expect(pkg.pi.skills).toContain("./skills/engineering/grilling");
     expect(content).toMatch(/^name: grilling/m);
     expect(content).toMatch(/model-invoked|Pi-native/i);
-    expect(content).toContain("https://raw.githubusercontent.com/mattpocock/skills/refs/heads/main/skills/productivity/grilling/SKILL.md");
   });
 
   test("preserves canonical design-tree and round frontier protocol", () => {
@@ -210,10 +209,12 @@ describe("grilling skill references", () => {
     expect(content).toMatch(/frontier is empty|nothing left silently assumed/i);
   });
 
-  test("uses ask_user_question interaction, not the CLI/visualizer", () => {
-    // The text-based grilling skill drives rounds through Pi's ask_user_question
-    // interaction. It must NOT reference the grilling CLI/visualizer.
-    expect(content).toMatch(/ask_user_question/);
+  test("uses plain-text rounds, not the CLI/visualizer", () => {
+    // The text-based grilling skill drives rounds through plain text, not
+    // Pi's ask_user_question structured interaction. It must NOT reference
+    // the grilling CLI/visualizer.
+    expect(content).toMatch(/round/i);
+    expect(content).not.toMatch(/ask_user_question/);
     expect(content).not.toMatch(/grilling-cli\.mjs/);
     expect(content).not.toMatch(/--state/);
   });

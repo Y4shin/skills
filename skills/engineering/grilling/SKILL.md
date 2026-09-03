@@ -3,52 +3,54 @@ name: grilling
 description: Model-invoked, Pi-native reference for relentlessly stress-testing a plan, decision, or idea through focused questions.
 ---
 
-# /grilling — shared-understanding decision interviews
+# /grilling - shared-understanding decision interviews
 
-Use this reusable, model-invoked skill when a user asks to grill, stress-test, or
-make a plan/decision explicit. It is based on Matt Pocock's canonical grilling
-skill: https://raw.githubusercontent.com/mattpocock/skills/refs/heads/main/skills/productivity/grilling/SKILL.md
+Interview the user relentlessly until you reach a shared understanding. Map
+this as a **design tree**: every decision branches into the decisions that
+depend on it.
 
 The goal is shared understanding, not a performance of questioning. Preserve
 the user's decisions, expose trade-offs, and do not silently invent answers.
 
 ## Design tree and frontier
 
-Map the subject as a **design tree**: each decision branches into the decisions
-that depend on it. Record the known facts, decisions, alternatives, rationale,
-constraints, and downstream consequences as the conversation progresses.
-
-Work in **rounds**. The **frontier** is every decision whose prerequisites are
-already settled. Recompute it after each answer. Ask the whole currently
-unblocked frontier in one round, rather than enforcing one question per
-assistant turn. A question that depends on another question still open in this
-round belongs to a later round.
+Work the tree in **rounds**. The **frontier** is every decision whose
+prerequisites are already settled: the questions you can ask _now_ without
+guessing at answers you have not heard yet. Ask the whole frontier in one
+round: number each question and give your recommended answer. Then wait for
+the user's answers before the next round.
+A question that depends on another question still open in this round belongs
+to a later round.
 
 For every frontier question, be focused and provide a concrete recommended
-answer. Use Pi's `ask_user_question` interaction for decisions, with numbered
-questions and choices where useful, then wait for the user's answers. Do not
-answer on the user's behalf.
+answer. Do not answer on the user's behalf.
 
 Format a round like this:
 
 ```text
-❓ **Q1** — **<question title>**: <focused question and choices>
+❓ **Q1** - **<question title>**: <focused question and choices>
 
 ➡️ Recommended answer: <concrete recommendation and why>
 
 ---
 
-❓ **Q2** — **<question title>**: <focused question and choices>
+❓ **Q2** - **<question title>**: <focused question and choices>
 
 ➡️ Recommended answer: <concrete recommendation and why>
 ```
 
+Each round the user answers reshapes the tree: settled decisions push the
+frontier outward and unblock questions that depended on them. Recompute the
+frontier after each answer.
+
 ## Facts, ordering, and recording
 
-Finding facts is the agent's job, never the user's. When a question needs facts
-from the repository or environment, inspect them with Pi's repository/task tools
-(and use available architecture/navigation tools) before asking. Ask the user
-only for decisions that cannot be looked up. Never guess a prerequisite fact.
+Finding _facts_ is your job, never the user's. When a frontier question needs
+a fact from the environment (filesystem, tools, etc.), dispatch a sub-agent to
+find it; do not ask the user for anything you could look up yourself. Do not
+block on it: a running exploration is an unsettled prerequisite, so only the
+questions downstream of it wait for the sub-agent to report; ask the rest of
+the frontier now. The _decisions_ are the user's: put each to them and wait.
 
 Order questions by prerequisites: settle parent decisions before dependent
 choices. After each round, record the user's answer in the relevant task or
@@ -56,8 +58,9 @@ planning artifact in the user's terms. Keep a decision index when the current
 Wayfinder or task resource provides one. Preserve settled decisions; do not
 re-ask them. For each settled decision, retain important rejected options,
 trade-offs, constraints, rationale, and downstream consequences. If an answer
-creates work precise enough to state, hand it off through Wayfinder's existing
-task workflow rather than duplicating task routing here.
+creates work precise enough to state, hand it off to wayfinder (for planning
+decisions) or to-spec (for implementation decisions), not by duplicating task
+routing here.
 
 ## Completion gate
 

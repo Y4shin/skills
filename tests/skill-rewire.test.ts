@@ -4,9 +4,9 @@
  * and its CLI were dropped in the adopt-mp-skills-way map, grilling #1 Q15;
  * the seams that asserted them are removed.)
  *
- *  - skills/engineering/grilling/SKILL.md is the text-based skill
- *    (ask_user_question), and skills/engineering/wayfinder/resources/grilling.md
- *    drives that text path.
+ *  - skills/engineering/grilling/SKILL.md is the text-based skill (plain-text
+ *    rounds, not ask_user_question), and skills/engineering/wayfinder/resources/
+ *    grilling.md drives that text path.
  */
 
 import { readFileSync } from "node:fs";
@@ -19,13 +19,17 @@ function readFile(relativePath: string): string {
   return readFileSync(join(PROJECT, relativePath), "utf-8");
 }
 
-// ─── Seam 2c: text-based grilling skill uses ask_user_question ─────────
+// ─── Seam 2c: text-based grilling skill uses plain-text rounds ────────
 
-describe("seam 2c — text-based grilling skill uses ask_user_question, not the CLI", () => {
+describe("seam 2c - text-based grilling skill uses plain-text rounds, not the CLI", () => {
   const content = readFile("skills/engineering/grilling/SKILL.md");
 
-  test("drives rounds through ask_user_question", () => {
-    expect(content).toMatch(/ask_user_question/);
+  test("drives rounds through plain text (Q1/Q2 format)", () => {
+    expect(content).toMatch(/Q1|round/i);
+  });
+
+  test("does not reference ask_user_question", () => {
+    expect(content).not.toMatch(/ask_user_question/);
   });
 
   test("does not reference the grilling CLI / visualizer", () => {

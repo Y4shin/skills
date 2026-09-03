@@ -1,63 +1,111 @@
 ---
 name: domain-modeling
-description: Model a problem domain's concepts, relationships, invariants, ownership, terminology, and lifecycle states before planning behavior.
+description: Model-invoked. Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a CONTEXT.md, or recording or editing an ADR.
 ---
 
-# /domain-modeling — Domain modeling reference
+# /domain-modeling - Domain modeling reference
 
-Use this model-invoked, Pi-native reference when a feature or architecture plan
-needs a shared description of the domain before implementation. It is a
-portable reasoning method, not an autonomous implementation pipeline and not a
-replacement for `/codebase-design`, architecture exploration, or grilling.
-Do not assume a particular framework, persistence technology, or application
-domain.
+Actively build and sharpen the project's domain model as you design. This is
+the *active* discipline: challenging terms, inventing edge-case scenarios, and
+writing the glossary and decisions down the moment they crystallise. (Merely
+*reading* `CONTEXT.md` for vocabulary is not this skill: that is a one-line
+habit any skill can do. This skill is for when you are changing the model, not
+just consuming it.)
 
-## Modeling procedure
+## File structure
 
-1. **Set the boundary.** State the capability, actors, events, and outcomes
-   under discussion. Separate observed facts and source terminology from
-   hypotheses. Name what is explicitly out of scope.
-2. **Discover concepts.** Extract nouns and meaningful values from requirements,
-   examples, existing documentation, and code. For each concept, record its
-   purpose, identity (if any), important attributes, and which capability owns
-   its meaning. Distinguish entities with identity from value objects and
-   domain events. Do not create types merely because a noun appears once.
-3. **Map relationships.** Describe associations and their direction, cardinality,
-   containment, and dependency. Say whether a relationship is ownership,
-   reference, membership, or a temporal/event link. Identify which side may
-   create, change, or delete the relationship and what must remain true when it
-   changes.
-4. **Name invariants.** Write rules as testable statements using an explicit
-   subject and scope: “A ___ must ___,” “At most one ___ may ___,” or “___ is
-   required when ___.” Include uniqueness, cardinality, authorization,
-   consistency, and ordering constraints. Mark each rule as domain-invariant,
-   policy/configuration, or an assumption; identify the owner and the failure
-   outcome. Never hide an invariant in an implementation detail.
-5. **Model lifecycle and state.** For every concept with meaningful change,
-   list states, valid transitions, triggering command/event, actor, guard
-   (invariant), side effects, and terminal states. Distinguish an unavailable
-   or unknown state from a valid empty state. Record whether transitions are
-   reversible, idempotent, or time-dependent, and what happens on rejected
-   transitions.
-6. **Clarify ownership and vocabulary.** Assign an owner for each concept,
-   invariant, relationship, and transition. Capture canonical terms, aliases,
-   overloaded words, units, identity rules, and boundaries where a term's
-   meaning changes. Prefer the domain's established language; record proposed
-   renames instead of silently translating it.
-7. **Resolve uncertainty.** List open questions, competing interpretations,
-   evidence, and consequences. Use `ask_user_question` when a product or domain
-   decision is required; do not guess. Record settled decisions and downstream
-   consequences in the task's decision record, following the repository's task
-   workflow conventions. Keep assumptions visibly separate from confirmed
-   invariants.
+Most repos have a single context:
+
+```
+/
+├── CONTEXT.md
+├── docs/
+│   └── adr/
+│       ├── 0001-event-sourced-orders.md
+│       └── 0002-postgres-for-write-model.md
+└── src/
+```
+
+If a `CONTEXT-MAP.md` exists at the root, the repo has multiple contexts. The
+map points to where each one lives:
+
+```
+/
+├── CONTEXT-MAP.md
+├── docs/
+│   └── adr/                          ← system-wide decisions
+├── src/
+│   ├── ordering/
+│   │   ├── CONTEXT.md
+│   │   └── docs/adr/                 ← context-specific decisions
+│   └── billing/
+│       ├── CONTEXT.md
+│       └── docs/adr/
+```
+
+Create files lazily: only when you have something to write. If no `CONTEXT.md`
+exists, create one when the first term is resolved. If no `docs/adr/` exists,
+create it when the first ADR is needed.
+
+The skill infers which structure applies: if `CONTEXT-MAP.md` exists, read it
+to find contexts; if only a root `CONTEXT.md` exists, single context; if neither
+exists, create a root `CONTEXT.md` lazily when the first term is resolved.
+
+## During the session
+
+### Challenge against the glossary
+
+When the user uses a term that conflicts with the existing language in
+`CONTEXT.md`, call it out immediately. "Your glossary defines 'cancellation' as
+X, but you seem to mean Y. Which is it?"
+
+### Sharpen fuzzy language
+
+When the user uses vague or overloaded terms, propose a precise canonical term.
+"You are saying 'account': do you mean the Customer or the User? Those are
+different things."
+
+### Discuss concrete scenarios
+
+When domain relationships are being discussed, stress-test them with specific
+scenarios. Invent scenarios that probe edge cases and force the user to be
+precise about the boundaries between concepts.
+
+### Cross-reference with code
+
+When the user states how something works, check whether the code agrees. If you
+find a contradiction, surface it: "Your code cancels entire Orders, but you just
+said partial cancellation is possible. Which is right?"
+
+### Update CONTEXT.md inline
+
+When a term is resolved, update `CONTEXT.md` right there. Do not batch these up:
+capture them as they happen. Use the format in [CONTEXT-FORMAT.md](./CONTEXT-FORMAT.md).
+
+`CONTEXT.md` should be totally devoid of implementation details. Do not treat
+`CONTEXT.md` as a spec, a scratch pad, or a repository for implementation
+decisions. It is a glossary and nothing else.
+
+### Offer ADRs sparingly
+
+Only offer to create an ADR when all three are true:
+
+1. **Hard to reverse**: the cost of changing your mind later is meaningful
+2. **Surprising without context**: a future reader will wonder "why did they do
+   it this way?"
+3. **The result of a real trade-off**: there were genuine alternatives and you
+   picked one for specific reasons
+
+If any of the three is missing, skip the ADR. Use the format in
+[ADR-FORMAT.md](./ADR-FORMAT.md).
 
 ## Expected modeling output
 
 Return a concise **domain model** containing:
 
 - **Boundary and actors:** scope, exclusions, and relevant outcomes.
-- **Concept catalog:** concept kind (entity, value, event, or policy), identity,
-  purpose, owner, and key attributes.
+- **Concept catalog:** concept kind (entity, value, event, or policy),
+  identity, purpose, owner, and key attributes.
 - **Relationship map:** direction, cardinality, ownership/reference semantics,
   and mutation authority.
 - **Invariant catalog:** numbered, testable rules with classification, owner,
@@ -66,18 +114,8 @@ Return a concise **domain model** containing:
   side effect, and terminal-state notes.
 - **Terminology:** canonical terms, aliases, definitions, units, and unresolved
   naming conflicts.
-- **Uncertainty and decisions:** open questions, assumptions, evidence,
-  settled decisions, and consequences.
+- **Uncertainty and decisions:** open questions, assumptions, evidence, settled
+  decisions, and consequences.
 
-Validate the model with concrete examples and counterexamples. Check that each
-invariant has an owner, each transition has guards and outcomes, each
-relationship has explicit cardinality, and every concept is used by the stated
-boundary. Present unresolved uncertainty rather than inventing domain rules.
-
-## Collaboration and boundaries
-
-The model is an input to feature planning and architecture-oriented work. A
-caller may use the output when writing a task or architecture spec, but this
-skill does not prescribe a code structure, implement behavior, run an
-architecture survey, or replace `/wayfinder`'s planning protocol. Keep the
-model application-agnostic and cite the evidence used to make domain claims.
+Validate the model with concrete examples and counterexamples. Present
+unresolved uncertainty rather than inventing domain rules.
