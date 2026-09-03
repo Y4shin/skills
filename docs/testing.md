@@ -71,3 +71,11 @@ installed Pi API.
 - **YAML gotcha:** an unquoted `: ` inside a frontmatter value (e.g. a
   title containing `type: bug`) makes the YAML invalid; the task tools
   then *silently skip* the file. Quote such values.
+- **Skill helper-script testing (CLI seam):** when a skill ships executable
+  helper scripts (e.g. `skills/skill-creator/scripts/*.mjs`), test them via
+  `spawnSync` on the script CLI (stdout + exit code) from a dedicated vitest
+  file (e.g. `tests/skill-creator-scripts.test.ts`). Pin `cwd` to the repo
+  root, give each `spawnSync` a timeout, and use `mkdtempSync` + `try/finally
+  rmSync` for any temp skill dirs. Include a **dogfood assertion** where
+  appropriate — e.g. `validate_skill.mjs skills/skill-creator` must exit 0
+  (the skill's own validator validates itself).
