@@ -102,15 +102,15 @@ describe("validate_skill.mjs", () => {
     }
   });
 
-  test("rejects unknown frontmatter key (disable-model-invocation)", () => {
+  test("accepts disable-model-invocation as a valid frontmatter key", () => {
     const dir = makeTempSkillDir(
       "test-skill",
       `name: test-skill\ndescription: A valid skill.\ndisable-model-invocation: true`,
     );
     try {
       const result = runScript("validate_skill.mjs", ["test-skill"], dir);
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain("disable-model-invocation");
+      expect(result.status).toBe(0);
+      expect(result.stderr).toBe("");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

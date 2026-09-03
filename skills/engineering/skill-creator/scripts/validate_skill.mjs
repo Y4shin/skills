@@ -16,7 +16,8 @@
 // By-hand fallback: open SKILL.md and confirm by hand that the frontmatter
 // opens with ---, has a name in hyphen-case ≤64 == folder name, and a
 // description ≤1024 with no angle brackets. Check that every key is one of
-// name, description, license, compatibility, allowed-tools, metadata.
+// name, description, license, compatibility, allowed-tools, metadata,
+  //     disable-model-invocation, argument-hint.
 
 import { readFileSync, existsSync } from "node:fs";
 import { join, basename, resolve } from "node:path";
@@ -25,10 +26,14 @@ import { parse } from "yaml";
 const ALLOWED_KEYS = new Set([
   "name",
   "description",
+  "disable-model-invocation",
+  "argument-hint",
   "license",
   "compatibility",
   "allowed-tools",
   "metadata",
+  "disable-model-invocation",
+  "argument-hint",
 ]);
 
 const NAME_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -89,7 +94,7 @@ function main() {
   // Check: no unknown keys
   for (const key of Object.keys(fm)) {
     if (!ALLOWED_KEYS.has(key)) {
-      fail(`Error: unknown frontmatter key "${key}". Allowed keys: name, description, license, compatibility, allowed-tools, metadata`);
+      fail(`Error: unknown frontmatter key "${key}". Allowed keys: name, description, license, compatibility, allowed-tools, metadata, disable-model-invocation, argument-hint`);
     }
   }
 

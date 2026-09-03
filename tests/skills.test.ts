@@ -91,6 +91,16 @@ const SKILL_FILES = [
   "skills/engineering/improve-codebase-architecture/SKILL.md",
   "skills/productivity/wait-what/SKILL.md",
   "skills/engineering/skill-creator/SKILL.md",
+  "skills/engineering/prototype/SKILL.md",
+  "skills/engineering/research/SKILL.md",
+  "skills/engineering/resolving-merge-conflicts/SKILL.md",
+  "skills/engineering/wizard/SKILL.md",
+  "skills/engineering/triage/SKILL.md",
+  "skills/productivity/handoff/SKILL.md",
+  "skills/productivity/to-questionnaire/SKILL.md",
+  "skills/productivity/teach/SKILL.md",
+  "skills/productivity/writing-for-agents/SKILL.md",
+  "skills/productivity/grill-me/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -134,7 +144,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(15);
+    expect(pkg.pi.skills.length).toBe(25);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
