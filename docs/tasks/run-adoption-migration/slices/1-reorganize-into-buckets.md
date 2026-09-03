@@ -4,7 +4,7 @@ slug: reorganize-into-buckets
 title: Reorganize skills/ into engineering/productivity/misc/in-progress/deprecated buckets with promotion rules
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: m
 blocked_by: []
 ---

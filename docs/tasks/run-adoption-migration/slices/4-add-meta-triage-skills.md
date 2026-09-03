@@ -4,7 +4,7 @@ slug: add-meta-triage-skills
 title: Add writing-for-agents (+SKILL-MECHANICS), triage (retiring report-bug's intake), and grill-me (stateless interview)
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: m
 blocked_by:
 - reorganize-into-buckets

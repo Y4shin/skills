@@ -4,7 +4,7 @@ slug: add-utility-skills
 title: Add the 7 standalone utility skills (prototype, research, resolving-merge-conflicts, wizard, handoff, to-questionnaire, teach) adapted to Pi
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: l
 blocked_by:
 - reorganize-into-buckets

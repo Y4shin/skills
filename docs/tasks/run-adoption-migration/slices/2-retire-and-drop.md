@@ -4,7 +4,7 @@ slug: retire-and-drop
 title: Retire report-bug into deprecated/ and drop grilling-with-ui + its CLI/UI scripts
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: s
 blocked_by:
 - reorganize-into-buckets
