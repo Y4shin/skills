@@ -4,7 +4,7 @@ slug: realign-skills
 title: Re-align grilling (consult-first), code-review (12-smell baseline), tdd (refactor-out-of-loop), domain-modeling (companion docs + CONTEXT-MAP + 3-criteria ADR) to Matt's current
 task: ../task.md
 mode: hitl
-status: todo
+status: done
 size: m
 blocked_by:
 - reorganize-into-buckets
