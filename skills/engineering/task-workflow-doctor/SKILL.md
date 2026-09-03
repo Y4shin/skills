@@ -23,17 +23,17 @@ When something feels wrong with the task workflow, tasks are not showing up, a r
 
 | Symptom | Missing / misconfigured artifact | Route |
 |---|---|---|
-| Tasks are not showing up; `docs/tasks/` is empty or missing | `docs/tasks/` tree | `/skill:onboard-workflow` (see [resources/missing-tasks-tree.md](resources/missing-tasks-tree.md)) |
-| Task state is lost or not tracked | `docs/tasks/state.yaml` | `/skill:onboard-workflow` (see [resources/missing-state-yaml.md](resources/missing-state-yaml.md)) |
-| Cannot create or archive bugs | `docs/bugs/` and `docs/bugs/archive/` | `/skill:onboard-workflow` (see [resources/missing-bugs-dirs.md](resources/missing-bugs-dirs.md)) |
-| Dev environment setup is undocumented | `docs/dev-env.md` | `/skill:onboard-workflow` (see [resources/missing-dev-env.md](resources/missing-dev-env.md)) |
-| Testing conventions are undocumented | `docs/testing.md` | `/skill:onboard-workflow` (see [resources/missing-testing-md.md](resources/missing-testing-md.md)) |
+| Tasks are not showing up; `docs/tasks/` is empty or missing | `docs/tasks/` tree | `/skill:setup-workflow` (see [resources/missing-tasks-tree.md](resources/missing-tasks-tree.md)) |
+| Task state is lost or not tracked | `docs/tasks/state.yaml` | `/skill:setup-workflow` (see [resources/missing-state-yaml.md](resources/missing-state-yaml.md)) |
+| Cannot create or archive bugs | `docs/bugs/` and `docs/bugs/archive/` | `/skill:setup-workflow` (see [resources/missing-bugs-dirs.md](resources/missing-bugs-dirs.md)) |
+| Dev environment setup is undocumented | `docs/dev-env.md` | `/skill:setup-workflow` (see [resources/missing-dev-env.md](resources/missing-dev-env.md)) |
+| Testing conventions are undocumented | `docs/testing.md` | `/skill:setup-workflow` (see [resources/missing-testing-md.md](resources/missing-testing-md.md)) |
 | CONTEXT.md is missing | repo-root `CONTEXT.md` | Manual step until adopted (see [resources/missing-context-md.md](resources/missing-context-md.md)) |
 | ADR directory is missing | `docs/adr/` | Manual step until adopted (see [resources/missing-adr-dir.md](resources/missing-adr-dir.md)) |
 | Skills or subagents are not registered | `package.json` `pi.skills` / `pi.subagents` | Manual fix (see [resources/manifest-misconfigured.md](resources/manifest-misconfigured.md)) |
 
 ## Routing notes
 
-- For every issue that involves the core task/bug directory tree, state file, or standard docs, run `/skill:onboard-workflow`. Do not duplicate its setup logic.
+- For every issue that involves the core task/bug directory tree, state file, or standard docs, run `/skill:setup-workflow`. Do not duplicate its setup logic.
 - For `CONTEXT.md` and `docs/adr/`, the relevant skill creates them lazily when adopted. Until then, create them manually or adopt the relevant skill.
 - For manifest misconfiguration, edit `package.json` directly and consult the manifest documentation.

@@ -12,4 +12,4 @@
 
 ## Route
 
-Run `/skill:onboard-workflow` to write `docs/tasks/state.yaml`.
+Run `/skill:setup-workflow` to write `docs/tasks/state.yaml`.

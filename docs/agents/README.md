@@ -1,6 +1,6 @@
 # docs/agents/
 
-Per-repo configuration that the engineering skills read. `onboard-workflow`
+Per-repo configuration that the engineering skills read. `setup-workflow`
 populates this directory during initial setup; edit the files directly to
 reconfigure.
 
@@ -16,5 +16,5 @@ substrate):
 - `triage-labels.md`: the label strings mapped to the canonical triage
   roles, when `triage` is configured.
 
-These are created lazily: `onboard-workflow` writes them when it runs, and
+These are created lazily: `setup-workflow` writes them when it runs, and
 they are extended as the adoption lands.

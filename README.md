@@ -25,7 +25,7 @@ pi install /path/to/task-workflow
 Then in any repo:
 
 ```
-/skill:onboard-workflow    # creates docs/tasks/ + docs/bugs/
+/skill:setup-workflow    # creates docs/tasks/ + docs/bugs/
 /skill:wayfinder           # grill first, then grow a dependency-aware work graph from an idea
 ```
 

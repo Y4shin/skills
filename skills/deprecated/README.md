@@ -10,3 +10,7 @@ note naming what replaced it.
   reproduce, triage/promote). Retired in favor of `triage` (the
   `adopt-mp-skills-way` map, grilling #1 Q12); the spot-fix path is being
   folded into `triage`.
+- **[onboard-workflow](./onboard-workflow/SKILL.md)**: Initialize a
+  repository for the task-workflow. Replaced by `setup-workflow` (the
+  `adopt-mp-skills-way` map, grilling #2 R1Q1: one auto-detecting skill that
+  handles both onboarding and migration).

@@ -12,4 +12,4 @@
 
 ## Route
 
-Run `/skill:onboard-workflow` to write the `docs/testing.md` template.
+Run `/skill:setup-workflow` to write the `docs/testing.md` template.

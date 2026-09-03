@@ -12,4 +12,4 @@ The `docs/tasks/` directory tree, including `docs/tasks/archive/` and `docs/task
 
 ## Route
 
-Run `/skill:onboard-workflow` to create the task directory structure.
+Run `/skill:setup-workflow` to create the task directory structure.

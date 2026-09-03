@@ -77,7 +77,7 @@ describe("agent frontmatter", () => {
 
 const SKILL_FILES = [
   "skills/engineering/task-overview/SKILL.md",
-  "skills/engineering/onboard-workflow/SKILL.md",
+  "skills/engineering/setup-workflow/SKILL.md",
   "skills/engineering/wayfinder/SKILL.md",
   "skills/engineering/implement-task/SKILL.md",
   "skills/engineering/finalize-task/SKILL.md",
@@ -531,7 +531,7 @@ describe("skill cross-references", () => {
     expect(content).toContain("wayfinder");
     expect(content).toContain("implement-task");
     expect(content).toContain("finalize-task");
-    expect(content).toContain("onboard-workflow");
+    expect(content).toContain("setup-workflow");
   });
 
   test("implement-task wrapper reads type and dispatches to resources", () => {
@@ -725,18 +725,18 @@ describe("skill cross-references", () => {
     expect(content).toContain("bug: <slug>");
   });
 
-  test("onboard-workflow creates docs/bugs/archive directory", () => {
-    const content = readFile("skills/engineering/onboard-workflow/SKILL.md");
+  test("setup-workflow creates docs/bugs/archive directory", () => {
+    const content = readFile("skills/engineering/setup-workflow/SKILL.md");
     expect(content).toContain("docs/bugs/archive");
   });
 
-  test("onboard-workflow writes docs/dev-env.md template", () => {
-    const content = readFile("skills/engineering/onboard-workflow/SKILL.md");
+  test("setup-workflow writes docs/dev-env.md template", () => {
+    const content = readFile("skills/engineering/setup-workflow/SKILL.md");
     expect(content).toContain("docs/dev-env.md");
   });
 
-  test("onboard-workflow does not clobber existing docs/dev-env.md", () => {
-    const content = readFile("skills/engineering/onboard-workflow/SKILL.md");
+  test("setup-workflow does not clobber existing docs/dev-env.md", () => {
+    const content = readFile("skills/engineering/setup-workflow/SKILL.md");
     expect(content).toMatch(/do not clobber|already exists|skip.*docs\/dev-env\.md|preserve.*docs\/dev-env\.md/i);
   });
 
@@ -756,9 +756,9 @@ describe("skill cross-references", () => {
     expect(content).toContain("docs/bugs/");
   });
 
-  test("task-workflow-doctor references onboard-workflow", () => {
+  test("task-workflow-doctor references setup-workflow", () => {
     const content = readFile("skills/engineering/task-workflow-doctor/SKILL.md");
-    expect(content).toContain("onboard-workflow");
+    expect(content).toContain("setup-workflow");
   });
 
   test("task-workflow-doctor has not-a-fixer contract", () => {

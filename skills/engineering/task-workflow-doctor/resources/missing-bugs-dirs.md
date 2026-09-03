@@ -13,4 +13,4 @@
 
 ## Route
 
-Run `/skill:onboard-workflow` to create the bugs directory structure.
+Run `/skill:setup-workflow` to create the bugs directory structure.

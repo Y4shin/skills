@@ -140,7 +140,7 @@ Off the main flow entirely.
 | Break a spec into tracer-bullet feature/bug tickets | `/skill:to-tickets` |
 | Implement the ready frontier | `/skill:implement-task` |
 | Finalize / archive | `/skill:finalize-task` |
-| Initialize repo | `/skill:onboard-workflow` |
+| Initialize repo | `/skill:setup-workflow` |
 | Triage incoming issues | `/skill:triage` |
 | Diagnose a hard bug | `/skill:diagnosing-bugs` |
 

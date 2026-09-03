@@ -19,7 +19,7 @@ Model- or user-reachable.
 
 - **[task-overview](./task-overview/SKILL.md)**: Entry point. Routes queries
   to `task_*` tools and actions to skills.
-- **[onboard-workflow](./onboard-workflow/SKILL.md)**: Initialize a
+- **[setup-workflow](./setup-workflow/SKILL.md)**: Initialize a
   repository for the task-workflow.
 - **[implement-task](./implement-task/SKILL.md)**: Implements all remaining
   slices of a task via per-slice chains.

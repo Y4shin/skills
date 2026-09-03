@@ -2,7 +2,7 @@
 
 A Pi package of agent skills for planning and executing work via a
 dependency-aware task graph under `docs/tasks/`. Skills are organized into
-buckets and consumed by the per-repo configuration `onboard-workflow`
+buckets and consumed by the per-repo configuration `setup-workflow`
 emits.
 
 ## Language

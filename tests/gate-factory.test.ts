@@ -74,7 +74,7 @@ interface StubExtensionAPI extends ExtensionAPI {
 
 const GATED_SKILL_NAMES = [
   "task-overview",
-  "onboard-workflow",
+  "setup-workflow",
   "wayfinder",
   "implement-task",
   "finalize-task",

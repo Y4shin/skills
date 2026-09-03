@@ -29,7 +29,7 @@ import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 
 const FALLBACK_GATED_SKILL_NAMES = [
   "task-overview",
-  "onboard-workflow",
+  "setup-workflow",
   "wayfinder",
   "implement-task",
   "finalize-task",

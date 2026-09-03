@@ -35,7 +35,7 @@
     ],
     "skills": [
       "./skills/engineering/task-overview",
-      "./skills/engineering/onboard-workflow",
+      "./skills/engineering/setup-workflow",
       "./skills/engineering/wayfinder",
       "./skills/engineering/implement-task",
       "./skills/engineering/finalize-task",
