@@ -86,6 +86,12 @@ Scaffold everything a repo needs to use the task-workflow:
 
 ## Migrate (old repo)
 
+> **Target-state spec:** the on-disk target state for each schema version is
+> distilled in `docs/migration-target.yaml` (a stable, machine-readable,
+> versioned spec). The upgrade resources below are the *steps*; this spec is
+> the *destination*. When an upgrade resource's steps diverge from the spec,
+> the spec records the deviation as the truth.
+
 The repo is on an older schema. Apply each upgrade resource in sequence from
 the repo's current version to the target version:
 
