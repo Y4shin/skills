@@ -4,7 +4,7 @@ slug: scaffold-repo-root-docs
 title: Scaffold repo-root CONTEXT.md, docs/adr/, Pi-adapted conventions doc, docs/agents/, and docs/tasks/out-of-scope/ + the schema_version mechanism
 task: ../task.md
 mode: hitl
-status: todo
+status: done
 size: m
 blocked_by:
 - reorganize-into-buckets
