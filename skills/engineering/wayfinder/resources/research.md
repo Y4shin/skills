@@ -1,4 +1,4 @@
-# Wayfinder Planning Resource — Research
+# Wayfinder Planning Resource, Research
 
 Use this resource when a decision depends on facts from documentation, APIs,
 third-party systems, or the local repository.

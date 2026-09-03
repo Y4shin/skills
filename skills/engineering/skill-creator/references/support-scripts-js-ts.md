@@ -1,14 +1,14 @@
-# Support Scripts — JS/TS
+# Support Scripts, JS/TS
 
 Read when the chosen language is JS or TypeScript. The shared policy (when
 to ship, language choice, self-contained-at-runtime, by-hand fallback,
 shape, testing, runtime floor, default-stack picks) lives in
-`support-scripts.md` — read it first. This file covers only JS/TS-specific
+`support-scripts.md`, read it first. This file covers only JS/TS-specific
 details.
 
 ## Runtime
 
-JS/TS helpers run on **Node.js** (the default), **Deno**, or **Bun** —
+JS/TS helpers run on **Node.js** (the default), **Deno**, or **Bun**:
 whichever the target project already uses. Node floor = **Node 20 LTS**.
 
 **Portability trade-off:** a Node/TS script needs a runtime the target harness
@@ -22,15 +22,15 @@ the op is dangerous. Don't assume Node is present.
 
 ## Self-contained at runtime: bundle into a committed artifact
 
-When a JS/TS helper needs libraries, **bundling is endorsed** — bundle
+When a JS/TS helper needs libraries, **bundling is endorsed**, bundle
 deps + script into one **committed** runnable artifact via a build step:
 
 - The build step produces a committed `.mjs` (or `.js`) that the end user
-  runs with `node helper.mjs <args>` — no `node_modules`, no installed
+  runs with `node helper.mjs <args>`, no `node_modules`, no installed
   packages.
 - **Keep the readable source** (`src/cli.ts` or `src/cli.mjs`) alongside the
   committed artifact for patching (the "runnable AND readable" principle).
-  The artifact-only approach is rejected — it loses the patchable source.
+  The artifact-only approach is rejected, it loses the patchable source.
 - The build step + committed artifact are an **authoring concern** (the
   skill-author commits them), not run by the end user.
 
@@ -43,11 +43,11 @@ is the lean default.
 
 ### Bundle template (JS/TS)
 
-The concrete esbuild build — use the **programmatic JS API** (not the CLI,
+The concrete esbuild build, use the **programmatic JS API** (not the CLI,
 whose `--banner:js` is literal and breaks on real newlines):
 
 ```js
-// build.mjs — programmatic esbuild (the JS API avoids the CLI's literal-banner
+// build.mjs, programmatic esbuild (the JS API avoids the CLI's literal-banner
 // newline pitfall and lets the createRequire banner be a real string).
 import { build } from "esbuild";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -78,19 +78,19 @@ let s = readFileSync("dist/helper.mjs", "utf8");
 if (!s.startsWith("#!")) writeFileSync("dist/helper.mjs", banner + s);
 ```
 
-- **Run on the bare floor:** `node dist/helper.mjs <args>` — no
+- **Run on the bare floor:** `node dist/helper.mjs <args>`, no
   `node_modules`, no installed packages (the `.mjs` is self-contained).
-- **The `createRequire` banner is conditional** — only when a bundled dep is
+- **The `createRequire` banner is conditional**, only when a bundled dep is
   CJS. If every dep is ESM-native, omit it. When in doubt, include it; the
   namespace-import alias (`_nodeModule`) avoids collisions with deps that
   import `createRequire` themselves.
 - **Min-version contract:** the committed `.mjs` should check
   `process.version` / `process.versions.node` and error with "install at
   least Node 20" if older (an agent reading that error must consult the user
-  before installing — never silently install an interpreter). See
+  before installing, never silently install an interpreter). See
   [Min-version contract](#min-version-contract) below.
 
-> **Verified at Node 20 LTS** via the `bundle-script-template` prototype —
+> **Verified at Node 20 LTS** via the `bundle-script-template` prototype:
 > the esbuild template produced a self-contained `.mjs` that ran clean on
 > the bare floor runtime (no `node_modules`). See
 > `docs/tasks/bundle-script-template/findings.md` for the build comparison
@@ -102,7 +102,7 @@ Three library-specific surprises found while exercising the picks at the
 floor (all resolved; none changes a pick, but watch out when writing the
 helper):
 
-1. **`diff-match-patch`'s class export is `diff_match_patch`** — lowercase
+1. **`diff-match-patch`'s class export is `diff_match_patch`**, lowercase
    with underscores, NOT `diffMatchPatch`. The reference example should use
    the correct name:
    ```js
@@ -115,7 +115,7 @@ helper):
    import { exec } from "tinyexec";  // or: import { x } from "tinyexec";
    ```
 3. **The `createRequire` banner collides** if a bundled dep also imports
-   `createRequire` from `node:module` (cheerio/undici do) — you get
+   `createRequire` from `node:module` (cheerio/undici do), you get
    `SyntaxError: Identifier 'createRequire' has already been declared`.
    The fix is the **namespace import alias** shown in the template above:
    `import * as _nodeModule from "node:module"` then
@@ -125,7 +125,7 @@ helper):
 
 Ship `.ts` source **iff** the build step commits a runnable artifact
 (`.mjs`/`.js`). **Never** ship a `.ts` that needs `tsc`/`tsx` at the end-user
-runtime — the end-user runtime stays dependency-free per the shared policy.
+runtime, the end-user runtime stays dependency-free per the shared policy.
 The committed artifact is what the end user runs; the `.ts` source is kept
 for patching.
 
@@ -168,7 +168,7 @@ the artifact.
 Node floor = **Node 20 LTS**. The script should check `process.version` /
 `process.versions.node` and error with "install at least Node 20" if older.
 An agent reading that error must **consult the user before installing
-anything** — never silently install an interpreter.
+anything**, never silently install an interpreter.
 
 ```javascript
 const [major] = process.versions.node.split(".").map(Number);
@@ -187,16 +187,16 @@ shared file for the concrete pins).
 
 The shared `support-scripts.md` lists the full default-stack table for both
 languages. Below is the **JS/TS column**, verified at the floor (Node 20 LTS)
-via the `bundle-script-template` prototype — every pick passed when bundled
+via the `bundle-script-template` prototype, every pick passed when bundled
 into a self-contained `.mjs` and run on the bare floor runtime (no
 `node_modules`).
 
 | # | Slot | JS/TS pick |
 |---|------|------------|
 | 1 | CLI parsing | `commander` 14.x |
-| 2 | HTTP requests | built-in `fetch` / `node:undici` (❌ axios — supply-chain backdoor) |
+| 2 | HTTP requests | built-in `fetch` / `node:undici` (❌ axios, supply-chain backdoor) |
 | 3 | config/env/secrets | `yaml` (eemeli) |
-| 4 | formatting (LLM-facing) | *(plain text — no entry)* |
+| 4 | formatting (LLM-facing) | *(plain text, no entry)* |
 | 5 | validation/schemas | `zod` |
 | 6 | FS traversal/globbing | `tinyglobby` |
 | 7 | process/subprocess | `tinyexec` |
@@ -212,15 +212,15 @@ into a self-contained `.mjs` and run on the bare floor runtime (no
 | 16 | tabular (CSV/TSV) | `papaparse` |
 | 17 | git operations | `isomorphic-git` (no git binary) |
 
-> Verified at Node 20 LTS via the `bundle-script-template` prototype — all 17
+> Verified at Node 20 LTS via the `bundle-script-template` prototype, all 17
 > slots passed on the bare floor runtime bundled into a self-contained
 > `.mjs`. See `docs/tasks/bundle-script-template/findings.md` for the full
 > smoke-test results.
 
 ## By-hand fallback
 
-Per the shared safety decision in `support-scripts.md` — a by-hand fallback
+Per the shared safety decision in `support-scripts.md`, a by-hand fallback
 is a considered, safety-first choice, not a default. Omit it for
 dangerous/irreversible/non-obvious ops; provide it only when the path is
 safe, deterministic, and within the agent's reliable capability. Do not
-restate the shared policy here — refer to it.
+restate the shared policy here, refer to it.

@@ -10,13 +10,13 @@ blocked_by:
 completed_at: 2026-09-03T19:10:00Z
 ---
 
-# map-mp-skills-onto-this-repo — grilling
+# map-mp-skills-onto-this-repo, grilling
 
 ## Decision to settle
 
 Given the current-state report (`mp-skills-current-state-report/findings.md`)
-and the live Matt clone it keeps, decide — for every skill, concept, and
-convention where Matt's repo and this repo differ — which version wins, and
+and the live Matt clone it keeps, decide, for every skill, concept, and
+convention where Matt's repo and this repo differ, which version wins, and
 what we keep that Matt's repo does not have.
 
 The posture is **largely adopt Matt's way**: on conflict, Matt's wins by
@@ -29,9 +29,9 @@ plan) and downstream implementation tasks consume as the target state.
 
 ## Parent decisions it depends on
 
-- **Conflict default = Matt's wins** (entry grilling Q1 — settled). This
+- **Conflict default = Matt's wins** (entry grilling Q1, settled). This
   grilling applies it per-item; it does not re-ask the default.
-- **Extraction scope = skills + concepts only** (entry grilling Q2 —
+- **Extraction scope = skills + concepts only** (entry grilling Q2:
   settled). Conflicts about CI/build tooling are out of scope.
 - The current-state report must be complete (blocked_by). This grilling does
   not re-derive Matt's inventory; it reasons over the report and re-opens
@@ -90,7 +90,7 @@ still match Matt's current version vs have diverged.
   Rejected: collapse to one step (loses the spec as a reviewable artifact); no
   spec/ticket step (contradicts Q1). Consequence: two new skills (`to-spec`,
   `to-tickets`); `implement-task` consumes the tickets they produce; wayfinder
-  no longer creates feature/bug tasks (Q1) — `to-tickets` does.
+  no longer creates feature/bug tasks (Q1), `to-tickets` does.
 - **Onboarding/setup (Q6): EXTEND onboard-workflow.** One skill scaffolds
   everything a repo now needs: the existing `docs/tasks/`, `state.yaml`,
   `CHANGELOG.md`, `docs/testing.md`, `docs/dev-env.md` PLUS the new Q2 repo-root
@@ -163,7 +163,7 @@ still match Matt's current version vs have diverged.
   seven items individually (the six structural strengths PLUS `implement-task`
   as a 7th item). Visited in round 4b; decisions recorded there.
 
-## Decisions settled in this grilling (round 4b — keep-as-ours, visited)
+## Decisions settled in this grilling (round 4b, keep-as-ours, visited)
 
 - **Q11.1 Task type system: KEEP 6 TYPES, SCOPED BY PHASE.** Keep all 6 types
   (research/prototype/grilling/manual/feature/bug), but scope which types
@@ -222,7 +222,7 @@ still match Matt's current version vs have diverged.
   implement-spec-style graph/concurrency language; the rewrite is an
   implementation task.
 
-## Decisions settled in this grilling (round 5 — smaller axes)
+## Decisions settled in this grilling (round 5, smaller axes)
 
 - **agents/openai.yaml (Q14): CONCEPT YES, FILE NO.** Adopt the *concept*
   (keep invocation policy in sync across representations; user-invoked in
@@ -237,7 +237,7 @@ still match Matt's current version vs have diverged.
 - **grill-me (Q15): ADOPT, DROP grilling-with-ui.** Adopt Matt's `grill-me`
   (stateless interview, no repo needed) as a thin user-invoked wrapper around
   `grilling` for the no-repo case. DROP our `grilling-with-ui`
-  (browser-visualized grilling) — it is a divergence from Matt with no Matt
+  (browser-visualized grilling), it is a divergence from Matt with no Matt
   equivalent, and the user chose to standardize on Matt's plain-text interview.
   Rejected: keep grilling-with-ui (a keep-ours with no stated reason survives
   under largely-adopt only if justified; the user dropped it). Consequence:
@@ -259,7 +259,7 @@ still match Matt's current version vs have diverged.
   Consequence: `docs/tasks/out-of-scope/` added to the on-disk scaffold;
   `onboard-workflow` (Q6) and the migration create it; `triage` reads it.
 
-## Decisions settled in this grilling (round 6 — disposition of remaining Matt skills + changesets)
+## Decisions settled in this grilling (round 6, disposition of remaining Matt skills + changesets)
 
 - **in-progress/ skills (Q18): DON'T ADOPT, EXCEPT claude-handoff AS INSPIRATION.**
   Do not adopt `loop-me`, `writing-beats`/`writing-fragments`/`writing-shape`,
@@ -302,7 +302,7 @@ grilling, domain-modeling, codebase-design, code-review, diagnosing-bugs, the
 The current-state report's "already-adopted check" tells us which of these
 still match Matt's current version vs have diverged.
 
-Candidate conflict axes the grilling must visit (non-exhaustive — extend
+Candidate conflict axes the grilling must visit (non-exhaustive, extend
 from the report):
 
 - **Planning model:** Matt's strict "plan first (decisions, not deliverables),
@@ -350,7 +350,7 @@ Run the grilling in rounds over the report's conflict axes. For each axis:
 
 Seed the first round with the highest-leverage axes (planning model,
 spec/ticket handoff, onboarding/setup, repo-root docs) because they reshape
-what a repo needs on disk — which is exactly what the migration skill must
+what a repo needs on disk, which is exactly what the migration skill must
 move. Defer utility-skill adoption and already-adopted-but-diverged items to
 later rounds once the structural axes are settled.
 
@@ -358,17 +358,17 @@ later rounds once the structural axes are settled.
 
 - The decision table becomes the **target state** for grilling #2
   (`design-migration-skill`) and for implementation tasks.
-- Some decisions will surface new work precise enough to state — e.g.
+- Some decisions will surface new work precise enough to state, e.g.
   "re-introduce a spec/ticket step", "adopt `ask-matt` router", "add
   repo-root CONTEXT.md + ADRs". These are graduated from the map's Fog into
   tasks during this grilling or handed to Wayfinder, **not** created ad hoc
   here.
 - If the grilling finds the current-state report missing a conflict axis, it
-  returns to the research task with a specific gap — it does not improvise.
+  returns to the research task with a specific gap, it does not improvise.
 - The set of "keep-as-ours, here is the concrete reason" entries becomes the
   migration skill's preserve-list (things the migration must not touch).
 
-## Grilling summary — target state (frontier empty)
+## Grilling summary, target state (frontier empty)
 
 All conflict axes visited across 6 rounds (Q1-Q20). Shared understanding
 reached under the **largely-adopt** posture (Matt's wins by default; keep-ours
@@ -388,16 +388,16 @@ only with a concrete reason). This is the target state for grilling #2
   router + phase boundaries; name kept. Companion `PHASE-BOUNDARIES.md` adopted.
 - **Q11.7 implement-task:** KEEP ours + borrow `implement-spec`'s task-graph /
   concurrent-implementer / merger-subagent / max-concurrency language.
-- **Q11.1 Task type system:** KEEP 6 types, **scoped by phase** — planning types
+- **Q11.1 Task type system:** KEEP 6 types, **scoped by phase**, planning types
   (research/prototype/grilling/manual) from wayfinder; implementation types
   (feature/bug) from `to-tickets`.
 
 ### Repo layout & docs
-- **Q2 Repo-root docs:** ADOPT all three — root `CONTEXT.md` (glossary),
+- **Q2 Repo-root docs:** ADOPT all three, root `CONTEXT.md` (glossary),
   `docs/adr/` (ADRs), Pi-adapted agent-conventions doc (not CLAUDE.md-specific).
 - **Q3 Skill layout:** ADOPT buckets + promotion (`engineering`/`productivity`
   ship + get docs pages; `misc`/`in-progress`/`deprecated` kept, not shipped).
-- **Q9 Human docs pages:** ADOPT, adapted — `docs/<bucket>/<name>.md` per
+- **Q9 Human docs pages:** ADOPT, adapted, `docs/<bucket>/<name>.md` per
   promoted skill, 4-section frame, repo-relative links (no aihero.dev publish).
 - **Q17 out-of-scope KB:** ADOPT at `docs/tasks/out-of-scope/` (not repo root).
 - **Q6 Onboarding:** EXTEND `onboard-workflow` to scaffold the full new layout
@@ -441,7 +441,7 @@ only with a concrete reason). This is the target state for grilling #2
   where operative; user-invoked skills phrased as human instructions.
 
 ### Gated / left open
-- `grilling` re-align is consult-first (Q13) — a sub-decision to resolve during
+- `grilling` re-align is consult-first (Q13), a sub-decision to resolve during
   implementation or a follow-up grilling round, not silently rewritten.
 - Whether the `prototype`/`research` *task types* converge with the new
   *skills* of the same name (decide in implementation).

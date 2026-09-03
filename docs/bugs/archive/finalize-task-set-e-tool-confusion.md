@@ -61,7 +61,7 @@ Observed twice on 2026-08-27 (the two finalizes referenced above).
 
 ## Suspected area
 
-`skills/finalize-task/SKILL.md`, Step 7 — the scripted block mixes shell
+`skills/finalize-task/SKILL.md`, Step 7, the scripted block mixes shell
 commands (`git mv`, `git checkout`, `git merge`, `git branch`) with a Pi tool
 call (`task_state_set`) as if all are shell binaries, and the surrounding
 convention encourages a single `set -e` block.
@@ -95,14 +95,14 @@ tools invoked as functions, not shell binaries, so an agent following the
 step does not wrap them in `set -e` expecting CLI semantics.
 
 Regression test: `tests/skills.test.ts` > "finalize-task Step 7 separates Pi
-tool calls from the shell archive block" — asserts the Step 7 block containing
+tool calls from the shell archive block", asserts the Step 7 block containing
 `git merge --no-ff` does not contain `task_state_set` / `task_map_tick`, while
 both tools still appear in Step 7 marked as tool invocations. Red on the
 unfixed prose, green after the fix.
 
 ## Impact
 
-No data loss, no wrong final state — the task always finalized and main
+No data loss, no wrong final state, the task always finalized and main
 always got the merge. The only cost was the agent recovering mid-sequence on
 every finalize that touched `docs/tasks/state.yaml`, which was noisy and
 distracting (and risked a real mistake if the agent ever didn't recover).

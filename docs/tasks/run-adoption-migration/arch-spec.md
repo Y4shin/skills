@@ -1,4 +1,4 @@
-# arch-spec — run-adoption-migration
+# arch-spec, run-adoption-migration
 
 > This is a markdown/restructuring task, not TDD-able application code. The
 > "seams" are structural assertions in `tests/skills.test.ts` +
@@ -43,8 +43,8 @@ Each slice's verification is, in order:
   add-meta-triage): implement-task SKILL.md + resources reference the new
   skills + implement-spec graph/concurrency language.
 - **L1 (hitl):** `scaffold-repo-root-docs`, `add-planning-handoff-skills`,
-  `realign-skills` (grilling consult-first) — each blocked by reorganize.
-- **L2 (afk finalize):** `changesets-prose-finalize` — blocked by all
+  `realign-skills` (grilling consult-first), each blocked by reorganize.
+- **L2 (afk finalize):** `changesets-prose-finalize`, blocked by all
   others; final em-dash sweep + changesets + `schema_version: 3`.
 
 ## Architecture notes

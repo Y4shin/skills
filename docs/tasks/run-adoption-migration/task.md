@@ -2,7 +2,7 @@
 kind: task
 type: feature
 slug: run-adoption-migration
-title: Run the largely-adopt-Matt adoption on this repo (v2.10.0 → v3.0.0) — the actual migration, whose proven steps the migration skill is later built from
+title: Run the largely-adopt-Matt adoption on this repo (v2.10.0 → v3.0.0), the actual migration, whose proven steps the migration skill is later built from
 map: adopt-mp-skills-way
 status: ready
 blocked_by:
@@ -19,7 +19,7 @@ slices:
 - changesets-prose-finalize
 ---
 
-# run-adoption-migration — feature
+# run-adoption-migration, feature
 
 ## Decision being implemented
 
@@ -27,7 +27,7 @@ Grilling #1 (`map-mp-skills-onto-this-repo`) settled the largely-adopt target
 state across 20 decisions (Q1-Q20). Grilling #2 (`design-migration-skill`)
 designed a migration skill whose `upgrade-2-to-3` resource is an 11-step
 ordered transformation. **This task runs those steps for real on this repo**
-(v2.10.0 → v3.0.0) — it is the actual adoption, not a dry-run. The proven
+(v2.10.0 → v3.0.0), it is the actual adoption, not a dry-run. The proven
 shape of these steps is what `build-migration-skill` (blocked by this task)
 later distills into the reusable migration skill + `upgrade-2-to-3` resource,
 so the migration skill is built from a battle-tested run rather than a
@@ -66,7 +66,7 @@ into a reusable migration skill.
   skill`, blocked by this task); migrating any other repo; re-litigating
   grilling #1 decisions (the target state is fixed).
 - **Constraint:** the `grilling` skill re-align is **consult-first** (grilling
-  #1 Q13) — the `realign-skills` slice must consult the user before rewriting
+  #1 Q13), the `realign-skills` slice must consult the user before rewriting
   the `grilling` skill text.
 - **Constraint:** telemetry must be maintained/extended, never removed (map
   constraint). New/rewritten skills get `telemetry_skill_context` +
@@ -96,11 +96,11 @@ into a reusable migration skill.
 ## Existing abstractions to use
 
 - `task_*` tools (`task_frontier`, `task_dependency_levels`, `task_slices`,
-  `task_map_tick`) for graph mechanics — foundational, unchanged.
+  `task_map_tick`) for graph mechanics, foundational, unchanged.
 - `skills/skill-creator/` + `skills/skill-creator/scripts/validate_skill.mjs`
   for scaffolding/validating new skills (each new skill must pass
   `validate_skill.mjs`).
-- `tests/skills.test.ts` `SKILL_FILES` + manifest count assertions — extend
+- `tests/skills.test.ts` `SKILL_FILES` + manifest count assertions, extend
   for new skills.
 - The Matt clone (gitignored) for adapting SKILL.md text + companion docs.
 - `docs/testing.md` mock/seam conventions; `docs/repo-gating.md` (the repo-

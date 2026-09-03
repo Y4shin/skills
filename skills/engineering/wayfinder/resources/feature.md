@@ -1,4 +1,4 @@
-# Wayfinder Planning Resource — Feature
+# Wayfinder Planning Resource, Feature
 
 Use this resource when the task delivers new application behavior. This
 resource creates a feature task that the unchanged

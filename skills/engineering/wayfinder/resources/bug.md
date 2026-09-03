@@ -1,4 +1,4 @@
-# Wayfinder Planning Resource — Bug
+# Wayfinder Planning Resource, Bug
 
 Use this resource when existing behavior is incorrect. The resulting task must
 remain compatible with the unchanged `implement-task/resources/bug.md`

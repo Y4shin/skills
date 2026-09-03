@@ -13,7 +13,7 @@ slices:
 - migration-tests
 ---
 
-# build-migration-skill — feature
+# build-migration-skill, feature
 
 ## Decision being implemented
 
@@ -31,8 +31,8 @@ the versioned target-state spec file, and structure-assertion tests.
 
 A reusable `migrate-workflow` (or renamed `onboard-workflow`) skill exists,
 auto-detects whether a repo is fresh (onboard), old (migrate), or already
-new (no-op) via the `schema_version` stamp in `state.yaml`, and — for an
-old repo — applies per-upgrade resource files in sequence (currently just
+new (no-op) via the `schema_version` stamp in `state.yaml`, and, for an
+old repo, applies per-upgrade resource files in sequence (currently just
 `upgrade-2-to-3`, which encodes the proven adoption). It has dry-run +
 backup-branch + idempotent safety. Its first run already migrated this
 repo (v2.10.0 → v3.0.0) during `run-adoption-migration`; this task makes
@@ -59,7 +59,7 @@ workflow needs and how they look.
   any deviations from grilling #2's designed 11 steps. Where the run
   deviated, the resource encodes the deviation (not the design).
 - **Constraint:** the migration skill replaces `onboard-workflow` per
-  grilling #2 R1Q1 (one skill, auto-detecting). The name is open — decide
+  grilling #2 R1Q1 (one skill, auto-detecting). The name is open, decide
   in `skill-and-detection-and-upgrade-resource` (stay `onboard-workflow` or
   become `setup-workflow`/`migrate-workflow`).
 
@@ -72,7 +72,7 @@ workflow needs and how they look.
   `run-adoption-migration`'s final slice summary), each tracing to a
   grilling #1 decision.
 - A versioned target-state spec file exists (location/format from
-  grilling #2 R1Q2 — e.g. `docs/migration-target.yaml` or a skill section),
+  grilling #2 R1Q2, e.g. `docs/migration-target.yaml` or a skill section),
   distilled from grilling #1's decision table and verified against what
   the adoption actually did.
 - `tests/skills.test.ts` has structure assertions for the skill (exists,
@@ -97,5 +97,5 @@ workflow needs and how they look.
   R2Q1 (version-stamp + per-upgrade resources, sequential), R2Q2 (fixed
   ordered step list per resource), R3Q1 (dry-run + backup + idempotent),
   R3Q2 (first run = this repo, already done), R3Q3 (structure assertions).
-- Grilling #1 Q6 (extend onboard-workflow — now superseded by R1Q1's
+- Grilling #1 Q6 (extend onboard-workflow, now superseded by R1Q1's
   one-skill decision), Q11.1 (types scoped by phase).

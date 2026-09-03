@@ -35,7 +35,7 @@ What `skill-creator` *authors* are Agent Skills. **By default it authors
 generic skills that assume only the bare-minimum target-agent capabilities**
 (roughly: the agent can read the `SKILL.md` body and, optionally, call MCP
 tools). On top of that default, `skill-creator` carries a small set of
-**capability-conditional rules** — "if the target agent supports filesystem
+**capability-conditional rules**, "if the target agent supports filesystem
 access, do X", "if it supports bash tool-calls, include a runnable script for
 Y", "if it needs network/MCP server Z, …". These rules are keyed on
 *target-agent capabilities*, not on harness brands; when the target's
@@ -46,8 +46,8 @@ register, and test a skill for a Pi package, and how to keep the portable core
 distinct from Pi-specific extensions.
 
 The skill teaches how to produce **small, reliable, discoverable, maintainable
-skills** — progressive disclosure, single-sourcing, trigger-word descriptions,
-degrees of freedom matched to fragility — rather than bloated prompt dumps. It
+skills**, progressive disclosure, single-sourcing, trigger-word descriptions,
+degrees of freedom matched to fragility, rather than bloated prompt dumps. It
 synthesizes the strongest ideas from the DeepAgents `skill-creator` and the
 sentient-agi `meta-skill-creator` into a smaller, coherent skill grounded in the
 **current** Agent Skills specification, and stands on its own: future agents
@@ -70,7 +70,7 @@ generalization review) is complete.
   `task-workflow` is installed and is auto-disabled in work repos by the repo
   gate, same as the other 15 skills.
 - **Spec purity:** `skill-creator`'s own frontmatter uses only Agent Skills
-  spec fields — `name` + `description` — and **nothing else**. This repo's own
+  spec fields, `name` + `description`, and **nothing else**. This repo's own
   skills use a Pi-only `disable-model-invocation` field that is **not** in the
   spec and fails both reference validators; the new skill must not. A
   `skill-creator` *wants* to auto-trigger on "create a skill", so it should be
@@ -83,12 +83,12 @@ generalization review) is complete.
   snapshot in the proposal.
 - **Capability-conditional, not brand-conditional.** The per-harness
   differences are expressed as capability rules + one named target (Pi). No
-  per-brand reference file for each of the ~45 Agent-Skills clients — the
+  per-brand reference file for each of the ~45 Agent-Skills clients, the
   broad catalog is out of scope; the generic + Pi targets are in scope.
 - **skill-creator's own helper scripts are Node/TS** (this repo's canonical
   language), dependency-light, each with a by-hand fallback for harnesses that
   can't run them, and tested with vitest. (Trade-off: a harness without Node
-  uses the by-hand fallback; accepted — the repo is Node-canonical.)
+  uses the by-hand fallback; accepted, the repo is Node-canonical.)
 - **Produced-skill helper scripts are language-flexible**: the produced skill
   bundles a script in its own `scripts/` only when an operation is
   fragile/exact/repeated; the language matches the target repo/project's
@@ -108,8 +108,8 @@ generalization review) is complete.
   `skills/skill-creator/`, registered in `package.json` `pi.skills` (→16) and
   `tests/skills.test.ts`, frontmatter spec-pure so the folder is also a valid
   standalone Agent Skill. This matches the `build-tdd-reference-skill`
-  precedent. (Rejected: standalone outside the package — not exercised by the
-  repo's tests; unregistered in `skills/` — unusual, easy to re-add by
+  precedent. (Rejected: standalone outside the package, not exercised by the
+  repo's tests; unregistered in `skills/`, unusual, easy to re-add by
   accident, and the `create-task` redirect is the existing precedent we are
   *not* following.)
 - **Authoring model (grilling Q1, the central design).** By default
@@ -127,18 +127,18 @@ generalization review) is complete.
   `.claude/skills/` + `SKILL.md`; Codex "builds on the open agent skills
   standard". So "author for arbitrary harnesses" = produce one spec-conformant
   skill + per-target install location + optional extensions, loaded on demand.
-- **Name (grilling Q2).** `skill-creator` — the de-facto name both DeepAgents
+- **Name (grilling Q2).** `skill-creator`, the de-facto name both DeepAgents
   and sentient-agi use; best recognition for "create/make/build a skill".
   Known risk (accepted as a non-issue): name collision if another
-  `skill-creator` is installed in the same setup — the description
+  `skill-creator` is installed in the same setup, the description
   disambiguates and the user manages their install set. (Rejected: `skill-author` / `agent-skill-creator`
-  — no collision but less recognition.)
+ , no collision but less recognition.)
 - **skill-creator's own support scripts (grilling Q3).** Node/TS: a minimal
   frontmatter validator, a scaffolder, and a discoverer, dependency-light,
   each with a by-hand fallback, porting the best of sentient-agi's
   stdlib-Python scripts and **fixing sentient's validator bug** (it omits the
   spec-allowed `compatibility` field). Tested with vitest. (Trade-off: less
-  portable than stdlib Python across harnesses without Node — the by-hand
+  portable than stdlib Python across harnesses without Node, the by-hand
   fallback covers it; accepted because the repo is Node-canonical.)
 - **Produced-skill support scripts (grilling Q3).** Language-flexible: ship a
   script only when an operation is fragile/exact/repeated; pick the language
@@ -166,26 +166,26 @@ generalization review) is complete.
   what"; "what not to include"; "principle of no surprise".
 
 - **v1 scope confirmed (refinement).** Bash is **in** v1 for produced-skill
-  scripts — the third well-known target language; the
+  scripts, the third well-known target language; the
   `support-script-conventions` grilling and the three support-script references
   (Python, JS/TS, Bash) all cover it. The `skill-creator` name collision with
   other skill-creators is a non-issue (accepted). The trigger-rate eval harness
-  is overkill for now — out of v1. Non-Agent-Skills "skill"-like artifacts
+  is overkill for now, out of v1. Non-Agent-Skills "skill"-like artifacts
   (Custom GPTs, plugins) are out of scope.
 - **Support-script grilling Q1 (settled).** The three per-language support-script
   references get a **shared** file `references/support-scripts.md` (the common
   backbone) + per-language specifics files (single-sourced; a point is adapted
   in a per-language file only when needed). Backbone accepted with three
-  refinements: (1) **Bash is supported but discouraged** — Windows portability
+  refinements: (1) **Bash is supported but discouraged**, Windows portability
   varies by agent (some Windows agents have no POSIX shell); tiny pure-shell
   glue only, prefer Python for anything cross-platform. (2) **Produced-skill
-  scripts must be self-contained at the end-user runtime** — the end user must
+  scripts must be self-contained at the end-user runtime**, the end user must
   not need to install libraries or have extra CLI tools present. Two ways:
   stdlib-only (lightest), or use libraries + a **build step** that bundles
   deps+script into one **committed** file (Python `zipapp`; JS/TS a bundler).
   Network calls are an acceptable dependency; what we avoid is requiring CLI
   tools present or end-user library installs. (3) **By-hand fallback is not a
-  default** — a considered, safety-first choice: for dangerous / irreversible /
+  default**, a considered, safety-first choice: for dangerous / irreversible /
   non-obvious ops (e.g. a Forgejo API mutation), OMIT the fallback and
   stop/require-the-script, because an agent fumbling a dangerous op by hand
   (outdated/poor API docs) is worse than no fallback. Provide a by-hand fallback
@@ -201,7 +201,7 @@ generalization review) is complete.
   whose optimum path per language becomes a template a later follow-up folds
   into the references. Testing (Q4): run on a worked example against the
   **committed bundled artifact** (not only the source); use the project's
-  runner if present, else a direct run. **Q5/Q6/Q7 — a default stack by
+  runner if present, else a direct run. **Q5/Q6/Q7, a default stack by
   concern**: 17 concern-slots (CLI, HTTP, config/env/secrets, logging/pretty
   output, validation/schemas, FS/globbing, process/subprocess, OpenAPI client,
   local web UI, local REST server, retry/backoff, simple output templating,
@@ -212,7 +212,7 @@ generalization review) is complete.
   The fills live in the per-language references; the standards in the shared one.
   The library fills are being chosen now (Q7).
 - **`bundle-script-template` prototype settled (Q3-deferred, now resolved).**
-  The prototype picked the per-language bundle template — **Python: `zipapp`
+  The prototype picked the per-language bundle template, **Python: `zipapp`
   (stdlib)** over `shiv` (which needs a wheel + console-script + fights
   externally-managed pythons); **JS/TS: the project's existing bundler if it has
   one (Vite lib-mode in this repo, per `scripts/build.ts`), else `esbuild`**

@@ -16,12 +16,12 @@ The repo gains the grilling #1 Q2 + Q17 repo-root docs: a root `CONTEXT.md`
 (this repo's own domain glossary, modeled on Matt's), `docs/adr/` (repo
 ADRs, seeded with an ADR recording this largely-adopt decision), a
 Pi-adapted agent-conventions doc (Matt's is `CLAUDE.md`/`AGENTS.md`; ours
-is adapted to Pi — not Claude-specific — and records the bucket/promotion
+is adapted to Pi, not Claude-specific, and records the bucket/promotion
 rules, the invocation split, the no-em-dashes rule, and the skill-tool
 invocation convention), `docs/agents/` (per-repo config the skills read,
 seeded from `onboard-workflow`'s future output), and `docs/tasks/out-of-
 scope/` (the rejected-requests KB, Q17). The `schema_version` mechanism is
-added to `docs/tasks/state.yaml` (grilling #2 R2Q1) — set to `2` for now
+added to `docs/tasks/state.yaml` (grilling #2 R2Q1), set to `2` for now
 (the build-migration-skill task bumps it to 3 once the adoption is proven;
 this slice introduces the field).
 
@@ -34,8 +34,8 @@ this slice introduces the field).
   recording this adoption decision + its rationale (the 3 ADR criteria from
   `domain-modeling/ADR-FORMAT.md`: hard-to-reverse, surprising, real
   trade-off).
-- A Pi-adapted agent-conventions doc exists (name TBD — e.g.
-  `AGENTS.md` or `CONVENTIONS.md` — **confirm with user**); records bucket
+- A Pi-adapted agent-conventions doc exists (name TBD, e.g.
+  `AGENTS.md` or `CONVENTIONS.md`, **confirm with user**); records bucket
   layout, promotion rules, invocation split, no-em-dashes, skill-tool
   invocation convention. NOT Claude-specific.
 - `docs/agents/` exists (seeded minimal; `onboard-workflow` will populate
@@ -56,7 +56,7 @@ contains implementation details (must be glossary-only per domain-
 modeling); ADR missing one of the 3 criteria. Scenarios: a new reader
 understands the repo layout from the conventions doc; `triage` (added
 earlier) can read `docs/tasks/out-of-scope/`. Edge cases: naming the
-conventions doc (AGENTS.md vs CONVENTIONS.md — confirm with user; Matt
+conventions doc (AGENTS.md vs CONVENTIONS.md, confirm with user; Matt
 uses CLAUDE.md/AGENTS.md symlink, we are Pi-native).
 
 ## Constraints and dependencies

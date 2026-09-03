@@ -3,13 +3,13 @@ name: task-workflow-doctor
 description: Diagnose a broken task workflow and route to the right skill. Use when the workflow is broken, tasks are not showing, the doctor is needed, CONTEXT.md is missing, docs/bugs is missing, or bugs cannot be created.
 ---
 
-# /task-workflow-doctor — Task Workflow Doctor
+# /task-workflow-doctor, Task Workflow Doctor
 
 The doctor **diagnoses** a reported task-workflow symptom, checks for the common missing directories and files, and **routes** you to the right skill or manual step. It is not a fixer.
 
 ## Purpose
 
-When something feels wrong with the task workflow — tasks are not showing up, a required file is missing, or a skill command fails — this skill inspects the repository for the most common causes and tells you exactly which skill to run or which file to create.
+When something feels wrong with the task workflow, tasks are not showing up, a required file is missing, or a skill command fails, this skill inspects the repository for the most common causes and tells you exactly which skill to run or which file to create.
 
 > The doctor diagnoses and routes; it does not fix. Run the routed skill to fix.
 

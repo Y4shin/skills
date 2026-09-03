@@ -2,7 +2,7 @@
 
 ## Framework
 
-- [Vitest](https://vitest.dev/) (`vitest run`) — test files under `tests/`.
+- [Vitest](https://vitest.dev/) (`vitest run`), test files under `tests/`.
 - Type checking: `tsc --noEmit` (no emitted build; `type: module`).
 
 ## Run commands
@@ -23,7 +23,7 @@
   stub the detection/config modules via `vi.mock`. This is cheaper and more
   isolating than the integration harness and works when the harness is
   broken. See `tests/gate-factory.test.ts` (the repo-gate factory tests) for
-  the pattern — it asserts which tool names register and which `on(event)`
+  the pattern, it asserts which tool names register and which `on(event)`
   handlers fire under different gate decisions._
 - **Iteration-loop seams (function-as-dependency):** when a loop shells out
   to an external process and parses its output, inject the step as a
@@ -34,12 +34,12 @@
 
 ## Integration harness (tests/integration/)
 
-- Sessions run on the **faux provider** from pi-ai's compat layer —
+- Sessions run on the **faux provider** from pi-ai's compat layer:
   canned responses, no network. Two layers: `registerFauxProvider`
   (pi-ai, serves the responses) + `ModelRegistry.registerProvider`
   (pi-coding-agent, makes auth/model resolution pass).
 - Use `AuthStorage.inMemory()` + `ModelRegistry.inMemory(authStorage)`
-  — `ModelRuntime` was removed in pi-coding-agent 0.80.3.
+ , `ModelRuntime` was removed in pi-coding-agent 0.80.3.
 - `registerProvider` requires `baseUrl` when the provider defines
   models (a dummy like `http://faux.local` is fine).
 
@@ -53,7 +53,7 @@ stems from a version skew in the installed
 way the harness imports it). It is **pre-existing and unrelated** to any
 feature landed since. Until fixed, run the suite with
 `npx vitest run --exclude tests/integration/session.test.ts`, or rely on
-the per-feature unit tests. Do **not** let this block landing new work —
+the per-feature unit tests. Do **not** let this block landing new work:
 verify it's not your change by checking the failure is that same
 `AuthStorage.inMemory` line. The follow-up bug task
 `fix-integration-harness-auth-storage` tracks updating the harness for the
@@ -74,5 +74,5 @@ installed Pi API.
   file (e.g. `tests/skill-creator-scripts.test.ts`). Pin `cwd` to the repo
   root, give each `spawnSync` a timeout, and use `mkdtempSync` + `try/finally
   rmSync` for any temp skill dirs. Include a **dogfood assertion** where
-  appropriate — e.g. `validate_skill.mjs skills/skill-creator` must exit 0
+  appropriate, e.g. `validate_skill.mjs skills/skill-creator` must exit 0
   (the skill's own validator validates itself).

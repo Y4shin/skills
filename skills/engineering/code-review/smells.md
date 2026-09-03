@@ -1,12 +1,12 @@
 # Smell baseline
 
-Twelve Fowler code smells from _Refactoring_, chapter 3. The Standards axis of `/code-review` carries this list as a floor when the repo documents no overriding standard. Each smell is a labelled heuristic — "possible Feature Envy" — never a hard violation.
+Twelve Fowler code smells from _Refactoring_, chapter 3. The Standards axis of `/code-review` carries this list as a floor when the repo documents no overriding standard. Each smell is a labelled heuristic, "possible Feature Envy", never a hard violation.
 
 ## Mysterious Name
 
 **What it is:** a function, variable, type, or module whose name does not reveal what it does or holds.
 
-**How to fix:** rename it so the intent is honest and obvious. If no honest name comes to mind, the underlying design is probably still murky — clarify the responsibility first.
+**How to fix:** rename it so the intent is honest and obvious. If no honest name comes to mind, the underlying design is probably still murky, clarify the responsibility first.
 
 ## Duplicated Code
 

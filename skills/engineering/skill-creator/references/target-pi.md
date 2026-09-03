@@ -1,11 +1,11 @@
-# Targeting Pi — Authoring a Skill for a Pi Package
+# Targeting Pi, Authoring a Skill for a Pi Package
 
 Read when the target is Pi.
 
 This reference covers Pi-specific conventions for authoring an Agent Skill
 that ships inside a Pi package. The portable format rules (frontmatter,
 directory structure, progressive disclosure) live in
-`agent-skills-spec.md` — this file covers only what differs when the
+`agent-skills-spec.md`, this file covers only what differs when the
 target is Pi.
 
 ## Where Pi skills live
@@ -39,10 +39,10 @@ loads skills from this list at startup.
 Conventionally, every skill in the package is covered by
 `tests/skills.test.ts`. Two assertions are kept in sync with the manifest:
 
-1. **`SKILL_FILES` array** — lists every `skills/<name>/SKILL.md` path.
+1. **`SKILL_FILES` array**, lists every `skills/<name>/SKILL.md` path.
    When you add a skill, append its path to this array.
 
-2. **`pi.skills.length` assertion** — the test asserts that the
+2. **`pi.skills.length` assertion**, the test asserts that the
    `package.json` `pi.skills` array length equals the expected count.
    When you add a skill, bump this number.
 
@@ -71,12 +71,12 @@ from the system prompt and explicit `/skill:<name>` invocations are
 blocked.
 
 Because `skill-creator` ships inside `task-workflow`, it inherits this
-gating. A skill you **produce** for this package also inherits the gate —
+gating. A skill you **produce** for this package also inherits the gate:
 it will not load in work repos. State this so the author isn't surprised:
 the skill works in personal repos and anywhere `task-workflow` is
 installed and not gated, but it is invisible in work repos.
 
-This is a feature, not a bug — the gate keeps workflow skills out of
+This is a feature, not a bug, the gate keeps workflow skills out of
 unrelated work contexts.
 
 ## Companion reference files
@@ -86,7 +86,7 @@ precedent in this repo. The `tdd` skill ships `tests.md` and `mocking.md`
 alongside its `SKILL.md`, keeping the main file lean while providing
 focused reference material the agent loads on demand.
 
-Use companion references when they keep the main `SKILL.md` lean — move
+Use companion references when they keep the main `SKILL.md` lean, move
 detailed specs, conventions, or per-language guidance into `references/`.
 Keep references **one level deep**: `SKILL.md` links directly to a
 reference file, not to a chain of references pointing to more references.

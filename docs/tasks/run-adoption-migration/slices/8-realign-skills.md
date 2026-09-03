@@ -15,7 +15,7 @@ blocked_by:
 Four already-shipped skills are re-aligned to Matt's current text (grilling
 #1 Q13 + Q16), keeping Pi-native bits (`ask_user_question`, vendored CDN
 for improve-architecture, telemetry): `grilling` (terser form + "Call the
-Skill tool" wording — **CONSULT USER FIRST** per Q13 before rewriting);
+Skill tool" wording, **CONSULT USER FIRST** per Q13 before rewriting);
 `code-review` (spell out the 12-smell Fowler baseline + "repo overrides" +
 "always a judgement call" rules); `tdd` (refactor-out-of-loop wording:
 "Refactoring is not part of the loop. It belongs to the review stage");
@@ -48,7 +48,7 @@ modes: `grilling` rewritten without consultation (violates Q13); a re-align
 drops telemetry (must preserve); `tdd` still says red-green-refactor.
 Scenarios: each re-aligned skill reads as Matt's current + Pi-native bits.
 Edge cases: the `grilling` consultation may decide NOT to re-align (keep
-  ours) — that's a valid outcome; record it.
+  ours), that's a valid outcome; record it.
 
 ## Constraints and dependencies
 

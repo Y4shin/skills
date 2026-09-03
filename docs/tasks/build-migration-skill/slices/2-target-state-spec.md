@@ -12,7 +12,7 @@ blocked_by:
 
 ## End-to-end behavior
 
-Grilling #2 R1Q2: the target-state spec file is created — a stable,
+Grilling #2 R1Q2: the target-state spec file is created, a stable,
 versioned, machine-readable distillation of grilling #1's 20 decisions
 (Q1-Q20), verified against what `run-adoption-migration` actually did on
 disk. The migration skill reads this spec as its target state (decoupled
@@ -27,7 +27,7 @@ the migration skill, or `docs/migration-target.md`).
   skills exist in which buckets, which repo-root docs exist, the planning
   flow, the conventions, the keep-as-ours items).
 - The spec is **verified** against the actual post-adoption repo state
-  (what `run-adoption-migration` landed) — where the adoption deviated
+  (what `run-adoption-migration` landed), where the adoption deviated
   from grilling #1, the spec records the deviation as the truth.
 - The spec is versioned (ties to `schema_version: 3` / package version) so
   future migrations to later states are reproducible.
@@ -40,7 +40,7 @@ Seams: `npm test`, manual review (the spec is the durable artifact).
 Failure modes: the spec disagrees with the actual repo state (must
 verify); the spec duplicates the grilling #1 task body verbatim (must be
 a distillation). Scenarios: a future migration reads the spec to know the
-target. Edge cases: format choice (YAML vs Markdown section — record
+target. Edge cases: format choice (YAML vs Markdown section, record
 rationale).
 
 ## Constraints and dependencies

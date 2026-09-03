@@ -15,10 +15,10 @@ blocked_by:
 Three more skills are added, adapted to Pi: `writing-for-agents`
 (productivity/model) + its companion `SKILL-MECHANICS.md` (the prose
 discipline for writing skills/docs, per grilling #1 Q4); `triage`
-(engineering/user) — the issue/PR state-machine + agent-briefs skill,
+(engineering/user), the issue/PR state-machine + agent-briefs skill,
 **adapted to `docs/tasks/` + `docs/bugs/` + `docs/tasks/out-of-scope/`
 instead of an issue tracker**, which subsumes `report-bug`'s intake
-function (Q12); and `grill-me` (productivity/user) — the stateless
+function (Q12); and `grill-me` (productivity/user), the stateless
 interview wrapper around `grilling` for the no-repo case (Q15). Each passes
 `validate_skill.mjs`, is added to `package.json` `pi.skills`, and gets
 telemetry + no-em-dashes treatment. `triage`'s companion docs
@@ -34,7 +34,7 @@ substrate.
   exists under `skills/engineering/`, adapted to read/write
   `docs/tasks/` + `docs/bugs/` + `docs/tasks/out-of-scope/` (Q12, Q17)
   instead of a tracker. The `report-bug` spot-fix path is either preserved
-  inside `triage` or explicitly dropped — **decide and record** (Q12 left
+  inside `triage` or explicitly dropped, **decide and record** (Q12 left
   this to implementation).
 - `grill-me/` with `SKILL.md` exists under `skills/productivity/`, a thin
   user-invoked wrapper around `grilling` for the no-repo case.
@@ -56,7 +56,7 @@ report-bug spot-fix decision (record the choice + rationale).
 
 - Blocked by `reorganize-into-buckets`.
 - `triage` reads `docs/tasks/out-of-scope/` which is scaffolded in the
-  `scaffold-repo-root-docs` slice — but this slice can write the skill
+  `scaffold-repo-root-docs` slice, but this slice can write the skill
   text that *references* that dir before the dir exists (the hitl slice
   creates the dir); record the ordering assumption in notes.
 - Grilling #1 Q4 (writing-for-agents + keep skill-creator), Q12 (triage

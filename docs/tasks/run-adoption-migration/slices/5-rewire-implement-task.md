@@ -17,7 +17,7 @@ blocked_by:
 dispatch grows to dispatch to the new utility skills for matching task
 types where applicable under the two-phase model (e.g. a `prototype` task
 dispatches to the `prototype` skill; a `research` task dispatches to the
-`research` skill) — **note** Q11.1 scoped types by phase: planning types
+`research` skill), **note** Q11.1 scoped types by phase: planning types
 (research/prototype/grilling/manual) from wayfinder, feature/bug from
 to-tickets, so the dispatch wiring respects that split; (b) the `implement-
 task` SKILL.md + its feature/bug resources borrow `implement-spec`'s
@@ -38,7 +38,7 @@ maximum-concurrency-frontier language, synthesized into our richer pipeline
 - The `research`-skill-vs-task-type and `prototype`-skill-vs-task-type
   convergence (noted in `add-utility-skills`) is resolved here: decide
   whether the task type dispatches to the skill, the skill subsumes the
-  task type, or they coexist — record the decision.
+  task type, or they coexist, record the decision.
 - Telemetry wiring preserved; no-em-dashes applied.
 - `tests/skills.test.ts` (which asserts implement-task references tdd-worker
   etc.) is updated if references change; `npm test` + `npm run typecheck`
@@ -53,7 +53,7 @@ implement-spec language is bolted on without integrating with the existing
 failure toolbelt (must synthesize, not append). Scenarios: a `prototype`
 task dispatches to the `prototype` skill; a feature task's resource
 describes frontier concurrency. Edge cases: a task type with no matching
-new skill (grilling/manual) — dispatch unchanged.
+new skill (grilling/manual), dispatch unchanged.
 
 ## Constraints and dependencies
 

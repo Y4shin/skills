@@ -1,4 +1,4 @@
-# Agent Skills Format — Portable Specification
+# Agent Skills Format, Portable Specification
 
 Read when authoring frontmatter or deciding structure.
 
@@ -7,7 +7,7 @@ subset every Agent-Skills client supports. It is single-sourced from the
 live specification at
 [agentskills.io/specification](https://agentskills.io/specification); recheck
 that URL at authoring time in case the spec has evolved. Harness-specific
-extensions (e.g. Pi's `disable-model-invocation`) are **not** covered here —
+extensions (e.g. Pi's `disable-model-invocation`) are **not** covered here:
 see `target-pi.md` for those.
 
 ## Directory structure
@@ -46,7 +46,7 @@ instructions.
 | `license` | License name or reference to a bundled license file. |
 | `compatibility` | 1–500 characters. Environment requirements (intended product, system packages, network access, etc.). Omit when the skill has no special deps. |
 | `metadata` | A map from string keys to string values. Namespace your keys to avoid conflicts (e.g. `author`, `version`). |
-| `allowed-tools` | Space-separated string of pre-approved tools. **Experimental** — support varies by client. Use sparingly. |
+| `allowed-tools` | Space-separated string of pre-approved tools. **Experimental**, support varies by client. Use sparingly. |
 
 **No other frontmatter fields are spec-valid.** A skill carrying a field
 outside this set will fail portable validators such as
@@ -72,7 +72,7 @@ name: pdf--processing   # consecutive hyphens not allowed
 
 ### `description` guidance
 
-The description is the **only trigger mechanism** — the agent never sees
+The description is the **only trigger mechanism**, the agent never sees
 the body until the description matches. It should describe both *what* the
 skill does and *when* to use it, using the literal phrases a user would
 type.
@@ -92,7 +92,7 @@ description: Helps with PDFs.
 ## Body content
 
 The Markdown body after the frontmatter contains the skill instructions.
-There are no format restrictions — write whatever helps agents perform the
+There are no format restrictions, write whatever helps agents perform the
 task effectively.
 
 The agent loads the entire `SKILL.md` file once it decides to activate a

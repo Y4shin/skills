@@ -9,14 +9,14 @@
 
 | Dimension | mp-skills (Matt Pocock) | our repo (task-workflow v2.5.3) |
 |---|---|---|
-| **Skill buckets** | 5 categorized dirs: `engineering/` (18 skills), `productivity/` (7 skills), `misc/`, `in-progress/`, `deprecated/` — with promotion rules to control which ship | Flat — 6 active skills under `skills/`: wayfinder, implement-task, finalize-task, report-bug, onboard-workflow, task-overview (+ 1 retired `create-task`) |
-| **Human-facing docs** | Full `docs/engineering/<name>.md` + `docs/productivity/<name>.md` (4-section template: What It Does, When To Reach, Common Questions, It's Working If — published at aihero.dev) | None — only SKILL.md and agent definition files exist |
-| **Per-skill reference docs** | Rich: `tdd/tests.md`, `tdd/mocking.md`, `codebase-design/DEEPENING.md`, `codebase-design/DESIGN-IT-TWICE.md`, `domain-modeling/CONTEXT-FORMAT.md`, `domain-modeling/ADR-FORMAT.md`, `improve-codebase-architecture/HTML-REPORT.md`, `writing-for-agents/SKILL-MECHANICS.md`, etc. | Per-type planning templates in `wayfinder/resources/` (6) + per-type execution resources in `implement-task/resources/` (6) — more structured but less reference-rich |
-| **Internal ADRs** | `.agents/adr/` — documents repo-level design decisions (e.g., ship as Claude plugin, explicit setup pointer) | None |
-| **Repo-level config** | `setup-matt-pocock-skills` skill → `docs/agents/` (issue-tracker.md, triage-labels.md, domain.md) — configures per-repo issue tracker and label vocabulary | `onboard-workflow` → `docs/tasks/state.yaml`, `docs/tasks/CHANGELOG.md`, `docs/testing.md`, `docs/dev-env.md` |
-| **Router skill** | `ask-matt` — maps user intent to the right skill/flow with decision trees and phase boundary guidance | `task-workflow-overview` — routes queries to `task_*` tools and actions to skills |
+| **Skill buckets** | 5 categorized dirs: `engineering/` (18 skills), `productivity/` (7 skills), `misc/`, `in-progress/`, `deprecated/`, with promotion rules to control which ship | Flat, 6 active skills under `skills/`: wayfinder, implement-task, finalize-task, report-bug, onboard-workflow, task-overview (+ 1 retired `create-task`) |
+| **Human-facing docs** | Full `docs/engineering/<name>.md` + `docs/productivity/<name>.md` (4-section template: What It Does, When To Reach, Common Questions, It's Working If, published at aihero.dev) | None, only SKILL.md and agent definition files exist |
+| **Per-skill reference docs** | Rich: `tdd/tests.md`, `tdd/mocking.md`, `codebase-design/DEEPENING.md`, `codebase-design/DESIGN-IT-TWICE.md`, `domain-modeling/CONTEXT-FORMAT.md`, `domain-modeling/ADR-FORMAT.md`, `improve-codebase-architecture/HTML-REPORT.md`, `writing-for-agents/SKILL-MECHANICS.md`, etc. | Per-type planning templates in `wayfinder/resources/` (6) + per-type execution resources in `implement-task/resources/` (6), more structured but less reference-rich |
+| **Internal ADRs** | `.agents/adr/`, documents repo-level design decisions (e.g., ship as Claude plugin, explicit setup pointer) | None |
+| **Repo-level config** | `setup-matt-pocock-skills` skill → `docs/agents/` (issue-tracker.md, triage-labels.md, domain.md), configures per-repo issue tracker and label vocabulary | `onboard-workflow` → `docs/tasks/state.yaml`, `docs/tasks/CHANGELOG.md`, `docs/testing.md`, `docs/dev-env.md` |
+| **Router skill** | `ask-matt`, maps user intent to the right skill/flow with decision trees and phase boundary guidance | `task-workflow-overview`, routes queries to `task_*` tools and actions to skills |
 | **Agents (sub-agents)** | Referenced but no explicit definitions (agents are runtime constructs invoked in-line) | **4 defined agents**: `tdd-worker` (implements via TDD), `slice-verifier` (lint+tests gate), `land-worker` (merge+archive), `deviation-reporter` (spec diff analysis) |
-| **Custom tooling** | None — uses Claude Code built-in tools exclusively | Pi extension (`src/pi.ts` + `src/core/`) with custom `task_*` tools: dependency levels, frontier queries, finalization checks, artifact show/get/set, map tick, slices enumeration |
+| **Custom tooling** | None, uses Claude Code built-in tools exclusively | Pi extension (`src/pi.ts` + `src/core/`) with custom `task_*` tools: dependency levels, frontier queries, finalization checks, artifact show/get/set, map tick, slices enumeration |
 | **Telemetry instrumentation** | None | Full `telemetry_skill_context` + `submit_feedback` wiring across every skill and agent, with designed-for escape hatches explicitly recorded |
 | **Harness targets** | Claude Code plugin (official marketplace) + skills.sh for Codex/other agents | Pi package only (`pi install`) |
 | **Edge-case/utility skills** | `/resolving-merge-conflicts`, `/wizard` (interactive bash for human-only steps), `/handoff`, `/wait-what`, `/teach`, `/to-questionnaire`, `/research` (background agent), `/prototype` | None beyond core workflow |
@@ -76,7 +76,7 @@ Idea
 
 | mp-skills | our repo |
 |---|---|
-| **Plan first, execute second.** `/wayfinder` produces *only decisions* — research, prototype, or grilling tickets. One ticket per session. Only when the route is clear do you hand off to `/to-spec` → `/to-tickets` → `/implement`. | **Agile/iterative growth.** Map tasks can be planning *or* execution types. You can execute `feature` and `bug` tasks alongside `research` and `prototype` tasks within the same map. The graph grows dynamically as discovery happens — "Do not silently expand acceptance criteria. Add a task instead." |
+| **Plan first, execute second.** `/wayfinder` produces *only decisions*, research, prototype, or grilling tickets. One ticket per session. Only when the route is clear do you hand off to `/to-spec` → `/to-tickets` → `/implement`. | **Agile/iterative growth.** Map tasks can be planning *or* execution types. You can execute `feature` and `bug` tasks alongside `research` and `prototype` tasks within the same map. The graph grows dynamically as discovery happens, "Do not silently expand acceptance criteria. Add a task instead." |
 | Wayfinder explicitly says: *"Produce decisions, not deliverables."* | Wayfinder says: *"Return-to-Wayfinder is a designed-for escape hatch."* |
 
 ### 2. Spec/Ticket Handoff: Explicit Two-Phase vs. Eliminated
@@ -89,13 +89,13 @@ Idea
 
 | mp-skills | our repo |
 |---|---|
-| `/tdd` is a **reference document** defining good tests, seams, anti-patterns (implementation-coupled, tautological, horizontal slicing), and loop rules. It's a reusable skill any orchestrator can invoke. | TDD is a **pipeline** — the `tdd-worker` agent implements one slice with strict RED→GREEN→REFACTOR rules. The discipline is encoded in the agent definition, not a reusable skill document. Features: checkpoint commits per GREEN, uncertainty escape hatch, divergence-from-plan reporting. |
+| `/tdd` is a **reference document** defining good tests, seams, anti-patterns (implementation-coupled, tautological, horizontal slicing), and loop rules. It's a reusable skill any orchestrator can invoke. | TDD is a **pipeline**, the `tdd-worker` agent implements one slice with strict RED→GREEN→REFACTOR rules. The discipline is encoded in the agent definition, not a reusable skill document. Features: checkpoint commits per GREEN, uncertainty escape hatch, divergence-from-plan reporting. |
 
 ### 4. Grilling: Reusable Primitive vs. Inline Process
 
 | mp-skills | our repo |
 |---|---|
-| `grilling` is a **model-invoked primitive** (~200 lines): design tree, rounds, frontier, question format (`❓ Q1`), "facts are your job" rule. `grill-with-docs` and `grill-me` are user-invoked wrappers. `domain-modeling` is a separate skill for glossary/ADR building. | Grilling is described **inline** in wayfinder's SKILL.md ("mandatory grilling session"). The `grilling` task resource (in `implement-task/resources/`) is minimal — it defines a one-question-at-a-time HITL process but has no round structure, no frontier recomputation, no question format. No reusable primitive. |
+| `grilling` is a **model-invoked primitive** (~200 lines): design tree, rounds, frontier, question format (`❓ Q1`), "facts are your job" rule. `grill-with-docs` and `grill-me` are user-invoked wrappers. `domain-modeling` is a separate skill for glossary/ADR building. | Grilling is described **inline** in wayfinder's SKILL.md ("mandatory grilling session"). The `grilling` task resource (in `implement-task/resources/`) is minimal, it defines a one-question-at-a-time HITL process but has no round structure, no frontier recomputation, no question format. No reusable primitive. |
 
 ### 5. Debugging: 6-Phase Discipline vs. Intake + Promote
 
@@ -107,7 +107,7 @@ Idea
 
 | mp-skills | our repo |
 |---|---|
-| `/code-review` is a **first-class skill** — two-axis (Standards + Spec) review using **parallel sub-agents** so neither pollutes the other. Includes a 12-smell Fowler baseline. It's the explicit closing step of `/implement`. | **No code review skill.** Quality is enforced through TDD (tdd-worker), verification (slice-verifier runs lint + tests), and CI gate (in finalize-task). No human-readable review output. |
+| `/code-review` is a **first-class skill**, two-axis (Standards + Spec) review using **parallel sub-agents** so neither pollutes the other. Includes a 12-smell Fowler baseline. It's the explicit closing step of `/implement`. | **No code review skill.** Quality is enforced through TDD (tdd-worker), verification (slice-verifier runs lint + tests), and CI gate (in finalize-task). No human-readable review output. |
 | The two-axis separation is deliberate: *"A change can pass one axis and fail the other, and reporting them separately stops one from masking the other."* | |
 
 ### 7. Codebase Design Vocabulary
@@ -120,7 +120,7 @@ Idea
 
 | mp-skills | our repo |
 |---|---|
-| `/improve-codebase-architecture` generates a **visual HTML report** (with Mermaid before/after diagrams, Tailwind styling, candidate cards with recommendation strength badges), then grills through selected candidates. Run every few days as maintenance. | **No architecture improvement practice.** The workflow has no recurring maintenance survey — architecture quality is addressed only when wayfinder discovers it during planning. |
+| `/improve-codebase-architecture` generates a **visual HTML report** (with Mermaid before/after diagrams, Tailwind styling, candidate cards with recommendation strength badges), then grills through selected candidates. Run every few days as maintenance. | **No architecture improvement practice.** The workflow has no recurring maintenance survey, architecture quality is addressed only when wayfinder discovers it during planning. |
 
 ### 9. Context Management
 
@@ -138,13 +138,13 @@ Idea
 
 | mp-skills | our repo |
 |---|---|
-| Not explicitly addressed — skills assume the model handles errors naturally. | **Structured failure toolbelt** with 4 escalation levels: (1) Diagnose, (2) Split slice, (3) Retry +50% budget, (4) Escalate to user. Hard rule: *"Parent never implements — routing through workers is always cheaper."* Each toolbelt step records feedback. |
+| Not explicitly addressed, skills assume the model handles errors naturally. | **Structured failure toolbelt** with 4 escalation levels: (1) Diagnose, (2) Split slice, (3) Retry +50% budget, (4) Escalate to user. Hard rule: *"Parent never implements, routing through workers is always cheaper."* Each toolbelt step records feedback. |
 
 ### 12. Finalization Depth
 
 | mp-skills | our repo |
 |---|---|
-| Implicit — `/implement` commits work to the current branch. No dedicated finalization step. Changelog is human-maintained. | **Comprehensive finalization pipeline** in `/skill:finalize-task`: CI gate (fix-forward) → Impeccable note check → Knowledge harvest → Changelog → Task deviation→map sync → Bug closure (for type:bug) → Archive (task_map_tick, git mv, merge, branch delete) → Map finalization. |
+| Implicit, `/implement` commits work to the current branch. No dedicated finalization step. Changelog is human-maintained. | **Comprehensive finalization pipeline** in `/skill:finalize-task`: CI gate (fix-forward) → Impeccable note check → Knowledge harvest → Changelog → Task deviation→map sync → Bug closure (for type:bug) → Archive (task_map_tick, git mv, merge, branch delete) → Map finalization. |
 
 ### 13. Sub-Agent Architecture
 
@@ -156,7 +156,7 @@ Idea
 
 | mp-skills | our repo |
 |---|---|
-| No release automation — skills are distributed via Claude Code plugin (auto-updating) or skills.sh | `scripts/release.sh` script, npm version bumps, peer dependencies on pi-coding-agent and pi-subagents |
+| No release automation, skills are distributed via Claude Code plugin (auto-updating) or skills.sh | `scripts/release.sh` script, npm version bumps, peer dependencies on pi-coding-agent and pi-subagents |
 
 ---
 
@@ -218,13 +218,13 @@ Idea
 
 **mp-skills is designed as a broad, composable, human-facing skill ecosystem:**
 - Rich reusable primitives (grilling, domain-modeling, codebase-design) that orchestrator skills compose
-- Heavy investment in **communication** — human docs, shared vocabulary, context management, debriefing tools
+- Heavy investment in **communication**, human docs, shared vocabulary, context management, debriefing tools
 - Debugging and code review are **first-class disciplines**, not afterthoughts
 - Designer mindset: skills are small, easy to adapt, composable with any model
 
 **Our repo is designed as a focused, automated, pi-native task workflow:**
-- Heavy investment in **structural enforcement** — type system, dependency graph, size budgets, resource dispatch
-- Automation depth is unmatched — finalization, knowledge harvest, changelog, bug closure, map archiving
-- **Feedback loops are explicit** — every failure path is a "designed-for escape hatch" with telemetry
+- Heavy investment in **structural enforcement**, type system, dependency graph, size budgets, resource dispatch
+- Automation depth is unmatched, finalization, knowledge harvest, changelog, bug closure, map archiving
+- **Feedback loops are explicit**, every failure path is a "designed-for escape hatch" with telemetry
 - Sub-agent architecture is formalized with defined agents, tool allowlists, context isolation (fresh/fork)
 - Parent-never-implements discipline is a hard architectural constraint, not a suggestion

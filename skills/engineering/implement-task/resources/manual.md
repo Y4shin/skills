@@ -1,4 +1,4 @@
-# Implement Task — Manual Resource
+# Implement Task, Manual Resource
 
 Resolves a `type: manual` task when a decision or implementation is blocked on
 human or environment work.
@@ -29,9 +29,9 @@ The task must contain:
 This resource does not implement application behavior unless the task is
 explicitly reclassified as a feature or bug by Wayfinder.
 
-> **Feedback:** if the manual task hits a snag — a prerequisite you couldn't
+> **Feedback:** if the manual task hits a snag, a prerequisite you couldn't
 > verify, a checklist that was vague, an external state change that fought
-> back, or something that worked notably well — call
+> back, or something that worked notably well, call
 > `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
 > short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
 > two specific, actionable sentences about the *workflow*, not the task.

@@ -5,9 +5,9 @@ Mock only at **system boundaries**. Everything else should use the real code.
 ## Mock at system boundaries
 
 - External APIs (payment gateways, email providers, third-party services).
-- Databases — sometimes; prefer a real test database when it is cheap to spin up.
+- Databases, sometimes; prefer a real test database when it is cheap to spin up.
 - Time, randomness, UUID generation, and other non-deterministic dependencies.
-- The filesystem — sometimes, when the real filesystem is slow or unreliable in tests.
+- The filesystem, sometimes, when the real filesystem is slow or unreliable in tests.
 
 ## Do not mock
 
@@ -33,7 +33,7 @@ async function processPayment(order: Order, paymentClient: PaymentClient) {
   return paymentClient.charge(order.total);
 }
 
-// Hard to mock — creates its own dependency
+// Hard to mock, creates its own dependency
 async function processPayment(order: Order) {
   const client = new StripeClient(process.env.STRIPE_KEY);
   return client.charge(order.total);

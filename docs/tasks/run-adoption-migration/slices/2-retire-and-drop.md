@@ -25,7 +25,7 @@ trimmed in the prior slice) has neither.
 - `report-bug` is moved to `skills/deprecated/report-bug/` with a one-line
   note in `skills/deprecated/README.md` naming what replaced it (`triage`).
   Its content is preserved (not deleted) per Matt's deprecated convention.
-- `grilling-with-ui` is removed from `skills/` entirely (not deprecated —
+- `grilling-with-ui` is removed from `skills/` entirely (not deprecated:
   dropped per Q15).
 - `scripts/grilling-cli/` and `scripts/grilling-ui/` are removed (and their
   built `dist/` outputs if any).
@@ -45,16 +45,16 @@ Seams: `tests/skills.test.ts` (remove grilling-with-ui from `SKILL_FILES`,
   `pi install` no longer ships grilling-with-ui; `report-bug` content is
   readable under deprecated/. Edge cases: `package.json` dependencies
   (svelte, vite-plugin-singlefile) added for grilling-with-ui may now be
-  unused — remove if nothing else uses them (verify with a usage grep).
+  unused, remove if nothing else uses them (verify with a usage grep).
 
 ## Constraints and dependencies
 
 - Blocked by `reorganize-into-buckets` (skills are already in buckets; this
   slice moves report-bug into deprecated/ and removes grilling-with-ui).
 - Grilling #1 Q12 (triage retires report-bug; spot-fix path must survive
-  inside triage or be explicitly dropped — the `add-meta-triage-skills`
+  inside triage or be explicitly dropped, the `add-meta-triage-skills`
   slice decides that), Q15 (grill-me in, grilling-with-ui out).
-- Deprecation convention: Matt's `deprecated/README.md` — "a retired skill
+- Deprecation convention: Matt's `deprecated/README.md`, "a retired skill
   is deleted, and the changeset that removes it names whatever replaced
   it." We keep the content (not delete) and name the replacement; record
   this deviation in slice notes for the build task.

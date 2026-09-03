@@ -1,9 +1,9 @@
-# Support Scripts — Python
+# Support Scripts, Python
 
 Read when the chosen language is Python. The shared policy (when to ship,
 language choice, self-contained-at-runtime, by-hand fallback, shape,
 testing, runtime floor, default-stack picks) lives in
-`support-scripts.md` — read it first. This file covers only Python-specific
+`support-scripts.md`, read it first. This file covers only Python-specific
 details.
 
 ## Shebang
@@ -20,14 +20,14 @@ for agents that run it explicitly.
 
 ## Self-contained at runtime: stdlib-only or `zipapp`
 
-Two paths (the shared policy in `support-scripts.md` explains *why* — the end
+Two paths (the shared policy in `support-scripts.md` explains *why*, the end
 user must not install libraries or have extra CLI tools):
 
 ### 1. Stdlib-only (lightest)
 
 No dependencies. Use this whenever the stdlib suffices (`argparse`, `json`,
 `csv`, `pathlib`, `subprocess`, `datetime`, `difflib`, `html.parser`, etc.).
-The source *is* the artifact — commit it and run it directly.
+The source *is* the artifact, commit it and run it directly.
 
 ### 2. `zipapp` bundling (when libraries are used)
 
@@ -36,7 +36,7 @@ file), bundle deps + script into one committed `.pyz` (zipapp) via a build
 step:
 
 - The build step produces a committed `helper.pyz` (the zipapp) that the end
-  user runs with `python3 helper.pyz <args>` — no venv, no `PYTHONPATH`, no
+  user runs with `python3 helper.pyz <args>`, no venv, no `PYTHONPATH`, no
   installed libraries.
 - **Keep the readable source** (`src/your_pkg/cli.py`) alongside the
   committed `.pyz` for patching (the "runnable AND readable" principle).
@@ -45,7 +45,7 @@ step:
 
 #### Bundle template (Python)
 
-The concrete `zipapp` build — stdlib only (no third-party build tool, no
+The concrete `zipapp` build, stdlib only (no third-party build tool, no
 `pyproject.toml`):
 
 ```bash
@@ -62,20 +62,20 @@ mkdir -p build/pkg && cp -r build/deps/* build/pkg/ && cp -r src/your_pkg build/
 python -m zipapp build/pkg -m "your_pkg.cli:main" -o dist/helper.pyz -c
 ```
 
-- **Run on the bare floor:** `python3 dist/helper.pyz <args>` — no venv, no
+- **Run on the bare floor:** `python3 dist/helper.pyz <args>`, no venv, no
   `PYTHONPATH`, no installed libraries (the `.pyz` is self-contained).
 - **Min-version contract:** the `.pyz` shebang is `#!/usr/bin/env python3`; if
   the helper needs a floor newer than the user's python, the script's `main`
   must check `sys.version_info` and error with "install at least 3.10" (an
-  agent reading that error must consult the user before installing — never
+  agent reading that error must consult the user before installing, never
   silently install an interpreter). See [Min-version contract](#min-version-contract) below.
-- **`shiv` / `pex` rejected** — heavier pip-driven alternatives that require
+- **`shiv` / `pex` rejected**, heavier pip-driven alternatives that require
   an installable project (wheel build), a correct console-script name, and
   fight externally-managed pythons. `shiv` also hit entry-resolution failure
   (`ModuleNotFoundError: No module named 'helper_pkg'`) at runtime in the
   prototype. `zipapp` is a one-liner over a vendored deps dir with zero config.
 
-> **Verified at Python 3.10** via the `bundle-script-template` prototype — the
+> **Verified at Python 3.10** via the `bundle-script-template` prototype, the
 > `zipapp` template produced a self-contained `.pyz` that ran clean on the bare
 > floor runtime (no venv, no `PYTHONPATH`). See
 > `docs/tasks/bundle-script-template/findings.md` for the build comparison and
@@ -83,7 +83,7 @@ python -m zipapp build/pkg -m "your_pkg.cli:main" -o dist/helper.pyz -c
 
 ## Inputs
 
-- **`argparse`** for CLI arguments — it's stdlib, handles `--flags`,
+- **`argparse`** for CLI arguments, it's stdlib, handles `--flags`,
   positional args, help text, and subcommands.
 - **stdin** for piped input when the script is part of a pipeline.
 - Avoid interactive `input()` prompts unless the script's explicit purpose
@@ -92,25 +92,25 @@ python -m zipapp build/pkg -m "your_pkg.cli:main" -o dist/helper.pyz -c
 
 ## Exit codes
 
-- `0` — success.
-- Non-zero — failure. Use `sys.exit(1)` for a general failure, or specific
+- `0`, success.
+- Non-zero, failure. Use `sys.exit(1)` for a general failure, or specific
   codes if the caller distinguishes them. Print a helpful message to stderr
   before exiting (see "Shape" in the shared file).
 
 ## Known-good-literal vs recomputed-value (numeric scripts)
 
 When a script computes a numeric result, **test it against a known-good
-literal** — a value you verified independently (by hand, from a spec, or
+literal**, a value you verified independently (by hand, from a spec, or
 from a trusted source). **Never** assert against a value recomputed the same
 way the script computes it: that test passes by construction and can never
 disagree with the implementation. If the script has a bug, a recomputed
 expected value carries the same bug.
 
 ```python
-# ✅ Good — the expected value is a known-good literal
+# ✅ Good, the expected value is a known-good literal
 assert compute_checksum(b"hello") == 0x36106061  # verified independently
 
-# ❌ Bad — recomputed the same way, so it can never disagree
+# ❌ Bad, recomputed the same way, so it can never disagree
 assert compute_checksum(b"hello") == compute_checksum(b"hello")
 ```
 
@@ -136,7 +136,7 @@ only the source. For stdlib-only scripts the source *is* the artifact.
 Python floor = **3.10**. The script's `main` should check `sys.version_info`
 and error with a useful "install at least Python 3.10" message if run older.
 An agent reading that error must **consult the user before installing
-anything** — never silently install an interpreter.
+anything**, never silently install an interpreter.
 
 ```python
 import sys
@@ -154,7 +154,7 @@ shared file for the concrete pins).
 
 The shared `support-scripts.md` lists the full default-stack table for both
 languages. Below is the **Python column**, verified at the floor (Python 3.10)
-via the `bundle-script-template` prototype — every pick passed when bundled
+via the `bundle-script-template` prototype, every pick passed when bundled
 into a self-contained `.pyz` and run on the bare floor runtime (no venv, no
 `PYTHONPATH`).
 
@@ -163,7 +163,7 @@ into a self-contained `.pyz` and run on the bare floor runtime (no venv, no
 | 1 | CLI parsing | `click` |
 | 2 | HTTP requests | `httpx` |
 | 3 | config/env/secrets | `PyYAML` + stdlib `json`/`os` |
-| 4 | formatting (LLM-facing) | *(plain text — no entry)* |
+| 4 | formatting (LLM-facing) | *(plain text, no entry)* |
 | 5 | validation/schemas | `marshmallow` |
 | 6 | FS traversal/globbing | *(stdlib `pathlib`/`glob`)* |
 | 7 | process/subprocess | *(stdlib `subprocess`)* |
@@ -179,15 +179,15 @@ into a self-contained `.pyz` and run on the bare floor runtime (no venv, no
 | 16 | tabular (CSV/TSV) | *(stdlib `csv`)* |
 | 17 | git operations | `dulwich` (pure-Py fallback; no git binary) |
 
-> Verified at Python 3.10 via the `bundle-script-template` prototype — all 17
+> Verified at Python 3.10 via the `bundle-script-template` prototype, all 17
 > slots passed on the bare floor runtime bundled into a self-contained
 > `.pyz`. See `docs/tasks/bundle-script-template/findings.md` for the full
 > smoke-test results.
 
 ## By-hand fallback
 
-Per the shared safety decision in `support-scripts.md` — a by-hand fallback
+Per the shared safety decision in `support-scripts.md`, a by-hand fallback
 is a considered, safety-first choice, not a default. Omit it for
 dangerous/irreversible/non-obvious ops; provide it only when the path is
 safe, deterministic, and within the agent's reliable capability. Do not
-restate the shared policy here — refer to it.
+restate the shared policy here, refer to it.

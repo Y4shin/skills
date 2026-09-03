@@ -7,7 +7,7 @@ description: Capture, reproduce, and triage a bug. Writes a bug doc under docs/b
 
 > **Telemetry:** once you have derived the bug slug and written the bug doc,
 > call the `telemetry_skill_context` tool with
-> `{ skill_name: "report-bug", target }` — `target` = the bug slug (the
+> `{ skill_name: "report-bug", target }`, `target` = the bug slug (the
 > kebab-case name used for `docs/bugs/<slug>.md`). This skill has no static
 > invocation capture (the input is free-form text), so the tool is the only
 > way to record its target. Pass `skill_name` explicitly so the metadata
@@ -37,10 +37,10 @@ then either fix a trivial bug on the spot or promote it to a task.
 
 Parse the free-form input and propose these fields **en-bloc**:
 
-- `observed` — what happened
-- `expected` — what should have happened
-- `reproduction` — steps to trigger it
-- `severity` — `critical | major | minor | trivial`
+- `observed`, what happened
+- `expected`, what should have happened
+- `reproduction`, steps to trigger it
+- `severity`, `critical | major | minor | trivial`
 
 Let the user edit the whole set in one response. Do not explore the codebase.
 
@@ -86,10 +86,10 @@ Read the consuming repo's `docs/dev-env.md`.
 - **If reproduction fails**, ask **one** targeted question. If still stuck,
   set `status: wontfix`, add the rationale, commit, and stop.
 
-  Both are designed-for adjustments — record that either fired. Call
+  Both are designed-for adjustments, record that either fired. Call
   `submit_feedback({ kind: "expected", data })` with `data` e.g.
   `"report-bug: repro failed, asked one question on <slug>"` or, on wontfix,
-  `"report-bug: wontfix on <slug> — <one-line reason>"`.
+  `"report-bug: wontfix on <slug>, <one-line reason>"`.
 - **If reproduced**, set `status: confirmed` and commit the repro artifacts.
 
 Do not write regression tests at this step.
@@ -103,8 +103,8 @@ Judge whether the bug is trivial (typo, one-liner, obvious cause).
 Fix it directly on the current branch / main. No feature branch.
 
 1. Write the regression test from `repro.md`.
-2. Run it against the unfixed code — it must be **red**.
-3. Apply the fix — the test is **green**.
+2. Run it against the unfixed code, it must be **red**.
+3. Apply the fix, the test is **green**.
 4. Run the full suite.
 5. Commit directly to `main`, add a CHANGELOG line, and update the bug doc:
    `status: fixed`, fill `fix_commit`, add Root cause and Fix summary
@@ -130,14 +130,14 @@ Promote directly to a `type: bug` task without running the Wayfinder interview.
 There is no mid-flight escalation path. If a fix surprises you, stop and
 promote.
 
-Surprise-and-promote is a designed-for escape hatch — record that it fired.
+Surprise-and-promote is a designed-for escape hatch, record that it fired.
 Call `submit_feedback({ kind: "expected", data })` with `data` e.g.
 `"report-bug: trivial fix surprised, promoting <slug>"`.
 
-> **Feedback:** if triage hits a snag — a duplicate check that missed, a
+> **Feedback:** if triage hits a snag, a duplicate check that missed, a
 > `docs/dev-env.md` that was wrong, a reproduction that failed for
 > workflow reasons, a trivial/non-trivial call that was hard to make, or
-> something that worked notably well — call `submit_feedback({ kind, data })`
+> something that worked notably well, call `submit_feedback({ kind, data })`
 > autonomously to record it. `kind` is a short category (`good`, `bad`,
 > `friction`, `architecture`); `data` is one or two specific, actionable
 > sentences about the *workflow*, not the bug. Requires the `pi-telemetry`

@@ -36,7 +36,7 @@ type* (the convergence of those two names is recorded as a note; the
   `telemetry_skill_context` / `submit_feedback` per the repo convention;
   rewrites Matt's "Call the Skill tool with `<name>`" to Pi's invocation
   convention where operative (or keeps it harness-neutral if that reads
-  better — record the choice in slice notes).
+  better, record the choice in slice notes).
 - Each new skill passes `validate_skill.mjs` (the skill-creator dogfood).
 - `package.json` `pi.skills` lists all 7 (promoted, in their bucket).
 - `tests/skills.test.ts` `SKILL_FILES` + manifest count updated; green.
@@ -44,7 +44,7 @@ type* (the convergence of those two names is recorded as a note; the
 
 ## Per-skill adaptation notes (from grilling #1 Q8)
 
-- `prototype` (engineering/model): two branches — `LOGIC.md` (single
+- `prototype` (engineering/model): two branches, `LOGIC.md` (single
   shareable HTML) + `UI.md` (toggleable variants). Throwaway, no tests,
   capture as primary source on a branch.
 - `research` (engineering/model): background agent, cited Markdown. Note
@@ -64,11 +64,11 @@ type* (the convergence of those two names is recorded as a note; the
 Seams: `validate_skill.mjs` per skill (dogfood), `tests/skills.test.ts`
 structure assertions, `npm run typecheck`. Failure modes: a skill fails
 `validate_skill.mjs`; a skill retains an em-dash; a skill references
-`agents/openai.yaml` (should not — Q14); a companion doc is missing; the
+`agents/openai.yaml` (should not, Q14); a companion doc is missing; the
 `research` skill and `research` task type are conflated (record the
 distinction). Scenarios: `pi install` ships all 7; each SKILL.md is
 invokable. Edge cases: a Matt skill that is Claude-specific (e.g.
-`handoff`'s `argument-hint`) — adapt or drop the field (record choice).
+`handoff`'s `argument-hint`), adapt or drop the field (record choice).
 
 ## Constraints and dependencies
 

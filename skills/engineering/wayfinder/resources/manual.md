@@ -1,4 +1,4 @@
-# Wayfinder Planning Resource — Manual
+# Wayfinder Planning Resource, Manual
 
 Use this resource when progress requires a human or environment prerequisite,
 such as obtaining access, provisioning a service, or inspecting data that is

@@ -28,8 +28,8 @@ tasks:
 ## Destination
 
 A version of this repo that has largely adopted the way Matt Pocock's skills
-repo (`mattpocock/skills`) works — its skills, concepts, skill format, and
-conventions — over what we currently use. "Largely adopt" means: on conflict,
+repo (`mattpocock/skills`) works, its skills, concepts, skill format, and
+conventions, over what we currently use. "Largely adopt" means: on conflict,
 Matt's way wins by default; we keep our version only where we have a concrete,
 stated reason to.
 
@@ -37,14 +37,14 @@ The end state is reached when:
 
 - Matt's skills repo has been re-cloned at a fresh pinned commit and a
   current-state report describes what it contains *now* (skills, concepts,
-  conventions) — not the stale snapshot behind the archived
+  conventions), not the stale snapshot behind the archived
   `compare-to-mp-skills` map.
 - A grilling has mapped Matt's current state onto this repo and decided, per
   conflicting item, which version wins (Matt's by default, ours only with a
   stated reason) and what we keep that Matt's repo does not have.
 - A second grilling has produced a migration plan encoded as a reusable
   migration skill (new or existing) that can move any repo set up under the
-  current setup onto the new setup — because the adoption will likely change
+  current setup onto the new setup, because the adoption will likely change
   which files a repo using this workflow needs and how they look.
 - Any remaining preparation tasks the grillings surface have been created
   and resolved before implementation begins.
@@ -53,13 +53,13 @@ The end state is reached when:
 
 ## Constraints
 
-- This repo is a **Pi package** — all skills, agents, and extensions must work
+- This repo is a **Pi package**, all skills, agents, and extensions must work
   within the Pi harness. Matt's repo is a Claude Code plugin + skills.sh for
   Codex/other agents. Adoption means adapting his invocation model to Pi, not
   importing his harness verbatim.
 - The existing `task_*` tools (frontier, dependency levels, finalization,
   slices) and the Pi extension in `src/pi.ts` are foundational. "Largely
-  adopt" applies to skills/concepts/conventions/format — not to abandoning
+  adopt" applies to skills/concepts/conventions/format, not to abandoning
   the Pi-native tooling that has no Matt-side equivalent.
 - Telemetry (`telemetry_skill_context`, `submit_feedback`) must be maintained
   or extended, never removed.
@@ -81,7 +81,7 @@ The end state is reached when:
   conflict on approach/convention, **Matt's wins by default**. We keep our
   version only when we have a concrete, stated reason to. (Entry grilling Q1.)
 - **Extraction scope:** the research task extracts **skills + concepts only**
-  from Matt's repo — SKILL.md content, the grilling/planning concepts, and
+  from Matt's repo, SKILL.md content, the grilling/planning concepts, and
   skill format/conventions. It excludes Matt's CI/build tooling. (Entry
   grilling Q2.)
 - **Clone & report home:** Matt's repo is cloned to a **gitignored scratch
@@ -90,7 +90,7 @@ The end state is reached when:
   #1/#2 can re-open source files; `findings.md` is the canonical, self-contained
   report. (Entry grilling Q3, refined to gitignored + pinned hash.)
 - **Migration skill target:** the migration skill is **reusable for any repo**
-  — it is the way to get repos set up under the current setup working with the
+ , it is the way to get repos set up under the current setup working with the
   new setup, because the adoption will likely change which files a repo using
   this workflow needs and how they look. Migrating this repo is its first
   run/proof, not its only purpose. (Entry grilling Q4.)
@@ -165,9 +165,9 @@ blocking implementation.
 ## Out of scope
 
 - Porting Matt's CI/build tooling, release automation, or harness-specific
-  packaging (Claude Code plugin manifest, skills.sh) — extraction is skills +
+  packaging (Claude Code plugin manifest, skills.sh), extraction is skills +
   concepts only.
-- Replacing the Pi extension / `task_*` tools with a Matt-side equivalent —
+- Replacing the Pi extension / `task_*` tools with a Matt-side equivalent:
   there isn't one; these are foundational and stay.
 - Re-litigating decisions from `compare-to-mp-skills` that the re-comparison
   confirms are still aligned with Matt's current way.

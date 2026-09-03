@@ -19,7 +19,7 @@ per-upgrade resource files in sequence (2→3, then 3→4, ...). It replaces
 `onboard-workflow` (R1Q1: one skill owns both onboarding and migration,
 branching on detected state). The `resources/upgrade-2-to-3.md` resource
 is **distilled from the proven adoption** recorded in `run-adoption-
-migration/slices/9-changesets-prose-finalize.md`'s consolidated summary —
+migration/slices/9-changesets-prose-finalize.md`'s consolidated summary:
 not from grilling #2's theoretical design. The skill has dry-run +
 backup-branch + idempotent safety (R3Q1). The skill name is decided here
 (stay `onboard-workflow` vs `setup-workflow`/`migrate-workflow`).
@@ -39,7 +39,7 @@ backup-branch + idempotent safety (R3Q1). The skill name is decided here
   encoded as they actually happened.
 - Dry-run mode (print plan + affected files, no writes); backup git
   branch before applying; idempotent (re-run no-ops if current; resumes
-  from last completed step if mid-migration — per-step completion
+  from last completed step if mid-migration, per-step completion
   tracking).
 - Telemetry wired; no-em-dashes; passes `validate_skill.mjs`.
 - `tests/skills.test.ts` updated for the skill rename/replacement; `npm

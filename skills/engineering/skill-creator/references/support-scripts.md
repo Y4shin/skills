@@ -1,4 +1,4 @@
-# Support Scripts — Shared Policy
+# Support Scripts, Shared Policy
 
 Read first when a produced skill bundles a script in `scripts/`.
 
@@ -12,7 +12,7 @@ back here for the shared decisions.
 ## When to ship a script
 
 Bundle a script only for an operation that is **fragile, exact, repeated, or
-numeric** — where prose would let the agent get it wrong. Keep judgment steps
+numeric**, where prose would let the agent get it wrong. Keep judgment steps
 as prose; script the deterministic steps. If the agent can reliably do it from
 a one-line instruction, don't bundle a script.
 
@@ -20,7 +20,7 @@ a one-line instruction, don't bundle a script.
 
 - **Match the target repo/project's canonical language.** A Go repo → Go
   script; a JS/TS project → JS/TS; a Python codebase → Python.
-- **Default to Python** when unconstrained — it has the broadest
+- **Default to Python** when unconstrained, it has the broadest
   cross-platform reach with a rich stdlib.
 - **JS/TS** when the host project is JS/TS.
 - **Bash is supported but discouraged.** It is not reliably cross-platform
@@ -30,17 +30,17 @@ a one-line instruction, don't bundle a script.
   caveats.
 
 When the target repo's canonical language is none of Python/JS/TS/Bash (e.g.
-Ruby, Go, Rust), match that language — the per-language references here cover
+Ruby, Go, Rust), match that language, the per-language references here cover
 the three well-known defaults; other languages follow the same shared policy
 (self-contained at runtime, clear shape, tested on a worked example).
 
 ## Self-contained at the end-user runtime
 
 A produced skill's scripts must be **self-contained at the end-user's
-runtime** — the end user must not need to install libraries or have extra CLI
+runtime**, the end user must not need to install libraries or have extra CLI
 tools present. Two ways there:
 
-1. **Stdlib-only** — the lightest option; no dependencies at all.
+1. **Stdlib-only**, the lightest option; no dependencies at all.
 2. **Use libraries, but add a build step** that bundles the dependencies and
    the script into **one file**, and **commit the built artifact into the git
    tree** so it is ready to use. Python: `zipapp`; JS/TS: a bundler. The
@@ -55,17 +55,17 @@ time), not run by the end user.
 
 The concrete build recipe (one-file build command, entrypoint, where the
 committed artifact lives) is now folded into the per-language reference files
-(`support-scripts-python.md` and `support-scripts-js-ts.md`) — each carries the
+(`support-scripts-python.md` and `support-scripts-js-ts.md`), each carries the
 verified bundle template + the verified 17-slot stack table for its language.
 
 > **Verification note:** the `bundle-script-template` prototype smoke-tested
 > all 17 default-stack library picks at the floor runtimes (Python 3.10 / Node
-> 20 LTS) — every pick passed on the bare floor runtime (no venv / no
+> 20 LTS), every pick passed on the bare floor runtime (no venv / no
 > `node_modules`), confirming the self-contained contract holds. No slot
 > needs re-picking. See `docs/tasks/bundle-script-template/findings.md` for
 > the full results.
 
-## By-hand fallback — a considered, safety-first choice, NOT a default
+## By-hand fallback, a considered, safety-first choice, NOT a default
 
 The by-hand fallback is **not** a default that every script carries. The
 skill-author must weigh two questions:
@@ -73,9 +73,9 @@ skill-author must weigh two questions:
 1. **Can the agent even do it by hand?**
 2. **Is the by-hand path safe?**
 
-For ops that are **dangerous, irreversible, or non-obvious** — e.g. an API
+For ops that are **dangerous, irreversible, or non-obvious**, e.g. an API
 mutation such as a Forgejo operation, destructive ops, side-effect-heavy calls
-— a by-hand fallback the agent tries to replicate is **worse than none**. The
+- a by-hand fallback the agent tries to replicate is **worse than none**. The
 agent may find outdated or poor API docs and fumble a dangerous op "by any
 means necessary." In those cases **omit the by-hand fallback**; the skill
 should **stop and require the script** (or a human) rather than hand the agent
@@ -93,14 +93,14 @@ and do not restate it.
 
 Every produced-skill script should be:
 
-- **Clear inputs** — arguments or stdin, documented; the agent (or user)
+- **Clear inputs**, arguments or stdin, documented; the agent (or user)
   knows what to pass.
-- **A single output** — one result, not a side-effect-laden multi-step cascade
+- **A single output**, one result, not a side-effect-laden multi-step cascade
   unless that is the explicit purpose.
-- **Helpful errors** — not a bare traceback/stack. Catch failures and print
+- **Helpful errors**, not a bare traceback/stack. Catch failures and print
   what went wrong and what to do. The agent reading the error should be able
   to diagnose and fix, or know to ask the user.
-- **Runnable AND readable** — the script runs, but an agent that needs to
+- **Runnable AND readable**, the script runs, but an agent that needs to
   patch it can read and understand it. When bundling, keep the readable source
   alongside the committed artifact (per the per-language file).
 
@@ -120,12 +120,12 @@ output. Don't force a test framework onto a skill that has none.
 
 **Python floor: 3.10. Node floor: Node 20 LTS.** Every produced helper script
 declares its minimum supported runtime and, if run on an older one, **errors
-with a useful message** telling the user to install at least that version —
+with a useful message** telling the user to install at least that version:
 **with a remark that, if an agent reads that error, it must consult the user
 before installing anything** (never silently install an interpreter).
 
 Pin library majors that satisfy the floor. The floor is a *minimum-
-compatibility target*, not a recommendation — a produced skill must still run
+compatibility target*, not a recommendation, a produced skill must still run
 on the lowest version real users have. Prefer the current LTS where you
 control the runtime, but don't raise the declared floor (that breaks skills
 for users who haven't upgraded).
@@ -138,16 +138,16 @@ gates: bundles into one self-contained file (pure-Python / pure-JS, no
 C/Rust extensions or native modules); no required external binaries; cross-
 platform where the script must run; permissive license (MIT/Apache-2.0/BSD/
 ISC) by default; actively maintained. The `bundle-script-template` prototype
-smoke-tested all 17 at the floor — they pass.
+smoke-tested all 17 at the floor, they pass.
 
-Bash stays **coreutils-only / discouraged** — no library picks for Bash.
+Bash stays **coreutils-only / discouraged**, no library picks for Bash.
 
 | # | Slot | Python | JS/TS |
 |---|------|--------|-------|
 | 1 | CLI parsing | `click` | `commander` 14.x |
-| 2 | HTTP requests | `httpx` | built-in `fetch` / `node:undici` (❌ axios — supply-chain backdoor) |
+| 2 | HTTP requests | `httpx` | built-in `fetch` / `node:undici` (❌ axios, supply-chain backdoor) |
 | 3 | config/env/secrets | `PyYAML` + stdlib `json`/`os` | `yaml` (eemeli) |
-| 4 | formatting (LLM-facing) | *(plain text — no entry)* | *(plain text — no entry)* |
+| 4 | formatting (LLM-facing) | *(plain text, no entry)* | *(plain text, no entry)* |
 | 5 | validation/schemas | `marshmallow` | `zod` |
 | 6 | FS traversal/globbing | *(stdlib `pathlib`/`glob`)* | `tinyglobby` |
 | 7 | process/subprocess | *(stdlib `subprocess`)* | `tinyexec` |
@@ -169,7 +169,7 @@ Bash stays **coreutils-only / discouraged** — no library picks for Bash.
    C/Rust extensions or native modules that break the bundler).
 2. No required external binaries / no native runtime.
 3. Cross-platform where the script must run (no Windows-fragile defaults).
-4. License — permissive (MIT/Apache-2.0/BSD/ISC) by default; copyleft
+4. License, permissive (MIT/Apache-2.0/BSD/ISC) by default; copyleft
    (GPL/AGPL) allowed only conditionally: when the copyleft candidate is
    outstandingly better AND the target repo is license-compatible.
 5. Actively maintained, not abandoned.
@@ -179,5 +179,5 @@ chosen over `pydantic` and `jsonschema` because both pull a compiled Rust core
 that fails the self-contained-bundle gate. Use `pydantic`/`jsonschema` only
 when the target repo already ships them (not bundling).
 
-**Selection note for row 2 (HTTP):** ❌ `axios` — supply-chain backdoor
+**Selection note for row 2 (HTTP):** ❌ `axios`, supply-chain backdoor
 (UNC1069, Mar 2026). Do not use it.

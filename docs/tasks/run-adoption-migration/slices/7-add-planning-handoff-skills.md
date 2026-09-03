@@ -19,7 +19,7 @@ synthesizes the conversation/map into `docs/tasks/<slug>/spec.md`;
 `to-tickets` breaks it into tracer-bullet feature/bug tasks with
 `blocked_by` edges, stored as `docs/tasks/<slug>/task.md` files.
 `wayfinder` is reshaped to produce **decisions only** (research/prototype/
-grilling/manual tasks) per Q1 — it no longer creates feature/bug tasks
+grilling/manual tasks) per Q1, it no longer creates feature/bug tasks
 (that's `to-tickets`' job now). The `return-to-Wayfinder` escape hatch is
 replaced by Matt's "hand off, don't build" boundary. `task-workflow-
 overview` is rewritten to the ask-matt-style router (Q7, name kept) +
@@ -53,7 +53,7 @@ speaks tracker-language (must use docs/tasks/ + task_* tools); `wayfinder`
 still creates feature/bug tasks (must not, per Q1); the router omits a
 flow. Scenarios: an idea flows wayfinder → to-spec → to-tickets →
 implement-task on docs/tasks/. Edge cases: the `return-to-Wayfinder`
-hatch removal — ensure nothing else references it (grep).
+hatch removal, ensure nothing else references it (grep).
 
 ## Constraints and dependencies
 

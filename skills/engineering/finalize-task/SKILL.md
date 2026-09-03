@@ -8,17 +8,17 @@ metadata:
 # Finalize Task
 
 > **Telemetry:** call the `telemetry_skill_context` tool with
-> `{ skill_name: "finalize-task", map }` — `map` = the map slug if the task
+> `{ skill_name: "finalize-task", map }`, `map` = the map slug if the task
 > belongs to a map (else omit). The `target` (task slug) is already captured
 > automatically from your invocation argument, so do NOT pass it here. Pass
 > `skill_name` explicitly so the metadata correlates to this invocation even
 > when multiple skills run in one turn.
 
-## Step 0 — Prerequisites
+## Step 0, Prerequisites
 
-`task_finalizable <slug>` — must return "ready to finalize" (no open slices).
+`task_finalizable <slug>`, must return "ready to finalize" (no open slices).
 
-## Step 1 — CI gate
+## Step 1, CI gate
 
 ```
 git checkout task/{taskSlug}
@@ -27,11 +27,11 @@ git merge main 2>/dev/null || true
 
 Run the project's CI command (from `task_context` profile or detected from repo tooling). If it fails: STOP. Fix forward on the task branch. Do not merge a red branch.
 
-Fix-forward is a designed-for adjustment — record that it fired so its
+Fix-forward is a designed-for adjustment, record that it fired so its
 frequency can be correlated. Call `submit_feedback({ kind: "expected", data })`
 with `data` e.g. `"finalize: CI gate red on <taskSlug>, fixing forward"`.
 
-## Step 2 — Impeccable note check
+## Step 2, Impeccable note check
 
 Check if any `docs/tasks/${taskSlug}/impeccable-note-*.md` files exist.
 
@@ -52,7 +52,7 @@ Check if any `docs/tasks/${taskSlug}/impeccable-note-*.md` files exist.
 
   Do not proceed past this step without the user's decision.
 
-## Step 3 — Knowledge harvest
+## Step 3, Knowledge harvest
 
 Read the task doc, all deviation reports from `{chain_dir}/deviation-reports/` (if available), and the combined diff.
 
@@ -67,18 +67,18 @@ Also fold in any Impeccable notes that were resolved (user ran the commands):
 
 Commit: `git add -A && git commit -m "docs(task): harvest knowledge for {taskSlug}"`
 
-## Step 4 — Changelog
+## Step 4, Changelog
 
 Write a 3-5 line entry to `docs/tasks/CHANGELOG.md`:
 ```
-## <YYYY-MM-DD> — <title> (<slug>)
+## <YYYY-MM-DD>, <title> (<slug>)
 <key changes and decisions>. <outcome in one sentence>.
 ```
 If there were UI design notes that were acted on, mention this in the changelog entry.
 
 Commit: `git add docs/tasks/CHANGELOG.md && git commit -m "docs: changelog {taskSlug}"`
 
-## Step 5 — Task deviation → map (if applicable)
+## Step 5, Task deviation → map (if applicable)
 
 Read the task doc. If it belongs to a map (`map:` field):
 - Compare the task's original scope against what was actually delivered
@@ -86,7 +86,7 @@ Read the task doc. If it belongs to a map (`map:` field):
 - Check if the map's description needs updating
 - If deviations found: update the map doc. If significant: ask user.
 
-## Step 6 — Bug closure (type: bug only)
+## Step 6, Bug closure (type: bug only)
 
 Read the task doc frontmatter.
 
@@ -103,10 +103,10 @@ Read the task doc frontmatter.
   5. Archive the bug doc: `git mv docs/bugs/<slug>.md docs/bugs/archive/<slug>.md`
   6. Commit: `git commit -m "chore(bug): archive <slug>"`
 
-## Step 7 — Archive
+## Step 7, Archive
 
 Step 7 interleaves **Pi tool calls** with shell commands. `task_map_tick` and
-`task_state_set` are tools you invoke as functions, **not** shell binaries —
+`task_state_set` are tools you invoke as functions, **not** shell binaries:
 wrapping them in a `set -e` block makes them fail with `command not found`
 (exit 127) and abort the sequence. Call them as tools, and run the shell steps
 in a separate bash block.
@@ -114,7 +114,7 @@ in a separate bash block.
 1. **If the task belongs to a map**, call the Pi tool:
 
    ```
-   task_map_tick <map-slug> {taskSlug}  # Pi tool — not a shell command
+   task_map_tick <map-slug> {taskSlug}  # Pi tool, not a shell command
    ```
 
    (If the map has no matching child task, it errors harmlessly; fall back to
@@ -123,11 +123,11 @@ in a separate bash block.
 2. **Call the Pi tool** to clear workflow state:
 
    ```
-   task_state_set task null   # Pi tool — not a shell command
-   task_state_set slice null  # Pi tool — not a shell command
+   task_state_set task null   # Pi tool, not a shell command
+   task_state_set slice null  # Pi tool, not a shell command
    ```
 
-3. **Archive the task directory and merge the branch** (shell — safe under
+3. **Archive the task directory and merge the branch** (shell, safe under
    `set -e`, contains no Pi tools):
 
    ```bash
@@ -141,20 +141,20 @@ in a separate bash block.
 
    If remote exists: `git push origin main`
 
-## Step 8 — Map finalization (if last child)
+## Step 8, Map finalization (if last child)
 
 If `task_map_finalizable` returns ready for the map:
 - Summarize the map to CHANGELOG.md
 - Archive the map: `git mv docs/tasks/maps/<slug>/ docs/tasks/maps/archive/<slug>/`
 - Finalize map doc
 
-## Step 9 — Report
+## Step 9, Report
 
 "Task archived, CHANGELOG updated, main branch updated. Map status: <done/not done>."
 
-> **Feedback:** if finalizing hits a snag — a CI gate that's misconfigured, a
+> **Feedback:** if finalizing hits a snag, a CI gate that's misconfigured, a
 > knowledge-harvest step with nowhere to fold findings, a bug-closure path
-> that didn't line up, or something that worked notably well — call
+> that didn't line up, or something that worked notably well, call
 > `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
 > short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
 > two specific, actionable sentences about the *workflow*, not the task.

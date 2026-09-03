@@ -3,7 +3,7 @@ name: codebase-design
 description: Map an existing codebase's architecture, boundaries, dependencies, reuse opportunities, and safe extension points before proposing a change.
 ---
 
-# /codebase-design — Codebase design reference
+# /codebase-design, Codebase design reference
 
 Use this model-invoked reference before designing a change in an unfamiliar or
 substantive repository. It is a shared vocabulary and investigation procedure,

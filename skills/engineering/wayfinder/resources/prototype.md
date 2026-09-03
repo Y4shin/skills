@@ -1,4 +1,4 @@
-# Wayfinder Planning Resource — Prototype
+# Wayfinder Planning Resource, Prototype
 
 Use this resource when the key uncertainty is best answered by reacting to a
 concrete artifact, such as a UI variation, state model, or interaction flow.

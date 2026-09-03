@@ -25,7 +25,7 @@ model-invoked grouping, per Matt's convention).
 ## Acceptance criteria
 
 - Each existing skill directory is moved into the correct bucket (see
-  bucket assignment below). No skill content is changed in this slice —
+  bucket assignment below). No skill content is changed in this slice:
   only moved + `pi.skills` trimmed.
 - `package.json` `pi.skills` lists only promoted skills (engineering +
   productivity); non-promoted are absent.
@@ -50,7 +50,7 @@ later slices):
 - `misc/`: empty for now (Q19 adopts none).
 - `in-progress/`: empty for now (Q18 adopts none).
 - `deprecated/`: create-task is already retired (`disable-model-invocation:
-  true` compat redirect) — move it here.
+  true` compat redirect), move it here.
 
 ## Test plan
 
@@ -68,4 +68,4 @@ relocate to deprecated/).
   in-progress,deprecated}/README.md` + `CLAUDE.md` promotion rules) in the
   gitignored clone at `docs/tasks/mp-skills-current-state-report/matt-skills/`.
 - No skill content changes this slice (only moves + `pi.skills` + READMEs).
-- `tests/skills.test.ts` is the regression seam — update it in this slice.
+- `tests/skills.test.ts` is the regression seam, update it in this slice.

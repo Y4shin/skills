@@ -8,7 +8,9 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "changeset": "changeset",
+    "version": "changeset version"
   },
   "dependencies": {
     "yaml": "^2.6.1"
@@ -19,6 +21,7 @@
     "typebox": "*"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.27.0",
     "@earendil-works/pi-coding-agent": "^0.80.3",
     "@types/node": "^20.11.0",
     "pi-subagents": "0.34.0",

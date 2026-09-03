@@ -1,4 +1,4 @@
-# Wayfinder Planning Resource — Grilling
+# Wayfinder Planning Resource, Grilling
 
 Use this resource when the next task is a human decision that cannot be
 answered from the repository or external sources.
