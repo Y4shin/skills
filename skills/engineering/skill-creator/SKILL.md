@@ -105,9 +105,8 @@ reason, each exists to prevent a specific failure mode.
    errors; the semantic pass catches description/body mismatch, a common
    cause of false triggers.
 
-7. **Adversarial self-review.** Run four checks and revise:
-   - **Trigger test**, gather ≥3 should-trigger and ≥2 near-miss requests
-     (queries that share keywords but need something different). Run them
+7. **Adversarial self-review.** Run four checks and revise, then invoke the reviewer:
+   - **Trigger test**, gather ≥3 should-trigger and ≥2 near-miss requests     (queries that share keywords but need something different). Run them
      against the description; revise if a should-trigger doesn't fire or a
      near-miss does.
    - **Execution dry-run**, mentally (or actually) walk through the skill's
@@ -119,8 +118,18 @@ reason, each exists to prevent a specific failure mode.
    - **Generalization review**, does the skill teach a *method* (reusable
      across inputs) or a *one-off answer* (useful only for a specific
      instance)? Favor the method.
-   *Why:* this is the highest-leverage pass, it catches trigger gaps,
-   execution holes, and bloat that the author is blind to after writing.
+   - **Audience review**, sweep for meta-level narrative aimed at the
+     *author* rather than the *reader-agent*: version-change justifications
+     ("changed from a prior version because"), review-process notes ("during
+     the grilling we found"), or rationale for authoring choices. Reader-facing
+     rationale (why the *system* behaves this way) stays; author-facing
+     rationale (why the *document* was written this way) is cut.
+   *Why:* this is the highest-leverage pass, it catches trigger gaps,   execution holes, and bloat that the author is blind to after writing.
+
+   Then invoke the `/skill-review` skill (via the `skill-reviewer` agent),
+   which runs the audience-fit, trigger-behavior, and spec/portability axes as
+   parallel fresh-context reviewers and aggregates their findings. Revise against
+   those findings too.
 
 8. **Iterate on real usage.** Bundle what makes the agent reinvent the same
    helper or take the same detour; cut what false-triggers or wastes context.
@@ -216,6 +225,13 @@ Concise guidance for what to put in a produced skill's body:
   following a rule it doesn't understand. "Use parameterized queries to
   prevent SQL injection" teaches; "always use parameterized queries" just
   orders.
+- **Cut meta-level narrative.** The body is instructions for the *reader-agent*,
+  not a transcript of how the skill was authored. Strip version-change
+  justifications, review-process notes, creation backstory, and rationale for
+  authoring choices. "Changed from a prior version because" and "during the
+  grilling we found" never belong in the body. Reader-facing rationale (why the
+  *system* behaves this way) is valuable and stays; author-facing rationale (why
+  the *document* was written this way) is noise and is cut.
 - **Favor procedures over one-off answers.** Teach the agent *how to
   approach* a class of problems, not *what to produce* for one instance.
   A method generalizes; a one-off answer doesn't.

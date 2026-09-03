@@ -1,6 +1,6 @@
 # Task Changelog
 
-## 2026-09-03 — Largely adopt Matt Pocock's skills repo way (adopt-mp-skills-way)
+## 2026-09-03, Largely adopt Matt Pocock's skills repo way (adopt-mp-skills-way)
 
 Reorganized skills into engineering/productivity/misc/in-progress/deprecated buckets with promotion rules; adopted Matt's strict two-phase planning (wayfinder = decisions only -> to-spec -> to-tickets -> implement-task); added 12 skills (prototype, research, resolving-merge-conflicts, wizard, handoff, to-questionnaire, teach, writing-for-agents, triage, grill-me, to-spec, to-tickets); retired report-bug + grilling-with-ui; re-aligned grilling/code-review/tdd/domain-modeling to Matt's current; rewired implement-task with implement-spec graph/concurrency language; scaffolded repo-root AGENTS.md + CONTEXT.md + docs/adr/ + docs/agents/ + docs/tasks/out-of-scope/; integrated changesets into release.sh; no-em-dashes sweep; built the reusable setup-workflow migration skill + upgrade-2-to-3 resource + docs/migration-target.yaml distilled from the proven run. 434 tests green, schema_version 3.
 
