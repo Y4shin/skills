@@ -2,7 +2,7 @@
 
 Implements every non-done slice of a feature task. Steps are: architecture spec (user-approved) → per-slice chain per dependency level → coherence refactor.
 
-## Step 0 — Prerequisites
+## Step 0 -- Prerequisites
 
 Task doc exists with `slices:` list. Each slice has `## Test plan`, `size`, `blocked_by`. Run `task_slices <slug>` to enumerate.
 
@@ -15,7 +15,7 @@ const pendingSlices = task_slices(taskSlug)
 
 If none pending: "All slices done. Run `/skill:finalize-task`."
 
-## Step 1 — Architecture spec (user-approved)
+## Step 1 -- Architecture spec (user-approved)
 
 Before any TDD, draft an architecture spec. It lives at `docs/tasks/${taskSlug}/arch-spec.md` (stable and shared across all slice chains).
 
@@ -31,19 +31,42 @@ Also record in the task doc's `## Architecture notes` section (if the user adds 
 Present the complete spec to the user. One conversation. Iterate if needed.
 Once approved, write to `docs/tasks/${taskSlug}/arch-spec.md`.
 
-## Step 2 — Per-slice chain dispatch
+## Step 2 -- Per-slice chain dispatch
 
 > **Async dispatch (hard rule):** launch every chain with `async: true`. Never
 > block on a foreground subagent. After dispatching a slice's chain, call
-> `wait({ id })` to receive its result before moving on — slices within a level
+> `wait({ id })` to receive its result before moving on -- slices within a level
 > run sequentially on a shared repo cwd, so there is no parallel work meanwhile.
 > The run stays tracked, interruptible, and steerable.
 
-Call `task_dependency_levels <taskSlug>` to get BFS levels.
+The task's slices form a **task graph** with blocking relationships: each
+slice declares its `blocked_by` dependencies, and the **frontier** is the set
+of ready, unfinished slices (all blockers done). Call
+`task_dependency_levels <taskSlug>` to get BFS levels. The graph model is
+the same one `task_frontier` exposes: a level is a wave of slices whose
+blockers are all in prior levels.
 
-Each slice runs as a **sequential chain** that shares the repo working directory: `tdd-worker → (slice-verifier ∥ deviation-reporter ∥ ui-noter) → land-worker`. Steps share one cwd, so verify, deviation, and ui-noter see tdd-worker's actual code. `failFast: true` gates landing on verify+deviation. The ui-noter is advisory — it never gates landing.
+**Communication via context pointers.** Communicate to and from subagents
+primarily through context pointers (to the spec, slice docs, arch spec,
+research notes, previous commits). Do not duplicate information already
+available via pointers; pass the pointer, not the content.
 
-Slices within a level run **sequentially** (chains share the repo cwd, so parallel slices would clash). Levels remain strict barriers: level N+1 starts only after every slice in level N has landed.
+Each slice runs as a **sequential chain** that shares the repo working directory: `tdd-worker → (slice-verifier ∥ deviation-reporter ∥ ui-noter) → land-worker`. Steps share one cwd, so verify, deviation, and ui-noter see tdd-worker's actual code. `failFast: true` gates landing on verify+deviation. The ui-noter is advisory -- it never gates landing.
+
+Slices within a level run **sequentially** by default (chains share the
+repo cwd, so parallel slices would clash). Levels remain strict barriers:
+level N+1 starts only after every slice in level N has landed.
+
+**Per-slice worktree isolation for frontier concurrency.** When slices
+within a level are fully independent (no shared files, no shared state), the
+orchestrator MAY dispatch each slice's chain in its own worktree
+(`worktree: true`, one writer per worktree) for **maximum concurrency** across
+the frontier. Each worktree-isolated chain runs its tdd-worker, verifier,
+deviation-reporter, and land-worker in isolation; a merger step folds the
+landed work back into the task branch. Use the shared-cwd sequential path
+when slices share state; use per-slice worktrees only when the slices are
+truly independent. The choice does not change the chain itself -- only
+whether chains run serially on one cwd or concurrently across worktrees.
 
 ```
 levels = JSON.parse(task_dependency_levels(taskSlug)).levels
@@ -139,7 +162,7 @@ The following surfaces are ready for design refinement:
 - \`<path/to/file>\`: <brief description of the surface/component>
 
 #### Suggested commands
-- \`/impeccable <command> <path>\` — <why this command fits>
+- \`/impeccable <command> <path>\` -- <why this command fits>
 
 #### Notes
 - <what is currently bare-bones, what design decisions are missing>
@@ -155,7 +178,7 @@ If multiple surfaces exist, suggest a separate command for each, or a single com
 targeting the broadest surface noting sub-surfaces are contained within.
 
 This note is advisory. The user runs it after landing. Do NOT gate anything on it.
-Do NOT edit any files yourself — only write the note if UI work is found.`
+Do NOT edit any files yourself -- only write the note if UI work is found.`
                         }
                     ],
                     concurrency: 3
@@ -183,14 +206,14 @@ Set task_set status done on slice.`
         // Process the chain result
         if exists docs/tasks/${taskSlug}/.work/uncertainty.md:
             // tdd-worker hit uncertainty and stopped (failFast aborted before verify/land)
-            // This is a designed-for escape hatch — record that it fired.
+            // This is a designed-for escape hatch -- record that it fired.
             submit_feedback({ kind: "expected", data: `feature: tdd-worker uncertainty stop on slice ${slice}` })
             resolution = ask_user_question({
                 header: "Uncertain",
                 question: `TDD worker hit uncertainty in slice ${slice}:\n{read docs/tasks/${taskSlug}/.work/uncertainty.md}`
             })
             delete the uncertainty file
-            // Re-route to tdd-worker. Do NOT do the work yourself — parent context is expensive.
+            // Re-route to tdd-worker. Do NOT do the work yourself -- parent context is expensive.
             re-run the chain for this slice,
             appending the user's resolution to the tdd task prompt
             continue
@@ -206,7 +229,7 @@ Set task_set status done on slice.`
     // user-attention-needed. Update the arch spec for pending slices if API
     // surfaces changed. If a deviation reveals a workflow/planning problem
     // (ambiguous spec, wrong interface contract), surface it to the user.
-    // Do NOT report the deviation itself — that's a project finding.
+    // Do NOT report the deviation itself -- that's a project finding.
 
     // Also mention any ui-noter findings to the user, but non-blocking.
     // If the user wants to act on them now, let them; otherwise continue.
@@ -214,7 +237,7 @@ Set task_set status done on slice.`
 
 ## Whole-task code review (advisory)
 
-After all slices have landed, run a two-axis code review over the whole-task diff before the coherence refactor. The review is advisory — it does not gate landing (the slices already landed) and does not gate finalize.
+After all slices have landed, run a two-axis code review over the whole-task diff before the coherence refactor. The review is advisory -- it does not gate landing (the slices already landed) and does not gate finalize.
 
 ```js
 reviewId = subagent({
@@ -231,7 +254,7 @@ wait({ id: reviewId })
 
 Read `review/result.md` and surface the findings to the user. Step 3 (coherence refactor) uses these findings to drive refactoring priorities.
 
-## Step 3 — Coherence refactor
+## Step 3 -- Coherence refactor
 
 This stage owns refactoring; the tdd-worker loop is RED→GREEN only. Refactor here, not in the per-slice worker.
 
@@ -256,13 +279,13 @@ Do NOT change API surfaces that dependents call without user approval.
 Do NOT refactor outside the task's scope.
 
 **Cost note:** these refactors are done directly by you (the parent), which
-means your full context is loaded. Keep them genuinely small — if a refactor
+means your full context is loaded. Keep them genuinely small -- if a refactor
 would require reading more than ~5 files or editing more than ~50 lines,
 consider routing it through a subagent instead.
 
-**Final suite gate:** Run the full project test suite. It must be green before Step 3 is complete. If red, this is emergent cross-slice breakage — breakage that only appears when all slices combine and no single slice owns the fix. Apply small/medium root-cause fixes within the task's scope autonomously (same rules as above); escalate large, ambiguous, or API-surface-touching fixes to the user. For test failures: first try re-routing the fix through a subagent before doing it yourself.
+**Final suite gate:** Run the full project test suite. It must be green before Step 3 is complete. If red, this is emergent cross-slice breakage -- breakage that only appears when all slices combine and no single slice owns the fix. Apply small/medium root-cause fixes within the task's scope autonomously (same rules as above); escalate large, ambiguous, or API-surface-touching fixes to the user. For test failures: first try re-routing the fix through a subagent before doing it yourself.
 
-## Step 4 — Report
+## Step 4 -- Report
 
 Report completed slices, any deviations found and resolved, user interventions.
 
@@ -276,14 +299,14 @@ If any `impeccable-note-*.md` files were created, mention them at the end:
 
 Hard rule: on subagent failure the parent never implements. Its only moves are re-dispatch strategies, applied in this order:
 
-1. **Diagnose first** — read worker outputs and any partial diff. Never blindly redo.
-2. **First failure → split** — always split slice N into ad-hoc sub-slices Na, Nb, Nc (`slices/<N>a-<slug>.md`, conforming, chained via `blocked_by`; update the task doc `slices:` list; mark slice N `status: split`). Exception: if the slice is already atomic, skip to retry.
-3. **Second attempt → retry +50%** — re-run the chain with maxTurns increased by 50% and the diagnosis/fix instructions in the prompt.
-4. **Backstop → escalate** — after two consecutive retries still fail, ask the user: "Two retries for slice {slice} failed. Should I increase budgets further, relax constraints, or skip this slice?"
+1. **Diagnose first** -- read worker outputs and any partial diff. Never blindly redo.
+2. **First failure -> split** -- always split slice N into ad-hoc sub-slices Na, Nb, Nc (`slices/<N>a-<slug>.md`, conforming, chained via `blocked_by`; update the task doc `slices:` list; mark slice N `status: split`). Exception: if the slice is already atomic, skip to retry.
+3. **Second attempt -> retry +50%** -- re-run the chain with maxTurns increased by 50% and the diagnosis/fix instructions in the prompt.
+4. **Backstop -> escalate** -- after two consecutive retries still fail, ask the user: "Two retries for slice {slice} failed. Should I increase budgets further, relax constraints, or skip this slice?"
 
 Hard rule: the parent context is large and expensive; routing through workers is always cheaper than pulling the fix into the parent. The parent never writes code or edits files as a fix.
 
-Each toolbelt step is a designed-for adjustment, not a snag — but record
+Each toolbelt step is a designed-for adjustment, not a snag -- but record
 which one fired so its frequency can be correlated. Each time you take a
 toolbelt action, call `submit_feedback({ kind: "expected", data })` with `data`
 naming the step, e.g. `"feature: split slice <slug> after first failure"`
@@ -292,10 +315,10 @@ or `"feature: retry +50% on slice <slug>"` or `"feature: escalate slice <slug>
 
 ## Workflow feedback
 
-When the *workflow itself* snags — a chain that keeps failing for the same
+When the *workflow itself* snags -- a chain that keeps failing for the same
 reason, a slice that won't split, a worker that lacked a tool it needed, a
 dependency level that blocked unnecessarily, an arch spec that contradicted a
-slice doc, or something that worked notably well — call
+slice doc, or something that worked notably well -- call
 `submit_feedback({ kind, data })` autonomously, without prompting. `kind` is a
 short category (`good`, `bad`, `friction`, `architecture`); `data` is one or two
 specific, actionable sentences about the *workflow*, not the code. The
