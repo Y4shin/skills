@@ -118,3 +118,19 @@ into a reusable migration skill.
   handoff as inspiration only), Q19 (no misc), Q20 (changesets into release.sh).
 - Grilling #2: the migration skill design (build task, blocked by this one).
 completed_at: 2026-09-03T20:00:00Z
+
+## Implementation notes (harvested)
+
+The adoption landed across 9 slices on the `develop` branch (v2.10.0 -> v3.0.0),
+434 tests green, all 27 promoted skills pass `validate_skill.mjs`. Six deviations
+from grilling #2's designed 11 steps surfaced and are recorded in slice 9's
+"What the migration actually did" summary (the source for build-migration-skill):
+eval harness dropped with grilling-with-ui; validate_skill.mjs fix; CONTEXT.md
+scope clarified to full workflow glossary; router entry point uses grilling
+(grill-with-docs not yet separate); grilling re-aligned with plain-text not
+ask_user_question (consult-first); no new agent definitions needed. The
+task-overview folder was renamed to task-workflow-overview to match its
+frontmatter name (Q7 kept the name). The reusable migration skill
+(setup-workflow, replacing onboard-workflow) + upgrade-2-to-3 resource +
+docs/migration-target.yaml were distilled from this proven run by
+build-migration-skill.

@@ -68,6 +68,22 @@ installed Pi API.
 - **YAML gotcha:** an unquoted `: ` inside a frontmatter value (e.g. a
   title containing `type: bug`) makes the YAML invalid; the task tools
   then *silently skip* the file. Quote such values.
+- **Skill bucket layout (adopt-mp-skills-way):** skills live in bucket folders
+  `engineering/`/`productivity/` (promoted, in `package.json` `pi.skills` + get a
+  `docs/<bucket>/<name>.md` page) and `misc/`/`in-progress/`/`deprecated/` (kept,
+  not promoted). `tests/skills.test.ts` asserts the bucket layout via `readdirSync`
+  (only bucket dirs at `skills/` top level) + the manifest count. When moving a
+  skill between buckets, update `SKILL_FILES` paths, the `pi.skills` entries, and
+  any `toContain("./skills/<bucket>/<name>")` assertions in one commit.
+- **validate_skill.mjs allows `disable-model-invocation` + `argument-hint`:** the
+  validator's `ALLOWED_KEYS` includes these Pi frontmatter keys (every user-invoked
+  skill uses `disable-model-invocation`); a skill whose folder name != frontmatter
+  `name:` fails validation (rename the folder to match, not the name).
+- **Migration skill (setup-workflow) + version-stamp:** `docs/tasks/state.yaml`
+  carries `schema_version`; `setup-workflow` auto-detects fresh/old/current and
+  applies per-upgrade resources (`resources/upgrade-<from>-to-<to>.md`) in
+  sequence. Structure assertions verify the skill references `upgrade-2-to-3`,
+  `migration-target.yaml`, and the dry-run/backup/idempotent safety guarantees.
 - **Skill helper-script testing (CLI seam):** when a skill ships executable
   helper scripts (e.g. `skills/engineering/skill-creator/scripts/*.mjs`), test them via
   `spawnSync` on the script CLI (stdout + exit code) from a dedicated vitest

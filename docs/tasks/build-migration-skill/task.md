@@ -100,3 +100,15 @@ workflow needs and how they look.
 - Grilling #1 Q6 (extend onboard-workflow, now superseded by R1Q1's
   one-skill decision), Q11.1 (types scoped by phase).
 completed_at: 2026-09-03T20:03:00Z
+
+## Implementation notes (harvested)
+
+The migration skill is `setup-workflow` (replaces onboard-workflow; handles both
+fresh onboard + migrate via the `schema_version` stamp in state.yaml).
+`resources/upgrade-2-to-3.md` encodes the proven 9-step adoption (with the 6
+deviations). `docs/migration-target.yaml` is the versioned target-state spec
+distilled from grilling #1's 20 decisions, verified against the actual repo.
+Structure assertions in tests/skills.test.ts verify the skill references
+upgrade-2-to-3, migration-target.yaml, schema_version, and the
+dry-run/backup/idempotent safety guarantees. First run = this repo (the
+adoption it distills); reusable for any repo on an older schema.
