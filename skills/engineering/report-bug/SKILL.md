@@ -28,7 +28,7 @@ then either fix a trivial bug on the spot or promote it to a task.
   that is red when the bug is present and green after the fix. The sole
   exception is an untestable defect (e.g. visual-only); document the reason
   in the bug doc.
-- **Do not require `skills/report-bug/resources/repro-schemas/`.** Use them if
+- **Do not require `skills/engineering/report-bug/resources/repro-schemas/`.** Use them if
   present; otherwise proceed without them.
 - **If `docs/dev-env.md` is missing**, ask the user how to start the dev
   environment and how reproduction should work.

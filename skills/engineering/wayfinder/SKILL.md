@@ -84,7 +84,7 @@ The body is the canonical low-resolution map:
 Tasks live at `docs/tasks/<task-slug>/task.md` and are listed in the map's
 `tasks` array. Each task has one planning/execution type. Choose the type using
 this table, then follow the matching planning resource in
-`skills/wayfinder/resources/` before writing the task:
+`skills/engineering/wayfinder/resources/` before writing the task:
 
 - `research` — gather high-trust evidence;
 - `prototype` — build a cheap artifact to answer a design question;

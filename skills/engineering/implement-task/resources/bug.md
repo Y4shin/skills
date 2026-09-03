@@ -16,6 +16,6 @@ mode from the invocation prose that follows the task reference.
    `resources/bug/autonomous.md`. This is the unchanged autonomous bug
    pipeline.
 
-Only this top-level file is referenced by `skills/implement-task/SKILL.md`.
+Only this top-level file is referenced by `skills/engineering/implement-task/SKILL.md`.
 The mode-specific resources own their respective pipelines; this router must
 not duplicate them.

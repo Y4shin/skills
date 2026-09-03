@@ -4,10 +4,10 @@
  * path-protection backstop.
  *
  * After splitting the visualizer out of /grilling:
- *  - skills/grilling/SKILL.md is the text-based skill (ask_user_question),
- *    and skills/wayfinder/resources/grilling.md drives that text path.
- *  - skills/grilling-with-ui/SKILL.md is the browser-visualized variant that
- *    drives the grilling CLI (skills/grilling-with-ui/grilling-cli.mjs).
+ *  - skills/engineering/grilling/SKILL.md is the text-based skill (ask_user_question),
+ *    and skills/engineering/wayfinder/resources/grilling.md drives that text path.
+ *  - skills/engineering/grilling-with-ui/SKILL.md is the browser-visualized variant that
+ *    drives the grilling CLI (skills/engineering/grilling-with-ui/grilling-cli.mjs).
  *
  * These tests observe three seams:
  *  1. Grep: grilling-with-ui SKILL.md contains NO .grilling.json, tmpdir, or
@@ -37,7 +37,7 @@ function readFile(relativePath: string): string {
 
 describe("seam 1 — hiding contract: no .grilling.json or temp-dir refs", () => {
   const files = [
-    "skills/grilling-with-ui/SKILL.md",
+    "skills/engineering/grilling-with-ui/SKILL.md",
   ];
 
   describe.each(files)("%s", (file) => {
@@ -72,7 +72,7 @@ describe("seam 1 — hiding contract: no .grilling.json or temp-dir refs", () =>
 // ─── Seam 2: structural — full round loop via CLI surface ─────────────
 
 describe("seam 2 — grilling-with-ui SKILL.md describes the full round loop via CLI", () => {
-  const content = readFile("skills/grilling-with-ui/SKILL.md");
+  const content = readFile("skills/engineering/grilling-with-ui/SKILL.md");
 
   test("mentions start (launch the session)", () => {
     expect(content).toMatch(/\bstart\b/);
@@ -133,7 +133,7 @@ describe("seam 2 — grilling-with-ui SKILL.md describes the full round loop via
 // ─── Seam 2b: core semantics preserved ────────────────────────────────
 
 describe("seam 2b — core grilling semantics preserved in grilling-with-ui SKILL.md", () => {
-  const content = readFile("skills/grilling-with-ui/SKILL.md");
+  const content = readFile("skills/engineering/grilling-with-ui/SKILL.md");
 
   test("preserves design tree concept", () => {
     expect(content).toMatch(/design tree/i);
@@ -187,7 +187,7 @@ describe("seam 2b — core grilling semantics preserved in grilling-with-ui SKIL
 // ─── Seam 2c: text-based grilling skill does not drive the CLI ────────
 
 describe("seam 2c — text-based grilling skill uses ask_user_question, not the CLI", () => {
-  const content = readFile("skills/grilling/SKILL.md");
+  const content = readFile("skills/engineering/grilling/SKILL.md");
 
   test("drives rounds through ask_user_question", () => {
     expect(content).toMatch(/ask_user_question/);
@@ -203,7 +203,7 @@ describe("seam 2c — text-based grilling skill uses ask_user_question, not the 
 // ─── Seam 2d: wayfinder grilling.md reverted to the text path ─────────
 
 describe("seam 2d — wayfinder grilling.md drives the text path, not the CLI", () => {
-  const content = readFile("skills/wayfinder/resources/grilling.md");
+  const content = readFile("skills/engineering/wayfinder/resources/grilling.md");
 
   test("asks one question at a time and does not answer for the user", () => {
     expect(content).toMatch(/one question at a time/i);

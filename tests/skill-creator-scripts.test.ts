@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { describe, expect, test, afterAll, beforeAll } from "vitest";
 
 const PROJECT = process.cwd();
-const SCRIPTS_DIR = join(PROJECT, "skills", "skill-creator", "scripts");
+const SCRIPTS_DIR = join(PROJECT, "skills", "engineering", "skill-creator", "scripts");
 
 function runScript(scriptName: string, args: string[], cwd?: string) {
   return spawnSync("node", [join(SCRIPTS_DIR, scriptName), ...args], {
@@ -249,13 +249,13 @@ describe("validate_skill.mjs", () => {
   });
 
   test("dogfood: validates skills/skill-creator (PASS)", () => {
-    const result = runScript("validate_skill.mjs", ["skills/skill-creator"]);
+    const result = runScript("validate_skill.mjs", ["skills/engineering/skill-creator"]);
     expect(result.status).toBe(0);
     expect(result.stdout.trim()).toBe("OK");
   });
 
   test("dogfood: validates skills/tdd (PASS)", () => {
-    const result = runScript("validate_skill.mjs", ["skills/tdd"]);
+    const result = runScript("validate_skill.mjs", ["skills/engineering/tdd"]);
     expect(result.status).toBe(0);
     expect(result.stdout.trim()).toBe("OK");
   });

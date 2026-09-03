@@ -72,7 +72,7 @@ installed Pi API.
   title containing `type: bug`) makes the YAML invalid; the task tools
   then *silently skip* the file. Quote such values.
 - **Skill helper-script testing (CLI seam):** when a skill ships executable
-  helper scripts (e.g. `skills/skill-creator/scripts/*.mjs`), test them via
+  helper scripts (e.g. `skills/engineering/skill-creator/scripts/*.mjs`), test them via
   `spawnSync` on the script CLI (stdout + exit code) from a dedicated vitest
   file (e.g. `tests/skill-creator-scripts.test.ts`). Pin `cwd` to the repo
   root, give each `spawnSync` a timeout, and use `mkdtempSync` + `try/finally

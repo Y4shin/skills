@@ -830,7 +830,7 @@ export default function (pi: ExtensionAPI) {
 
   const SKIP_DIRS = new Set(["node_modules", ".git", ".venv", "dist", "build", "coverage", "__pycache__"]);
 
-  // Single source of truth for the 12 Fowler smells is skills/code-review/smells.md.
+  // Single source of truth for the 12 Fowler smells is skills/engineering/code-review/smells.md.
   // This inlined copy is a fallback floor; keep it in sync with that file.
   const SMELL_BASELINE = `# Smell baseline
 

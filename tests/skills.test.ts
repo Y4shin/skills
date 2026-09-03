@@ -3,7 +3,7 @@
  * Verifies that all files have the expected structure and references.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
@@ -76,23 +76,23 @@ describe("agent frontmatter", () => {
 // ─── Skill SKILL.md structure tests ──────────────────────────────────
 
 const SKILL_FILES = [
-  "skills/task-overview/SKILL.md",
-  "skills/onboard-workflow/SKILL.md",
-  "skills/wayfinder/SKILL.md",
-  "skills/implement-task/SKILL.md",
-  "skills/finalize-task/SKILL.md",
-  "skills/report-bug/SKILL.md",
-  "skills/tdd/SKILL.md",
-  "skills/code-review/SKILL.md",
-  "skills/task-workflow-doctor/SKILL.md",
-  "skills/diagnosing-bugs/SKILL.md",
-  "skills/codebase-design/SKILL.md",
-  "skills/grilling/SKILL.md",
-  "skills/grilling-with-ui/SKILL.md",
-  "skills/domain-modeling/SKILL.md",
-  "skills/improve-codebase-architecture/SKILL.md",
-  "skills/wait-what/SKILL.md",
-  "skills/skill-creator/SKILL.md",
+  "skills/engineering/task-overview/SKILL.md",
+  "skills/engineering/onboard-workflow/SKILL.md",
+  "skills/engineering/wayfinder/SKILL.md",
+  "skills/engineering/implement-task/SKILL.md",
+  "skills/engineering/finalize-task/SKILL.md",
+  "skills/engineering/report-bug/SKILL.md",
+  "skills/engineering/tdd/SKILL.md",
+  "skills/engineering/code-review/SKILL.md",
+  "skills/engineering/task-workflow-doctor/SKILL.md",
+  "skills/engineering/diagnosing-bugs/SKILL.md",
+  "skills/engineering/codebase-design/SKILL.md",
+  "skills/engineering/grilling/SKILL.md",
+  "skills/engineering/grilling-with-ui/SKILL.md",
+  "skills/engineering/domain-modeling/SKILL.md",
+  "skills/engineering/improve-codebase-architecture/SKILL.md",
+  "skills/productivity/wait-what/SKILL.md",
+  "skills/engineering/skill-creator/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -137,13 +137,13 @@ describe("package.json", () => {
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
     expect(pkg.pi.skills.length).toBe(17);
-    expect(pkg.pi.skills).toContain("./skills/codebase-design");
-    expect(pkg.pi.skills).toContain("./skills/domain-modeling");
-    expect(pkg.pi.skills).toContain("./skills/improve-codebase-architecture");
-    expect(pkg.pi.skills).toContain("./skills/grilling");
-    expect(pkg.pi.skills).toContain("./skills/grilling-with-ui");
-    expect(pkg.pi.skills).toContain("./skills/wait-what");
-    expect(pkg.pi.skills).toContain("./skills/skill-creator");
+    expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
+    expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
+    expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
+    expect(pkg.pi.skills).toContain("./skills/engineering/grilling");
+    expect(pkg.pi.skills).toContain("./skills/engineering/grilling-with-ui");
+    expect(pkg.pi.skills).toContain("./skills/productivity/wait-what");
+    expect(pkg.pi.skills).toContain("./skills/engineering/skill-creator");
   });
 
   test("has subagents config", () => {
@@ -158,14 +158,27 @@ describe("package.json", () => {
   test("no skills/archive", () => {
     expect(existsSync(join(PROJECT, "skills", "archive"))).toBe(false);
   });
+
+  test("skills are organized into promoted buckets", () => {
+    // Bucket layout (adopt-mp-skills-way, grilling #1 Q3):
+    // engineering/ + productivity/ are promoted; misc/in-progress/deprecated are not.
+    for (const bucket of ["engineering", "productivity", "misc", "in-progress", "deprecated"]) {
+      expect(existsSync(join(PROJECT, "skills", bucket))).toBe(true);
+    }
+    // No skill dirs left at the top level except the buckets.
+    const top = readdirSync(join(PROJECT, "skills"));
+    for (const entry of top) {
+      expect(["engineering", "productivity", "misc", "in-progress", "deprecated"]).toContain(entry);
+    }
+  });
 });
 
 describe("grilling skill references", () => {
-  const content = readFile("skills/grilling/SKILL.md");
+  const content = readFile("skills/engineering/grilling/SKILL.md");
 
   test("is registered as the reusable Pi grilling skill", () => {
     const pkg = JSON.parse(readFile("package.json"));
-    expect(pkg.pi.skills).toContain("./skills/grilling");
+    expect(pkg.pi.skills).toContain("./skills/engineering/grilling");
     expect(content).toMatch(/^name: grilling/m);
     expect(content).toMatch(/model-invoked|Pi-native/i);
     expect(content).toContain("https://raw.githubusercontent.com/mattpocock/skills/refs/heads/main/skills/productivity/grilling/SKILL.md");
@@ -198,11 +211,11 @@ describe("grilling skill references", () => {
 });
 
 describe("grilling-with-ui skill references", () => {
-  const content = readFile("skills/grilling-with-ui/SKILL.md");
+  const content = readFile("skills/engineering/grilling-with-ui/SKILL.md");
 
   test("is registered as the reusable Pi grilling-with-ui skill", () => {
     const pkg = JSON.parse(readFile("package.json"));
-    expect(pkg.pi.skills).toContain("./skills/grilling-with-ui");
+    expect(pkg.pi.skills).toContain("./skills/engineering/grilling-with-ui");
     expect(content).toMatch(/^name: grilling-with-ui/m);
     expect(content).toMatch(/model-invoked|Pi-native/i);
     expect(content).toContain("https://raw.githubusercontent.com/mattpocock/skills/refs/heads/main/skills/productivity/grilling/SKILL.md");
@@ -235,11 +248,11 @@ describe("grilling-with-ui skill references", () => {
 });
 
 describe("domain-modeling skill references", () => {
-  const content = readFile("skills/domain-modeling/SKILL.md");
+  const content = readFile("skills/engineering/domain-modeling/SKILL.md");
 
   test("is registered as a model-invoked Pi skill", () => {
     const pkg = JSON.parse(readFile("package.json"));
-    expect(pkg.pi.skills).toContain("./skills/domain-modeling");
+    expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(content).toMatch(/^name: domain-modeling/m);
     expect(content).toMatch(/model-invoked|Pi-native/i);
   });
@@ -257,7 +270,7 @@ describe("domain-modeling skill references", () => {
 });
 
 describe("improve-codebase-architecture skill references", () => {
-  const content = readFile("skills/improve-codebase-architecture/SKILL.md");
+  const content = readFile("skills/engineering/improve-codebase-architecture/SKILL.md");
 
   test("routes the survey through the scout and wayfinder", () => {
     expect(content).toContain("architecture-scout");
@@ -293,7 +306,7 @@ describe("improve-codebase-architecture skill references", () => {
   test("is explicitly user-invoked and has an offline report scaffold", () => {
     const fm = parseFrontmatter(content);
     expect(fm["disable-model-invocation"]).toBe("true");
-    const report = readFile("skills/improve-codebase-architecture/HTML-REPORT.md");
+    const report = readFile("skills/engineering/improve-codebase-architecture/HTML-REPORT.md");
     expect(report.trim().length).toBeGreaterThan(0);
     expect(report).toContain("vendor/tailwind.min.js");
     expect(report).toContain("vendor/mermaid.min.js");
@@ -301,13 +314,13 @@ describe("improve-codebase-architecture skill references", () => {
   });
 
   test("vendors both report dependencies", () => {
-    expect(readFile("skills/improve-codebase-architecture/vendor/tailwind.min.js").length).toBeGreaterThan(100_000);
-    expect(readFile("skills/improve-codebase-architecture/vendor/mermaid.min.js").length).toBeGreaterThan(1_000_000);
+    expect(readFile("skills/engineering/improve-codebase-architecture/vendor/tailwind.min.js").length).toBeGreaterThan(100_000);
+    expect(readFile("skills/engineering/improve-codebase-architecture/vendor/mermaid.min.js").length).toBeGreaterThan(1_000_000);
   });
 });
 
 describe("codebase-design skill references", () => {
-  const content = readFile("skills/codebase-design/SKILL.md");
+  const content = readFile("skills/engineering/codebase-design/SKILL.md");
 
   test("documents Pi-native architecture exploration vocabulary", () => {
     expect(content).toMatch(/CodeGraph/i);
@@ -370,7 +383,7 @@ describe("human-mode resource routing", () => {
   const routers = ["feature", "bug"];
 
   test.each(routers)("%s router is slim and references both mode resources", (kind) => {
-    const content = readFile(`skills/implement-task/resources/${kind}.md`);
+    const content = readFile(`skills/engineering/implement-task/resources/${kind}.md`);
     expect(content).toContain(`resources/${kind}/autonomous.md`);
     expect(content).toContain(`resources/${kind}/human.md`);
     expect(content).toMatch(/ambiguous/i);
@@ -379,14 +392,14 @@ describe("human-mode resource routing", () => {
   });
 
   test.each(routers)("%s mode resources exist and autonomous copy is substantial", (kind) => {
-    const autonomous = readFile(`skills/implement-task/resources/${kind}/autonomous.md`);
-    const human = readFile(`skills/implement-task/resources/${kind}/human.md`);
+    const autonomous = readFile(`skills/engineering/implement-task/resources/${kind}/autonomous.md`);
+    const human = readFile(`skills/engineering/implement-task/resources/${kind}/human.md`);
     expect(autonomous.length).toBeGreaterThan(2500);
     expect(human.length).toBeGreaterThan(100);
   });
 
   test.each(routers)("%s router documents clear human phrases, variants, and autonomous fallback", (kind) => {
-    const content = readFile(`skills/implement-task/resources/${kind}.md`);
+    const content = readFile(`skills/engineering/implement-task/resources/${kind}.md`);
     expect(content).toMatch(/implement (the task )?(yourself|manually)|human mode|manual mode/i);
     expect(content).toMatch(/no prose|no trailing prose|fallback|autonomous/i);
     expect(content).toMatch(/confirmation|confirm/i);
@@ -394,7 +407,7 @@ describe("human-mode resource routing", () => {
 });
 
 describe("human-mode feature pipeline", () => {
-  const content = readFile("skills/implement-task/resources/feature/human.md");
+  const content = readFile("skills/engineering/implement-task/resources/feature/human.md");
 
   test("requires collaborative architecture planning and explicit consent before implementation", () => {
     expect(content).toMatch(/architecture[- ]spec/i);
@@ -441,7 +454,7 @@ describe("human-mode feature pipeline", () => {
 });
 
 describe("human-mode bug pipeline", () => {
-  const content = readFile("skills/implement-task/resources/bug/human.md");
+  const content = readFile("skills/engineering/implement-task/resources/bug/human.md");
 
   test("requires collaborative reproduction and diagnosis planning with consent", () => {
     expect(content).toMatch(/reproduction|reproduce/i);
@@ -486,14 +499,14 @@ describe("human-mode integration coverage", () => {
   const taskKinds = ["feature", "bug"] as const;
 
   test.each(taskKinds)("%s router is the sole dispatch entry and discovers both modes", (kind) => {
-    const router = readFile(`skills/implement-task/resources/${kind}.md`);
+    const router = readFile(`skills/engineering/implement-task/resources/${kind}.md`);
     expect(router).toContain(`resources/${kind}/autonomous.md`);
     expect(router).toContain(`resources/${kind}/human.md`);
     expect(router).toMatch(/no trailing mode prose|no prose/i);
     expect(router).toMatch(/ambiguous/i);
     expect(router).toContain("ask_user_question");
 
-    const wrapper = readFile("skills/implement-task/SKILL.md");
+    const wrapper = readFile("skills/engineering/implement-task/SKILL.md");
     expect(wrapper).toContain(`resources/${kind}.md`);
     expect(wrapper).not.toContain(`resources/${kind}/human.md`);
     expect(wrapper).not.toContain(`resources/${kind}/autonomous.md`);
@@ -501,7 +514,7 @@ describe("human-mode integration coverage", () => {
 
   test.each(taskKinds.flatMap((kind) => modes.map((mode) => [kind, mode] as const)))
     ("%s %s resource exists and is non-empty", (kind, mode) => {
-      const content = readFile(`skills/implement-task/resources/${kind}/${mode}.md`);
+      const content = readFile(`skills/engineering/implement-task/resources/${kind}/${mode}.md`);
       expect(content.trim().length).toBeGreaterThan(100);
     });
 
@@ -512,7 +525,7 @@ describe("human-mode integration coverage", () => {
     expect(reviewer.tools).not.toMatch(/edit|write|land-worker/);
 
     for (const kind of taskKinds) {
-      const human = readFile(`skills/implement-task/resources/${kind}/human.md`);
+      const human = readFile(`skills/engineering/implement-task/resources/${kind}/human.md`);
       expect(human).toMatch(/read[- ]only/i);
       expect(human).toMatch(/must not edit|cannot edit/i);
       expect(human).toContain("land-worker");
@@ -521,7 +534,7 @@ describe("human-mode integration coverage", () => {
   });
 
   test.each(taskKinds)("%s human protocol covers verifier failure and approval rejection", (kind) => {
-    const human = readFile(`skills/implement-task/resources/${kind}/human.md`);
+    const human = readFile(`skills/engineering/implement-task/resources/${kind}/human.md`);
     expect(human).toMatch(/verifier[- ]first/i);
     expect(human).toMatch(/fast[- ]fail/i);
     expect(human).toMatch(/failure.*return|return.*failure/i);
@@ -530,7 +543,7 @@ describe("human-mode integration coverage", () => {
   });
 
   test("feature human protocol preserves collaborative post-handoff assistance boundary", () => {
-    const human = readFile("skills/implement-task/resources/feature/human.md");
+    const human = readFile("skills/engineering/implement-task/resources/feature/human.md");
     expect(human).toMatch(/after the per[- ]slice handoff|after.*handoff/i);
     expect(human).toMatch(/explicit request.*code assistance|code assistance.*explicit/i);
     expect(human).toMatch(/multiple slices|each slice|every slice/i);
@@ -540,7 +553,7 @@ describe("human-mode integration coverage", () => {
 
 describe("skill cross-references", () => {
   test("overview references all core skills", () => {
-    const content = readFile("skills/task-overview/SKILL.md");
+    const content = readFile("skills/engineering/task-overview/SKILL.md");
     expect(content).toContain("wayfinder");
     expect(content).toContain("implement-task");
     expect(content).toContain("finalize-task");
@@ -548,7 +561,7 @@ describe("skill cross-references", () => {
   });
 
   test("implement-task wrapper reads type and dispatches to resources", () => {
-    const content = readFile("skills/implement-task/SKILL.md");
+    const content = readFile("skills/engineering/implement-task/SKILL.md");
     expect(content).toContain("task_get");
     expect(content).toContain("type");
     expect(content).toContain("resources/feature.md");
@@ -561,7 +574,7 @@ describe("skill cross-references", () => {
   });
 
   test("wayfinder owns task creation and direct handoff", () => {
-    const content = readFile("skills/wayfinder/SKILL.md");
+    const content = readFile("skills/engineering/wayfinder/SKILL.md");
     expect(content).toContain("`create-task`, `to-spec`, and `to-tickets`");
     expect(content).toContain("mandatory grilling session");
     expect(content).toContain("implement-task");
@@ -571,84 +584,84 @@ describe("skill cross-references", () => {
 
   test("wayfinder has one planning resource per task type", () => {
     for (const type of ["feature", "bug", "research", "prototype", "grilling", "manual"]) {
-      const content = readFile(`skills/wayfinder/resources/${type}.md`);
+      const content = readFile(`skills/engineering/wayfinder/resources/${type}.md`);
       expect(content).toContain("Wayfinder Planning Resource");
       expect(content).toContain(`type: ${type}`);
     }
   });
 
   test("implement-task re-enters wayfinder after a map frontier", () => {
-    const content = readFile("skills/implement-task/SKILL.md");
+    const content = readFile("skills/engineering/implement-task/SKILL.md");
     expect(content).toContain("wayfinder <map-slug>");
     expect(content).toContain("reassess the map");
   });
 
   test("implement-task feature resource references task_dependency_levels", () => {
-    const content = readFile("skills/implement-task/resources/feature/autonomous.md");
+    const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
     expect(content).toContain("task_dependency_levels");
   });
 
   test("implement-task feature resource references tdd-worker agent", () => {
-    const content = readFile("skills/implement-task/resources/feature/autonomous.md");
+    const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
     expect(content).toContain("tdd-worker");
   });
 
   test("implement-task feature resource references slice-verifier agent", () => {
-    const content = readFile("skills/implement-task/resources/feature/autonomous.md");
+    const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
     expect(content).toContain("slice-verifier");
   });
 
   test("implement-task feature resource references land-worker agent", () => {
-    const content = readFile("skills/implement-task/resources/feature/autonomous.md");
+    const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
     expect(content).toContain("land-worker");
   });
 
   test("implement-task feature resource references deviation-reporter agent", () => {
-    const content = readFile("skills/implement-task/resources/feature/autonomous.md");
+    const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
     expect(content).toContain("deviation-reporter");
   });
 
   test("implement-task feature resource references code-reviewer agent", () => {
-    const content = readFile("skills/implement-task/resources/feature/autonomous.md");
+    const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
     expect(content).toContain("code-reviewer");
   });
 
   for (const resource of ["research", "prototype", "grilling", "manual"]) {
     test(`implement-task ${resource} resource exists and is non-coding`, () => {
-      const content = readFile(`skills/implement-task/resources/${resource}.md`);
+      const content = readFile(`skills/engineering/implement-task/resources/${resource}.md`);
       expect(content).toContain("Implement Task");
       expect(content).toContain("Completion evidence");
     });
   }
 
   test("implement-task bug resource references tdd-worker agent", () => {
-    const content = readFile("skills/implement-task/resources/bug/autonomous.md");
+    const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
     expect(content).toContain("tdd-worker");
   });
 
   test("implement-task bug resource references slice-verifier agent", () => {
-    const content = readFile("skills/implement-task/resources/bug/autonomous.md");
+    const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
     expect(content).toContain("slice-verifier");
   });
 
   test("implement-task bug resource references land-worker agent", () => {
-    const content = readFile("skills/implement-task/resources/bug/autonomous.md");
+    const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
     expect(content).toContain("land-worker");
   });
 
   test("implement-task bug resource references code-reviewer agent", () => {
-    const content = readFile("skills/implement-task/resources/bug/autonomous.md");
+    const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
     expect(content).toContain("code-reviewer");
   });
 
   test("implement-task bug resource uses red-first regression test rule", () => {
-    const content = readFile("skills/implement-task/resources/bug/autonomous.md");
+    const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
     expect(content).toMatch(/red.{0,40}test|test.{0,40}red/i);
   });
 
   test("feature and bug resources include failure toolbelt in order", () => {
-    const feature = readFile("skills/implement-task/resources/feature/autonomous.md");
-    const bug = readFile("skills/implement-task/resources/bug/autonomous.md");
+    const feature = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
+    const bug = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
     for (const content of [feature, bug]) {
       const splitIdx = content.indexOf("split");
       const retryIdx = content.indexOf("retry");
@@ -660,17 +673,17 @@ describe("skill cross-references", () => {
   });
 
   test("finalize-task references task_finalizable", () => {
-    const content = readFile("skills/finalize-task/SKILL.md");
+    const content = readFile("skills/engineering/finalize-task/SKILL.md");
     expect(content).toContain("task_finalizable");
   });
 
   test("finalize-task references task_map_tick", () => {
-    const content = readFile("skills/finalize-task/SKILL.md");
+    const content = readFile("skills/engineering/finalize-task/SKILL.md");
     expect(content).toContain("task_map_tick");
   });
 
   test("finalize-task Step 7 separates Pi tool calls from the shell archive block", () => {
-    const content = readFile("skills/finalize-task/SKILL.md");
+    const content = readFile("skills/engineering/finalize-task/SKILL.md");
     const step7Start = content.indexOf("## Step 7");
     expect(step7Start).toBeGreaterThan(-1);
     const step8Start = content.indexOf("## Step 8", step7Start);
@@ -701,85 +714,85 @@ describe("skill cross-references", () => {
   });
 
   test("finalize-task references task_map_finalizable", () => {
-    const content = readFile("skills/finalize-task/SKILL.md");
+    const content = readFile("skills/engineering/finalize-task/SKILL.md");
     expect(content).toContain("task_map_finalizable");
   });
 
   test("finalize-task has a type: bug branch", () => {
-    const content = readFile("skills/finalize-task/SKILL.md");
+    const content = readFile("skills/engineering/finalize-task/SKILL.md");
     expect(content).toMatch(/type\s*:\s*bug/i);
   });
 
   test("finalize-task bug branch archives bug docs to docs/bugs/archive", () => {
-    const content = readFile("skills/finalize-task/SKILL.md");
+    const content = readFile("skills/engineering/finalize-task/SKILL.md");
     expect(content).toContain("docs/bugs/archive");
   });
 
   test("finalize-task bug branch sets status fixed and fills fix_commit", () => {
-    const content = readFile("skills/finalize-task/SKILL.md");
+    const content = readFile("skills/engineering/finalize-task/SKILL.md");
     expect(content).toContain("status: fixed");
     expect(content).toContain("fix_commit");
   });
 
   test("finalize-task bug branch asks user when bug field is absent", () => {
-    const content = readFile("skills/finalize-task/SKILL.md");
+    const content = readFile("skills/engineering/finalize-task/SKILL.md");
     expect(content).toMatch(/ask.{0,80}bug/i);
   });
 
   test("finalize-task documents bug slug frontmatter convention", () => {
-    const content = readFile("skills/finalize-task/SKILL.md");
+    const content = readFile("skills/engineering/finalize-task/SKILL.md");
     expect(content).toContain("bug: <slug>");
   });
 
   test("onboard-workflow creates docs/bugs/archive directory", () => {
-    const content = readFile("skills/onboard-workflow/SKILL.md");
+    const content = readFile("skills/engineering/onboard-workflow/SKILL.md");
     expect(content).toContain("docs/bugs/archive");
   });
 
   test("onboard-workflow writes docs/dev-env.md template", () => {
-    const content = readFile("skills/onboard-workflow/SKILL.md");
+    const content = readFile("skills/engineering/onboard-workflow/SKILL.md");
     expect(content).toContain("docs/dev-env.md");
   });
 
   test("onboard-workflow does not clobber existing docs/dev-env.md", () => {
-    const content = readFile("skills/onboard-workflow/SKILL.md");
+    const content = readFile("skills/engineering/onboard-workflow/SKILL.md");
     expect(content).toMatch(/do not clobber|already exists|skip.*docs\/dev-env\.md|preserve.*docs\/dev-env\.md/i);
   });
 
   test("task-overview routes planning to wayfinder", () => {
-    const content = readFile("skills/task-overview/SKILL.md");
+    const content = readFile("skills/engineering/task-overview/SKILL.md");
     expect(content).toContain("/skill:wayfinder");
     expect(content).toContain("task_frontier");
   });
 
   test("task-overview routes report a bug to /skill:report-bug", () => {
-    const content = readFile("skills/task-overview/SKILL.md");
+    const content = readFile("skills/engineering/task-overview/SKILL.md");
     expect(content).toContain("/skill:report-bug");
   });
 
   test("task-overview lists triage queue query", () => {
-    const content = readFile("skills/task-overview/SKILL.md");
+    const content = readFile("skills/engineering/task-overview/SKILL.md");
     expect(content).toContain('grep -l "status: reported" docs/bugs/*.md');
   });
 
   test("task-overview mentions docs/bugs as bug list location", () => {
-    const content = readFile("skills/task-overview/SKILL.md");
+    const content = readFile("skills/engineering/task-overview/SKILL.md");
     expect(content).toContain("docs/bugs/");
   });
 
   test("task-workflow-doctor references onboard-workflow", () => {
-    const content = readFile("skills/task-workflow-doctor/SKILL.md");
+    const content = readFile("skills/engineering/task-workflow-doctor/SKILL.md");
     expect(content).toContain("onboard-workflow");
   });
 
   test("task-workflow-doctor has not-a-fixer contract", () => {
-    const content = readFile("skills/task-workflow-doctor/SKILL.md");
+    const content = readFile("skills/engineering/task-workflow-doctor/SKILL.md");
     expect(content).toContain("diagnoses");
     expect(content).toContain("routes");
   });
 
   test("implement-task bug resource references diagnosing-bugs skill", () => {
-    const content = readFile("skills/implement-task/resources/bug/autonomous.md");
+    const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
     expect(content).toContain("diagnosing-bugs");
   });
 
@@ -789,13 +802,13 @@ describe("skill cross-references", () => {
   });
 
   test("diagnosing-bugs skill names Phase 1 as non-skippable", () => {
-    const content = readFile("skills/diagnosing-bugs/SKILL.md");
+    const content = readFile("skills/engineering/diagnosing-bugs/SKILL.md");
     expect(content).toContain("Phase 1");
     expect(content).toContain("non-skippable");
   });
 
   test("diagnosing-bugs skill documents skippable phases with recorded justification", () => {
-    const content = readFile("skills/diagnosing-bugs/SKILL.md");
+    const content = readFile("skills/engineering/diagnosing-bugs/SKILL.md");
     expect(content).toContain("skippable");
     expect(content).toMatch(/justified|recorded/);
   });
