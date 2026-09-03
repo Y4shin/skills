@@ -4,7 +4,7 @@ type: feature
 slug: build-migration-skill
 title: Build the reusable migration skill (auto-detecting onboard+migrate) from the proven adoption steps, with upgrade-2-to-3 resource, target-state spec, and tests
 map: adopt-mp-skills-way
-status: ready
+status: done
 blocked_by:
 - run-adoption-migration
 slices:
@@ -99,3 +99,4 @@ workflow needs and how they look.
   R3Q2 (first run = this repo, already done), R3Q3 (structure assertions).
 - Grilling #1 Q6 (extend onboard-workflow, now superseded by R1Q1's
   one-skill decision), Q11.1 (types scoped by phase).
+completed_at: 2026-09-03T20:03:00Z
