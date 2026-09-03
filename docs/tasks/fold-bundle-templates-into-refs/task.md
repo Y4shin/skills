@@ -4,7 +4,7 @@ type: feature
 slug: fold-bundle-templates-into-refs
 title: Fold the bundle templates + verified 17-slot stack into the support-script references
 map: portable-skill-authoring
-status: ready
+status: done
 blocked_by:
 - build-skill-creator-skill
 slices:
