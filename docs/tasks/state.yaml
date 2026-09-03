@@ -1,2 +1,6 @@
-task: None
+task: build-skill-creator-skill
 slice: None
+landed:
+  build-skill-creator-skill:
+    - scaffold-and-register
+

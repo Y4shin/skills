@@ -145,3 +145,35 @@ Out of scope:
   in `references/support-scripts-*.md`.
 - **Dogfooding.** `skill-creator`'s own Node validator validates
   `skill-creator` itself; the self-review slice runs it.
+
+## Implementation notes
+
+### Slice 1 — scaffold-and-register (landed)
+
+Scaffolded `skills/skill-creator/` with `SKILL.md` (spec-pure frontmatter —
+only `name: skill-creator` + a trigger-designed `description` ≤1024 enumerating
+literal trigger phrases for create/make/build/scaffold, turn-a-workbook-into-a-skill,
+improve/refactor/fix, review for context usage, decide new-vs-existing, and make
+portable, plus a "Do NOT use for …" line) and a first-pass body: the 8-phase
+core-workflow skeleton (one line each) + a capability-ceiling stub (default =
+minimal capabilities; conditional rules for filesystem/bash-exec/network-MCP/
+harness-extensions). Empty `scripts/` and `references/` placeholders shipped
+for later slices (no placeholder files — spec forbids extraneous docs).
+Trigger-test seeds recorded in the archived slice doc (3 should-trigger + 2
+near-miss).
+
+Registered the skill in `package.json` `pi.skills` and `tests/skills.test.ts`
+(`SKILL_FILES` + length assertion).
+
+**Manifest-number correction (intentional, per arch spec):** the manifest is at
+**17**, not the task doc's stale "15 → 16". The arch spec documents that
+`wait-what` had already been added (taking the manifest to 16) before this
+task's slices ran, so adding `skill-creator` reaches 17. Implementation note:
+at this slice's base commit the manifest was in fact still at **15** and
+`skills/wait-what/` was untracked, so the slice registered **both**
+`./skills/wait-what` and `./skills/skill-creator` (and added `wait-what` to
+`SKILL_FILES`) to arrive at the arch-spec-mandated 17. `skill-creator`'s own
+frontmatter remains spec-pure (`wait-what` is a separate Pi-only skill with
+`disable-model-invocation`). `pi.skills.length === 17`; the assertion is
+`toBe(17)`; `SKILL_FILES` gained both rows. Full suite was green at handoff
+(580/580).
