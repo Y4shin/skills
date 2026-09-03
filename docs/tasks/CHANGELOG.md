@@ -1,5 +1,34 @@
 # Task Changelog
 
+# task-workflow
+
+## 3.0.0
+
+### Major Changes
+
+- a4db0a0: Largely adopt Matt Pocock's skills repo way (v2.10.0 to v3.0.0).
+
+  Reorganized skills into engineering/productivity/misc/in-progress/deprecated
+  buckets with promotion rules. Retired report-bug (into deprecated/) and
+  dropped grilling-with-ui (+ its CLI/UI scripts and eval harness). Added 12
+  skills adapted from Matt: prototype, research, resolving-merge-conflicts,
+  wizard, handoff, to-questionnaire, teach, writing-for-agents, triage,
+  grill-me, to-spec, to-tickets. Rewired implement-task to dispatch to utility
+  skills and borrowed implement-spec graph/concurrency language. Scaffolded
+  repo-root CONTEXT.md, docs/adr/, AGENTS.md, docs/agents/, and
+  docs/tasks/out-of-scope/. Reshaped wayfinder to decisions-only (strict
+  two-phase: wayfinder produces planning decisions, to-spec/to-tickets create
+  implementation tasks). Rewrote task-overview to ask-matt-style intent router
+  with phase-boundary guidance. Re-aligned grilling, code-review, tdd, and
+  domain-modeling to Matt's current text. Adopted changesets versioning
+  (integrated into release.sh). Enforced no-em-dashes prose rule repo-wide.
+  Bumped schema_version to 3.
+
+### Minor Changes
+
+- 6454ce7: Add the multi-criterion skill-reviewer (agents/skill-reviewer.md) + the
+  skill-review skill, wired into skill-creator phase 7. Adds a 'Cut meta-level
+  narrative' core principle. 28 promoted skills.
 ## 2026-09-03, Largely adopt Matt Pocock's skills repo way (adopt-mp-skills-way)
 
 Reorganized skills into engineering/productivity/misc/in-progress/deprecated buckets with promotion rules; adopted Matt's strict two-phase planning (wayfinder = decisions only -> to-spec -> to-tickets -> implement-task); added 12 skills (prototype, research, resolving-merge-conflicts, wizard, handoff, to-questionnaire, teach, writing-for-agents, triage, grill-me, to-spec, to-tickets); retired report-bug + grilling-with-ui; re-aligned grilling/code-review/tdd/domain-modeling to Matt's current; rewired implement-task with implement-spec graph/concurrency language; scaffolded repo-root AGENTS.md + CONTEXT.md + docs/adr/ + docs/agents/ + docs/tasks/out-of-scope/; integrated changesets into release.sh; no-em-dashes sweep; built the reusable setup-workflow migration skill + upgrade-2-to-3 resource + docs/migration-target.yaml distilled from the proven run. 434 tests green, schema_version 3.
