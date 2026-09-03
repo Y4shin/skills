@@ -116,7 +116,7 @@ fi
 # --------------------------------------------------------------------------
 # 7. Stage, commit, tag
 # --------------------------------------------------------------------------
-git add package.json docs/tasks/CHANGELOG.md
+git add package.json docs/tasks/CHANGELOG.md .changeset
 git commit -q -m "chore(release): releasing v${new_version}"
 git tag "v${new_version}" -m "v${new_version}"
 echo "Tagged v${new_version}"
