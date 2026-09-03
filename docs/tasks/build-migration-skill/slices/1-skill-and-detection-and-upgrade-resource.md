@@ -4,7 +4,7 @@ slug: skill-and-detection-and-upgrade-resource
 title: Build the auto-detecting migration skill (replacing onboard-workflow) + the upgrade-2-to-3 resource distilled from the proven adoption
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: l
 blocked_by: []
 ---
