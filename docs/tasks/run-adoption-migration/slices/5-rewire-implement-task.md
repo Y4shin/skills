@@ -4,7 +4,7 @@ slug: rewire-implement-task
 title: Wire implement-task to dispatch to the new utility skills + borrow implement-spec's graph/concurrency language
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: m
 blocked_by:
 - add-utility-skills
