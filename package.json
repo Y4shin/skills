@@ -61,7 +61,8 @@
       "./skills/productivity/writing-for-agents",
       "./skills/productivity/grill-me",
       "./skills/engineering/to-spec",
-      "./skills/engineering/to-tickets"
+      "./skills/engineering/to-tickets",
+      "./skills/engineering/eval-review"
     ],
     "subagents": {
       "agents": [

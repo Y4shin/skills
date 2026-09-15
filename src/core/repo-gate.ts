@@ -29,7 +29,13 @@ export interface ReadOriginDeps extends WalkDeps {
 
 export interface GateConfig {
   disableOnRepo: string[];
-  enable: boolean;
+  /**
+   * Local enable override. `true` forces the package on, `false` forces it
+   * off, and `undefined` means no local override, fall back to disableOnRepo
+   * patterns. Only read from the project settings file; a global `enable` is
+   * ignored (the global side configures patterns, not a default switch).
+   */
+  enable?: boolean;
   diagnostics: string[];
 }
 
@@ -230,9 +236,11 @@ function parseOriginFromConfig(
  *   global:  $PI_CODING_AGENT_DIR/settings.json  or  ~/.pi/agent/settings.json
  *   project: <repo-root>/.pi/settings.json
  *
- * Project settings override global settings per key. Missing or unreadable
- * files are treated as empty (fail-open). The returned `diagnostics` array
- * records malformed JSON or invalid shape, but this function never throws.
+ * disableOnRepo patterns are read from the global file only. The local enable
+ * override (force-on / force-off) is read from the project file only. Missing
+ * or unreadable files are treated as empty (fail-open). The returned
+ * `diagnostics` array records malformed JSON or invalid shape, but this
+ * function never throws.
  */
 export function readGateConfig(
   cwd: string,
@@ -258,64 +266,33 @@ export function readGateConfig(
   const globalTaskWorkflow = getTaskWorkflow(globalSettings);
   const projectTaskWorkflow = getTaskWorkflow(projectSettings);
 
-  // Project overrides global per key, matching pi's deepMergeSettings semantics
-  // for the taskWorkflow object.
-  const disableOnRepo = pickOverride(
-    projectTaskWorkflow,
-    globalTaskWorkflow,
-    "disableOnRepo",
-  );
-  const enable = pickOverride(
-    projectTaskWorkflow,
-    globalTaskWorkflow,
-    "enable",
-  );
-
-  const result: GateConfig = {
-    disableOnRepo: [],
-    enable: true,
-    diagnostics,
-  };
-
-  if (disableOnRepo !== null) {
-    if (Array.isArray(disableOnRepo.value)) {
-      result.disableOnRepo = validateRegexArray(
-        disableOnRepo.value,
-        diagnostics,
-      );
+  // disableOnRepo is global-only (patterns live on the personal/global side).
+  // enable is project-only (a local override of the global pattern verdict).
+  let disableOnRepo: string[] = [];
+  if (globalTaskWorkflow && "disableOnRepo" in globalTaskWorkflow) {
+    const value = globalTaskWorkflow.disableOnRepo;
+    if (Array.isArray(value)) {
+      disableOnRepo = validateRegexArray(value, diagnostics);
     } else {
       diagnostics.push(
-        `taskWorkflow.disableOnRepo is not an array in ${disableOnRepo.source} settings, using []`,
+        `taskWorkflow.disableOnRepo is not an array in global settings, using []`,
       );
     }
   }
 
-  if (enable !== null) {
-    if (typeof enable.value === "boolean") {
-      result.enable = enable.value;
+  let enable: boolean | undefined;
+  if (projectTaskWorkflow && "enable" in projectTaskWorkflow) {
+    const value = projectTaskWorkflow.enable;
+    if (typeof value === "boolean") {
+      enable = value;
     } else {
       diagnostics.push(
-        `taskWorkflow.enable is not a boolean in ${enable.source} settings, defaulting to true`,
+        `taskWorkflow.enable is not a boolean in project settings, ignoring`,
       );
     }
   }
 
-  return result;
-}
-
-interface Override<T> {
-  value: T;
-  source: "project" | "global";
-}
-
-function pickOverride(
-  project: Record<string, unknown> | null,
-  global: Record<string, unknown> | null,
-  key: string,
-): Override<unknown> | null {
-  if (project && key in project) return { value: project[key], source: "project" };
-  if (global && key in global) return { value: global[key], source: "global" };
-  return null;
+  return { disableOnRepo, enable, diagnostics };
 }
 
 function readSettingsJson(
@@ -395,30 +372,38 @@ export function resolveGate(
 
 /**
  * Decide whether the gate is active for the given normalized origin,
- * disableOnRepo patterns, and project enable flag.
+ * disableOnRepo patterns, and local enable override.
  *
- * Truth table (from gate-config-mechanics findings.md):
- *   active = matches !== (projectEnable === false)
- *   (i.e. work repos are active unless locally re-enabled; personal repos are
- *   inactive unless opted out via project.enable=false.)
+ * `enable` is authoritative and means what it says:
+ *   - `true`  -> gate inactive (package forced on), patterns ignored
+ *   - `false` -> gate active (package forced off), patterns ignored
+ *   - undefined -> fall back to disableOnRepo patterns: a match gates the
+ *     repo (work repo), a non-match loads it (personal repo).
  *
- * | patterns match | enable | active | meaning |
- * | no             | true   | false  | personal |
- * | no             | false  | true   | escape hatch |
- * | yes            | true   | true   | work repo |
- * | yes            | false  | false  | work repo re-enabled locally |
- * | empty patterns | *      | false  | gate disabled globally |
+ * Truth table:
+ *
+ * | enable     | patterns match | active | meaning                       |
+ * | ---------- | ------------- | ------ | ----------------------------- |
+ * | true       | *             | false  | forced on locally             |
+ * | false      | *             | true   | forced off locally            |
+ * | undefined  | yes           | true   | work repo (auto-gated)        |
+ * | undefined  | no            | false  | personal repo (auto-loaded)  |
+ * | undefined  | (empty)       | false  | gate disabled globally        |
  */
 export function isWorkRepo(
   origin: string | null,
   patterns: string[],
-  projectEnable = true,
+  enable?: boolean,
 ): GateResult {
+  if (enable === true) {
+    return { active: false, reason: "forced on locally (project.enable=true)" };
+  }
+  if (enable === false) {
+    return { active: true, reason: "forced off locally (project.enable=false)" };
+  }
+
   if (patterns.length === 0) {
-    return {
-      active: false,
-      reason: "no disableOnRepo patterns",
-    };
+    return { active: false, reason: "no disableOnRepo patterns" };
   }
 
   const diagnostics: string[] = [];
@@ -442,33 +427,16 @@ export function isWorkRepo(
     }
   }
 
-  const active = matches ? projectEnable !== false : projectEnable === false;
-
   if (matches) {
-    if (projectEnable === false) {
-      return {
-        active,
-        reason: "work repo re-enabled locally (project.enable=false)",
-        diagnostics: diagnostics.length > 0 ? diagnostics : undefined,
-      };
-    }
     return {
-      active,
+      active: true,
       reason: "work repo matched disableOnRepo pattern",
       diagnostics: diagnostics.length > 0 ? diagnostics : undefined,
     };
   }
 
-  if (projectEnable === false) {
-    return {
-      active,
-      reason: "personal repo opted out (project.enable=false)",
-      diagnostics: diagnostics.length > 0 ? diagnostics : undefined,
-    };
-  }
-
   return {
-    active,
+    active: false,
     reason: "personal repo (no disableOnRepo match)",
     diagnostics: diagnostics.length > 0 ? diagnostics : undefined,
   };

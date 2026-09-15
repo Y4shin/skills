@@ -165,11 +165,11 @@ describe("readGateConfig", () => {
       projectSettingsPath: "/project/.pi/settings.json",
     });
     expect(result.disableOnRepo).toEqual([]);
-    expect(result.enable).toBe(true);
+    expect(result.enable).toBeUndefined();
     expect(result.diagnostics).toEqual([]);
   });
 
-  test("reads global disableOnRepo and enable", () => {
+  test("reads global disableOnRepo; ignores a global enable", () => {
     const files: Record<string, string> = {
       "/global/settings.json": JSON.stringify({
         taskWorkflow: {
@@ -188,16 +188,15 @@ describe("readGateConfig", () => {
       projectSettingsPath: "/project/.pi/settings.json",
     });
     expect(result.disableOnRepo).toEqual(["^github\\.com/QNCGmbH/.*$"]);
-    expect(result.enable).toBe(false);
+    expect(result.enable).toBeUndefined();
     expect(result.diagnostics).toEqual([]);
   });
 
-  test("project overrides global per key", () => {
+  test("project enable is the local override", () => {
     const files: Record<string, string> = {
       "/global/settings.json": JSON.stringify({
         taskWorkflow: {
           disableOnRepo: ["^github\\.com/QNCGmbH/.*$"],
-          enable: true,
         },
       }),
       "/project/.pi/settings.json": JSON.stringify({
@@ -234,14 +233,14 @@ describe("readGateConfig", () => {
       projectSettingsPath: "/project/.pi/settings.json",
     });
     expect(result.disableOnRepo).toEqual([]);
-    expect(result.enable).toBe(true);
+    expect(result.enable).toBeUndefined();
     expect(result.diagnostics.length).toBe(1);
     expect(result.diagnostics[0]).toContain("not an array");
   });
 
-  test("defaults non-boolean enable to true with diagnostic", () => {
+  test("ignores a non-boolean project enable with a diagnostic", () => {
     const files: Record<string, string> = {
-      "/global/settings.json": JSON.stringify({
+      "/project/.pi/settings.json": JSON.stringify({
         taskWorkflow: { enable: "no" },
       }),
     };
@@ -254,7 +253,7 @@ describe("readGateConfig", () => {
       globalSettingsPath: "/global/settings.json",
       projectSettingsPath: "/project/.pi/settings.json",
     });
-    expect(result.enable).toBe(true);
+    expect(result.enable).toBeUndefined();
     expect(result.diagnostics.length).toBe(1);
     expect(result.diagnostics[0]).toContain("not a boolean");
   });
@@ -293,7 +292,7 @@ describe("readGateConfig", () => {
       projectSettingsPath: "/project/.pi/settings.json",
     });
     expect(result.disableOnRepo).toEqual([]);
-    expect(result.enable).toBe(true);
+    expect(result.enable).toBeUndefined();
     expect(result.diagnostics.length).toBeGreaterThan(0);
     expect(result.diagnostics[0]).toContain("failed to read settings");
   });
@@ -322,16 +321,12 @@ describe("resolveGate integration", () => {
 
   function makeGlobalSettings(
     disableOnRepo: string[],
-    enable?: boolean,
   ): string {
     const dir = mkdtempSync(join(tmpdir(), "repo-gate-global-"));
     const path = join(dir, "settings.json");
     const settings: Record<string, unknown> = {
       taskWorkflow: { disableOnRepo },
     };
-    if (enable !== undefined) {
-      (settings.taskWorkflow as Record<string, unknown>).enable = enable;
-    }
     writeFileSync(path, JSON.stringify(settings));
     return path;
   }
@@ -366,16 +361,16 @@ describe("resolveGate integration", () => {
     rmSync(repo, { recursive: true, force: true });
   });
 
-  test("project enable:false re-enables a work repo", () => {
+  test("project enable:true forces a work repo on", () => {
     const globalSettingsPath = makeGlobalSettings([
       "^github\\.com[:/]QNCGmbH/.*$",
     ]);
     const repo = makeRepo("git@github.com:QNCGmbH/openai.git", {
-      taskWorkflow: { enable: false },
+      taskWorkflow: { enable: true },
     });
     const result = resolveGate(repo, { globalSettingsPath });
     expect(result.active).toBe(false);
-    expect(result.reason).toContain("re-enabled locally");
+    expect(result.reason).toContain("forced on locally");
     rmSync(globalSettingsPath.replace(/settings\.json$/, ""), {
       recursive: true,
       force: true,
@@ -398,7 +393,7 @@ describe("resolveGate integration", () => {
     rmSync(repo, { recursive: true, force: true });
   });
 
-  test("anwaltde Bitbucket work repo is re-enabled by project enable:false", () => {
+  test("project enable:false forces a Bitbucket work repo off", () => {
     const globalSettingsPath = makeGlobalSettings([
       "^bitbucket\\.org[:/]anwaltde/.*$",
     ]);
@@ -406,8 +401,25 @@ describe("resolveGate integration", () => {
       taskWorkflow: { enable: false },
     });
     const result = resolveGate(repo, { globalSettingsPath });
-    expect(result.active).toBe(false);
-    expect(result.reason).toContain("re-enabled locally");
+    expect(result.active).toBe(true);
+    expect(result.reason).toContain("forced off locally");
+    rmSync(globalSettingsPath.replace(/settings\.json$/, ""), {
+      recursive: true,
+      force: true,
+    });
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  test("project enable:false forces a personal repo off", () => {
+    const globalSettingsPath = makeGlobalSettings([
+      "^bitbucket\\.org[:/]anwaltde/.*$",
+    ]);
+    const repo = makeRepo("https://github.com/Y4shin/skills.git", {
+      taskWorkflow: { enable: false },
+    });
+    const result = resolveGate(repo, { globalSettingsPath });
+    expect(result.active).toBe(true);
+    expect(result.reason).toContain("forced off locally");
     rmSync(globalSettingsPath.replace(/settings\.json$/, ""), {
       recursive: true,
       force: true,
@@ -418,45 +430,53 @@ describe("resolveGate integration", () => {
 
 describe("isWorkRepo", () => {
   test("empty patterns disable the gate", () => {
-    const result = isWorkRepo("github.com/QNCGmbH/openai", [], true);
+    const result = isWorkRepo("github.com/QNCGmbH/openai", []);
     expect(result.active).toBe(false);
     expect(result.reason).toBe("no disableOnRepo patterns");
   });
 
-  test("no match + enable true/absent -> personal (active=false)", () => {
-    const result = isWorkRepo("github.com/other/org", ["github.com/QNCGmbH"], true);
+  test("enable:true forces on regardless of a pattern match", () => {
+    const result = isWorkRepo("github.com/QNCGmbH/openai", ["github.com/QNCGmbH"], true);
     expect(result.active).toBe(false);
+    expect(result.reason).toContain("forced on");
   });
 
-  test("no match + enable false -> active=true (escape hatch)", () => {
+  test("enable:false forces off regardless of a pattern match", () => {
+    const result = isWorkRepo("github.com/QNCGmbH/openai", ["github.com/QNCGmbH"], false);
+    expect(result.active).toBe(true);
+    expect(result.reason).toContain("forced off");
+  });
+
+  test("enable:false forces off even for a personal repo", () => {
     const result = isWorkRepo("github.com/other/org", ["github.com/QNCGmbH"], false);
     expect(result.active).toBe(true);
+    expect(result.reason).toContain("forced off");
   });
 
-  test("match + enable true -> active=true (work repo)", () => {
-    const result = isWorkRepo("github.com/QNCGmbH/openai", ["github.com/QNCGmbH"], true);
+  test("no local enable + match -> active=true (work repo)", () => {
+    const result = isWorkRepo("github.com/QNCGmbH/openai", ["github.com/QNCGmbH"]);
     expect(result.active).toBe(true);
   });
 
-  test("match + enable false -> active=false (re-enabled locally)", () => {
-    const result = isWorkRepo("github.com/QNCGmbH/openai", ["github.com/QNCGmbH"], false);
+  test("no local enable + no match -> personal (active=false)", () => {
+    const result = isWorkRepo("github.com/other/org", ["github.com/QNCGmbH"]);
     expect(result.active).toBe(false);
   });
 
   test("no origin -> personal", () => {
-    const result = isWorkRepo(null, ["github.com/QNCGmbH"], true);
+    const result = isWorkRepo(null, ["github.com/QNCGmbH"]);
     expect(result.active).toBe(false);
     expect(result.reason).toContain("personal");
   });
 
   test("empty string origin -> personal", () => {
-    const result = isWorkRepo("", ["github.com/QNCGmbH"], true);
+    const result = isWorkRepo("", ["github.com/QNCGmbH"]);
     expect(result.active).toBe(false);
     expect(result.reason).toContain("personal");
   });
 
   test("invalid regex is skipped and produces a diagnostic", () => {
-    const result = isWorkRepo("github.com/QNCGmbH/openai", ["[", "github.com/QNCGmbH"], true);
+    const result = isWorkRepo("github.com/QNCGmbH/openai", ["[", "github.com/QNCGmbH"]);
     expect(result.active).toBe(true);
     expect(result.diagnostics).toBeDefined();
     expect(result.diagnostics!.length).toBeGreaterThan(0);
@@ -464,18 +484,18 @@ describe("isWorkRepo", () => {
   });
 
   test("prefix pattern matches", () => {
-    const result = isWorkRepo("github.com/QNCGmbH/openai", ["^github\\.com/QNCGmbH"], true);
+    const result = isWorkRepo("github.com/QNCGmbH/openai", ["^github\\.com/QNCGmbH"]);
     expect(result.active).toBe(true);
   });
 
   test("full normalized string must match the pattern", () => {
-    const result = isWorkRepo("github.com/QNCGmbH/openai", ["^github\\.com/QNCGmbH$"], true);
+    const result = isWorkRepo("github.com/QNCGmbH/openai", ["^github\\.com/QNCGmbH$"]);
     expect(result.active).toBe(false);
     expect(result.reason).toContain("personal");
   });
 
   test("origin with trailing slash normalizes before matching", () => {
-    const result = isWorkRepo("https://github.com/QNCGmbH/openai/", ["github.com/QNCGmbH"], true);
+    const result = isWorkRepo("https://github.com/QNCGmbH/openai/", ["github.com/QNCGmbH"]);
     expect(result.active).toBe(true);
   });
 });

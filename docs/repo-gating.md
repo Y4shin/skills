@@ -5,8 +5,9 @@ repo, including work repos where it doesn't belong (the work repo has its own
 canon; the `task_*` tools write to a `docs/tasks/` tree the work repo doesn't
 use; the injected guidelines clutter the system prompt). The gate auto-disables
 all of the package's resources in work repos based on the repo's `git origin`
-remote, with **zero per-repo config**, the gate lives on the global/personal
-side.
+remote, with **zero per-repo config** required to get the default behaviour:
+the patterns live on the global/personal side, and any individual repo can
+override them locally.
 
 ## What gets gated in a work repo
 
@@ -34,12 +35,15 @@ Explicit `/skill:<name>` is prevented via the `input` event (see above).
 ## Configuration
 
 Two layers, both read by the extension at startup (it reads the files itself;
-pi gives extensions no `SettingsManager`):
+pi gives extensions no `SettingsManager`). They have **different jobs**: the
+global side lists which remotes are work repos; a repo can override that verdict
+locally. `enable` means exactly what it says.
 
 - **Global** (`~/.pi/agent/settings.json`, or `PI_CODING_AGENT_DIR`): a top-level
   `taskWorkflow.disableOnRepo` array of regex strings tested against the
   normalized `provider/org/repo` remote. Empty / absent → gate disabled
-  (current behaviour; everything loads everywhere).
+  (current behaviour; everything loads everywhere). A global `enable` key is
+  **ignored**; the global side configures patterns, not a default switch.
 
   ```jsonc
   {
@@ -53,23 +57,29 @@ pi gives extensions no `SettingsManager`):
   ```
 
 - **Per-project override** (`<repo>/.pi/settings.json`): a top-level
-  `taskWorkflow.enable` (bool, default `true`). A repo matching a
-  `disableOnRepo` pattern can set `enable: false` to re-enable the package
-  locally; a non-matching repo can set `enable: false` to opt out (quiet personal
-  repo). Both files are read; pi deep-merges project over global, and unknown
-  top-level keys survive (the `Settings` parser does not strip them).
+  `taskWorkflow.enable` (bool). It is **authoritative and means what it says**:
+
+  - `true` → the package is forced **on** for this repo, patterns ignored.
+  - `false` → the package is forced **off** for this repo, patterns ignored.
+  - absent → fall back to `disableOnRepo` (match gates the repo, no-match loads
+    it).
+
+  So a repo that a global pattern marks as work can opt back in with
+  `enable: true`, and a personal repo can opt out with `enable: false`. Both
+  files are read; unknown top-level keys survive (the `Settings` parser does not
+  strip them).
 
 ### Truth table
 
-`active = (disableOnRepo matches this repo's normalized origin) AND (project.taskWorkflow.enable is not false)`
+`active = (local enable === true) ? false : (local enable === false) ? true : (disableOnRepo matches this repo's normalized origin)`
 
-| `disableOnRepo` matches? | `project.taskWorkflow.enable` | gate active? | meaning |
+| local `enable` | `disableOnRepo` matches? | gate active? | meaning |
 | --- | --- | --- | --- |
-| no | `true` / absent | **no** | personal, load everything |
-| no | `false` | **yes** | personal repo opting out (escape hatch) |
-| yes | `true` / absent | **yes** | work repo, gate everything (primary case) |
-| yes | `false` | **no** | work-org repo re-enabled locally |
-| empty / absent | * | **no** | gate disabled globally, current behaviour |
+| `true` | any | **no** | forced on locally |
+| `false` | any | **yes** | forced off locally |
+| absent | yes | **yes** | work repo, auto-gated (primary case) |
+| absent | no | **no** | personal repo, auto-loaded |
+| absent | (empty/absent patterns) | **no** | gate disabled globally, current behaviour |
 
 ## Detection rules
 

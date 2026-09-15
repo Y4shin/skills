@@ -139,6 +139,8 @@ Off the main flow entirely.
 | Turn a conversation/map into a spec | `/skill:to-spec` |
 | Break a spec into tracer-bullet feature/bug tickets | `/skill:to-tickets` |
 | Implement the ready frontier | `/skill:implement-task` |
+| Review an eval suite or triage a failed run | `/skill:eval-review` |
+| Review an Agent Skill | `/skill:skill-review` |
 | Finalize / archive | `/skill:finalize-task` |
 | Initialize repo | `/skill:setup-workflow` |
 | Triage incoming issues | `/skill:triage` |

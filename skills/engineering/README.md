@@ -42,6 +42,12 @@ Model- or user-reachable.
   decision, or idea through focused questions.
 - **[skill-creator](./skill-creator/SKILL.md)**: Scaffold, build, or fix an
   Agent Skill.
+- **[skill-review](./skill-review/SKILL.md)**: Multi-criterion review of an
+  Agent Skill: audience fit, trigger behavior, spec portability, progressive
+  disclosure.
+- **[eval-review](./eval-review/SKILL.md)**: Multi-criterion review of an
+  eval suite (contract validity, outcome grading, isolation, scorer
+  integrity), or single-pass triage of a failed run.
 
 > Note: `report-bug` and the two-phase planning reshape are in flight under
 > the `adopt-mp-skills-way` map; this README reflects the current state and is

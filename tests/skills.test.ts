@@ -105,6 +105,7 @@ const SKILL_FILES = [
   "skills/engineering/to-spec/SKILL.md",
   "skills/engineering/to-tickets/SKILL.md",
   "skills/engineering/skill-review/SKILL.md",
+  "skills/engineering/eval-review/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -148,7 +149,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(28);
+    expect(pkg.pi.skills.length).toBe(29);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
