@@ -73,3 +73,69 @@ skill-prose tickets land.
 
 - overhaul-artifact-model (the migration targets the v4 model and
   layout this ticket consumes).
+
+## Implementation notes
+
+### Slice - overhaul-v4-migration (landed)
+
+The v4 migration landed on `slice/overhaul-v4-migration` (20 commits,
+merged into `task/overhaul-v4-migration`). `src/core/migrate.ts` is the
+transformation, pure over a `TreePort` and importing the real v4 model
+(`fromFrontmatter`, `validateCombination`, `TYPE_LEAVES`, `TYPE_LEAF` from
+`core/art.ts`; `fromObject`, `toObject`, `freshState` from `core/state.ts`),
+so the layout and state tables stay single-sourced. `src/migrate-cli.ts` is
+the thin argv wrapper holding the real `FsPort`;
+`skills/engineering/setup-workflow/scripts/migrate.mjs` spawns it with
+`--experimental-strip-types` plus `ts-resolve.mjs`, a resolve hook needed
+because the sources use NodeNext `.js` specifiers that type stripping does
+not rewrite. `setup-workflow` keys its fresh/migrate/no-op detection on
+`schema_version: 4` and carries `resources/upgrade-3-to-4.md`, the 9-step
+ordered list tracing each step to the effort spec's Migration section. All
+nine changed files are inside the spec's allowed set; the live `docs/tasks`
+tree is untouched. Verified independently: 601/601 tests (13 files),
+`tsc --noEmit` clean; no lint script is configured.
+
+Mutation-verified non-negotiables: removing the YAML round-trip check fails
+49 tests, forcing `noop: false` fails 5, removing the resumability marker
+guards fails 1, removing `tree.rollback()` fails 1. The pre-commit
+`verifyStagedWrite` loop is defense in depth rather than the mechanism, since
+`dumpVerified` already verifies every write at generation time.
+
+Carried forward, in priority order:
+
+1. **Corruption safety is demonstrated only for the in-memory test port.**
+   `MemPort` in the tests applies to a scratch copy and swaps it in only on
+   full success, so the injected-failure test passes. `FsPort` applies moves,
+   writes, and deletes directly on disk one at a time with no scratch copy or
+   undo journal, and `rollback()` only clears the staged maps, so it cannot
+   undo what already landed. Reproduced against the real CLI: a rename that
+   fails with EACCES leaves the first move applied while `state.yaml` still
+   says `schema_version: 3`, a half-migrated tree the progress marker does not
+   describe. No test covers it (`FsPort` is not exported, and the CLI failure
+   test fails at `state.yaml` parsing, before anything is staged). The
+   operator's backup branch makes corruption recoverable, not impossible, so
+   the spec's stronger wording does not hold for the code that runs against a
+   user's repo. Fix by staging into a temp dir or an undo journal, plus a test
+   that drives the real port through an injected mid-apply failure, or by
+   scoping the guarantee honestly in the arch-spec, the acceptance criterion,
+   and the SKILL.md prose.
+2. **Two vocabulary tables are duplicated from `art.ts`.** `TASK_CATEGORIES`
+   copies `TASK_SUBTYPES` verbatim and `AUX_TYPES` re-lists four
+   `KNOWN_TYPES`. The values agree today, but `TASK_CATEGORIES` decides
+   `tasks/` versus `tickets/`, so a new planning subtype in `art.ts` would be
+   misfiled as a ticket with no test failing. Importing `TASK_SUBTYPES` and
+   deriving `AUX_TYPES` from `KNOWN_TYPES` closes it.
+3. **The dead-pointer step reports rather than rewrites.** A surviving
+   `/skill:task-overview` in any file becomes a `dead-pointer` needs-human
+   item and the file is left byte-identical; the setup-workflow pointer
+   itself is fixed, so the acceptance criterion is met where it matters.
+   Confirm reporting-only is intended, since the spec's verb is "fix".
+4. **`VENDORED_NAMES` hardcodes `matt-skills`** rather than a general rule
+   (a directory with no OKF frontmatter anywhere). The single live instance
+   satisfies the criterion; recording the generality gap as a known choice.
+
+One live file, `docs/tasks/archive/gate-skills-prompt-and-help/task.md`, has
+frontmatter YAML that does not parse (an unquoted `: ` in its title). The
+migration reports it and leaves it byte-identical; it needs a hand fix before
+that subtree can migrate. Whether and when to run the migration against this
+repo's own live tree remains a user call at run time.
