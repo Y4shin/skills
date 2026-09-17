@@ -18,14 +18,14 @@ whenever a schema upgrade is released.
 
 Read `docs/tasks/state.yaml`:
 
-- **No `schema_version` field** (or no `state.yaml`): the repo is fresh. Run
+- **No `state.yaml`, or no `schema_version` field**: the repo is fresh. Run
   the **onboard** branch (below).
-- **`schema_version` is less than current**: the repo is behind. Run the
-  **migrate** branch (below), applying each upgrade resource in sequence.
-- **`schema_version` equals current**: the repo is already on the latest
-  schema. Stop and report "already on schema_version N, nothing to do."
+- **`schema_version` is less than 4**: the repo is behind. Run the
+  **migrate** branch (below).
+- **`schema_version` equals 4**: the repo is already current. Stop and report
+  "already on schema_version 4, nothing to do." This is the no-op branch.
 
-The current schema version is `3`.
+The current schema version is **4**.
 
 ## Onboard (fresh repo)
 
@@ -34,7 +34,6 @@ Scaffold everything a repo needs to use the task-workflow:
 1. Create directory structure:
    ```
    mkdir -p docs/tasks/archive
-   mkdir -p docs/tasks/maps/archive
    mkdir -p docs/tasks/out-of-scope
    mkdir -p docs/bugs
    mkdir -p docs/bugs/archive
@@ -43,95 +42,131 @@ Scaffold everything a repo needs to use the task-workflow:
    ```
    Empty directories get a `.gitkeep`.
 
-2. Write `docs/tasks/state.yaml`:
+2. Write `docs/tasks/state.yaml` (the v4 shape: two real-null pointers plus
+   the stamp):
    ```yaml
+   schema_version: 4
+   map: null
    task: null
-   slice: null
-   schema_version: 3
    ```
 
-3. Write `docs/tasks/CHANGELOG.md`:
+3. Write `docs/tasks/index.md` carrying `okf_version: "0.2"` and a listing of
+   the tree. The migration regenerates it; wayfinder refreshes it on map
+   create and finalize-task refreshes it on archive.
+
+4. Write `docs/tasks/CHANGELOG.md` with conformant frontmatter:
    ```markdown
+   ---
+   type: changelog
+   title: Task Changelog
+   ---
+
    # Task Changelog
    ```
 
-4. Write `docs/testing.md` with a template (framework, run commands, mock
+5. Write `docs/testing.md` with a template (framework, run commands, mock
    conventions).
 
-5. Write `docs/dev-env.md` with a template describing how to start the dev
+6. Write `docs/dev-env.md` with a template describing how to start the dev
    environment, how reproduction should work, or an explicit "do not attempt
    AI reproduction" placeholder. If `docs/dev-env.md` already exists, do not
    clobber it; leave the existing file in place.
 
-6. Write `CONTEXT.md` at repo root (the project's domain glossary; see the
+7. Write `CONTEXT.md` at repo root (the project's domain glossary; see the
    domain-modeling skill for the format). For repos that ARE the workflow
    package itself (like this one), the glossary holds the workflow's
    ubiquitous language. For downstream repos, it holds the project's domain
    terms.
 
-7. Write `AGENTS.md` at repo root with the agent conventions (bucket layout,
+8. Write `AGENTS.md` at repo root with the agent conventions (bucket layout,
    promotion rules, invocation split, no-em-dashes rule, skill-tool
    invocation convention).
 
-8. Write `docs/agents/README.md` (per-repo config the skills read, seeded
+9. Write `docs/agents/README.md` (per-repo config the skills read, seeded
    minimal; the skills populate it over time).
 
-9. Write `docs/tasks/out-of-scope/README.md` (the rejected-requests KB;
-   explains its purpose).
+10. Write `docs/tasks/out-of-scope/index.md` (the rejected-requests KB;
+    explains its purpose).
 
-10. Commit: `chore: initialize task-workflow (schema_version 3)`.
+11. Commit: `chore: initialize task-workflow (schema_version 4)`.
 
-11. Report: "Ready. Run `/skill:task-overview` to see the full flow, or
-    `/skill:wayfinder` to start planning."
+12. Report: "Ready. Run `/skill:task-workflow-overview` to see the full flow,
+    or `/skill:wayfinder` to start planning."
 
 ## Migrate (old repo)
 
-> **Target-state spec:** the on-disk target state for each schema version is
-> distilled in `docs/migration-target.yaml` (a stable, machine-readable,
-> versioned spec). The upgrade resources below are the *steps*; this spec is
-> the *destination*. When an upgrade resource's steps diverge from the spec,
-> the spec records the deviation as the truth.
+> **Target-state spec:** the on-disk target state for schema 3 is distilled
+> in `docs/migration-target.yaml` (a stable, machine-readable, versioned
+> spec). The upgrade resources below are the *steps*; this spec is the
+> *destination*. When an upgrade resource's steps diverge from the spec, the
+> spec records the deviation as the truth.
 
-The repo is on an older schema. Apply each upgrade resource in sequence from
-the repo's current version to the target version:
+The repo is on an older schema. Create a backup branch, then run the
+migration CLI, which owns the whole any-vintage-to-4 transformation:
 
-1. Create a backup git branch: `git checkout -b migrate/schema-${from}-to-${to}`.
+1. Create a backup git branch: `git checkout -b migrate/schema-${from}-to-4`.
    This is the safety net; the migration is reversible by checking out the
    previous branch.
 
-2. For each version step from the repo's `schema_version` to the current
-   version, read and follow `resources/upgrade-${from}-to-${to}.md` in order.
-   Each resource is a fixed, ordered step list that encodes the proven
-   transformations for that version jump.
+2. Run the migration CLI from the repo root:
+   ```
+   node skills/engineering/setup-workflow/scripts/migrate.mjs
+   ```
+   The shim spawns `src/migrate-cli.ts`, which runs `migrate()` over the
+   repo's own tree. It performs the effort-grouped layout reorganization,
+   the frontmatter unification, the aux backfill, the archive reshape, the
+   state rebuild, the legacy slice reporting, the vendored-tree relocation,
+   and the root index write, as one transformation.
 
-3. After each upgrade resource completes, bump `schema_version` in
-   `docs/tasks/state.yaml` to the target version of that resource.
+3. Read the printed **MigrateReport**. It lists every change and every item
+   needing human eyes: normalized status/workflow_state combinations, legacy
+   slice directories found (reported, never deleted), vendored trees moved
+   outside the bundle, and unresolvable `blocked_by` references. Surface
+   every needs-human item to the user.
 
-4. After all upgrades are applied, run the full test suite (`npm test` +
+4. For repos still on schema 2, also read and follow
+   `resources/upgrade-2-to-3.md` first: the CLI migrates the tree, but the
+   skill-bucket and repo-root-doc work of that jump is not a tree rewrite.
+
+5. After the migration completes, run the full test suite (`npm test` +
    `npm run typecheck`) and verify it is green.
 
-5. Commit: `chore: migrate task-workflow schema ${from} to ${to}`.
+6. Commit: `chore: migrate task-workflow schema ${from} to 4`.
+
+The ordered step list the CLI executes is encoded in
+`resources/upgrade-3-to-4.md`, tracing each step to the effort spec's
+Migration section.
 
 ### Dry-run mode
 
-If the user asks for a dry run (or passes `--dry-run`), print the planned
-steps and the files each step will add, remove, or rewrite, without writing
-anything. Report the full plan, then stop.
+If the user asks for a dry run (or passes `--dry-run`), the CLI prints the
+planned steps and the files each step will add, remove, or rewrite, without
+writing anything. Report the full plan, then stop.
 
 ### Idempotence
 
-Re-running on a repo whose `schema_version` is already current is a no-op:
-report "already on schema_version N, nothing to do." Re-running mid-migration
-(after a backup branch exists but before all steps complete) resumes from the
-last uncompleted step. Track per-step completion via a
+Re-running on a repo whose `schema_version` is already 4 is a no-op: report
+"already on schema_version 4, nothing to do." Re-running mid-migration (after
+a backup branch exists but before all steps complete) resumes from the last
+uncompleted step. The CLI tracks per-step completion via a
 `.migration-progress` marker file (a checklist of completed step numbers) in
-`docs/tasks/`; delete it when the migration finishes.
+`docs/tasks/`; it deletes the marker when the migration finishes. Because
+every step is independently idempotent, a resume that loses the marker still
+converges to the same end state.
+
+### Corruption safety
+
+The migration verifies the YAML round-trip of every rewrite before a single
+byte lands. A failure mid-migration leaves the tree untouched.
 
 ## Available upgrade resources
 
+- [upgrade-3-to-4](resources/upgrade-3-to-4.md): the v4 hop (effort-grouped
+  layout, OKF frontmatter, state rebuild, slice reporting, vendored-tree
+  relocation, root index), executed by the migration CLI.
 - [upgrade-2-to-3](resources/upgrade-2-to-3.md): the largely-adopt-Matt
   adoption (v2.x bucket layout, two-phase planning, 12 new skills, repo-root
-  docs, changesets, no-em-dashes).
+  docs, changesets, no-em-dashes). Repos still on 2 run this first.
 
 > **Feedback:** if setup or migration hits a snag, a step that didn't fit the
 > repo, a resource that was wrong, or something that worked notably well, call
