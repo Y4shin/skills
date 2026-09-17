@@ -658,7 +658,10 @@ function reorganize(
   paths: string[],
   plan: Plan,
 ): void {
-  const markdown = sorted(paths.filter(isMarkdown));
+  // The migration owns the docs/tasks bundle. Markdown elsewhere in the
+  // repo (docs/ideas, docs/adr, the root README) is out of scope: never
+  // moved, rewritten, or reported.
+  const markdown = sorted(paths.filter((p) => isMarkdown(p) && under(p, TASK_ROOT)));
   const legacySliceDirs = new Set<string>();
 
   // First pass: classify every primary artifact, so an aux file can be

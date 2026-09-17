@@ -670,6 +670,24 @@ describe("migrate: no two files collapse to one destination", () => {
   });
 });
 
+describe("migrate: scope", () => {
+  test("markdown outside docs/tasks is never touched or reported", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/ideas/note.md": "# Idea\n\nno frontmatter, outside the bundle\n",
+      "docs/ideas/broken.md": "---\nbad: [yaml\n---\n",
+      "README.md": "# readme\n",
+    });
+    const report = migrate(tree);
+    const files = tree.snapshot();
+    expect(files["docs/ideas/note.md"]).toBe("# Idea\n\nno frontmatter, outside the bundle\n");
+    expect(files["docs/ideas/broken.md"]).toBe("---\nbad: [yaml\n---\n");
+    expect(files["README.md"]).toBe("# readme\n");
+    expect(report.needsHuman.filter((h) => !h.path.startsWith("docs/tasks/"))).toEqual([]);
+    expect(report.changes.filter((c) => !c.path.startsWith("docs/tasks/"))).toEqual([]);
+  });
+});
+
 describe("migrate: unparseable frontmatter", () => {
   test("a file whose frontmatter will not parse is reported, not rewritten", () => {
     // A title with an unquoted ': ' makes the YAML invalid. The migration
