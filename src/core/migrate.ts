@@ -170,17 +170,20 @@ export function detectVintage(tree: TreePort): number {
   let raw: unknown;
   try {
     raw = parseYamlFile(tree.read(STATE_PATH));
-  } catch {
-    return 0;
+  } catch (e) {
+    throw new Error(`cannot read '${STATE_PATH}': ${(e as Error).message}`);
   }
-  if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
-    const obj = raw as Record<string, unknown>;
-    const v = obj.schema_version;
-    if (typeof v === "number") return v;
-    if (typeof v === "string" && /^\d+$/.test(v)) return Number(v);
-    // No stamp: v1 is recognizable by its nested `active:` block.
-    if (obj.active !== undefined) return 1;
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(
+      `cannot read '${STATE_PATH}': expected a YAML mapping, got ${Array.isArray(raw) ? "a list" : typeof raw}`,
+    );
   }
+  const obj = raw as Record<string, unknown>;
+  const v = obj.schema_version;
+  if (typeof v === "number") return v;
+  if (typeof v === "string" && /^\d+$/.test(v)) return Number(v);
+  // No stamp: v1 is recognizable by its nested `active:` block.
+  if (obj.active !== undefined) return 1;
   return 0;
 }
 
