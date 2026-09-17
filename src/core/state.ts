@@ -1,7 +1,7 @@
 /**
- * Workflow state model for state.yaml — version 4.
+ * Workflow state model for state.yaml, version 4.
  *
- * Pure data — no file I/O. Serializes to/from a plain YAML-compatible object.
+ * Pure data, no file I/O. Serializes to/from a plain YAML-compatible object.
  *
  * The model is two pointers (`map`, `task`) plus `rest`: the lossless bag of
  * every key the module does not model (schema_version, a legacy v3 `slice`

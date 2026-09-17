@@ -1,5 +1,5 @@
 /**
- * Tests for the v4 state model — pure functions, no I/O.
+ * Tests for the v4 state model, pure functions, no I/O.
  *
  * The contract: two pointers (map, task), a lossless `rest` bag, real
  * nulls. fromObject then toObject reproduces every key of an arbitrary
@@ -83,7 +83,7 @@ describe("round-trip fidelity", () => {
     const original = { map: "auth", task: "login", slice: "login-form", schema_version: 3 };
     const state = fromObject(original);
     const obj = toObject(state);
-    // rest keys first, pointers last — same key set, same values.
+    // rest keys first, pointers last: same key set, same values.
     expect(obj).toEqual(original);
     expect(Object.keys(obj).sort()).toEqual(Object.keys(original).sort());
   });

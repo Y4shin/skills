@@ -710,10 +710,10 @@ export function createTools(): Record<string, Tool> {
         const s = loadState(root);
         const field = p.field as string;
         if (field !== "map" && field !== "task") {
-          throw new Error(`unknown field '${field}' — use 'map' or 'task'`);
+          throw new Error(`unknown field '${field}': use 'map' or 'task'`);
         }
         if (p.value === "None") {
-          throw new Error(`invalid pointer value 'None' — use 'null' to clear '${field}'`);
+          throw new Error(`invalid pointer value 'None': use 'null' to clear '${field}'`);
         }
         const v = p.value === "null" ? null : p.value;
         s[field] = v;
