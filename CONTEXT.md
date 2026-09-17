@@ -89,6 +89,24 @@ implementation types (feature/bug) come from `to-tickets`. A feature/bug
 task is not re-typed as research.
 _Avoid_: category, kind
 
+**Artifact type** (v4):
+The OKF `type:` frontmatter field: the artifact kind (`task`, `ticket`,
+`map`, `spec`, `findings`, `changelog`, `out-of-scope note`, `deviation
+report`, `arch spec`). Under v4 the six-value workflow vocabulary above moves
+to `subtype:`, so `type` names what a file *is* and `subtype` names the
+workflow category that routes it. The model reads both shapes: a v3 file's
+`kind:` maps to `type` and its `type:` maps to `subtype`. Unknown type values
+are tolerated (OKF requires it); a missing one is an error.
+_Avoid_: kind (the field v4 replaced)
+
+**Workflow state** (v4):
+The companion field to OKF `status`, carrying what OKF status cannot:
+`todo`, `ready`, `in-progress`, `blocked`, `done`. Done-ness gates on
+`workflow_state: done`. Allowed combinations are enforced: `draft` pairs only
+with `todo`, `deprecated` only with `done`, `stable` with any. Absent status
+means `stable`; spec, map, and aux files carry no `workflow_state`.
+_Avoid_: status (that is the OKF field; this is the workflow half)
+
 **Skill bucket**:
 One of five directories under `skills/`: `engineering/` (daily code work,
 promoted), `productivity/` (non-code workflow, promoted), `misc/` (kept,
@@ -128,6 +146,10 @@ _Avoid_: blacklist (too negative)
 - A **map** holds many **tasks**.
 - A **task** has one **task type** and one `blocked_by` list.
 - A **feature** or **bug** task holds many **slices**.
+- An **artifact type** names what a file is; a **task type** is the
+  `subtype` that routes it. Under v4 the two are separate fields.
+- A **workflow state** pairs with the OKF `status` on the same artifact, and
+  only the allowed combinations are valid.
 - `docs/tasks/state.yaml` holds the two **state pointers**; every other key
   in that file is unmodeled and preserved verbatim.
 - The **frontier** is the set of tasks/slices whose `blocked_by`

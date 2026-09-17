@@ -89,8 +89,8 @@ on it to catch files with no type; those surface as resolution errors.
 ### Coherence pass (post-review)
 
 The whole-task review and the deviation report surfaced four issues, all fixed
-here. The chain's own numbers were 523/523; the suite is now 529/529 with six
-new regression tests.
+here. The chain's own numbers were 523/523; after this pass the suite was
+529/529 with six new regression tests.
 
 - **The `orphan` check missed one direction.** `task.md` was absent from the
   type/location table, so a `task.md` declaring `type: ticket` was not flagged
@@ -113,3 +113,39 @@ new regression tests.
 Effect on the live tree: the anomaly stream went from 54 findings (44 orphans,
 10 missing-blocked-by-target) to **zero**, so `overhaul-graph-tools` inherits a
 signal it can act on rather than a false-positive pile.
+
+### Second coherence pass (post-review)
+
+A second whole-task review found four more issues, all fixed. Final numbers:
+**537/537 tests**, `tsc --noEmit` clean, live-tree anomaly stream still zero
+over 118 artifacts.
+
+- **The resolver ignored `want` on the directory branch.** A directory holding
+  both `map.md` and `spec.md` errored on whichever leaf it found first instead
+  of selecting the wanted one. `directoryLeaf` now consults `want` first, so
+  the spec's "honored on every branch" holds for the directory branch too, and
+  a directory with no artifact of the wanted type errors naming that type.
+- **`arch-spec.md` was unreachable via a directory selector**, though the spec
+  lists it as a scan location. It is now a directory leaf, so an
+  arch-spec-only effort directory resolves.
+- **A map's feature-to-feature edge was always a false positive.** The effort
+  spec gives maps `blocked_by` holding effort-to-effort edges, so a map's
+  target is always in a different effort; scoping maps to their own effort
+  flagged every legitimate edge. Maps are now their own scope, so a real edge
+  passes while an absent target map is still reported. This one mattered most:
+  it would have poisoned the stream `overhaul-graph-tools` consumes.
+- **`isV4TaskPath` had a false negative** for a task directory literally named
+  `tasks`. It is now anchored on the `docs/tasks` pair plus the
+  effort-adjacent `tasks/` segment.
+- **v4 `subtype` was silently collapsed** when it equalled `type`. In v4
+  `subtype` is its own key, so it is read verbatim; only the v3 `kind`/`type`
+  collision collapses.
+- **Layout knowledge was triplicated** across `art.ts` and `pi.ts`.
+  `TYPE_LEAVES` in the model is now the single source for the type-to-filename
+  map, the directory leaves, and the type priority order.
+- **Em-dashes removed** from the deviation report, and the
+  `task_resolve` / `task_assert_kind` descriptions now speak the v4 type
+  vocabulary instead of the dead `slice` one.
+
+Eight further regression tests cover these. `missing-type` remains reachable
+only for a hand-built `Artifact`; that is documented rather than faked.
