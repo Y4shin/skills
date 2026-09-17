@@ -171,10 +171,6 @@ function dumpVerified(path: string, data: FrontmatterData, body: string): string
 /** The slug a destination path implies: the directory that carries it. */
 function slugFromPath(path: string): string {
   const parts = segments(path);
-  const file = basenameOf(path);
-  // `<...>/<slug>/<leaf>.md` for a task or ticket; `<effort>/<leaf>.md` for a
-  // map, spec, or arch spec.
-  if (file === "task.md" || file === "ticket.md") return parts[parts.length - 2] ?? "";
   return parts[parts.length - 2] ?? "";
 }
 
