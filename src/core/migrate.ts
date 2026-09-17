@@ -645,12 +645,22 @@ function reorganize(
   // placed beside the artifact it belongs to.
   const placement = new Map<string, { effort: string; container: string; archived: boolean }>();
   const archSpecCount = new Map<string, number>();
+  // Effort roots that a map or spec anchors, for map-level aux files.
+  const effortRoots = new Map<string, { effort: string; archived: boolean }>();
   for (const path of markdown) {
     const loc = vintageLocation(path);
     const doc = readDoc(tree, path);
     if (doc === null) continue;
     const type = effectiveType(doc.data);
-    if (type !== "task" && type !== "ticket") continue;
+    if (type !== "task" && type !== "ticket") {
+      // A map or spec anchors its effort root, so an aux file beside it has
+      // a home even when no task or ticket shares the directory.
+      if (type === "map" || type === "spec") {
+        const effort = loc.effort ?? effortFromFrontmatter(doc.data) ?? loc.slug ?? "";
+        if (effort !== "") effortRoots.set(placeKey(loc), { effort, archived: loc.archived });
+      }
+      continue;
+    }
     const effort = loc.effort ?? effortFromFrontmatter(doc.data) ?? loc.slug ?? "";
     if (effort === "") continue;
     const container = type === "task" ? "tasks" : "tickets";
@@ -688,7 +698,33 @@ function reorganize(
     if (doc === null) {
       // A markdown file with no frontmatter: an aux file to backfill.
       const type = auxTypeForPath(path);
-      if (type === null) continue;
+      if (type === null) {
+        // An unrecognized markdown beside an effort anchor (a handoff, a
+        // comparison note) still belongs to that effort: move it with the
+        // anchor so the maps/ subtree empties and nothing is orphaned.
+        const anchor = effortRoots.get(placeKey(loc));
+        if (anchor !== undefined) {
+          const base = anchor.archived ? ARCHIVE : TASK_ROOT;
+          const dest = `${base}/${anchor.effort}/${basenameOf(path)}`;
+          stageMoveIfNeeded(path, dest, plan);
+          plan.writes.set(
+            dest,
+            dumpVerified(dest, {
+              type: "out-of-scope note",
+              title:
+                titleFromBody(doc0(tree, path).body) ?? basenameOf(path).replace(/\.md$/, ""),
+              status: "stable",
+            }, doc0(tree, path).body),
+          );
+          plan.changes.push({
+            action: "move",
+            path: dest,
+            from: path,
+            detail: `moved '${path}' beside its effort at '${dest}' with conformant frontmatter`,
+          });
+        }
+        continue;
+      }
       const dest = auxHome(path, loc, placement, archSpecCount);
       const data: FrontmatterData = {
         type,

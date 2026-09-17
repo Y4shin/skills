@@ -670,6 +670,39 @@ describe("migrate: no two files collapse to one destination", () => {
   });
 });
 
+describe("migrate: map-level aux files", () => {
+  test("a handoff beside the map moves with the effort", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: effort\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/maps/effort/handoff.md": "# Handoff\n\nnotes\n",
+    });
+    migrate(tree);
+    const files = tree.snapshot();
+    expect(files["docs/tasks/effort/map.md"]).toBeDefined();
+    expect(files["docs/tasks/effort/handoff.md"]).toContain("# Handoff");
+    expect(files["docs/tasks/maps/effort/handoff.md"]).toBeUndefined();
+  });
+
+  test("the maps subtree is empty after the migration", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/live/map.md":
+        "---\nkind: map\nslug: live\ntitle: Live\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/maps/live/notes.md": "# Notes\n",
+      "docs/tasks/maps/archive/old/map.md":
+        "---\nkind: map\nslug: old\ntitle: Old\nstatus: done\ntasks: []\n---\n",
+      "docs/tasks/maps/archive/old/extra.md": "# Extra\n",
+    });
+    migrate(tree);
+    const files = tree.snapshot();
+    expect(Object.keys(files).filter((p) => p.includes("/maps/"))).toEqual([]);
+    expect(files["docs/tasks/live/notes.md"]).toContain("# Notes");
+    expect(files["docs/tasks/archive/old/extra.md"]).toContain("# Extra");
+  });
+});
+
 describe("migrate: the dead pointer", () => {
   test("a surviving task-overview pointer is reported, not rewritten", () => {
     const tree = port({
