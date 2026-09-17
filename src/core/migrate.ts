@@ -441,6 +441,23 @@ function isBroken(
   return doc !== null && "broken" in doc;
 }
 
+/** The body of a markdown file: everything after its frontmatter, or the
+ * whole file when it carries none. */
+function bodyOf(tree: TreePort, path: string): string {
+  const doc = readDoc(tree, path);
+  if (doc !== null && !isBroken(doc)) return doc.body;
+  const text = safeRead(tree, path) ?? "";
+  if (text.startsWith("---")) {
+    // A frontmatter fence the parser rejects: keep everything after the
+    // closing fence so the rewrite does not drop the document's text.
+    const lines = text.split("\n");
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].trim() === "---") return lines.slice(i + 1).join("\n");
+    }
+  }
+  return text;
+}
+
 /** The first heading of a markdown body, as a title fallback. */
 function titleFromBody(body: string): string | null {
   const m = body.match(/^#\s+(.+)$/m);
@@ -1176,8 +1193,7 @@ function writeIndex(tree: TreePort, plan: Plan, paths: string[]): void {
 /** Backfill CHANGELOG.md and out-of-scope/README.md (which becomes index.md). */
 function backfillBundleFiles(tree: TreePort, paths: string[], plan: Plan): void {
   if (paths.includes(CHANGELOG_PATH)) {
-    const doc = readDoc(tree, CHANGELOG_PATH);
-    const body = doc !== null && !isBroken(doc) ? doc.body : "\n# Task Changelog\n";
+    const body = bodyOf(tree, CHANGELOG_PATH) || "\n# Task Changelog\n";
     const data: FrontmatterData = { type: "changelog", title: "Task Changelog" };
     const content = dumpVerified(CHANGELOG_PATH, data, body);
     if (safeRead(tree, CHANGELOG_PATH) !== content) {
@@ -1201,8 +1217,7 @@ function backfillBundleFiles(tree: TreePort, paths: string[], plan: Plan): void 
   const oosReadme = `${TASK_ROOT}/out-of-scope/README.md`;
   const oosIndex = `${TASK_ROOT}/out-of-scope/index.md`;
   if (paths.includes(oosReadme)) {
-    const doc = readDoc(tree, oosReadme);
-    const body = doc !== null && !isBroken(doc) ? doc.body : "\n# out-of-scope\n";
+    const body = bodyOf(tree, oosReadme) || "\n# out-of-scope\n";
     const data: FrontmatterData = {
       type: "out-of-scope note",
       title: "out-of-scope",

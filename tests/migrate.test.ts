@@ -806,6 +806,34 @@ describe("migrate: the dead pointer", () => {
   });
 });
 
+describe("migrate: bundle files", () => {
+  test("out-of-scope/README.md becomes index.md with frontmatter", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/out-of-scope/README.md": "# Rejected\n\nreasons\n",
+    });
+    migrate(tree);
+    const files = tree.snapshot();
+    expect(files["docs/tasks/out-of-scope/README.md"]).toBeUndefined();
+    const index = files["docs/tasks/out-of-scope/index.md"];
+    expect(index).toBeDefined();
+    expect(index).toContain("reasons");
+    expect(parse(index).data.type).toBe("out-of-scope note");
+  });
+
+  test("the CHANGELOG gains conformant frontmatter and keeps its body", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/CHANGELOG.md": "# Task Changelog\n\n## 3.0.0\n\nstuff\n",
+    });
+    migrate(tree);
+    const changelog = tree.snapshot()["docs/tasks/CHANGELOG.md"];
+    expect(parse(changelog).data.type).toBe("changelog");
+    expect(changelog).toContain("## 3.0.0");
+    expect(changelog).toContain("stuff");
+  });
+});
+
 describe("migrate: dry run", () => {
   test("stages nothing and reports the plan", () => {
     const tree = port({ ...V3_FILES });
