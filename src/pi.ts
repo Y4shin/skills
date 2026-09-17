@@ -258,7 +258,7 @@ function scanArtifacts(root: string): ScanHit[] {
     try {
       const { art, doc } = parseArtifactFile(p);
       hits.push({ path: p, art, doc });
-    } catch { /* not an artifact — skip, never fatal */ }
+    } catch { /* not an artifact: skip, never fatal */ }
   }
   return hits;
 }
@@ -323,7 +323,7 @@ function resolveArt(root: string, selector: string, want?: string): ScanHit {
   for (const group of byType.values()) {
     if (group.length > 1) {
       throw new ResolutionError(
-        `'${selector}' is ambiguous — matches multiple artifacts: ${group.map((g) => g.path).join(", ")}`,
+        `'${selector}' is ambiguous: matches multiple artifacts: ${group.map((g) => g.path).join(", ")}`,
       );
     }
   }

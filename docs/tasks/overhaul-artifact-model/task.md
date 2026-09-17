@@ -81,13 +81,35 @@ the optional `Artifact.path` field (the model seam is pure, but
 directory name for the v4 slug). Neither obliges a caller.
 
 Carried forward for `overhaul-graph-tools`, which consumes `findAnomalies`:
-the `orphan` type/location table omits `task.md`, so a `task.md` declaring
-`type: ticket` is not flagged; `effortDirOf` collapses all archived efforts
-into one `archive` bucket and all v3 maps into one `maps` bucket, which
-silently accepts cross-effort edges; and on the current v3 tree the stream is
-mostly false positives (44 orphans, 10 missing-blocked-by-target over 118
-artifacts), expected to settle after `overhaul-v4-migration` reshapes the
-layout. `missing-type` is unreachable through real parsing
-(`fromFrontmatter` throws first). Four em-dashes remain in added lines
-(`src/pi.ts:261`, `tests/plugin.test.ts:617`, plus two inherited), and
-`tests/plugin.test.ts` now ends without a trailing newline.
+the anomaly stream is clean on the live tree (0 anomalies over 118
+artifacts), so it is actionable as-is. `missing-type` is unreachable through
+real parsing (`fromFrontmatter` throws first), so graph tools should not rely
+on it to catch files with no type; those surface as resolution errors.
+
+### Coherence pass (post-review)
+
+The whole-task review and the deviation report surfaced four issues, all fixed
+here. The chain's own numbers were 523/523; the suite is now 529/529 with six
+new regression tests.
+
+- **The `orphan` check missed one direction.** `task.md` was absent from the
+  type/location table, so a `task.md` declaring `type: ticket` was not flagged
+  while the reverse was. `typeForFilename` is now path-aware: `task.md`
+  implies `task` only under the v4 `tasks/` subtree, so both directions are
+  caught without flagging every v3 flat task.
+- **Effort scoping is now shape-aware.** The old rule took the path segment
+  after `docs/tasks`, which collapsed every archived effort into one `archive`
+  bucket and every v3 map into one `maps` bucket, silently accepting
+  cross-effort edges. `effortKeyOf` scopes v3 artifacts by their frontmatter
+  `map:` field (v3 flat tasks carry it) and v4 artifacts by their effort
+  directory, with the two namespaces prefixed so they cannot collide.
+- **The anchor check is v4-only.** A v3 flat task directory is its own effort
+  and carries no map or spec by design, so requiring an anchor there flagged
+  every live v3 task. It now applies to `shape: "v4"` artifacts only.
+- **Four em-dashes removed** from added lines in `src/core/art.ts`,
+  `src/pi.ts` (two), and `tests/plugin.test.ts`, and the missing trailing
+  newline restored.
+
+Effect on the live tree: the anomaly stream went from 54 findings (44 orphans,
+10 missing-blocked-by-target) to **zero**, so `overhaul-graph-tools` inherits a
+signal it can act on rather than a false-positive pile.

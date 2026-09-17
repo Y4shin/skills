@@ -1,5 +1,5 @@
 /**
- * Artifact model — represents the OKF artifacts in the docs/tasks/ tree.
+ * Artifact model: represents the OKF artifacts in the docs/tasks/ tree.
  *
  * Pure data — no file I/O. The extension manages reading/writing files.
  *
@@ -180,7 +180,18 @@ export function validateArtifact(art: Artifact): Anomaly[] {
 
 // ─── Location-derived checks ──────────────────────────────────────────────────
 
-/** The effort directory an artifact path belongs to, or null. */
+/**
+ * The effort directory an artifact path belongs to, or null.
+ *
+ * Shape-aware, so two artifacts are siblings only when they really share an
+ * effort:
+ * - v4 effort-grouped: `docs/tasks/<effort>/...` -> `<effort>`.
+ * - v3 archived: `docs/tasks/archive/<effort>/...` -> `archive/<effort>`, so
+ *   archived efforts stay distinct instead of collapsing into one bucket.
+ * - v3 maps subtree: `docs/tasks/maps/<map>/...` -> `maps/<map>`, so each map
+ *   is its own scope instead of collapsing into one bucket.
+ * - v3 flat task: `docs/tasks/<task>/...` -> `<task>` (its own effort).
+ */
 function effortDirOf(path: string): string | null {
   const parts = path.split(/[\\/]/).filter((p) => p !== "");
   let marker = -1;
@@ -192,10 +203,26 @@ function effortDirOf(path: string): string | null {
   }
   if (marker === -1) marker = parts.indexOf("tasks");
   if (marker === -1) return null;
-  return parts[marker + 1] ?? null;
+
+  const first = parts[marker + 1];
+  if (first === undefined) return null;
+
+  if (first === "archive") {
+    const archived = parts[marker + 2];
+    return archived === undefined ? "archive" : `archive/${archived}`;
+  }
+  if (first === "maps") {
+    const map = parts[marker + 2];
+    return map === undefined ? "maps" : `maps/${map}`;
+  }
+  return first;
 }
 
-/** The filename an artifact's location requires, keyed by type. */
+/**
+ * The filename an artifact's location requires, keyed by type. `task.md` is
+ * deliberately absent: it is both the v3 flat-task filename and the v4
+ * decision-task filename, so on its own it implies no type.
+ */
 const LOCATION_FILENAME: Record<string, string> = {
   ticket: "ticket.md",
   map: "map.md",
@@ -203,12 +230,55 @@ const LOCATION_FILENAME: Record<string, string> = {
   "arch spec": "arch-spec.md",
 };
 
-/** The type a filename implies, or null when the filename is type-neutral. */
-function typeForFilename(file: string): string | null {
+/**
+ * The type a filename implies, or null when the filename is type-neutral.
+ *
+ * `task.md` is neutral in the v3 shape (its only artifact filename) but in the
+ * v4 effort-grouped layout it sits under `tasks/`, where it does imply `task`.
+ * The path is consulted so the v4 case is caught without flagging every v3
+ * task as an orphan.
+ */
+function typeForFilename(file: string, path: string): string | null {
+  if (file === "task.md") {
+    return isV4TaskPath(path) ? "task" : null;
+  }
   for (const [type, name] of Object.entries(LOCATION_FILENAME)) {
     if (file === name) return type;
   }
   return null;
+}
+
+/**
+ * True for the v4 `docs/tasks/<effort>/tasks/<task>/task.md` shape. The `tasks`
+ * segment must be the v4 subtree: an effort directory before it, a task
+ * directory and the filename after it.
+ */
+function isV4TaskPath(path: string): boolean {
+  const parts = path.split(/[\\/]/).filter((p) => p !== "");
+  const i = parts.lastIndexOf("tasks");
+  if (i === -1) return false;
+  return i >= 2 && parts[i - 1] !== "docs" && parts.length >= i + 3;
+}
+
+/**
+ * The effort scope an artifact belongs to, as a comparable key.
+ *
+ * The two shapes group differently, so the key is shape-aware:
+ * - v3: the frontmatter `map:` field is the grouping (v3 flat task dirs each
+ *   carry `map: <effort>`), so siblings share a map. Falling back to the
+ *   directory keeps a map-less v3 artifact scoped to itself.
+ * - v4: placement is the grouping (the `map:` field is dropped), so the key is
+ *   the effort directory from the path.
+ *
+ * The `map:` and `dir:` prefixes keep the two namespaces from colliding.
+ */
+function effortKeyOf(art: Artifact): string {
+  if (art.shape === "v3") {
+    const m = art.data.map;
+    if (typeof m === "string" && m !== "") return `map:${m}`;
+  }
+  const effort = art.path ? effortDirOf(art.path) : null;
+  return effort === null ? "" : `dir:${effort}`;
 }
 
 /**
@@ -233,7 +303,7 @@ export function findAnomalies(artifacts: Artifact[]): Anomaly[] {
     if (!art.path) continue;
     const label = art.slug || art.path;
     const file = art.path.split(/[\\/]/).pop() ?? "";
-    const implied = typeForFilename(file);
+    const implied = typeForFilename(file, art.path);
     if (implied !== null && implied !== art.type) {
       anomalies.push({
         kind: "orphan",
@@ -244,7 +314,10 @@ export function findAnomalies(artifacts: Artifact[]): Anomaly[] {
     }
     if (art.type === "task" || art.type === "ticket") {
       const effort = effortDirOf(art.path);
-      if (effort !== null && !effortsWithAnchor.has(effort)) {
+      // Only the v4 effort-grouped layout requires an anchor. A v3 flat task
+      // directory is its own effort and carries no map or spec by design, so
+      // checking it there would flag every live v3 task.
+      if (art.shape === "v4" && effort !== null && !effortsWithAnchor.has(effort)) {
         anomalies.push({
           kind: "orphan",
           artifact: label,
@@ -257,14 +330,12 @@ export function findAnomalies(artifacts: Artifact[]): Anomaly[] {
   // blocked_by targets, scoped to the referring artifact's effort.
   const provided = new Map<string, Set<string>>();
   for (const art of artifacts) {
-    const effort = art.path ? effortDirOf(art.path) : null;
-    const key = effort ?? "";
+    const key = effortKeyOf(art);
     if (!provided.has(key)) provided.set(key, new Set());
     provided.get(key)!.add(art.slug);
   }
   for (const art of artifacts) {
-    const effort = art.path ? effortDirOf(art.path) : null;
-    const key = effort ?? "";
+    const key = effortKeyOf(art);
     const available = provided.get(key) ?? new Set<string>();
     for (const target of art.blocked_by) {
       if (!available.has(target)) {

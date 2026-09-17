@@ -223,6 +223,73 @@ describe("findAnomalies", () => {
     map.path = "/repo/docs/tasks/eff/map.md";
     expect(findAnomalies([map, a, b])).toEqual([]);
   });
+
+  test("reports a v4 task.md that declares type ticket (both orphan directions)", () => {
+    const map = fromFrontmatter({ type: "map", status: "draft" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    const asTicket = fromFrontmatter({ type: "ticket", status: "stable", workflow_state: "todo" }, "decide");
+    asTicket.path = "/repo/docs/tasks/eff/tasks/decide/task.md";
+    const anomalies = findAnomalies([map, asTicket]);
+    expect(anomalies.map((a) => a.kind)).toContain("orphan");
+    expect(anomalies[0].detail).toMatch(/declares type 'ticket', not 'task'/);
+  });
+
+  test("does not flag a v3 flat task.md as an orphan (task.md is v3-neutral)", () => {
+    const art = fromFrontmatter({ kind: "task", type: "feature", slug: "legacy", status: "done" });
+    art.path = "/repo/docs/tasks/legacy/task.md";
+    expect(findAnomalies([art])).toEqual([]);
+  });
+
+  test("does not flag a v3 flat task for lacking a map or spec anchor", () => {
+    const art = fromFrontmatter({ kind: "task", type: "feature", slug: "legacy", status: "done" });
+    art.path = "/repo/docs/tasks/legacy/task.md";
+    expect(findAnomalies([art]).filter((a) => a.kind === "orphan")).toEqual([]);
+  });
+
+  test("scopes v3 tasks by their map field, so a sibling dependency resolves", () => {
+    const a = fromFrontmatter({ kind: "task", type: "feature", slug: "first", map: "eff", status: "done" });
+    a.path = "/repo/docs/tasks/first/task.md";
+    const b = fromFrontmatter({
+      kind: "task",
+      type: "feature",
+      slug: "second",
+      map: "eff",
+      status: "ready",
+      blocked_by: ["first"],
+    });
+    b.path = "/repo/docs/tasks/second/task.md";
+    expect(findAnomalies([a, b])).toEqual([]);
+  });
+
+  test("reports a v3 blocked_by edge across two different maps", () => {
+    const a = fromFrontmatter({ kind: "task", type: "feature", slug: "first", map: "eff-a", status: "done" });
+    a.path = "/repo/docs/tasks/archive/first/task.md";
+    const b = fromFrontmatter({
+      kind: "task",
+      type: "feature",
+      slug: "second",
+      map: "eff-b",
+      status: "ready",
+      blocked_by: ["first"],
+    });
+    b.path = "/repo/docs/tasks/archive/second/task.md";
+    const anomalies = findAnomalies([a, b]);
+    expect(anomalies.map((x) => x.kind)).toContain("missing-blocked-by-target");
+  });
+
+  test("keeps archived efforts distinct instead of collapsing them into one bucket", () => {
+    const a = fromFrontmatter({ kind: "task", type: "feature", slug: "first", status: "done" });
+    a.path = "/repo/docs/tasks/archive/eff-a/task.md";
+    const b = fromFrontmatter({
+      kind: "task",
+      type: "feature",
+      slug: "second",
+      status: "ready",
+      blocked_by: ["first"],
+    });
+    b.path = "/repo/docs/tasks/archive/eff-b/task.md";
+    expect(findAnomalies([a, b]).map((x) => x.kind)).toContain("missing-blocked-by-target");
+  });
 });
 
 describe("sliceInfoFrom", () => {

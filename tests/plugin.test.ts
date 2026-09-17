@@ -614,7 +614,7 @@ describe("task-workflow tools", () => {
   });
 });
 
-describe("task-workflow tools — v4 effort-grouped tree", () => {
+describe("task-workflow tools: v4 effort-grouped tree", () => {
   let tools: Record<string, { description: string; execute: Function }>;
 
   beforeAll(() => { tools = createTools(); });
