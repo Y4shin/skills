@@ -21,7 +21,7 @@ import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
 import { fromFrontmatter, sliceInfoFrom, dependencyLevels, type Artifact, type ArtifactKind, type SliceInfo, type WorkItemInfo } from "./core/art.js";
-import { toObject, fromObject, DEFAULT_STATE, type WorkflowState } from "./core/state.js";
+import { toObject, fromObject, type WorkflowState } from "./core/state.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 
@@ -397,10 +397,14 @@ function mapChildInfos(root: string, mapPath: string): WorkItemInfo[] {
 
 // ─── State helpers ─────────────────────────────────────────────────────────────
 
+function freshDefault(): WorkflowState {
+  return { map: null, task: null, rest: {} };
+}
+
 function loadState(root: string): WorkflowState {
   const sp = join(taskRoot(root), "state.yaml");
-  if (!existsSync(sp)) return { ...DEFAULT_STATE };
-  try { return fromObject(readYaml(sp)); } catch { return { ...DEFAULT_STATE }; }
+  if (!existsSync(sp)) return freshDefault();
+  try { return fromObject(readYaml(sp)); } catch { return freshDefault(); }
 }
 
 function saveState(root: string, state: WorkflowState): void {
