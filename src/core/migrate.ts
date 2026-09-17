@@ -22,6 +22,8 @@ import {
   validateCombination,
   TYPE_LEAVES,
   TYPE_LEAF,
+  TASK_SUBTYPES,
+  KNOWN_TYPES,
 } from "./art.js";
 import { fromObject, toObject, freshState } from "./state.js";
 
@@ -481,16 +483,22 @@ function titleFromBody(body: string): string | null {
 
 // ─── Layout classification ────────────────────────────────────────────────────
 
-/** The v3 workflow categories that plan a task rather than implement a ticket. */
-const TASK_CATEGORIES = new Set(["research", "prototype", "grilling", "manual"]);
+/**
+ * The v3 workflow categories that plan a task rather than implement a ticket.
+ * Derived from the model, so a new planning subtype in `art.ts` is classified
+ * as a task here instead of being silently misfiled as a ticket.
+ */
+const TASK_CATEGORIES = new Set<string>(TASK_SUBTYPES);
 
-/** The OKF types that are auxiliary files beside a primary artifact. */
-const AUX_TYPES = new Set([
-  "findings",
-  "deviation report",
-  "changelog",
-  "out-of-scope note",
-]);
+/**
+ * The OKF types that are auxiliary files beside a primary artifact, derived
+ * from the model's known types so the two cannot drift.
+ */
+const AUX_TYPES = new Set<string>(
+  KNOWN_TYPES.filter((t) =>
+    t === "findings" || t === "deviation report" || t === "changelog" || t === "out-of-scope note",
+  ),
+);
 
 /** Where an artifact belongs in the v4 layout. */
 type Slot =
@@ -1047,22 +1055,93 @@ function rebuildState(tree: TreePort, paths: string[], plan: Plan, from: number)
 
 // ─── Step 3: report the rest ──────────────────────────────────────────────────
 
-/** Vendored non-OKF trees inside the bundle, and unresolvable references. */
-const VENDORED_NAMES = new Set(["matt-skills"]);
+/**
+ * A vendored non-OKF tree: a self-contained directory subtree under the bundle
+ * holding foreign markdown (no OKF `type`/`kind`), such as a clone of an
+ * external skills repo kept for reference.
+ *
+ * The rule is general rather than name-based, so any repo's vendored clone is
+ * caught. Three guards keep it from misfiring on ordinary content:
+ *
+ * - A subtree must hold **zero valid OKF artifacts**. A task directory with a
+ *   couple of frontmatter-less aux files is normal (the migration backfills
+ *   them), whereas a vendored clone contains nothing this workflow owns.
+ * - A subtree needs at least two non-OKF markdown files, so a single stray
+ *   file is backfilled rather than relocated.
+ * - Recognized artifact containers (`tasks/`, `tickets/`, `slices/`,
+ *   `deviation-reports/`, `archive/`) are never treated as vendored.
+ */
+const ARTIFACT_CONTAINERS = new Set(["tasks", "tickets", "slices", "deviation-reports", "archive"]);
 
-function reportRest(tree: TreePort, paths: string[], plan: Plan): void {
-  // Vendored trees: a directory inside the bundle whose contents are not OKF
-  // artifacts. It moves outside the bundle with a pointer left behind.
-  const vendoredRoots = new Set<string>();
-  for (const path of paths) {
-    for (const seg of segments(path)) {
-      if (VENDORED_NAMES.has(seg)) {
-        const parts = segments(path);
-        const i = parts.indexOf(seg);
-        vendoredRoots.add(parts.slice(0, i + 1).join("/"));
-      }
+/** True when a markdown file's frontmatter is not a valid OKF artifact. */
+function isNonOkfMarkdown(text: string): boolean {
+  try {
+    fromFrontmatter(parse(text).data);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * True when the directory ending at `parts[i - 1]` is an effort directory
+ * rather than a nested subdirectory: `docs/tasks/<effort>` in the live layout,
+ * or `docs/tasks/{archive,maps}/<effort>` in the v3 ones. A vendored clone
+ * lives *inside* an effort, never as the effort itself.
+ */
+function isEffortDir(parts: string[], i: number): boolean {
+  if (i === 3) return true;
+  if (i === 4) {
+    const afterBundle = parts[2] ?? "";
+    return afterBundle === "archive" || afterBundle === "maps";
+  }
+  return false;
+}
+
+/** The vendored subtrees found under the bundle, shallowest first. */
+function findVendoredRoots(tree: TreePort, paths: string[]): string[] {
+  // Per candidate directory subtree: how many non-OKF markdown files it holds,
+  // and whether it holds any valid artifact at all.
+  const nonOkf = new Map<string, number>();
+  const hasArtifact = new Set<string>();
+
+  for (const path of sorted(paths.filter(isMarkdown))) {
+    if (!under(path, TASK_ROOT)) continue;
+    const text = safeRead(tree, path);
+    if (text === null) continue;
+    const foreign = isNonOkfMarkdown(text);
+    const parts = segments(path);
+    // `i` is the segment count of the candidate directory. Depth 3 is the
+    // first level below the bundle (an effort dir, so excluded), which is what
+    // keeps an effort root from being mistaken for a vendored clone inside it.
+    for (let i = 3; i < parts.length; i++) {
+      const last = parts[i - 1] ?? "";
+      if (ARTIFACT_CONTAINERS.has(last)) continue;
+      if (isEffortDir(parts, i)) continue;
+      const dir = parts.slice(0, i).join("/");
+      if (!under(dir, TASK_ROOT)) continue;
+      if (foreign) nonOkf.set(dir, (nonOkf.get(dir) ?? 0) + 1);
+      else hasArtifact.add(dir);
     }
   }
+
+  // A candidate is vendored when it holds at least two non-OKF markdown files,
+  // holds no valid artifact, and no ancestor of it is already vendored (keep
+  // the shallowest root).
+  const roots: string[] = [];
+  for (const [dir, count] of [...nonOkf.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    if (count < 2) continue;
+    if (hasArtifact.has(dir)) continue;
+    if (roots.some((r) => under(dir, r))) continue;
+    roots.push(dir);
+  }
+  return roots;
+}
+
+function reportRest(tree: TreePort, paths: string[], plan: Plan): void {
+  // Vendored trees: a non-OKF subtree inside the bundle. It moves outside the
+  // bundle with a pointer left behind.
+  const vendoredRoots = new Set<string>(findVendoredRoots(tree, paths));
   for (const root of sorted(vendoredRoots)) {
     const dest = `docs/vendored/${basenameOf(root)}`;
     plan.needsHuman.push({

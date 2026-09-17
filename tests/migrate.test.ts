@@ -609,6 +609,41 @@ describe("migrate: reporting", () => {
     expect(item!.path).toContain("matt-skills");
   });
 
+  test("the vendored rule is general, not a hardcoded name", () => {
+    // Any foreign clone is caught, whatever it is called.
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/archive/report/other-vendor/README.md": "# other\n",
+      "docs/tasks/archive/report/other-vendor/docs/a.md": "# a\n",
+    });
+    const report = migrate(tree);
+    const files = tree.snapshot();
+    expect(files["docs/vendored/other-vendor/README.md"]).toBe("# other\n");
+    expect(report.needsHuman.some((h) => h.kind === "vendored-tree")).toBe(true);
+  });
+
+  test("a task directory with frontmatter-less aux files is NOT vendored", () => {
+    // Two frontmatter-less aux files beside a real task are ordinary content
+    // the migration backfills, not a vendored clone to relocate.
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/my-task/task.md":
+        "---\nkind: task\ntype: feature\nslug: my-task\ntitle: T\nmap: effort\nstatus: ready\nblocked_by: []\n---\n",
+      "docs/tasks/my-task/arch-spec.md": "# Arch\n\nno frontmatter\n",
+      "docs/tasks/my-task/deviation-reports/1-split.md": "# Split\n\nno frontmatter\n",
+    });
+    const report = migrate(tree);
+    const files = tree.snapshot();
+    expect(report.needsHuman.some((h) => h.kind === "vendored-tree")).toBe(false);
+    // The aux files stayed in the bundle and gained frontmatter. A single
+    // arch-spec hoists to the effort root; the deviation report stays beside
+    // the ticket.
+    expect(files["docs/tasks/effort/arch-spec.md"]).toBeDefined();
+    expect(files["docs/tasks/effort/tickets/my-task/deviation-reports/1-split.md"]).toBeDefined();
+  });
+
   test("an unresolvable blocked_by reference is reported, not dropped", () => {
     const tree = port({
       "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
