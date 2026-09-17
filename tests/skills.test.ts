@@ -838,6 +838,53 @@ describe("setup-workflow / migration skill references", () => {
     }
   });
 });
+
+// ─── setup-workflow v4 (schema_version 4) ────────────────────────────
+
+describe("setup-workflow v4", () => {
+  const skill = readFile("skills/engineering/setup-workflow/SKILL.md");
+
+  test("keys detection on schema_version 4 as current", () => {
+    expect(skill).toMatch(/current schema version is \*\*4\*\*|schema_version 4|`4`/);
+  });
+
+  test("names the three branches: fresh, migrate, no-op", () => {
+    expect(skill).toMatch(/onboard/i);
+    expect(skill).toMatch(/migrate/i);
+    expect(skill).toMatch(/no-op|already on schema_version/i);
+  });
+
+  test("the migrate branch invokes the CLI", () => {
+    expect(skill).toMatch(/scripts\/migrate\.mjs/);
+  });
+
+  test("the migrate branch mentions the MigrateReport", () => {
+    expect(skill).toMatch(/MigrateReport/);
+  });
+
+  test("the onboard branch writes the v4 scaffold", () => {
+    expect(skill).toMatch(/schema_version: 4/);
+    expect(skill).toMatch(/okf_version/);
+  });
+
+  test("references the upgrade-3-to-4 resource", () => {
+    expect(skill).toMatch(/upgrade-3-to-4/);
+  });
+
+  test("the dead task-overview pointer is fixed", () => {
+    expect(skill).toContain("/skill:task-workflow-overview");
+    expect(skill).not.toContain("/skill:task-overview`");
+  });
+
+  test("upgrade-3-to-4 resource exists with the ordered step list", () => {
+    const content = readFile("skills/engineering/setup-workflow/resources/upgrade-3-to-4.md");
+    expect(content).toMatch(/Migration/);
+    expect(content).toMatch(/scripts\/migrate\.mjs/);
+    for (let i = 1; i <= 9; i++) {
+      expect(content).toMatch(new RegExp(`## Step ${i}`));
+    }
+  });
+});
 // ─── Skill-review wiring ─────────────────────────────────────────────
 
 describe("skill-review wiring", () => {

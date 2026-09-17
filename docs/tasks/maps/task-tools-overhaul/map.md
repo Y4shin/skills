@@ -25,7 +25,7 @@ tasks:
 - slug: overhaul-v4-migration
   blocked_by:
   - overhaul-artifact-model
-  done: false
+  done: true
 - slug: overhaul-graph-tools
   blocked_by:
   - overhaul-v4-migration

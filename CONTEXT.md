@@ -52,6 +52,28 @@ slices within a level run sequentially (shared repo cwd), levels are
 strict barriers.
 _Avoid_: rank, tier
 
+**Migration**:
+The one-time transformation that takes a repo's `docs/tasks/` tree from any
+vintage (fresh, unversioned, v1, v2, v3, flat, maps-subtree, archived) to the
+v4 effort-grouped OKF bundle. It is a tested unit (`src/core/migrate.ts`),
+invoked through a CLI by `setup-workflow`'s migrate branch, not a tool in the
+registered surface. Its non-negotiables: every rewrite is YAML-verified
+before it lands, a failure leaves the tree untouched (files and directories),
+a second run is a no-op, and an interrupted run resumes. It is the only
+writer of `schema_version: 4`.
+_Avoid_: upgrade (that is the per-version resource file; the migration is the
+whole transformation)
+
+**Vendored tree**:
+A self-contained non-OKF subtree inside the `docs/tasks/` bundle, such as a
+clone of an external skills repo kept for reference. It is not part of the
+bundle, so the migration moves it outside (namespaced by its effort, under
+`docs/vendored/`) and leaves a pointer file behind. The rule is structural:
+zero valid OKF artifacts, at least two non-OKF markdown files, and the shape
+of a tree rather than a folder of loose notes.
+_Avoid_: submodule (that is a git mechanism; this is a directory of foreign
+files)
+
 **schema_version**:
 The version stamp in `docs/tasks/state.yaml` that the migration skill reads
 to detect whether a repo is fresh (onboard), old (migrate), or already
@@ -154,6 +176,10 @@ _Avoid_: blacklist (too negative)
   in that file is unmodeled and preserved verbatim.
 - The **frontier** is the set of tasks/slices whose `blocked_by`
   dependencies are all done.
+- The **migration** stamps `schema_version: 4` and reshapes the tree; it is
+  the only writer of that key.
+- A **vendored tree** is moved out of the bundle by the migration, with a
+  pointer file left at its old location.
 - A **decision ticket** is a **task** (a child of a **map**).
 - A bug report or feature request carries one **triage role** at a time.
 - The **out-of-scope KB** is checked by `triage` before grilling.
