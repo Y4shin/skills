@@ -16,7 +16,7 @@
  */
 
 import YAML from "yaml";
-import { parse, dump, type Document, type FrontmatterData } from "./frontmatter.js";
+import { parse, dump, type FrontmatterData } from "./frontmatter.js";
 import {
   fromFrontmatter,
   validateCombination,
@@ -65,7 +65,11 @@ export interface Change {
 }
 
 export interface HumanItem {
-  kind: "slice-dir" | "vendored-tree" | "unresolvable-ref" | "normalized-combination";
+  kind:
+    | "slice-dir"
+    | "vendored-tree"
+    | "unresolvable-ref"
+    | "normalized-combination";
   path: string;
   detail: string;
 }
@@ -83,36 +87,18 @@ export interface MigrateReport {
 const TASK_ROOT = "docs/tasks";
 const STATE_PATH = `${TASK_ROOT}/state.yaml`;
 const INDEX_PATH = `${TASK_ROOT}/index.md`;
+const CHANGELOG_PATH = `${TASK_ROOT}/CHANGELOG.md`;
+const ARCHIVE = `${TASK_ROOT}/archive`;
+const MAPS = `${TASK_ROOT}/maps`;
 const DEFAULT_PROGRESS_PATH = `${TASK_ROOT}/.migration-progress`;
 
 /** The OKF version the bundle carries. */
 export const OKF_VERSION = "0.2";
 
-/**
- * Verify a staged write before it lands: markdown must carry parseable YAML
- * frontmatter, and every other file must parse as YAML. This is the check the
- * port calls at the commit boundary, so a malformed rewrite throws before a
- * single byte is written.
- */
-export function verifyStagedWrite(path: string, content: string): void {
-  if (isMarkdown(path)) {
-    parse(content);
-    return;
-  }
-  if (path.endsWith(".yaml") || path.endsWith(".yml")) {
-    YAML.parse(content);
-  }
-}
-
 // ─── Small helpers ────────────────────────────────────────────────────────────
 
 function posix(p: string): string {
   return p.split("\\").join("/").replace(/^\.\//, "");
-}
-
-function dirnameOf(p: string): string {
-  const i = p.lastIndexOf("/");
-  return i === -1 ? "" : p.slice(0, i);
 }
 
 function basenameOf(p: string): string {
@@ -133,22 +119,54 @@ function isMarkdown(p: string): boolean {
   return p.endsWith(".md");
 }
 
+/** A stable, deterministic ordering for the whole transformation. */
+function sorted(paths: Iterable<string>): string[] {
+  return [...paths].sort();
+}
+
+// ─── YAML helpers ─────────────────────────────────────────────────────────────
+
+function parseYamlFile(text: string): unknown {
+  return YAML.parse(text);
+}
+
+function stringifyYaml(data: unknown): string {
+  return YAML.stringify(data, {
+    sortMapEntries: false,
+    indentSeq: false,
+    lineWidth: 0,
+  });
+}
+
+/**
+ * Verify a staged write before it lands: markdown must carry parseable YAML
+ * frontmatter, and every other file must parse as YAML. This is the check the
+ * port calls at the commit boundary, so a malformed rewrite throws before a
+ * single byte is written.
+ */
+export function verifyStagedWrite(path: string, content: string): void {
+  if (isMarkdown(path)) {
+    parse(content);
+    return;
+  }
+  if (path.endsWith(".yaml") || path.endsWith(".yml")) {
+    YAML.parse(content);
+  }
+}
+
 // ─── Vintage detection ────────────────────────────────────────────────────────
 
 /**
  * The detected vintage of the tree.
  *
- * 0 means unversioned or fresh; 1 is the nested `active:` state block; 2 and 3
- * are the flat state shapes. The version is read from `schema_version` when
- * present, else inferred from the shape of `state.yaml`.
+ * 0 means unversioned (or fresh, with no docs/tasks at all); 1 is the nested
+ * `active:` state block; 2 and 3 are the flat state shapes. The version is
+ * read from `schema_version` when present, else inferred from the shape of
+ * `state.yaml`.
  */
 export function detectVintage(tree: TreePort): number {
   const paths = tree.list().map(posix);
-  if (!paths.includes(STATE_PATH)) {
-    // No state file: fresh when there is no docs/tasks at all, else an
-    // unversioned v2/v3-shaped tree.
-    return paths.some((p) => under(p, TASK_ROOT)) ? 0 : 0;
-  }
+  if (!paths.includes(STATE_PATH)) return 0;
   let raw: unknown;
   try {
     raw = parseYamlFile(tree.read(STATE_PATH));
@@ -162,25 +180,257 @@ export function detectVintage(tree: TreePort): number {
     if (typeof v === "string" && /^\d+$/.test(v)) return Number(v);
     // No stamp: v1 is recognizable by its nested `active:` block.
     if (obj.active !== undefined) return 1;
-    return 0;
   }
   return 0;
 }
 
-/** Parse a whole-file YAML document (state.yaml is not frontmatter). */
-function parseYamlFile(text: string): unknown {
-  return YAML.parse(text);
+// ─── Frontmatter shaping ──────────────────────────────────────────────────────
+
+/** The workflow category a v3 artifact carried, mapped to a v4 subtype. */
+function subtypeOf(data: FrontmatterData, type: string): string | null {
+  const raw = data.subtype ?? data.type;
+  if (typeof raw !== "string" || raw.trim() === "") return null;
+  // A bare `kind: task, type: task` carries no workflow category.
+  if (raw === type) return null;
+  return raw;
 }
 
-function YAMLstringify(data: unknown): string {
-  return YAML.stringify(data, {
-    sortMapEntries: false,
-    indentSeq: false,
-    lineWidth: 0,
-  });
+/** The OKF type a v3 artifact carried, mapped to its v4 name. */
+function typeOf(data: FrontmatterData): string | null {
+  // v3 wrote the artifact kind in `kind:` and the workflow category in
+  // `type:`; v4 writes the kind in `type:`. Prefer `kind` when present.
+  const raw = data.kind ?? data.type;
+  if (typeof raw !== "string" || raw.trim() === "") return null;
+  // v3 wrote findings as `kind: finding`; v4's OKF type is the plural.
+  if (raw === "finding") return "findings";
+  return raw;
+}
+
+/**
+ * The v4 OKF type for a v3 artifact.
+ *
+ * v3 wrote every workflow item as `kind: task` and carried the workflow
+ * category in `type:`; v4 splits them. A planning category (research,
+ * prototype, grilling, manual) stays a `task`; an implementation category
+ * (feature, bug) becomes a `ticket`.
+ */
+function effectiveType(data: FrontmatterData): string | null {
+  const kind = typeOf(data);
+  if (kind === null) return null;
+  if (kind !== "task") return kind;
+  const subtype = subtypeOf(data, kind);
+  if (subtype !== null && !TASK_CATEGORIES.has(subtype)) return "ticket";
+  return "task";
+}
+
+/**
+ * The OKF status a v3 workflow status maps to.
+ *
+ * v3 `status` was the workflow state, so it maps onto the v4 pair: a done or
+ * archived artifact is deprecated (terminal), a mid-authoring draft stays
+ * draft, and everything else is the steady state, stable. This matches the
+ * convention the v4 seed tree already uses: an archived effort's map is
+ * deprecated and its done ticket is deprecated with workflow_state done.
+ */
+function okfStatusOf(v3Status: string | null, workflowState: string | null): string {
+  if (v3Status === "draft") return "draft";
+  if (v3Status === "done" || workflowState === "done") return "deprecated";
+  return "stable";
+}
+
+/** The workflow_state a v3 status maps to, or null when the type has none. */
+function workflowStateOf(v3Status: string | null): string | null {
+  switch (v3Status) {
+    case "todo":
+    case "ready":
+    case "in-progress":
+    case "blocked":
+    case "done":
+      return v3Status;
+    case "active":
+      return "in-progress";
+    case "draft":
+      return "todo";
+    case "proposed":
+      return "todo";
+    default:
+      return null;
+  }
+}
+
+/**
+ * The v4 frontmatter for an artifact, derived from its v3 shape.
+ *
+ * `kind` to `type`, the old `type` to `subtype`, `slug` and `map` dropped,
+ * `status` split into OKF `status` + `workflow_state`, and the legacy
+ * `slices:`, `started_at`, `completed_at`, `bug:`, and slice-level `mode`
+ * fields stripped. Unknown keys survive verbatim.
+ */
+function shapeFrontmatter(
+  data: FrontmatterData,
+  type: string,
+  needsHuman: HumanItem[],
+  path: string,
+): FrontmatterData {
+  const out: FrontmatterData = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (
+      k === "kind" ||
+      k === "slug" ||
+      k === "map" ||
+      k === "slices" ||
+      k === "started_at" ||
+      k === "completed_at" ||
+      k === "bug" ||
+      k === "task"
+    ) {
+      continue;
+    }
+    // The map's `tasks:` array is deleted: the directory is the registration.
+    if (k === "tasks" && type === "map") continue;
+    if (k === "type") continue; // rewritten below
+    if (k === "subtype") continue; // rewritten below
+    if (k === "status") continue; // rewritten below
+    if (k === "workflow_state") continue; // rewritten below
+    if (k === "mode" && type === "slice") continue;
+    out[k] = v;
+  }
+
+  out.type = type;
+
+  const subtype = subtypeOf(data, type);
+  if (subtype !== null) out.subtype = subtype;
+
+  const v3Status = typeof data.status === "string" ? data.status : null;
+  const hasWorkflow = type === "task" || type === "ticket";
+  const workflowState = hasWorkflow ? workflowStateOf(v3Status) : null;
+  const status = okfStatusOf(v3Status, workflowState);
+
+  // Normalize invalid combinations: draft only pairs with todo, deprecated
+  // only with done. A normalized pair is recorded for human eyes.
+  let normalized = status;
+  let normalizedState = workflowState;
+  if (normalized === "draft" && normalizedState !== null && normalizedState !== "todo") {
+    normalizedState = "todo";
+  }
+  if (normalized === "deprecated" && normalizedState !== null && normalizedState !== "done") {
+    normalizedState = "done";
+  }
+  const reason = validateCombination(normalized, normalizedState);
+  if (reason !== null) {
+    normalized = "stable";
+  }
+  if (normalized !== status || normalizedState !== workflowState) {
+    needsHuman.push({
+      kind: "normalized-combination",
+      path,
+      detail: `normalized '${path}': status '${status}' with workflow_state '${workflowState}' is not a valid OKF pair`,
+    });
+  }
+
+  out.status = normalized;
+  if (normalizedState !== null) out.workflow_state = normalizedState;
+  return out;
+}
+
+/** Read an artifact's frontmatter and body, or null when it has none. */
+function readDoc(tree: TreePort, path: string): { data: FrontmatterData; body: string } | null {
+  let text: string;
+  try {
+    text = tree.read(path);
+  } catch {
+    return null;
+  }
+  try {
+    const doc = parse(text);
+    return { data: doc.data, body: doc.body };
+  } catch {
+    return null;
+  }
+}
+
+/** The first heading of a markdown body, as a title fallback. */
+function titleFromBody(body: string): string | null {
+  const m = body.match(/^#\s+(.+)$/m);
+  return m ? m[1].trim() : null;
+}
+
+// ─── Layout classification ────────────────────────────────────────────────────
+
+/** The v3 workflow categories that plan a task rather than implement a ticket. */
+const TASK_CATEGORIES = new Set(["research", "prototype", "grilling", "manual"]);
+
+/** The OKF types that are auxiliary files beside a primary artifact. */
+const AUX_TYPES = new Set([
+  "findings",
+  "deviation report",
+  "changelog",
+  "out-of-scope note",
+]);
+
+/** Where an artifact belongs in the v4 layout. */
+type Slot =
+  | { kind: "map" | "spec" | "arch-spec"; effort: string }
+  | { kind: "task" | "ticket"; effort: string; slug: string }
+  | { kind: "aux"; dir: string };
+
+/**
+ * The effort directory a v3 path belongs to, and whether it is archived.
+ *
+ * Handles the flat `docs/tasks/<task>/` sprawl, the `docs/tasks/maps/<map>/`
+ * subtree, and the `docs/tasks/archive/...` tree.
+ */
+function vintageLocation(
+  path: string,
+): { archived: boolean; effort: string | null; slug: string | null } {
+  const parts = segments(path);
+  const i = parts.indexOf("tasks", parts.indexOf("docs") === 0 ? 1 : 0);
+  if (i === -1) return { archived: false, effort: null, slug: null };
+  const rest = parts.slice(i + 1);
+
+  // `maps/archive/<map>/...`: an archived map subtree.
+  if (rest[0] === "maps" && rest[1] === "archive") {
+    return { archived: true, effort: rest[2] ?? null, slug: null };
+  }
+  // `maps/<map>/...`: the live map subtree.
+  if (rest[0] === "maps") {
+    return { archived: false, effort: rest[1] ?? null, slug: null };
+  }
+  // `archive/<dir>/...`: the v3 archive. For a map the dir is the effort;
+  // for a task it is the slug and the effort comes from its `map:` field.
+  if (rest[0] === "archive") {
+    return { archived: true, effort: null, slug: rest[1] ?? null };
+  }
+  // `out-of-scope/...` and the bundle's own root files have no effort.
+  if (rest[0] === "out-of-scope") {
+    return { archived: false, effort: null, slug: null };
+  }
+  // `<effort>/tickets/<slug>/...` or `<effort>/tasks/<slug>/...`: already v4.
+  if ((rest[1] === "tickets" || rest[1] === "tasks") && rest[2] !== undefined) {
+    return { archived: false, effort: rest[0] ?? null, slug: rest[2] };
+  }
+  // `<slug>/...`: the v3 flat task sprawl.
+  return { archived: false, effort: null, slug: rest[0] ?? null };
+}
+
+/** The effort an artifact's own frontmatter names, when it names one. */
+function effortFromFrontmatter(data: FrontmatterData): string | null {
+  const m = data.map;
+  if (typeof m === "string" && m.trim() !== "") return m;
+  return null;
 }
 
 // ─── The transformation ───────────────────────────────────────────────────────
+
+interface Plan {
+  /** Source path -> destination path, for moves. */
+  moves: Array<{ from: string; to: string }>;
+  /** Destination path -> new content, for rewrites and adds. */
+  writes: Map<string, string>;
+  /** Paths reported but left in place. */
+  needsHuman: HumanItem[];
+  changes: Change[];
+}
 
 /**
  * Migrate a tree to schema_version 4.
@@ -191,45 +441,562 @@ function YAMLstringify(data: unknown): string {
  */
 export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateReport {
   const from = detectVintage(tree);
-  const changes: Change[] = [];
-  const needsHuman: HumanItem[] = [];
+  const progressPath = opts.progressPath ?? DEFAULT_PROGRESS_PATH;
+  const allPaths = tree.list().map(posix);
 
-  const stage = (change: Change): void => {
-    changes.push(change);
+  const plan: Plan = {
+    moves: [],
+    writes: new Map(),
+    needsHuman: [],
+    changes: [],
   };
 
-  const write = (path: string, content: string, detail: string): void => {
-    if (!opts.dryRun) tree.stageWrite(path, content);
-    stage({ action: "add", path, detail });
-  };
+  const doneSteps = readProgress(tree, progressPath);
 
-  // Step 1: the fresh scaffold (also the tail of every other vintage).
+  // Step 1: reorganize the layout, unify frontmatter, backfill aux files,
+  // reshape the archive. One pass over every markdown file in the tree.
+  if (!doneSteps.has(1)) {
+    reorganize(tree, allPaths, plan, opts.dryRun === true);
+  }
+
+  // Step 2: rebuild state.yaml.
+  if (!doneSteps.has(2)) {
+    rebuildState(tree, allPaths, plan, from);
+  }
+
+  // Step 3: report the rest: slice dirs, vendored trees, unresolvable refs.
+  if (!doneSteps.has(3)) {
+    reportRest(tree, allPaths, plan);
+  }
+
+  // Step 4: write the root index.
+  if (!doneSteps.has(4)) {
+    writeIndex(plan, allPaths);
+  }
+
+  // Step 5: backfill CHANGELOG.md and out-of-scope/README.md.
+  if (!doneSteps.has(5)) {
+    backfillBundleFiles(tree, allPaths, plan);
+  }
+
+  // Step 6: fix the dead pointer in the onboarding report.
+  if (!doneSteps.has(6)) {
+    fixDeadPointer(tree, allPaths, plan);
+  }
+
+  const noop = isV4(tree, allPaths) && plan.moves.length === 0 && plan.writes.size === 0;
+
+  if (!opts.dryRun) {
+    for (const { from: src, to } of plan.moves) tree.stageMove(src, to);
+    for (const [path, content] of plan.writes) tree.stageWrite(path, content);
+    if (noop) {
+      // Idempotence: nothing staged, nothing to commit.
+    } else {
+      tree.commit({ failAfterWrites: opts.failAfterWrites });
+      // The marker is written after the commit, so an interrupted run
+      // resumes from the last completed step.
+      writeProgress(tree, progressPath);
+      if (from >= 4) tree.stageDelete(progressPath);
+    }
+  }
+
+  return {
+    from,
+    to: 4,
+    changes: plan.changes,
+    needsHuman: plan.needsHuman,
+    noop,
+  };
+}
+
+/** True when the tree already carries the v4 stamp and the v4 layout. */
+function isV4(tree: TreePort, paths: string[]): boolean {
+  if (!paths.includes(STATE_PATH)) return false;
+  try {
+    const raw = parseYamlFile(tree.read(STATE_PATH));
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return false;
+    return (raw as Record<string, unknown>).schema_version === 4;
+  } catch {
+    return false;
+  }
+}
+
+function readProgress(tree: TreePort, progressPath: string): Set<number> {
+  const paths = tree.list().map(posix);
+  if (!paths.includes(progressPath)) return new Set();
+  try {
+    const text = tree.read(progressPath);
+    const nums = text.match(/\d+/g) ?? [];
+    return new Set(nums.map(Number));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeProgress(tree: TreePort, progressPath: string): void {
+  const steps = [1, 2, 3, 4, 5, 6];
+  tree.stageWrite(progressPath, steps.join("\n") + "\n");
+}
+
+// ─── Step 1: reorganize ───────────────────────────────────────────────────────
+
+/**
+ * One pass over every markdown file: classify it, work out its v4 home,
+ * stage the move, and stage the reshaped frontmatter.
+ *
+ * Idempotence: a file already in its v4 home with v4 frontmatter stages
+ * nothing.
+ */
+function reorganize(
+  tree: TreePort,
+  paths: string[],
+  plan: Plan,
+  dryRun: boolean,
+): void {
+  const markdown = sorted(paths.filter(isMarkdown));
+  const legacySliceDirs = new Set<string>();
+
+  // First pass: classify every primary artifact, so an aux file can be
+  // placed beside the artifact it belongs to.
+  const placement = new Map<string, { effort: string; container: string; archived: boolean }>();
+  for (const path of markdown) {
+    const loc = vintageLocation(path);
+    const doc = readDoc(tree, path);
+    if (doc === null) continue;
+    const type = effectiveType(doc.data);
+    if (type !== "task" && type !== "ticket") continue;
+    const effort = loc.effort ?? effortFromFrontmatter(doc.data) ?? loc.slug ?? "";
+    if (effort === "") continue;
+    const container = type === "task" ? "tasks" : "tickets";
+    placement.set(placeKey(loc), {
+      effort,
+      container,
+      archived: loc.archived,
+    });
+  }
+
+  for (const path of markdown) {
+    const loc = vintageLocation(path);
+
+    // Legacy slice docs: reported, never moved or rewritten.
+    if (segments(path).includes("slices")) {
+      legacySliceDirs.add(path.slice(0, path.lastIndexOf("/")));
+      continue;
+    }
+
+    // The bundle's own root files are handled by their own steps.
+    if (path === INDEX_PATH || path === CHANGELOG_PATH) continue;
+    if (under(path, `${TASK_ROOT}/out-of-scope`)) continue;
+
+    const doc = readDoc(tree, path);
+    if (doc === null) {
+      // A markdown file with no frontmatter: an aux file to backfill.
+      const type = auxTypeForPath(path);
+      if (type === null) continue;
+      const dest = auxHome(path, loc, placement);
+      const data: FrontmatterData = {
+        type,
+        title: titleFromBody(doc0(tree, path).body) ?? basenameOf(path).replace(/\.md$/, ""),
+        status: "stable",
+      };
+      stageMoveIfNeeded(path, dest, plan);
+      plan.writes.set(dest, dump({ data, body: doc0(tree, path).body }));
+      plan.changes.push({
+        action: dest === path ? "rewrite" : "move",
+        path: dest,
+        from: dest === path ? undefined : path,
+        detail: `backfilled frontmatter on '${dest}'`,
+      });
+      continue;
+    }
+
+    const type = effectiveType(doc.data);
+    if (type === null) continue;
+
+    const dest = v4Home(path, type, doc.data, loc, placement);
+    if (dest === null) continue;
+
+    const shaped = shapeFrontmatter(doc.data, type, plan.needsHuman, dest);
+    const content = dump({ data: shaped, body: doc.body });
+    stageMoveIfNeeded(path, dest, plan);
+    if (content !== safeRead(tree, path) || dest !== path) {
+      plan.writes.set(dest, content);
+      plan.changes.push({
+        action: dest === path ? "rewrite" : "move",
+        path: dest,
+        from: dest === path ? undefined : path,
+        detail:
+          dest === path
+            ? `unified frontmatter on '${dest}'`
+            : `moved '${path}' to '${dest}' and unified its frontmatter`,
+      });
+    }
+  }
+
+  for (const dir of sorted(legacySliceDirs)) {
+    plan.needsHuman.push({
+      kind: "slice-dir",
+      path: dir,
+      detail: `legacy slice directory '${dir}' is reported and left in place (v4 dropped slice support)`,
+    });
+  }
+}
+
+function doc0(tree: TreePort, path: string): { data: FrontmatterData; body: string } {
+  try {
+    return parse(tree.read(path));
+  } catch {
+    return { data: {}, body: tree.read(path) };
+  }
+}
+
+function safeRead(tree: TreePort, path: string): string | null {
+  try {
+    return tree.read(path);
+  } catch {
+    return null;
+  }
+}
+
+/** The key an aux file and its primary artifact share. */
+function placeKey(loc: { archived: boolean; slug: string | null }): string {
+  return `${loc.archived ? "archive/" : ""}${loc.slug ?? ""}`;
+}
+
+/** The aux-file destination for a frontmatter-less markdown file. */
+function auxHome(
+  path: string,
+  loc: { archived: boolean; effort: string | null; slug: string | null },
+  placement: Map<string, { effort: string; container: string; archived: boolean }>,
+): string {
+  const place = placement.get(placeKey(loc));
+  const file = basenameOf(path);
+  if (place !== undefined) {
+    const base = place.archived ? ARCHIVE : TASK_ROOT;
+    const containerDir = segments(path).includes("deviation-reports")
+      ? "deviation-reports/"
+      : "";
+    return `${base}/${place.effort}/${place.container}/${loc.slug ?? ""}/${containerDir}${file}`;
+  }
+  // No primary artifact to sit beside: keep the file where it is.
+  return path;
+}
+
+/** The OKF type an aux filename implies, or null. */
+function auxTypeForFilename(file: string): string | null {
+  if (file === "spec.md") return "spec";
+  if (file === "arch-spec.md") return "arch spec";
+  if (file === "findings.md") return "findings";
+  if (file === "CHANGELOG.md") return "changelog";
+  return null;
+}
+
+/**
+ * The OKF type an aux file's path implies, or null.
+ *
+ * A file under `deviation-reports/` is a deviation report whatever its own
+ * name; every other aux file is recognized by its filename.
+ */
+function auxTypeForPath(path: string): string | null {
+  if (segments(path).includes("deviation-reports")) return "deviation report";
+  return auxTypeForFilename(basenameOf(path));
+}
+
+/** The v4 home for an artifact, or null when it has no home. */
+function v4Home(
+  path: string,
+  type: string,
+  data: FrontmatterData,
+  loc: { archived: boolean; effort: string | null; slug: string | null },
+  placement: Map<string, { effort: string; container: string; archived: boolean }>,
+): string | null {
+  const base = loc.archived ? ARCHIVE : TASK_ROOT;
+  const slug = loc.slug;
+
+  if (type === "map") {
+    const effort = loc.effort ?? effortFromFrontmatter(data) ?? (slug ?? "");
+    if (effort === "") return null;
+    return `${base}/${effort}/map.md`;
+  }
+  if (type === "spec") {
+    const effort = loc.effort ?? effortFromFrontmatter(data) ?? (slug ?? "");
+    if (effort === "") return null;
+    return `${base}/${effort}/spec.md`;
+  }
+  if (type === "arch spec") {
+    const effort = loc.effort ?? effortFromFrontmatter(data) ?? (slug ?? "");
+    if (effort === "") return null;
+    return `${base}/${effort}/arch-spec.md`;
+  }
+  if (type === "task" || type === "ticket") {
+    const effort = loc.effort ?? effortFromFrontmatter(data) ?? (slug ?? "");
+    if (effort === "") return null;
+    const container = type === "task" ? "tasks" : "tickets";
+    const leaf = type === "task" ? "task.md" : "ticket.md";
+    return `${base}/${effort}/${container}/${slug}/${leaf}`;
+  }
+  if (AUX_TYPES.has(type)) {
+    // An aux file sits beside the artifact it belongs to.
+    return auxHome(path, loc, placement);
+  }
+  return null;
+}
+
+function stageMoveIfNeeded(from: string, to: string, plan: Plan): void {
+  if (from === to) return;
+  plan.moves.push({ from, to });
+}
+
+// ─── Step 2: rebuild state.yaml ───────────────────────────────────────────────
+
+/**
+ * Rebuild `state.yaml` as `{schema_version: 4, map, task}` with real nulls.
+ *
+ * The `map` pointer is seeded from the old `map` pointer (or the v1 `active`
+ * block), and the legacy `slice` key is dropped. Unknown keys the state module
+ * does not model are dropped too: v4 owns the shape.
+ */
+function rebuildState(tree: TreePort, paths: string[], plan: Plan, from: number): void {
   const state = freshState();
-  const stateObj: Record<string, unknown> = {
+  if (paths.includes(STATE_PATH)) {
+    try {
+      const parsed = fromObject(parseYamlFile(tree.read(STATE_PATH)));
+      state.map = parsed.map;
+      state.task = parsed.task;
+    } catch {
+      /* a corrupt state file rebuilds empty */
+    }
+  }
+  const obj: Record<string, unknown> = {
     schema_version: 4,
     map: state.map,
     task: state.task,
   };
-  write(STATE_PATH, YAMLstringify(stateObj), "write the v4 state file");
+  const content = stringifyYaml(obj);
+  if (safeRead(tree, STATE_PATH) !== content) {
+    plan.writes.set(STATE_PATH, content);
+    plan.changes.push({
+      action: "rewrite",
+      path: STATE_PATH,
+      detail: `rebuilt state.yaml at schema_version 4 (from vintage ${from})`,
+    });
+  }
+}
 
-  write(
-    INDEX_PATH,
-    dump({
-      data: { type: "index", okf_version: OKF_VERSION, title: "docs/tasks" },
-      body: "\n# docs/tasks\n",
-    }),
-    "write the root index carrying okf_version",
-  );
+// ─── Step 3: report the rest ──────────────────────────────────────────────────
 
-  write(
-    `${TASK_ROOT}/CHANGELOG.md`,
-    dump({ data: { type: "changelog", title: "Task Changelog" }, body: "\n# Task Changelog\n" }),
-    "write the conformant task changelog",
-  );
+/** Vendored non-OKF trees inside the bundle, and unresolvable references. */
+const VENDORED_NAMES = new Set(["matt-skills"]);
 
-  if (!opts.dryRun) {
-    tree.commit({ failAfterWrites: opts.failAfterWrites });
+function reportRest(tree: TreePort, paths: string[], plan: Plan): void {
+  // Vendored trees: a directory inside the bundle whose contents are not OKF
+  // artifacts. It moves outside the bundle with a pointer left behind.
+  const vendoredRoots = new Set<string>();
+  for (const path of paths) {
+    for (const seg of segments(path)) {
+      if (VENDORED_NAMES.has(seg)) {
+        const parts = segments(path);
+        const i = parts.indexOf(seg);
+        vendoredRoots.add(parts.slice(0, i + 1).join("/"));
+      }
+    }
+  }
+  for (const root of sorted(vendoredRoots)) {
+    const dest = `${TASK_ROOT}/../vendored/${basenameOf(root)}`;
+    plan.needsHuman.push({
+      kind: "vendored-tree",
+      path: root,
+      detail: `vendored tree '${root}' moves outside the bundle to '${dest}' with a pointer left behind`,
+    });
+    for (const path of sorted(paths.filter((p) => under(p, root)))) {
+      plan.moves.push({ from: path, to: path.replace(root, dest) });
+      plan.changes.push({
+        action: "move",
+        path: path.replace(root, dest),
+        from: path,
+        detail: `moved vendored file '${path}' outside the bundle`,
+      });
+    }
+    const pointer = `${dirnameOf(root)}/${basenameOf(root)}.pointer.md`;
+    plan.writes.set(
+      pointer,
+      dump({
+        data: {
+          type: "out-of-scope note",
+          title: `Vendored tree moved: ${basenameOf(root)}`,
+          status: "stable",
+        },
+        body: `\nThe vendored tree formerly at \`${root}\` now lives at \`${dest}\`.\n`,
+      }),
+    );
+    plan.changes.push({
+      action: "add",
+      path: pointer,
+      detail: `left a pointer at '${pointer}' naming the vendored tree's new home`,
+    });
   }
 
-  return { from, to: 4, changes, needsHuman, noop: false };
+  // Unresolvable blocked_by references: reported, never dropped silently.
+  const provided = new Set<string>();
+  for (const path of paths) {
+    if (!isMarkdown(path)) continue;
+    const doc = readDoc(tree, path);
+    if (doc === null) continue;
+    const slug = slugOf(path);
+    if (slug !== null) provided.add(slug);
+  }
+  for (const path of sorted(paths.filter(isMarkdown))) {
+    const doc = readDoc(tree, path);
+    if (doc === null) continue;
+    const blocked = doc.data.blocked_by;
+    if (!Array.isArray(blocked)) continue;
+    for (const target of blocked.map(String)) {
+      if (provided.has(target)) continue;
+      plan.needsHuman.push({
+        kind: "unresolvable-ref",
+        path,
+        detail: `'${path}' is blocked by '${target}', which no artifact in the tree provides`,
+      });
+    }
+  }
+}
+
+/** The slug a path implies: its directory name, or the leaf's own name. */
+function slugOf(path: string): string | null {
+  const parts = segments(path);
+  const file = basenameOf(path);
+  if (file === "task.md" || file === "ticket.md" || file === "map.md") {
+    return parts[parts.length - 2] ?? null;
+  }
+  return null;
+}
+
+function dirnameOf(p: string): string {
+  const i = p.lastIndexOf("/");
+  return i === -1 ? "" : p.slice(0, i);
+}
+
+// ─── Step 4: the root index ───────────────────────────────────────────────────
+
+/**
+ * Write `docs/tasks/index.md` carrying `okf_version: "0.2"` and a listing of
+ * the tree.
+ */
+function writeIndex(plan: Plan, paths: string[]): void {
+  const efforts = new Set<string>();
+  for (const path of paths) {
+    const parts = segments(path);
+    const i = parts.indexOf("tasks", parts.indexOf("docs") === 0 ? 1 : 0);
+    if (i === -1) continue;
+    const rest = parts.slice(i + 1);
+    if (rest[0] === undefined) continue;
+    if (rest[0] === "archive" || rest[0] === "maps") {
+      if (rest[1] !== undefined) efforts.add(rest[1]);
+      continue;
+    }
+    if (rest[0] === "out-of-scope") continue;
+    if (rest.length === 1) continue;
+    efforts.add(rest[0]);
+  }
+  for (const move of plan.moves) {
+    const parts = segments(move.to);
+    const i = parts.indexOf("tasks");
+    if (i === -1) continue;
+    const rest = parts.slice(i + 1);
+    if (rest[0] === undefined || rest[0] === "archive") continue;
+    if (rest.length === 1) continue;
+    efforts.add(rest[0]);
+  }
+
+  const lines = ["", "# docs/tasks", ""];
+  if (efforts.size === 0) {
+    lines.push("(no efforts yet)", "");
+  } else {
+    for (const effort of sorted(efforts)) lines.push(`- ${effort}`);
+    lines.push("");
+  }
+  const body = lines.join("\n");
+
+  const data: FrontmatterData = {
+    type: "index",
+    okf_version: OKF_VERSION,
+    title: "docs/tasks",
+  };
+  const content = dump({ data, body });
+  plan.writes.set(INDEX_PATH, content);
+  plan.changes.push({
+    action: "add",
+    path: INDEX_PATH,
+    detail: `wrote '${INDEX_PATH}' with okf_version "${OKF_VERSION}" and the tree listing`,
+  });
+}
+
+// ─── Step 5: bundle files ─────────────────────────────────────────────────────
+
+/** Backfill CHANGELOG.md and out-of-scope/README.md (which becomes index.md). */
+function backfillBundleFiles(tree: TreePort, paths: string[], plan: Plan): void {
+  if (paths.includes(CHANGELOG_PATH)) {
+    const doc = readDoc(tree, CHANGELOG_PATH);
+    const body = doc?.body ?? "\n# Task Changelog\n";
+    const data: FrontmatterData = { type: "changelog", title: "Task Changelog" };
+    plan.writes.set(CHANGELOG_PATH, dump({ data, body }));
+    plan.changes.push({
+      action: "rewrite",
+      path: CHANGELOG_PATH,
+      detail: `backfilled frontmatter on '${CHANGELOG_PATH}'`,
+    });
+  } else {
+    const data: FrontmatterData = { type: "changelog", title: "Task Changelog" };
+    plan.writes.set(CHANGELOG_PATH, dump({ data, body: "\n# Task Changelog\n" }));
+    plan.changes.push({
+      action: "add",
+      path: CHANGELOG_PATH,
+      detail: `created '${CHANGELOG_PATH}' with conformant frontmatter`,
+    });
+  }
+
+  const oosReadme = `${TASK_ROOT}/out-of-scope/README.md`;
+  const oosIndex = `${TASK_ROOT}/out-of-scope/index.md`;
+  if (paths.includes(oosReadme)) {
+    const doc = readDoc(tree, oosReadme);
+    const body = doc?.body ?? "\n# out-of-scope\n";
+    const data: FrontmatterData = {
+      type: "out-of-scope note",
+      title: "out-of-scope",
+      status: "stable",
+    };
+    plan.moves.push({ from: oosReadme, to: oosIndex });
+    plan.writes.set(oosIndex, dump({ data, body }));
+    plan.changes.push({
+      action: "move",
+      path: oosIndex,
+      from: oosReadme,
+      detail: `moved '${oosReadme}' to '${oosIndex}' with conformant frontmatter`,
+    });
+  }
+}
+
+// ─── Step 6: the dead pointer ─────────────────────────────────────────────────
+
+/**
+ * Fix the dead `/skill:task-overview` pointer in the onboarding report.
+ *
+ * The onboarding report lives in the setup-workflow skill's own text, which
+ * the migration does not own; the pointer it can fix is the one written into
+ * the tree by the v3 onboarding step (a report file), when one is present.
+ */
+function fixDeadPointer(tree: TreePort, paths: string[], plan: Plan): void {
+  for (const path of sorted(paths.filter(isMarkdown))) {
+    if (!under(path, TASK_ROOT)) continue;
+    const text = safeRead(tree, path);
+    if (text === null) continue;
+    if (!text.includes("/skill:task-overview")) continue;
+    const fixed = text.split("/skill:task-overview").join("/skill:task-workflow-overview");
+    plan.writes.set(path, fixed);
+    plan.changes.push({
+      action: "rewrite",
+      path,
+      detail: `fixed the dead '/skill:task-overview' pointer in '${path}'`,
+    });
+  }
 }
