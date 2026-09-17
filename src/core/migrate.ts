@@ -624,7 +624,7 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
       to: 4,
       changes: plan.changes,
       needsHuman: plan.needsHuman,
-      noop: plan.moves.length === 0 && plan.writes.size === 0,
+      noop: from === 4 && plan.changes.length === 0,
     };
   }
 
@@ -659,7 +659,10 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
     to: 4,
     changes: plan.changes,
     needsHuman: plan.needsHuman,
-    noop: plan.moves.length === 0 && plan.writes.size === 0,
+    // "No-op" means the tree was already v4 and nothing was staged. A run
+    // that staged nothing on a non-v4 tree (a marker claiming steps that
+    // never landed) is not a no-op: the tree is still unmigrated.
+    noop: from === 4 && plan.changes.length === 0,
   };
 }
 

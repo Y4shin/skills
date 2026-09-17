@@ -345,6 +345,27 @@ describe("migrate: resumability", () => {
     expect(interrupted.snapshot()).toEqual(expected);
   });
 
+  test("a completed run leaves no marker behind", () => {
+    const tree = port({ ...V3_FILES });
+    migrate(tree);
+    expect(tree.snapshot()["docs/tasks/.migration-progress"]).toBeUndefined();
+  });
+
+  test("a marker naming completed steps is honored", () => {
+    // A marker left by an earlier interrupted run: the steps it names are
+    // skipped, and the remaining steps still run.
+    const tree = port({ ...V3_FILES });
+    tree.stageWrite("docs/tasks/.migration-progress", "1\n2\n3\n4\n5\n");
+    tree.commit();
+    const report = migrate(tree);
+    expect(report.noop).toBe(false);
+    // Step 1 was skipped, so no task was moved.
+    const files = tree.snapshot();
+    expect(files["docs/tasks/my-task/task.md"]).toBeDefined();
+    // Step 2 was skipped too, so the state file was left as it was.
+    expect(files["docs/tasks/state.yaml"]).toContain("schema_version: 3");
+  });
+
   test("a resume that loses the marker still converges", () => {
     const tree = port({ ...V3_FILES });
     migrate(tree);
