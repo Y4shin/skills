@@ -1135,6 +1135,9 @@ function writeIndex(tree: TreePort, plan: Plan, paths: string[]): void {
   const live = new Set<string>();
   const archived = new Set<string>();
   for (const path of finalPaths) {
+    // Placeholder files (.gitkeep) and non-artifact files are not efforts.
+    const file = basenameOf(path);
+    if (file.startsWith(".") || !file.endsWith(".md")) continue;
     const parts = segments(path);
     const i = parts.indexOf("tasks", parts.indexOf("docs") === 0 ? 1 : 0);
     if (i === -1) continue;

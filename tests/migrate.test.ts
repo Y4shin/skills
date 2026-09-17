@@ -519,6 +519,34 @@ describe("migrate: the root index", () => {
     expect(doc.body).toContain("task-tools-overhaul");
   });
 
+  test("never lists placeholder files as efforts", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/archive/.gitkeep": "",
+      "docs/tasks/archive/.gitkeep": "",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+    });
+    migrate(tree);
+    const body = parse(tree.snapshot()["docs/tasks/index.md"]).body;
+    expect(body).not.toContain(".gitkeep");
+    expect(body).toContain("effort");
+  });
+
+  test("the index is stable across a re-run", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/archive/.gitkeep": "",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+    });
+    migrate(tree);
+    const first = tree.snapshot()["docs/tasks/index.md"];
+    const second = migrate(tree);
+    expect(second.noop).toBe(true);
+    expect(tree.snapshot()["docs/tasks/index.md"]).toBe(first);
+  });
+
   test("lists live efforts and archived efforts separately", () => {
     const tree = port({ ...V3_FILES });
     migrate(tree);
