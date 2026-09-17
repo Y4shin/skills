@@ -330,3 +330,211 @@ describe("migrate: resumability", () => {
     expect(tree.snapshot()).toEqual(before);
   });
 });
+
+describe("migrate: every vintage reaches the same end state", () => {
+  /** The v4 end state a given fixture should produce, as a comparable shape. */
+  function endState(tree: MemPort): Record<string, string> {
+    return tree.snapshot();
+  }
+
+  test("v1 nested state: pointers read, block dropped", () => {
+    const tree = port({
+      "docs/tasks/state.yaml":
+        "active:\n  map: my-map\n  task: my-task\nlast_action: did a thing\nnext_action: do another\n",
+      "docs/tasks/maps/my-map/map.md":
+        "---\nkind: map\nslug: my-map\ntitle: My map\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/my-task/task.md":
+        "---\nkind: task\ntype: grilling\nslug: my-task\ntitle: My task\nmap: my-map\nstatus: done\nblocked_by: []\n---\n",
+    });
+    const report = migrate(tree);
+    expect(report.from).toBe(1);
+    const state = parseYamlFileForTest(tree.snapshot()["docs/tasks/state.yaml"]);
+    expect(state).toEqual({ schema_version: 4, map: "my-map", task: "my-task" });
+    // A grilling category stays a decision task, in tasks/.
+    expect(tree.snapshot()["docs/tasks/my-map/tasks/my-task/task.md"]).toBeDefined();
+  });
+
+  test("v2 flat tree folds into the effort-grouped layout", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 2\nmap: null\ntask: null\n",
+      "docs/tasks/flat-task/task.md":
+        "---\nkind: task\ntype: feature\nslug: flat-task\ntitle: Flat\nmap: flat-map\nstatus: todo\nblocked_by: []\n---\n",
+    });
+    const report = migrate(tree);
+    expect(report.from).toBe(2);
+    expect(tree.snapshot()["docs/tasks/flat-map/tickets/flat-task/ticket.md"]).toBeDefined();
+  });
+
+  test("unversioned tree (no schema_version) migrates by shape", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "map: null\ntask: null\n",
+      "docs/tasks/maps/some-map/map.md":
+        "---\nkind: map\nslug: some-map\ntitle: Some\nstatus: active\ntasks: []\n---\n",
+    });
+    const report = migrate(tree);
+    expect(report.from).toBe(0);
+    expect(tree.snapshot()["docs/tasks/some-map/map.md"]).toBeDefined();
+    const state = parseYamlFileForTest(tree.snapshot()["docs/tasks/state.yaml"]);
+    expect(state).toEqual({ schema_version: 4, map: null, task: null });
+  });
+
+  test("a state.yaml with unknown keys drops them (v4 owns the shape)", () => {
+    const tree = port({
+      "docs/tasks/state.yaml":
+        "schema_version: 3\nmap: m\ntask: null\nslice: null\nfuture_key: keep-me\n",
+      "docs/tasks/maps/m/map.md":
+        "---\nkind: map\nslug: m\ntitle: M\nstatus: active\ntasks: []\n---\n",
+    });
+    migrate(tree);
+    const state = parseYamlFileForTest(tree.snapshot()["docs/tasks/state.yaml"]);
+    expect(state).toEqual({ schema_version: 4, map: "m", task: null });
+  });
+
+  test("the same end state across v1, v2 and v3 for the same effort", () => {
+    const shared = {
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/effort-task/task.md":
+        "---\nkind: task\ntype: feature\nslug: effort-task\ntitle: Effort task\nmap: effort\nstatus: ready\nblocked_by: []\n---\n",
+    };
+    const v1 = port({
+      "docs/tasks/state.yaml": "active:\n  map: effort\n  task: null\n",
+      ...shared,
+    });
+    const v2 = port({
+      "docs/tasks/state.yaml": "schema_version: 2\nmap: effort\ntask: null\n",
+      ...shared,
+    });
+    const v3 = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: effort\ntask: null\nslice: null\n",
+      ...shared,
+    });
+    migrate(v1);
+    migrate(v2);
+    migrate(v3);
+    expect(endState(v1)).toEqual(endState(v2));
+    expect(endState(v2)).toEqual(endState(v3));
+  });
+});
+
+describe("migrate: the root index", () => {
+  test("carries okf_version 0.2 and lists the tree", () => {
+    const tree = port({ ...V3_FILES });
+    migrate(tree);
+    const content = tree.snapshot()["docs/tasks/index.md"];
+    const doc = parse(content);
+    expect(doc.data.okf_version).toBe("0.2");
+    expect(doc.data.type).toBe("index");
+    expect(doc.body).toContain("task-tools-overhaul");
+    expect(doc.body).toContain("old-map");
+  });
+});
+
+describe("migrate: reporting", () => {
+  test("a spec-only effort directory survives the migration", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/spec-only/spec.md":
+        "---\nkind: spec\ntitle: Spec only\nstatus: draft\n---\n\n# Spec\n",
+    });
+    migrate(tree);
+    const spec = fm(tree.snapshot()["docs/tasks/spec-only/spec.md"]);
+    expect(spec.type).toBe("spec");
+    expect(spec.status).toBe("draft");
+    expect(spec.kind).toBeUndefined();
+  });
+
+  test("an effort directory with only a map survives", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/lonely/map.md":
+        "---\nkind: map\nslug: lonely\ntitle: Lonely\nstatus: active\ntasks: []\n---\n",
+    });
+    migrate(tree);
+    expect(tree.snapshot()["docs/tasks/lonely/map.md"]).toBeDefined();
+  });
+
+  test("a vendored tree moves outside the bundle with a pointer left behind", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/archive/report/matt-skills/README.md": "# vendored\n",
+      "docs/tasks/archive/report/matt-skills/skills/tdd/SKILL.md": "# tdd\n",
+    });
+    const report = migrate(tree);
+    const files = tree.snapshot();
+
+    expect(files["docs/vendored/matt-skills/README.md"]).toBe("# vendored\n");
+    expect(files["docs/vendored/matt-skills/skills/tdd/SKILL.md"]).toBe("# tdd\n");
+    expect(files["docs/tasks/archive/report/matt-skills/README.md"]).toBeUndefined();
+
+    const pointer = files["docs/tasks/archive/report/matt-skills.pointer.md"];
+    expect(pointer).toBeDefined();
+    expect(parse(pointer).data.type).toBe("out-of-scope note");
+    expect(pointer).toContain("docs/vendored/matt-skills");
+
+    const item = report.needsHuman.find((h) => h.kind === "vendored-tree");
+    expect(item).toBeDefined();
+    expect(item!.path).toContain("matt-skills");
+  });
+
+  test("an unresolvable blocked_by reference is reported, not dropped", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/effort-task/task.md":
+        "---\nkind: task\ntype: feature\nslug: effort-task\ntitle: T\nmap: effort\nstatus: todo\nblocked_by: [ghost-task]\n---\n",
+    });
+    const report = migrate(tree);
+    const item = report.needsHuman.find((h) => h.kind === "unresolvable-ref");
+    expect(item).toBeDefined();
+    expect(item!.detail).toContain("ghost-task");
+    // Reported, not dropped: the reference survives in the migrated file.
+    const ticket = fm(tree.snapshot()["docs/tasks/effort/tickets/effort-task/ticket.md"]);
+    expect(ticket.blocked_by).toEqual(["ghost-task"]);
+  });
+
+  test("a normalized combination appears in needsHuman", () => {
+    // A hand-edited or partially migrated file can carry an invalid OKF pair;
+    // the migration normalizes it and records it for human eyes.
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/effort/tickets/effort-task/ticket.md":
+        "---\ntype: ticket\nsubtype: feature\ntitle: T\nstatus: draft\nworkflow_state: done\n---\n",
+    });
+    const report = migrate(tree);
+    const item = report.needsHuman.find((h) => h.kind === "normalized-combination");
+    expect(item).toBeDefined();
+    const ticket = fm(tree.snapshot()["docs/tasks/effort/tickets/effort-task/ticket.md"]);
+    expect(ticket.status).toBe("draft");
+    expect(ticket.workflow_state).toBe("todo");
+  });
+
+  test("the report lists every change and every needs-human item", () => {
+    const tree = port({ ...V3_FILES });
+    const report = migrate(tree);
+    expect(report.changes.length).toBeGreaterThan(0);
+    expect(report.needsHuman.length).toBeGreaterThan(0);
+    for (const c of report.changes) {
+      expect(["add", "move", "rewrite", "delete"]).toContain(c.action);
+      expect(c.path).not.toBe("");
+      expect(c.detail).not.toBe("");
+    }
+    for (const h of report.needsHuman) {
+      expect(h.path).not.toBe("");
+      expect(h.detail).not.toBe("");
+    }
+  });
+});
+
+describe("migrate: dry run", () => {
+  test("stages nothing and reports the plan", () => {
+    const tree = port({ ...V3_FILES });
+    const before = tree.snapshot();
+    const report = migrate(tree, { dryRun: true });
+    expect(report.changes.length).toBeGreaterThan(0);
+    expect(tree.snapshot()).toEqual(before);
+  });
+});

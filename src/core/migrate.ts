@@ -281,31 +281,47 @@ function shapeFrontmatter(
 
   const v3Status = typeof data.status === "string" ? data.status : null;
   const hasWorkflow = type === "task" || type === "ticket";
-  const workflowState = hasWorkflow ? workflowStateOf(v3Status) : null;
-  let status = okfStatusOf(v3Status, workflowState);
-  let normalizedState = workflowState;
 
-  if (!alreadyV4) {
-    // Normalize invalid combinations: draft only pairs with todo, deprecated
-    // only with done. A normalized pair is recorded for human eyes.
-    if (status === "draft" && normalizedState !== null && normalizedState !== "todo") {
-      normalizedState = "todo";
-    }
-    if (
-      status === "deprecated" &&
-      normalizedState !== null &&
-      normalizedState !== "done"
-    ) {
-      normalizedState = "done";
-    }
-    if (validateCombination(status, normalizedState) !== null) status = "stable";
-    if (status !== okfStatusOf(v3Status, workflowState) || normalizedState !== workflowState) {
-      needsHuman.push({
-        kind: "normalized-combination",
-        path,
-        detail: `normalized '${path}': status '${okfStatusOf(v3Status, workflowState)}' with workflow_state '${workflowState}' is not a valid OKF pair`,
-      });
-    }
+  // The final OKF status / workflow_state pair. A v3 file derives it from its
+  // workflow status; an already-v4 file keeps its own pair verbatim, except
+  // that an invalid pair is normalized (and recorded) here too, so a
+  // hand-edited or partially migrated tree converges.
+  let status: string;
+  let normalizedState: string | null;
+  if (alreadyV4) {
+    status = typeof data.status === "string" ? data.status : "stable";
+    normalizedState = typeof data.workflow_state === "string" ? data.workflow_state : null;
+  } else {
+    normalizedState = hasWorkflow ? workflowStateOf(v3Status) : null;
+    status = okfStatusOf(v3Status, normalizedState);
+  }
+
+  const derived = alreadyV4
+    ? status
+    : okfStatusOf(v3Status, hasWorkflow ? workflowStateOf(v3Status) : null);
+  const derivedState = alreadyV4
+    ? normalizedState
+    : hasWorkflow
+      ? workflowStateOf(v3Status)
+      : null;
+
+  if (status === "draft" && normalizedState !== null && normalizedState !== "todo") {
+    normalizedState = "todo";
+  }
+  if (
+    status === "deprecated" &&
+    normalizedState !== null &&
+    normalizedState !== "done"
+  ) {
+    normalizedState = "done";
+  }
+  if (validateCombination(status, normalizedState) !== null) status = "stable";
+  if (status !== derived || normalizedState !== derivedState) {
+    needsHuman.push({
+      kind: "normalized-combination",
+      path,
+      detail: `normalized '${path}': status '${derived}' with workflow_state '${derivedState}' is not a valid OKF pair`,
+    });
   }
 
   for (const [k, v] of Object.entries(data)) {
@@ -334,13 +350,11 @@ function shapeFrontmatter(
       continue;
     }
     if (k === "status") {
-      out.status = alreadyV4 ? v : status;
+      out.status = status;
       continue;
     }
     if (k === "workflow_state") {
-      if (alreadyV4 || normalizedState !== null) {
-        out.workflow_state = alreadyV4 ? v : normalizedState;
-      }
+      if (normalizedState !== null) out.workflow_state = normalizedState;
       continue;
     }
     out[k] = v;
@@ -840,7 +854,7 @@ function reportRest(tree: TreePort, paths: string[], plan: Plan): void {
     }
   }
   for (const root of sorted(vendoredRoots)) {
-    const dest = `${TASK_ROOT}/../vendored/${basenameOf(root)}`;
+    const dest = `docs/vendored/${basenameOf(root)}`;
     plan.needsHuman.push({
       kind: "vendored-tree",
       path: root,
