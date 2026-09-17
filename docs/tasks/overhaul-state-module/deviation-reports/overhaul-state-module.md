@@ -1,4 +1,4 @@
-## Deviation report — overhaul-state-module
+## Deviation report: overhaul-state-module
 
 Branch compared: `task/overhaul-state-module..slice/overhaul-state-module`
 (6 checkpoint commits, `6b0e1fb`..`28d5a98`).
@@ -148,4 +148,8 @@ tickets later in this map, so they need no new decision.
   (10 files)
 - `npx vitest run tests/integration/session.test.ts` → 16 passed
 - `npm run typecheck` → clean
-- em-dash scan over added diff lines → none
+- em-dash scan over added diff lines: two found and fixed (this report's own
+  header and the task doc's Implementation notes heading, both emitted by the
+  pre-existing `agents/deviation-reporter.md` / `agents/land-worker.md`
+  templates, which still carry the em-dash form and are outside this ticket's
+  scope).

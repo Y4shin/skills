@@ -21,7 +21,7 @@ import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
 import { fromFrontmatter, sliceInfoFrom, dependencyLevels, type Artifact, type ArtifactKind, type SliceInfo, type WorkItemInfo } from "./core/art.js";
-import { toObject, fromObject, type WorkflowState } from "./core/state.js";
+import { toObject, fromObject, freshState, isPointerName, POINTER_NAMES, type WorkflowState } from "./core/state.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 
@@ -397,14 +397,10 @@ function mapChildInfos(root: string, mapPath: string): WorkItemInfo[] {
 
 // ─── State helpers ─────────────────────────────────────────────────────────────
 
-function freshDefault(): WorkflowState {
-  return { map: null, task: null, rest: {} };
-}
-
 function loadState(root: string): WorkflowState {
   const sp = join(taskRoot(root), "state.yaml");
-  if (!existsSync(sp)) return freshDefault();
-  try { return fromObject(readYaml(sp)); } catch { return freshDefault(); }
+  if (!existsSync(sp)) return freshState();
+  try { return fromObject(readYaml(sp)); } catch { return freshState(); }
 }
 
 function saveState(root: string, state: WorkflowState): void {
@@ -702,23 +698,24 @@ export function createTools(): Record<string, Tool> {
     ),
 
     task_state_set: def(
-      "Set a workflow state field (map or task). Use 'null' to clear.",
-      { field: Str("Field: 'map' or 'task'"), value: Str("New value (or 'null')") },
+      `Set a workflow state field (${POINTER_NAMES.join(" or ")}). Use 'null' to clear.`,
+      { field: Str(`Field: ${POINTER_NAMES.map((n) => `'${n}'`).join(" or ")}`), value: Str("New value (or 'null')") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
-        if (!isInitialized(root)) mkdirSync(taskRoot(root), { recursive: true });
-        const s = loadState(root);
-        const field = p.field as string;
-        if (field !== "map" && field !== "task") {
-          throw new Error(`unknown field '${field}': use 'map' or 'task'`);
+        const allowed = POINTER_NAMES.map((n) => `'${n}'`).join(" or ");
+        if (!isPointerName(p.field)) {
+          throw new Error(`unknown field '${p.field}': use ${allowed}`);
         }
         if (p.value === "None") {
-          throw new Error(`invalid pointer value 'None': use 'null' to clear '${field}'`);
+          throw new Error(`invalid pointer value 'None': use 'null' to clear '${p.field}'`);
         }
+        if (!isInitialized(root)) mkdirSync(taskRoot(root), { recursive: true });
+        const s = loadState(root);
         const v = p.value === "null" ? null : p.value;
-        s[field] = v;
+        if (p.field === "map") s.map = v;
+        else s.task = v;
         saveState(root, s);
-        return `${field} = ${v ?? "null"}`;
+        return `${p.field} = ${v ?? "null"}`;
       },
     ),
 

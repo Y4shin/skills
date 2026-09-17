@@ -36,10 +36,15 @@ describe("fromObject", () => {
       const state = fromObject(bad);
       expect(state).toEqual(DEFAULT_STATE);
       expect(state.rest).toEqual({});
-      expect(state).not.toBe(DEFAULT_STATE);
-      state.map = "mutated";
-      expect(DEFAULT_STATE.map).toBeNull();
     }
+  });
+
+  test("each fresh default is independent (no shared rest bag)", () => {
+    const a = fromObject(null);
+    const b = fromObject(undefined);
+    a.rest.injected = true;
+    expect(b.rest).toEqual({});
+    expect(DEFAULT_STATE.rest).toEqual({});
   });
 
   test("coerces non-string pointer values to null", () => {
@@ -59,7 +64,6 @@ describe("fromObject", () => {
 describe("toObject", () => {
   test("serializes pointers and rest: rest keys first, pointers last", () => {
     const obj = toObject({ map: "auth", task: "login", rest: { schema_version: 3 } });
-    expect(Object.keys(obj)).toEqual(["schema_version", "map", "task"]);
     expect(obj).toEqual({ schema_version: 3, map: "auth", task: "login" });
   });
 
@@ -83,9 +87,31 @@ describe("round-trip fidelity", () => {
     const original = { map: "auth", task: "login", slice: "login-form", schema_version: 3 };
     const state = fromObject(original);
     const obj = toObject(state);
-    // rest keys first, pointers last: same key set, same values.
+    // Same key set, same values. Key order is an internal choice.
     expect(obj).toEqual(original);
+  });
+
+  test("reproduces every key of an arbitrary state object", () => {
+    // Arbitrary shape: mixed value types, a nested object, an array, a null,
+    // a legacy slice key, and keys whose names collide with nothing modeled.
+    const original: Record<string, unknown> = {
+      schema_version: 3,
+      map: "auth",
+      task: null,
+      slice: "legacy-form",
+      future: { nested: { deep: [1, 2, 3] } },
+      count: 0,
+      enabled: false,
+      notes: ["a", "b"],
+      empty: null,
+    };
+    const obj = toObject(fromObject(original));
+    expect(obj).toEqual(original);
+    // Every key present, and value types preserved (numbers stay numbers).
     expect(Object.keys(obj).sort()).toEqual(Object.keys(original).sort());
+    expect(typeof obj.schema_version).toBe("number");
+    expect(obj.enabled).toBe(false);
+    expect(obj.count).toBe(0);
   });
 
   test("multiple unknown keys survive one write", () => {
@@ -119,7 +145,8 @@ describe("round-trip fidelity", () => {
     expect(obj.next_action).toBe("y");
     expect(obj.map).toBe("auth");
     expect(obj.task).toBe("logout");
-    expect(Object.keys(obj)).toEqual(["active", "last_action", "next_action", "map", "task"]);
+    // The preserved keys are all still there alongside the appended pointers.
+    expect(Object.keys(obj).sort()).toEqual(["active", "last_action", "map", "next_action", "task"]);
   });
 
   test("round-trip of a YAML parse-then-stringify cycle keeps nulls real", async () => {

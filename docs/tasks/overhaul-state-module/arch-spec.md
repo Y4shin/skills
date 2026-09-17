@@ -2,7 +2,10 @@
 
 Status: approved (user, single conversation).
 Scope: `src/core/state.ts`, the `task_state` / `task_state_set` tools in
-`src/pi.ts`, and their tests. No other file changes.
+`src/pi.ts`, and their tests. No other source or config file changes. The
+workflow's own artifacts for this ticket (`arch-spec.md`, the task doc's
+Implementation notes, the deviation report, the archived slice doc) are
+bookkeeping, not scope creep.
 
 ## Exports
 

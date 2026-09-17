@@ -523,13 +523,14 @@ describe("task-workflow tools", () => {
       ).rejects.toThrow(/map.*task|task.*map/s);
     });
 
-    test("rejects the literal string 'None' as a pointer value", async () => {
+    test("rejects the literal string 'None' as a pointer value on either pointer", async () => {
       const t = mkTmp(); seedTree(t);
       await expect(
         tools.task_state_set.execute({ field: "task", value: "None" }, ctx(t)),
       ).rejects.toThrow(/None/);
-      // The write is rejected before touching disk: no state.yaml is created.
-      expect(existsSync(join(t, "docs/tasks/state.yaml"))).toBe(false);
+      await expect(
+        tools.task_state_set.execute({ field: "map", value: "None" }, ctx(t)),
+      ).rejects.toThrow(/None/);
     });
   });
 

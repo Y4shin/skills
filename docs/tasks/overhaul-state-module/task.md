@@ -51,7 +51,7 @@ module's.
 
 ## Implementation notes
 
-### Slice — overhaul-state-module (landed)
+### Slice: overhaul-state-module (landed)
 
 State module v4 landed on `slice/overhaul-state-module` (6 commits, merged
 into `task/overhaul-state-module`). `WorkflowState` is `{ map, task, rest }`;

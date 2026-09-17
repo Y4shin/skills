@@ -16,7 +16,26 @@ export interface WorkflowState {
   rest: Record<string, unknown>;
 }
 
-export const DEFAULT_STATE: WorkflowState = { map: null, task: null, rest: {} };
+/** The two fields the setter accepts. Single source of the vocabulary. */
+export type PointerName = "map" | "task";
+
+export const POINTER_NAMES: readonly PointerName[] = ["map", "task"];
+
+/** Narrow an arbitrary field name to a settable pointer. */
+export function isPointerName(v: unknown): v is PointerName {
+  return v === "map" || v === "task";
+}
+
+/**
+ * A fresh empty state. Owns the shape so no caller re-encodes it, and returns
+ * a new `rest` object every call so callers cannot pollute each other through
+ * a shared bag.
+ */
+export function freshState(): WorkflowState {
+  return { map: null, task: null, rest: {} };
+}
+
+export const DEFAULT_STATE: WorkflowState = freshState();
 
 /** True when `v` is a plain object (not array, not null). */
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -41,7 +60,7 @@ function pointer(v: unknown): string | null {
  * them back. Never throws on shape.
  */
 export function fromObject(raw: unknown): WorkflowState {
-  if (!isPlainObject(raw)) return { ...DEFAULT_STATE, rest: {} };
+  if (!isPlainObject(raw)) return freshState();
 
   // v1 nested format: { active: { map, task }, last_action, next_action }
   // No top-level map/task keys; pointers read from the active block.
