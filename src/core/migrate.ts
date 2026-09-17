@@ -69,6 +69,7 @@ export interface HumanItem {
     | "slice-dir"
     | "vendored-tree"
     | "unresolvable-ref"
+    | "dead-pointer"
     | "normalized-combination";
   path: string;
   detail: string;
@@ -1069,11 +1070,14 @@ function backfillBundleFiles(tree: TreePort, paths: string[], plan: Plan): void 
 // ─── Step 6: the dead pointer ─────────────────────────────────────────────────
 
 /**
- * Fix the dead `/skill:task-overview` pointer in the onboarding report.
+ * Report the dead `/skill:task-overview` pointer wherever it survives in the
+ * tree.
  *
- * The onboarding report lives in the setup-workflow skill's own text, which
- * the migration does not own; the pointer it can fix is the one written into
- * the tree by the v3 onboarding step (a report file), when one is present.
+ * The pointer's home is the onboarding report, which is the setup-workflow
+ * skill's own text; that fix is a prose change in the skill, not a tree
+ * rewrite. Rewriting a live or archived document's prose here would silently
+ * edit artifact content the migration does not own, so the migration reports
+ * each surviving occurrence for human eyes instead.
  */
 function fixDeadPointer(tree: TreePort, paths: string[], plan: Plan): void {
   for (const path of sorted(paths.filter(isMarkdown))) {
@@ -1081,12 +1085,10 @@ function fixDeadPointer(tree: TreePort, paths: string[], plan: Plan): void {
     const text = safeRead(tree, path);
     if (text === null) continue;
     if (!text.includes("/skill:task-overview")) continue;
-    const fixed = text.split("/skill:task-overview").join("/skill:task-workflow-overview");
-    plan.writes.set(path, fixed);
-    plan.changes.push({
-      action: "rewrite",
+    plan.needsHuman.push({
+      kind: "dead-pointer",
       path,
-      detail: `fixed the dead '/skill:task-overview' pointer in '${path}'`,
+      detail: `'${path}' still names the retired '/skill:task-overview'; the live skill is '/skill:task-workflow-overview'`,
     });
   }
 }

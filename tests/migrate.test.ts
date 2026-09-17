@@ -557,6 +557,22 @@ describe("migrate: reporting", () => {
   });
 });
 
+describe("migrate: the dead pointer", () => {
+  test("a surviving task-overview pointer is reported, not rewritten", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/notes.md": "# Notes\n\nRun /skill:task-overview to begin.\n",
+    });
+    const report = migrate(tree);
+    const item = report.needsHuman.find((h) => h.kind === "dead-pointer");
+    expect(item).toBeDefined();
+    expect(item!.detail).toContain("task-workflow-overview");
+    // Reported, not rewritten: the artifact's own prose is not the
+    // migration's to edit.
+    expect(tree.snapshot()["docs/tasks/notes.md"]).toContain("/skill:task-overview");
+  });
+});
+
 describe("migrate: dry run", () => {
   test("stages nothing and reports the plan", () => {
     const tree = port({ ...V3_FILES });
