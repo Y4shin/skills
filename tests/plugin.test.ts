@@ -444,6 +444,8 @@ describe("task-workflow tools", () => {
       const parsed = YAML.parse(text) as Record<string, unknown>;
       expect(parsed.task).toBe("login");
       expect(parsed.map).toBeNull();
+      // The module never stamps schema_version; the file's business.
+      expect(parsed).not.toHaveProperty("schema_version");
     });
 
     test("clears a pointer with 'null' and writes a real null, not 'None'", async () => {
