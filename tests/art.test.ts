@@ -68,6 +68,12 @@ describe("fromFrontmatter v4 shape", () => {
     const art = fromFrontmatter({ type: "ticket", title: "Login" }, "login");
     expect(art.slug).toBe("login");
   });
+
+  test("reads a v4 subtype verbatim, even when it equals the type", () => {
+    // In v4 `subtype` is its own key, so an equal value is real data, not the
+    // v3 `kind`/`type` collision.
+    expect(fromFrontmatter({ type: "task", subtype: "task" }).subtype).toBe("task");
+  });
 });
 
 describe("fromFrontmatter v3 shape", () => {
@@ -289,6 +295,31 @@ describe("findAnomalies", () => {
     });
     b.path = "/repo/docs/tasks/archive/eff-b/task.md";
     expect(findAnomalies([a, b]).map((x) => x.kind)).toContain("missing-blocked-by-target");
+  });
+
+  test("accepts a map's feature-to-feature edge to another effort's map", () => {
+    // A map's blocked_by holds feature-to-feature edges, so its target is
+    // always in a different effort. Flagging it would make every real map
+    // edge a false positive.
+    const a = fromFrontmatter({ type: "map", status: "stable" }, "eff-a");
+    a.path = "/repo/docs/tasks/eff-a/map.md";
+    const b = fromFrontmatter({ type: "map", status: "stable", blocked_by: ["eff-a"] }, "eff-b");
+    b.path = "/repo/docs/tasks/eff-b/map.md";
+    expect(findAnomalies([a, b])).toEqual([]);
+  });
+
+  test("still reports a map edge whose target map does not exist", () => {
+    const b = fromFrontmatter({ type: "map", status: "stable", blocked_by: ["ghost-effort"] }, "eff-b");
+    b.path = "/repo/docs/tasks/eff-b/map.md";
+    expect(findAnomalies([b]).map((x) => x.kind)).toContain("missing-blocked-by-target");
+  });
+
+  test("catches a v4 task.md in a task directory literally named 'tasks'", () => {
+    const art = fromFrontmatter({ type: "ticket", status: "stable", workflow_state: "todo" }, "x");
+    art.path = "/repo/docs/tasks/eff/tasks/tasks/task.md";
+    const map = fromFrontmatter({ type: "map", status: "draft" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    expect(findAnomalies([map, art]).map((a) => a.kind)).toContain("orphan");
   });
 });
 

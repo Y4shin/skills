@@ -93,6 +93,9 @@ function seedV4Tree(t: string): void {
   );
   // A spec-only effort directory: no map, no tasks, no tickets.
   writeMd(join(base, "spec-only/spec.md"), "type: spec\ntitle: Spec only\nstatus: stable\n");
+  // An arch-spec-only effort directory: the shared architecture spec with no
+  // map, spec, tasks, or tickets.
+  writeMd(join(base, "arch-only/arch-spec.md"), "type: arch spec\ntitle: Arch only\nstatus: draft\n");
   // The archive mirrors the live layout.
   writeMd(join(base, "archive/old-effort/map.md"), "type: map\ntitle: Old effort\nstatus: deprecated\n");
   writeMd(
@@ -681,6 +684,37 @@ describe("task-workflow tools: v4 effort-grouped tree", () => {
       const t = mkTmp(); seedV4Tree(t);
       const out = await tools.task_show.execute({ selector: join(t, "docs/tasks/archive/old-effort/map.md") }, ctx(t));
       expect(out).toContain("Old effort");
+    });
+
+    test("resolves an arch-spec-only effort directory", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_show.execute({ selector: join(t, "docs/tasks/arch-only") }, ctx(t));
+      expect(out).toContain("type: arch spec");
+    });
+
+    test("honors the wanted type on a directory selector holding map and spec", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      // billing/ holds both map.md and spec.md. A want:"map" tool must pick
+      // map.md rather than erroring on whichever leaf it finds first.
+      const out = await tools.task_map_finalizable.execute({ selector: join(t, "docs/tasks/billing") }, ctx(t));
+      expect(out).toContain("ready to finalize");
+    });
+
+    test("errors naming the wanted type when a directory has no such artifact", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      await expect(
+        tools.task_map_finalizable.execute({ selector: join(t, "docs/tasks/spec-only") }, ctx(t)),
+      ).rejects.toThrow(/map/);
+    });
+
+    test("errors naming both paths when a slug is ambiguous within one type", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      // Two tickets share the slug 'dup' in different efforts.
+      mkdirSync(join(t, "docs/tasks/other/tickets/dup"), { recursive: true });
+      writeMd(join(t, "docs/tasks/other/tickets/dup/ticket.md"), "type: ticket\ntitle: Dup\nsubtype: feature\nstatus: stable\nworkflow_state: todo\n");
+      mkdirSync(join(t, "docs/tasks/billing/tickets/dup"), { recursive: true });
+      writeMd(join(t, "docs/tasks/billing/tickets/dup/ticket.md"), "type: ticket\ntitle: Dup\nsubtype: feature\nstatus: stable\nworkflow_state: todo\n");
+      await expect(tools.task_show.execute({ selector: "dup" }, ctx(t))).rejects.toThrow(/ambiguous/);
     });
   });
 

@@ -105,9 +105,10 @@ export function fromFrontmatter(data: FrontmatterData, dirName?: string): Artifa
 
   // v4 `subtype` and v3 `type` are the same field under two names. A v3 file
   // with a `type` equal to its `kind` (a bare `kind: task, type: task`) has no
-  // workflow category, so treat that as absent.
+  // workflow category, so treat that as absent. In v4 the field is read
+  // verbatim, since `subtype` is its own key there.
   const subtype = shape === "v4" ? str(data.subtype) : str(data.type);
-  const effectiveSubtype = subtype === type ? null : subtype;
+  const effectiveSubtype = shape === "v3" && subtype === type ? null : subtype;
 
   return {
     type,
@@ -180,6 +181,16 @@ export function validateArtifact(art: Artifact): Anomaly[] {
 
 // ─── Location-derived checks ──────────────────────────────────────────────────
 
+/** Split a path into its non-empty segments. */
+function pathParts(path: string): string[] {
+  return path.split(/[\\/]/).filter((p) => p !== "");
+}
+
+/** The final path segment (the filename). */
+function basenameOf(path: string): string {
+  return pathParts(path).pop() ?? "";
+}
+
 /**
  * The effort directory an artifact path belongs to, or null.
  *
@@ -193,7 +204,7 @@ export function validateArtifact(art: Artifact): Anomaly[] {
  * - v3 flat task: `docs/tasks/<task>/...` -> `<task>` (its own effort).
  */
 function effortDirOf(path: string): string | null {
-  const parts = path.split(/[\\/]/).filter((p) => p !== "");
+  const parts = pathParts(path);
   let marker = -1;
   for (let i = 0; i < parts.length - 1; i++) {
     if (parts[i] === "docs" && parts[i + 1] === "tasks") {
@@ -219,16 +230,24 @@ function effortDirOf(path: string): string | null {
 }
 
 /**
- * The filename an artifact's location requires, keyed by type. `task.md` is
- * deliberately absent: it is both the v3 flat-task filename and the v4
- * decision-task filename, so on its own it implies no type.
+ * The filename each artifact type lives in, in directory-selector preference
+ * order. This is the single source of the type-to-filename mapping: the
+ * model's location check and the resolver's directory/priority logic all
+ * derive from it, so the layout cannot drift between them.
+ *
+ * `task.md` is deliberately absent: it is both the v3 flat-task filename and
+ * the v4 decision-task filename, so on its own it implies no type.
  */
-const LOCATION_FILENAME: Record<string, string> = {
-  ticket: "ticket.md",
-  map: "map.md",
-  spec: "spec.md",
-  "arch spec": "arch-spec.md",
-};
+export const TYPE_LEAVES: readonly (readonly [type: string, file: string])[] = [
+  ["map", "map.md"],
+  ["ticket", "ticket.md"],
+  ["task", "task.md"],
+  ["spec", "spec.md"],
+  ["arch spec", "arch-spec.md"],
+];
+
+/** Type to filename, derived from TYPE_LEAVES. */
+export const TYPE_LEAF: Record<string, string> = Object.fromEntries(TYPE_LEAVES);
 
 /**
  * The type a filename implies, or null when the filename is type-neutral.
@@ -242,22 +261,30 @@ function typeForFilename(file: string, path: string): string | null {
   if (file === "task.md") {
     return isV4TaskPath(path) ? "task" : null;
   }
-  for (const [type, name] of Object.entries(LOCATION_FILENAME)) {
+  for (const [type, name] of TYPE_LEAVES) {
     if (file === name) return type;
   }
   return null;
 }
 
 /**
- * True for the v4 `docs/tasks/<effort>/tasks/<task>/task.md` shape. The `tasks`
- * segment must be the v4 subtree: an effort directory before it, a task
- * directory and the filename after it.
+ * True for the v4 `docs/tasks/<effort>/tasks/<task>/task.md` shape. Anchored
+ * on the `docs/tasks` pair and then requiring `tasks` as the segment directly
+ * after the effort, so a task directory that happens to be named `tasks` does
+ * not confuse the check.
  */
 function isV4TaskPath(path: string): boolean {
-  const parts = path.split(/[\\/]/).filter((p) => p !== "");
-  const i = parts.lastIndexOf("tasks");
-  if (i === -1) return false;
-  return i >= 2 && parts[i - 1] !== "docs" && parts.length >= i + 3;
+  const parts = pathParts(path);
+  let marker = -1;
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (parts[i] === "docs" && parts[i + 1] === "tasks") {
+      marker = i + 1;
+      break;
+    }
+  }
+  if (marker === -1) return false;
+  // docs/tasks/<effort>/tasks/<task-dir>/task.md
+  return parts[marker + 2] === "tasks" && parts.length >= marker + 5;
 }
 
 /**
@@ -269,10 +296,14 @@ function isV4TaskPath(path: string): boolean {
  *   directory keeps a map-less v3 artifact scoped to itself.
  * - v4: placement is the grouping (the `map:` field is dropped), so the key is
  *   the effort directory from the path.
+ * - maps are their own scope in every shape: a map's `blocked_by` carries
+ *   feature-to-feature edges, so its targets are other efforts' maps by
+ *   design. Scoping maps to their own effort would flag every real edge.
  *
- * The `map:` and `dir:` prefixes keep the two namespaces from colliding.
+ * The prefixes keep the namespaces from colliding.
  */
 function effortKeyOf(art: Artifact): string {
+  if (art.type === "map") return "maps:";
   if (art.shape === "v3") {
     const m = art.data.map;
     if (typeof m === "string" && m !== "") return `map:${m}`;
@@ -295,14 +326,14 @@ export function findAnomalies(artifacts: Artifact[]): Anomaly[] {
     if (!art.path) continue;
     const effort = effortDirOf(art.path);
     if (effort === null) continue;
-    const file = art.path.split(/[\\/]/).pop() ?? "";
+    const file = basenameOf(art.path);
     if (file === "map.md" || file === "spec.md") effortsWithAnchor.add(effort);
   }
 
   for (const art of artifacts) {
     if (!art.path) continue;
     const label = art.slug || art.path;
-    const file = art.path.split(/[\\/]/).pop() ?? "";
+    const file = basenameOf(art.path);
     const implied = typeForFilename(file, art.path);
     if (implied !== null && implied !== art.type) {
       anomalies.push({

@@ -1,4 +1,4 @@
-## Deviation report — overhaul-artifact-model
+## Deviation report: overhaul-artifact-model
 
 Branch compared: `task/overhaul-artifact-model..slice/overhaul-artifact-model`
 (2 checkpoint commits, `40f79cb`, `489cfd9`).
@@ -120,14 +120,15 @@ producer currently reports mostly false positives on the live tree, and
 scoping fixes above. The worker's own report does not mention this; I found it
 by running `findAnomalies` over the real tree.
 
-**4. Four em-dashes in added lines.** The repo bans em-dashes in prose this
-workflow writes. Two are in *new* lines:
-`src/pi.ts:261` (`/* not an artifact — skip, never fatal */`) and
-`tests/plugin.test.ts:617` (`describe("task-workflow tools — v4 effort-grouped
-tree")`). Two are carried over from pre-existing text
-(`src/core/art.ts`'s module header, and the reworked ambiguity error string at
-`src/pi.ts:511`, which inherited the em-dash from the line it replaced).
-`tests/plugin.test.ts` also now ends without a trailing newline.
+**4. Four em-dashes in added lines (fixed in the coherence pass).** The repo
+bans em-dashes in prose this workflow writes. Two were in *new* lines: a
+comment in `src/pi.ts` ("not an artifact" followed by an em-dash and "skip,
+never fatal") and a `describe` title in `tests/plugin.test.ts` ("task-workflow
+tools" followed by an em-dash and "v4 effort-grouped tree"). Two were carried
+over from pre-existing text (`src/core/art.ts`'s module header, and the
+reworked ambiguity error string in `src/pi.ts`, which inherited the em-dash
+from the line it replaced). All four were removed in the coherence pass, and
+the missing trailing newline in `tests/plugin.test.ts` was restored.
 
 **5. `missing-type` is unreachable in practice.** `fromFrontmatter` throws on a
 missing or empty type, so an `Artifact` can never carry an empty type and the

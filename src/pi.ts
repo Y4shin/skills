@@ -20,7 +20,7 @@ import { Type } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
-import { fromFrontmatter, sliceInfoFrom, dependencyLevels, type Artifact, type SliceInfo, type WorkItemInfo } from "./core/art.js";
+import { fromFrontmatter, sliceInfoFrom, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, type Artifact, type SliceInfo, type WorkItemInfo } from "./core/art.js";
 import { toObject, fromObject, freshState, isPointerName, POINTER_NAMES, type WorkflowState } from "./core/state.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
@@ -264,7 +264,7 @@ function scanArtifacts(root: string): ScanHit[] {
 }
 
 /** Preference order when one slug matches several artifact types. */
-const TYPE_PRIORITY = ["map", "ticket", "task", "spec", "arch spec"];
+const TYPE_PRIORITY = TYPE_LEAVES.map(([type]) => type);
 
 function typeRank(type: string): number {
   const i = TYPE_PRIORITY.indexOf(type);
@@ -272,7 +272,17 @@ function typeRank(type: string): number {
 }
 
 /** The files a directory selector may stand for, in preference order. */
-const DIRECTORY_LEAVES = ["map.md", "ticket.md", "task.md", "spec.md"];
+const DIRECTORY_LEAVES = TYPE_LEAVES.map(([, file]) => file);
+
+/**
+ * Pick the file a directory selector stands for. When a wanted type is given,
+ * only that type's leaf is considered, so `want: "spec"` on a directory that
+ * holds both `map.md` and `spec.md` selects the spec instead of erroring.
+ */
+function directoryLeaf(dir: string, want?: string): string | null {
+  const leaves = want && TYPE_LEAF[want] ? [TYPE_LEAF[want]] : DIRECTORY_LEAVES;
+  return leaves.map((leaf) => join(dir, leaf)).find(isFile) ?? null;
+}
 
 /** Resolve a slug or path to an artifact file path and its frontmatter document. */
 function resolveArt(root: string, selector: string, want?: string): ScanHit {
@@ -285,7 +295,13 @@ function resolveArt(root: string, selector: string, want?: string): ScanHit {
 
   if (target) {
     if (isDir(target)) {
-      target = DIRECTORY_LEAVES.map((leaf) => join(target, leaf)).find(isFile) ?? target;
+      const leaf = directoryLeaf(target, want);
+      if (leaf === null) {
+        throw new ResolutionError(
+          want ? `no ${want} in directory '${selector}'` : `'${selector}' is not a recognised artifact`,
+        );
+      }
+      target = leaf;
     }
     if (!isFile(target)) throw new ResolutionError(`'${selector}' is not a recognised artifact`);
     let parsed: { art: Artifact; doc: Document };
@@ -523,7 +539,7 @@ export function createTools(): Record<string, Tool> {
 
     task_resolve: def(
       "Resolve a slug or path to the artifact's file path.",
-      { selector: Str("Slug or path"), kind: OptStr("map, task, or slice") },
+      { selector: Str("Slug or path"), kind: OptStr("Wanted OKF type (map, ticket, task, spec, arch spec)") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         return resolveArt(root, p.selector, p.kind as string | undefined).path;
@@ -531,13 +547,16 @@ export function createTools(): Record<string, Tool> {
     ),
 
     task_assert_kind: def(
-      "Assert an artifact's kind (map/task/slice). Fails on mismatch.",
-      { selector: Str("Slug or path"), kind: { type: "string" as const, enum: ["map", "task", "slice"] } },
+      "Assert an artifact's type (map, ticket, task, spec, arch spec). Fails on mismatch.",
+      {
+        selector: Str("Slug or path"),
+        kind: { type: "string" as const, enum: ["map", "ticket", "task", "spec", "arch spec", "slice"] },
+      },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         const { art } = resolveArt(root, p.selector);
         if (art.type !== p.kind) throw new Error(`'${p.selector}' has type '${art.type}', not '${p.kind}'.`);
-        return `kind: ${p.kind} — OK`;
+        return `type: ${p.kind} (OK)`;
       },
     ),
 
