@@ -56,8 +56,19 @@ _Avoid_: rank, tier
 The version stamp in `docs/tasks/state.yaml` that the migration skill reads
 to detect whether a repo is fresh (onboard), old (migrate), or already
 current (no-op). Per-upgrade resource files apply in sequence from the
-repo's version to the current version.
+repo's version to the current version. The state module treats it as an
+unmodeled key: it is preserved verbatim through every state write and is
+stamped only by the migration.
 _Avoid_: version (too generic)
+
+**State pointer**:
+One of the two fields the state module models in `docs/tasks/state.yaml`:
+`map` (the effort in flight) and `task` (the current item). Everything else
+in the file is unmodeled and preserved verbatim, so a state write never
+destroys a key it does not know about. The v3 `slice` field is no longer a
+pointer; a file still carrying it keeps it untouched until the migration's
+state-file rebuild drops it.
+_Avoid_: cursor, position (both imply a single value; there are two)
 
 **Task type**:
 One of six, declared in a task's `type:` frontmatter, routing
@@ -117,6 +128,8 @@ _Avoid_: blacklist (too negative)
 - A **map** holds many **tasks**.
 - A **task** has one **task type** and one `blocked_by` list.
 - A **feature** or **bug** task holds many **slices**.
+- `docs/tasks/state.yaml` holds the two **state pointers**; every other key
+  in that file is unmodeled and preserved verbatim.
 - The **frontier** is the set of tasks/slices whose `blocked_by`
   dependencies are all done.
 - A **decision ticket** is a **task** (a child of a **map**).

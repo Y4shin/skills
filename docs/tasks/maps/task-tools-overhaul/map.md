@@ -17,7 +17,7 @@ tasks:
   done: true
 - slug: overhaul-state-module
   blocked_by: []
-  done: false
+  done: true
 - slug: overhaul-artifact-model
   blocked_by:
   - overhaul-state-module

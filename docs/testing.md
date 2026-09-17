@@ -31,6 +31,15 @@
   escalation) is unit-testable with a mock, independent of the real
   subprocess. _(The former `scripts/eval/` harness that illustrated this was
   removed with the grilling-with-ui CLI it drove; the pattern stands.)_
+- **Lossless round-trip modules (state.yaml):** when a module reads and
+  rewrites a user-owned file it does not fully model, give it an explicit
+  bag for the unmodeled keys (`WorkflowState.rest`) and test fidelity at the
+  pure seam: `toObject(fromObject(original))` must `toEqual(original)` for an
+  arbitrary object, not just for the fields the module knows. Cover the
+  value types (numbers stay numbers, real nulls never become the string
+  `"None"`), a sequence of two writes, and the legacy shape the module must
+  preserve but no longer model. See `tests/state.test.ts` and the
+  `task_state` / `task_state_set` blocks in `tests/plugin.test.ts`.
 
 ## Integration harness (tests/integration/)
 
@@ -43,21 +52,16 @@
 - `registerProvider` requires `baseUrl` when the provider defines
   models (a dummy like `http://faux.local` is fine).
 
-### Known issue: harness currently broken on the installed pi (0.80.10)
+### The harness runs green on the installed pi (0.80.10)
 
-`tests/integration/session.test.ts` (16 tests) fails with
-`TypeError: Cannot read properties of undefined (reading 'inMemory')` at
-`harness.ts:138` (`AuthStorage.inMemory()`). This reproduces on `main` and
-stems from a version skew in the installed
-`@earendil-works/pi-coding-agent` (it no longer exports `AuthStorage` the
-way the harness imports it). It is **pre-existing and unrelated** to any
-feature landed since. Until fixed, run the suite with
-`npx vitest run --exclude tests/integration/session.test.ts`, or rely on
-the per-feature unit tests. Do **not** let this block landing new work:
-verify it's not your change by checking the failure is that same
-`AuthStorage.inMemory` line. The follow-up bug task
-`fix-integration-harness-auth-storage` tracks updating the harness for the
-installed Pi API.
+`tests/integration/session.test.ts` (16 tests) **passes** on the installed
+`@earendil-works/pi-coding-agent` 0.80.10. An earlier revision of this doc
+recorded a `TypeError: Cannot read properties of undefined (reading
+'inMemory')` at `harness.ts:138` (`AuthStorage.inMemory()`); that was a
+version-skew failure from before the harness moved to `ModelRuntime.create`
+with `InMemoryCredentialStore` (see the imports at the top of `harness.ts`).
+The failure no longer reproduces, on `main` or on task branches. Run the full
+suite normally; do not exclude this file.
 
 ## Skill prose testing
 

@@ -1,52 +1,159 @@
 /**
- * Tests for the state model — pure functions, no I/O.
+ * Tests for the v4 state model, pure functions, no I/O.
+ *
+ * The contract: two pointers (map, task), a lossless `rest` bag, real
+ * nulls. fromObject then toObject reproduces every key of an arbitrary
+ * state.yaml object.
  */
 
 import { describe, expect, test } from "vitest";
 import { toObject, fromObject, DEFAULT_STATE } from "../src/core/state.js";
 
-describe("toObject", () => {
-  test("serializes to a plain object", () => {
-    const obj = toObject({ task: "login", slice: "login-form" });
-    expect(obj.task).toBe("login");
-    expect(obj.slice).toBe("login-form");
-  });
-});
-
 describe("fromObject", () => {
-  test("parses v2 flat format", () => {
-    const state = fromObject({ task: "login", slice: null });
+  test("parses the flat v4 format: map and task at top level", () => {
+    const state = fromObject({ map: "auth", task: "login" });
+    expect(state.map).toBe("auth");
     expect(state.task).toBe("login");
-    expect(state.slice).toBeNull();
   });
 
-  test("parses v1 nested format", () => {
-    const state = fromObject({ active: { task: "login", slice: "login-form", map: "auth" }, last_action: "x", next_action: "y" });
+  test("parses a v3 file with a legacy slice key into rest, verbatim", () => {
+    const state = fromObject({ map: "auth", task: "login", slice: "login-form", schema_version: 3 });
+    expect(state.map).toBe("auth");
     expect(state.task).toBe("login");
-    expect(state.slice).toBe("login-form");
+    expect(state.rest).toEqual({ slice: "login-form", schema_version: 3 });
   });
 
-  test("returns defaults for null/undefined", () => {
-    expect(fromObject(null)).toEqual(DEFAULT_STATE);
-    expect(fromObject(undefined)).toEqual(DEFAULT_STATE);
+  test("v1 nested format: pointers from active, active preserved in rest", () => {
+    const raw = { active: { map: "auth", task: "login" }, last_action: "x", next_action: "y" };
+    const state = fromObject(raw);
+    expect(state.map).toBe("auth");
+    expect(state.task).toBe("login");
+    expect(state.rest).toEqual(raw);
   });
 
-  test("returns defaults for non-object", () => {
-    expect(fromObject("hello")).toEqual(DEFAULT_STATE);
+  test("returns fresh defaults for null, undefined, and non-object input", () => {
+    for (const bad of [null, undefined, "hello", 42, ["array"]]) {
+      const state = fromObject(bad);
+      expect(state).toEqual(DEFAULT_STATE);
+      expect(state.rest).toEqual({});
+    }
   });
 
-  test("coerces non-string values to null", () => {
-    const state = fromObject({ task: 42, slice: true });
+  test("each fresh default is independent (no shared rest bag)", () => {
+    const a = fromObject(null);
+    const b = fromObject(undefined);
+    a.rest.injected = true;
+    expect(b.rest).toEqual({});
+    expect(DEFAULT_STATE.rest).toEqual({});
+  });
+
+  test("coerces non-string pointer values to null", () => {
+    const state = fromObject({ map: 42, task: true, schema_version: 3 });
+    expect(state.map).toBeNull();
     expect(state.task).toBeNull();
-    expect(state.slice).toBeNull();
+    expect(state.rest).toEqual({ schema_version: 3 });
+  });
+
+  test("the string 'None' coerces to null, not a pointer", () => {
+    const state = fromObject({ map: "None", task: "login" });
+    expect(state.map).toBeNull();
+    expect(state.task).toBe("login");
   });
 });
 
-describe("round-trip", () => {
-  test("toObject then fromObject preserves values", () => {
-    const original = { task: "login", slice: "login-form" };
-    const obj = toObject(original);
-    const state = fromObject(obj);
-    expect(state).toEqual(original);
+describe("toObject", () => {
+  test("serializes pointers and rest: rest keys first, pointers last", () => {
+    const obj = toObject({ map: "auth", task: "login", rest: { schema_version: 3 } });
+    expect(obj).toEqual({ schema_version: 3, map: "auth", task: "login" });
+  });
+
+  test("null pointers serialize as real null, never the string 'None'", () => {
+    const obj = toObject(DEFAULT_STATE);
+    expect(obj.map).toBeNull();
+    expect(obj.task).toBeNull();
+    expect(JSON.stringify(obj)).not.toContain("None");
+  });
+
+  test("does not stamp schema_version and does not write a slice key", () => {
+    const obj = toObject({ map: null, task: "login", rest: {} });
+    expect(obj).not.toHaveProperty("schema_version");
+    expect(obj).not.toHaveProperty("slice");
+    expect(obj).toEqual({ map: null, task: "login" });
+  });
+});
+
+describe("round-trip fidelity", () => {
+  test("fromObject then toObject reproduces every key of a v3 file", () => {
+    const original = { map: "auth", task: "login", slice: "login-form", schema_version: 3 };
+    const state = fromObject(original);
+    const obj = toObject(state);
+    // Same key set, same values. Key order is an internal choice.
+    expect(obj).toEqual(original);
+  });
+
+  test("reproduces every key of an arbitrary state object", () => {
+    // Arbitrary shape: mixed value types, a nested object, an array, a null,
+    // a legacy slice key, and keys whose names collide with nothing modeled.
+    const original: Record<string, unknown> = {
+      schema_version: 3,
+      map: "auth",
+      task: null,
+      slice: "legacy-form",
+      future: { nested: { deep: [1, 2, 3] } },
+      count: 0,
+      enabled: false,
+      notes: ["a", "b"],
+      empty: null,
+    };
+    const obj = toObject(fromObject(original));
+    expect(obj).toEqual(original);
+    // Every key present, and value types preserved (numbers stay numbers).
+    expect(Object.keys(obj).sort()).toEqual(Object.keys(original).sort());
+    expect(typeof obj.schema_version).toBe("number");
+    expect(obj.enabled).toBe(false);
+    expect(obj.count).toBe(0);
+  });
+
+  test("multiple unknown keys survive one write", () => {
+    const original = { schema_version: 3, map: "auth", task: null, future_key: "keep me", another: { nested: true } };
+    const obj = toObject(fromObject(original));
+    expect(obj).toEqual(original);
+  });
+
+  test("preservation holds across two consecutive writes", () => {
+    const original = { schema_version: 3, slice: "legacy", map: "auth", task: null };
+    let state = fromObject(original);
+    state.task = "login"; // first write
+    let obj = toObject(state);
+    expect(obj.schema_version).toBe(3);
+    expect(obj.slice).toBe("legacy");
+    state = fromObject(obj);
+    state.task = null; // second write
+    obj = toObject(state);
+    expect(obj).toEqual({ schema_version: 3, slice: "legacy", map: "auth", task: null });
+  });
+
+  test("v1 nested file round-trips with active preserved", () => {
+    const original = { active: { map: "auth", task: "login" }, last_action: "x", next_action: "y" };
+    const state = fromObject(original);
+    state.task = "logout";
+    const obj = toObject(state);
+    // The active block is preserved verbatim, not rewritten; the modeled
+    // pointers are appended after the preserved keys.
+    expect(obj.active).toEqual({ map: "auth", task: "login" });
+    expect(obj.last_action).toBe("x");
+    expect(obj.next_action).toBe("y");
+    expect(obj.map).toBe("auth");
+    expect(obj.task).toBe("logout");
+    // The preserved keys are all still there alongside the appended pointers.
+    expect(Object.keys(obj).sort()).toEqual(["active", "last_action", "map", "next_action", "task"]);
+  });
+
+  test("round-trip of a YAML parse-then-stringify cycle keeps nulls real", async () => {
+    const YAML = (await import("yaml")).default;
+    const state = fromObject(YAML.parse("map: null\ntask: login\nschema_version: 3\n"));
+    const text = YAML.stringify(toObject(state), { sortMapEntries: false, indentSeq: false, lineWidth: 0 });
+    expect(text).not.toContain("None");
+    expect(YAML.parse(text)).toEqual({ map: null, task: "login", schema_version: 3 });
   });
 });
