@@ -1,110 +1,117 @@
-# Handoff: task-tools-overhaul, to-tickets approval is the live step
+# Handoff: task-tools-overhaul, tickets published, frontier live
 
 You are continuing the `task-tools-overhaul` effort in this repo
-(github.com/Y4shin/skills, branch main). Everything this session
-produced is committed and pushed. The one thing still live: the user
-has NOT yet approved the ticket breakdown. Do not publish tickets
-until they answer the quiz.
+(github.com/Y4shin/skills, branch main). The to-tickets flow is
+complete: all eight tickets are published, registered in the map,
+and the frontier is live. Everything is committed and pushed unless
+noted below.
 
 ## Where we are
 
 - The map: `docs/tasks/maps/task-tools-overhaul/map.md`. All three
-  research/grilling children are done; "Decisions so far" carries the
-  complete decision set (G1 rounds 1-7, user-confirmed). Read it first;
-  it is settled and must not be re-litigated.
-- The decision record: `docs/tasks/overhaul-synthesis-grilling/task.md`
-  holds every round with rationale and rejected alternatives. The two
-  research findings it consumed:
-  `docs/tasks/tool-surface-inventory/findings.md` (851 lines) and
-  `docs/tasks/workflow-tool-usage-audit/findings.md` (972 lines).
-- The spec: `docs/tasks/task-tools-overhaul/spec.md` (457 lines),
-  user-approved via `/skill:to-spec`, synthesizes the decision set.
-  Test seams were explicitly approved: (1) tool-contract seam via the
-  registered-tool interface against fixture trees, (2) the migration
-  as its own testable unit per vintage.
+  research/grilling children are done; the eight implementation
+  tickets are registered with `done: false`. "Decisions so far"
+  (G1 rounds 1-7) is settled; do not re-litigate it.
+- The spec: `docs/tasks/task-tools-overhaul/spec.md`, user-approved
+  via `/skill:to-spec`, is the design source for every ticket. Test
+  seams approved: (1) tool-contract seam via the registered-tool
+  interface against fixture trees, (2) the migration as its own
+  tested unit per vintage.
+- The to-tickets quiz was answered on 2026-09-16; all four agent
+  recommendations were approved: keep ticket 3 (the migration) whole
+  and XL; rename-first ordering (ticket 5 before the prose tickets 6
+  and 7); guidelines deletion stays in ticket 8 (not merged into 7);
+  publish with one legacy slice doc per ticket so today's
+  implement-task pipeline can execute each ticket (the
+  vacuous-completion trap would otherwise fire, per the R2 audit).
+- Every ticket lives at `docs/tasks/<slug>/task.md` plus
+  `slices/1-<slug>.md` (v3 frontmatter shape, `mode: afk`, one slice
+  per ticket, test plans distilled from acceptance criteria). The
+  pipeline enumerates them via `task_slices`; verified before commit:
+  `task_slices overhaul-state-module` reports its slice todo.
+- Dependency levels (task_dependency_levels task-tools-overhaul):
+  1 overhaul-state-module → 2 overhaul-artifact-model →
+  3 overhaul-v4-migration → 4 overhaul-graph-tools →
+  5 overhaul-tw-rename → 6/7 overhaul-planning-skills ∥
+  overhaul-execution-skills (parallel) → 8 overhaul-dead-surface.
+  Frontier: overhaul-state-module.
+- `task_finalizable` was pinned down while publishing: it is neither
+  deleted nor lost. It survives, reworked to a status-based
+  predicate in ticket 4, renamed in ticket 5, consumed by finalize
+  prose in ticket 7. The spec's survivor/delete lists omit it; the
+  decision record (round 1 Q1) is authoritative.
 
 ## The immediate next step
 
-The `/skill:to-tickets task-tools-overhaul` run reached step 4 (quiz
-the user) and stopped for approval. An 8-ticket breakdown was
-presented; the user has not answered. The proposal, compact:
+Run `/skill:implement-task task-tools-overhaul` (or dispatch ticket
+by ticket: `overhaul-state-module` first, then the chain in level
+order). implement-task works the frontier: state module first, then
+the artifact model, the migration, graph tools, rename, the two
+parallel prose tickets, then the deletion ticket last.
 
-1. state module fix (lossless round-trip, real nulls, map pointer) -
-   no blockers
-2. v4 artifact model: dual-shape parsing and resolution - blocked by 1
-3. the v4 migration (any vintage to new tree) + setup-workflow v4 -
-   blocked by 2. Deliberately XL: one contract covers every vintage.
-4. scan-based graph tools + honest schema reference (tw_context) -
-   blocked by 3
-5. rename tool family to tw_ prefix (including soon-to-die tools, so
-   deletion stays a pure no-references-remain contract) - blocked by 4
-6. planning-side skills to v4 (wayfinder, to-spec, to-tickets,
-   doctor conformance symptom, router map) - blocked by 5
-7. execution-side skills to v4 (implement-task per-ticket chains,
-   mode: human hard-refuse, finalize-task, code-review/tdd standards
-   reads, ui-noter removal) - blocked by 5, parallel with 6
-8. contract: delete dead surface (task_resolve, task_assert_kind,
-   task_map_tasks, task_map_tick, task_slices, task_set_slices,
-   get_guidelines, list_guidelines, guidelines hook+machinery) -
-   blocked by 6 and 7
+Before each dispatch, decide human vs autonomous mode per the
+current feature router's prose rules. The tickets carry `mode: afk`
+on their slice docs, but the invocation prose governs; for the
+rename ticket especially, a human-mode run with the agent doing the
+mechanical sweep is fine.
 
-Quiz still open with the user: granularity (is 3 too big?), the
-rename-before-prose ordering choice (5 before 6/7; alternative is
-prose first, rename last), and whether guidelines deletion (8) should
-merge with the re-pointing (7). The agent's stated preference:
-rename-first, keep 3 whole, keep 8/7 separate.
+Two user calls embedded in the tickets, surfaced at run time:
 
-When the user answers: finish the to-tickets flow (publish all eight
-as `docs/tasks/<ticket-slug>/task.md` with the current task frontmatter
-shape, register them in the map's tasks array, wire blocked_by in a
-second pass) and then the frontier is live for `/skill:implement-task`.
+1. Ticket 3 does not run the migration against this repo's live
+   tree; tests use fixtures. When to flip the live tree is a user
+   call (the natural moment: after tickets 6/7 land, before ticket 8
+   so the deletion lands on the final tree).
+2. Ticket 7's human-mode refusal semantics: when implement-task
+   meets a `mode: human` ticket it hard-refuses and hands back with
+   the skill invocation; nothing to decide here unless the flow
+   snags.
 
 ## Caution: the old frontmatter is still current
 
-Belief check, verified before this session ends: the tree on disk is
-STILL v3-era (kind/map/slug/status/blocked_by, maps/ subtree, flat
-task dirs, map tasks array). Everything v4 (OKF types, subtype,
-workflow_state, effort-grouped layout, tw_ prefix, ticket.md) is
-DECIDED but NOT IMPLEMENTED. The to-tickets publication must use the
-OLD frontmatter shape (the skill's own template does) even though the
-tickets describe building the new one. Do not "fix" the shape while
-publishing; that is ticket 3's job.
+The tree on disk is STILL v3-era (kind/map/slug/status/blocked_by,
+maps/ subtree, flat task dirs, map tasks array). Everything v4 (OKF
+types, subtype, workflow_state, effort-grouped layout, tw_ prefix,
+ticket.md) is DECIDED but NOT IMPLEMENTED. The published tickets
+describe building the new world but use the old shape, deliberately:
+fixing the shape is ticket 3's migration, not the publication's job.
+Any new prose written before the flip (tickets 5-7) must use the OLD
+tool names and the OLD conventions where it touches live artifacts.
 
-Also live: `docs/tasks/state.yaml` reads
-`task: null / slice: null / schema_version: 3` (hand-normalized; the
-current tool wipes the version key on every write, which is the
-confirmed bug ticket 1 kills). After any `task_state_set` call, check
-that file and restore `schema_version: 3` if the tool dropped it.
+`docs/tasks/state.yaml` reads `task: null / slice: null /
+schema_version: 3` (hand-restored; the current tool wipes the
+version key on every write, the confirmed bug ticket 1 kills).
+After any `task_state_set` call, check that file and restore
+`schema_version: 3` if the tool dropped it.
 
 ## Known in-flight work, not yours to finish
 
-The working tree also carried these before this effort (now committed
-by user request, still unfinished): the repo-gate refactor
+The working tree also carries these before this effort (committed by
+user request, still unfinished): the repo-gate refactor
 (`src/core/repo-gate.ts` + docs + tests, semantics changed to
 enable-authoritative), the handoff skill rewrite, the eval-review
 skill (registered in package.json pi.skills, docs pages), and the
-pi-harness-evals map (`docs/tasks/maps/pi-harness-evals/`) whose spec
-child `docs/tasks/build-eval-creator-skill/spec.md` was never
+pi-harness-evals map (`docs/tasks/maps/pi-harness-evals/`) whose
+spec child `docs/tasks/build-eval-creator-skill/spec.md` was never
 ticketed. That map's user will run to-tickets on it separately. Do
 not absorb it into this effort.
 
 ## Suggested skills
 
-- `to-tickets` is USER-INVOKED: the remaining step of the current flow
-  needs the human to answer the quiz, then the agent finishes
-  publication per the skill's step 5.
-- `implement-task` (model-invoked): once tickets are published, it
-  works the frontier per ticket.
-- `finalize-task` (model-invoked): bookkeeping when a ticket lands.
-- `code-review` (model-invoked): the advisory whole-diff review at the
-  end of each ticket chain, per implement-task's pipeline.
+- `implement-task` (model-invoked): works the frontier per ticket,
+  chain per slice (each ticket has exactly one slice doc).
+- `finalize-task` (model-invoked): bookkeeping when a ticket lands
+  (map tick, changelog entry, knowledge harvest, archive). NOTE: it
+  is only correct on the live v3 tree; the tickets themselves
+  migrate the tree in ticket 3.
+- `code-review` (model-invoked): the advisory whole-diff review at
+  the end of each ticket chain, per implement-task's pipeline.
 
 ## Reference docs, by path
 
-- Map (decision record): docs/tasks/maps/task-tools-overhaul/map.md
+- Map (decision record + ticket registry): docs/tasks/maps/task-tools-overhaul/map.md
 - G1 rounds: docs/tasks/overhaul-synthesis-grilling/task.md
 - Spec: docs/tasks/task-tools-overhaul/spec.md
 - R1 inventory: docs/tasks/tool-surface-inventory/findings.md
 - R2 usage audit: docs/tasks/workflow-tool-usage-audit/findings.md
-- OKF 0.2 spec (external, what v4 complies with):
+- OKF 0.1 → 0.2 spec (external, what v4 complies with):
   https://github.com/GoogleCloudPlatform/open-knowledge-format

@@ -15,6 +15,38 @@ tasks:
   - tool-surface-inventory
   - workflow-tool-usage-audit
   done: true
+- slug: overhaul-state-module
+  blocked_by: []
+  done: false
+- slug: overhaul-artifact-model
+  blocked_by:
+  - overhaul-state-module
+  done: false
+- slug: overhaul-v4-migration
+  blocked_by:
+  - overhaul-artifact-model
+  done: false
+- slug: overhaul-graph-tools
+  blocked_by:
+  - overhaul-v4-migration
+  done: false
+- slug: overhaul-tw-rename
+  blocked_by:
+  - overhaul-graph-tools
+  done: false
+- slug: overhaul-planning-skills
+  blocked_by:
+  - overhaul-tw-rename
+  done: false
+- slug: overhaul-execution-skills
+  blocked_by:
+  - overhaul-tw-rename
+  done: false
+- slug: overhaul-dead-surface
+  blocked_by:
+  - overhaul-planning-skills
+  - overhaul-execution-skills
+  done: false
 ---
 
 ## Destination
