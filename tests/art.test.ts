@@ -3,29 +3,225 @@
  */
 
 import { describe, expect, test } from "vitest";
-import { fromFrontmatter, sliceInfoFrom, dependencyLevels, type SliceInfo } from "../src/core/art.js";
+import {
+  fromFrontmatter,
+  findAnomalies,
+  sliceInfoFrom,
+  dependencyLevels,
+  validateArtifact,
+  validateCombination,
+  type Artifact,
+  type SliceInfo,
+} from "../src/core/art.js";
 
-describe("fromFrontmatter", () => {
+describe("fromFrontmatter v4 shape", () => {
   test("parses a task artifact", () => {
-    const art = fromFrontmatter({ kind: "task", slug: "login", title: "Login", status: "draft" });
-    expect(art.kind).toBe("task");
-    expect(art.slug).toBe("login");
+    const art = fromFrontmatter({
+      type: "task",
+      subtype: "research",
+      title: "Login",
+      status: "draft",
+      workflow_state: "todo",
+      blocked_by: ["env"],
+      mode: "human",
+      size: "l",
+    });
+    expect(art.type).toBe("task");
+    expect(art.subtype).toBe("research");
     expect(art.status).toBe("draft");
+    expect(art.workflow_state).toBe("todo");
+    expect(art.title).toBe("Login");
+    expect(art.blocked_by).toEqual(["env"]);
+    expect(art.mode).toBe("human");
+    expect(art.size).toBe("l");
+    expect(art.shape).toBe("v4");
+  });
+
+  test("parses a ticket artifact with no size", () => {
+    const art = fromFrontmatter({ type: "ticket", subtype: "bug", status: "stable", workflow_state: "ready" });
+    expect(art.type).toBe("ticket");
+    expect(art.subtype).toBe("bug");
+    expect(art.size).toBeNull();
+    expect(art.mode).toBeNull();
   });
 
   test("parses a map artifact", () => {
+    const art = fromFrontmatter({ type: "map", title: "Auth", status: "draft" });
+    expect(art.type).toBe("map");
+    expect(art.subtype).toBeNull();
+    expect(art.workflow_state).toBeNull();
+  });
+
+  test("parses a spec artifact", () => {
+    const art = fromFrontmatter({ type: "spec", title: "Spec", status: "draft" });
+    expect(art.type).toBe("spec");
+    expect(art.workflow_state).toBeNull();
+  });
+
+  test("parses an aux file", () => {
+    const art = fromFrontmatter({ type: "findings", title: "Findings", status: "stable" });
+    expect(art.type).toBe("findings");
+    expect(art.status).toBe("stable");
+  });
+
+  test("takes the slug from the directory name when the frontmatter has none", () => {
+    const art = fromFrontmatter({ type: "ticket", title: "Login" }, "login");
+    expect(art.slug).toBe("login");
+  });
+});
+
+describe("fromFrontmatter v3 shape", () => {
+  test("maps kind to type and type to subtype", () => {
+    const art = fromFrontmatter({ kind: "task", type: "feature", slug: "login", map: "auth", status: "draft" });
+    expect(art.type).toBe("task");
+    expect(art.subtype).toBe("feature");
+    expect(art.slug).toBe("login");
+    expect(art.shape).toBe("v3");
+    expect(art.workflow_state).toBeNull();
+  });
+
+  test("maps a v3 map", () => {
     const art = fromFrontmatter({ kind: "map", slug: "auth", status: "draft" });
-    expect(art.kind).toBe("map");
+    expect(art.type).toBe("map");
+    expect(art.shape).toBe("v3");
   });
 
-  test("parses a slice artifact", () => {
+  test("maps a v3 slice", () => {
     const art = fromFrontmatter({ kind: "slice", slug: "do-thing", status: "todo", size: "m" });
-    expect(art.kind).toBe("slice");
+    expect(art.type).toBe("slice");
     expect(art.slug).toBe("do-thing");
+    expect(art.size).toBe("m");
+  });
+});
+
+describe("fromFrontmatter type requirement", () => {
+  test("tolerates an unknown type value", () => {
+    const art = fromFrontmatter({ type: "widget" });
+    expect(art.type).toBe("widget");
   });
 
-  test("throws on invalid kind", () => {
-    expect(() => fromFrontmatter({ kind: "widget" })).toThrow();
+  test("rejects a missing type", () => {
+    expect(() => fromFrontmatter({ title: "no type" })).toThrow(/type/);
+  });
+
+  test("rejects an empty type", () => {
+    expect(() => fromFrontmatter({ type: "   " })).toThrow(/type/);
+  });
+
+  test("rejects a missing v3 kind", () => {
+    expect(() => fromFrontmatter({ slug: "login" })).toThrow(/type/);
+  });
+});
+
+describe("validateCombination", () => {
+  test("allows draft with todo", () => {
+    expect(validateCombination("draft", "todo")).toBeNull();
+  });
+
+  test("rejects draft with done", () => {
+    expect(validateCombination("draft", "done")).toMatch(/draft/);
+  });
+
+  test("rejects draft with ready", () => {
+    expect(validateCombination("draft", "ready")).toMatch(/draft/);
+  });
+
+  test("allows deprecated with done", () => {
+    expect(validateCombination("deprecated", "done")).toBeNull();
+  });
+
+  test("rejects deprecated with todo", () => {
+    expect(validateCombination("deprecated", "todo")).toMatch(/deprecated/);
+  });
+
+  test("rejects deprecated with ready", () => {
+    expect(validateCombination("deprecated", "ready")).toMatch(/deprecated/);
+  });
+
+  test("allows stable with any workflow state", () => {
+    for (const state of ["todo", "ready", "in-progress", "blocked", "done"]) {
+      expect(validateCombination("stable", state)).toBeNull();
+    }
+  });
+
+  test("absent status means stable", () => {
+    expect(validateCombination(null, "done")).toBeNull();
+    expect(validateCombination(null, "todo")).toBeNull();
+  });
+
+  test("absent workflow_state has no rule", () => {
+    expect(validateCombination("draft", null)).toBeNull();
+    expect(validateCombination("deprecated", null)).toBeNull();
+  });
+});
+
+describe("validateArtifact", () => {
+  test("returns no anomaly for an allowed combination", () => {
+    const art = fromFrontmatter({ type: "task", status: "draft", workflow_state: "todo" });
+    expect(validateArtifact(art)).toEqual([]);
+  });
+
+  test("reports an invalid combination", () => {
+    const art = fromFrontmatter({ type: "task", status: "draft", workflow_state: "done" });
+    const anomalies = validateArtifact(art);
+    expect(anomalies).toHaveLength(1);
+    expect(anomalies[0].kind).toBe("invalid-combination");
+    expect(anomalies[0].detail).toMatch(/draft/);
+  });
+});
+
+describe("findAnomalies", () => {
+  test("returns nothing for a consistent set", () => {
+    const arts = [
+      fromFrontmatter({ type: "map", title: "Eff", status: "draft" }, "eff"),
+      fromFrontmatter({ type: "task", subtype: "research", status: "stable", workflow_state: "todo" }, "decide"),
+    ];
+    arts[1].path = "/repo/docs/tasks/eff/tasks/decide/task.md";
+    arts[0].path = "/repo/docs/tasks/eff/map.md";
+    expect(findAnomalies(arts)).toEqual([]);
+  });
+
+  test("reports a type that disagrees with its location", () => {
+    const art = fromFrontmatter({ type: "task", status: "stable", workflow_state: "todo" }, "login");
+    art.path = "/repo/docs/tasks/eff/tickets/login/ticket.md";
+    const map = fromFrontmatter({ type: "map", status: "draft" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    const anomalies = findAnomalies([map, art]);
+    expect(anomalies.map((a) => a.kind)).toContain("orphan");
+    expect(anomalies.find((a) => a.kind === "orphan")!.artifact).toBe("login");
+  });
+
+  test("reports a task in an effort directory with neither map nor spec", () => {
+    const art = fromFrontmatter({ type: "task", status: "stable", workflow_state: "todo" }, "decide");
+    art.path = "/repo/docs/tasks/eff/tasks/decide/task.md";
+    const anomalies = findAnomalies([art]);
+    expect(anomalies.map((a) => a.kind)).toContain("orphan");
+  });
+
+  test("reports a blocked_by target that does not exist", () => {
+    const art = fromFrontmatter(
+      { type: "task", status: "stable", workflow_state: "todo", blocked_by: ["ghost"] },
+      "decide",
+    );
+    art.path = "/repo/docs/tasks/eff/tasks/decide/task.md";
+    const map = fromFrontmatter({ type: "map", status: "draft" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    const anomalies = findAnomalies([map, art]);
+    expect(anomalies.map((a) => a.kind)).toContain("missing-blocked-by-target");
+    expect(anomalies.find((a) => a.kind === "missing-blocked-by-target")!.detail).toContain("ghost");
+  });
+
+  test("does not report a blocked_by target that exists in the same effort", () => {
+    const a = fromFrontmatter({ type: "task", status: "stable", workflow_state: "todo" }, "first");
+    a.path = "/repo/docs/tasks/eff/tasks/first/task.md";
+    const b = fromFrontmatter(
+      { type: "task", status: "stable", workflow_state: "todo", blocked_by: ["first"] },
+      "second",
+    );
+    b.path = "/repo/docs/tasks/eff/tasks/second/task.md";
+    const map = fromFrontmatter({ type: "map", status: "draft" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    expect(findAnomalies([map, a, b])).toEqual([]);
   });
 });
 
