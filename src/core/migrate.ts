@@ -22,7 +22,6 @@ import {
   validateCombination,
   TYPE_LEAVES,
   TYPE_LEAF,
-  type Artifact,
 } from "./art.js";
 import { fromObject, toObject, freshState } from "./state.js";
 
@@ -156,7 +155,27 @@ function dumpVerified(path: string, data: FrontmatterData, body: string): string
       `staged write to '${path}' does not round-trip through YAML: its frontmatter cannot be represented verbatim`,
     );
   }
+  // Conformance: the rewritten frontmatter must parse as a real v4 artifact
+  // through the same model the tools use. A rewrite that the model rejects
+  // never reaches the port.
+  try {
+    fromFrontmatter(reparsed, slugFromPath(path));
+  } catch (e) {
+    throw new Error(
+      `staged write to '${path}' is not a conformant v4 artifact: ${(e as Error).message}`,
+    );
+  }
   return content;
+}
+
+/** The slug a destination path implies: the directory that carries it. */
+function slugFromPath(path: string): string {
+  const parts = segments(path);
+  const file = basenameOf(path);
+  // `<...>/<slug>/<leaf>.md` for a task or ticket; `<effort>/<leaf>.md` for a
+  // map, spec, or arch spec.
+  if (file === "task.md" || file === "ticket.md") return parts[parts.length - 2] ?? "";
+  return parts[parts.length - 2] ?? "";
 }
 
 /**
@@ -915,10 +934,18 @@ function auxHome(
   return path;
 }
 
-/** The OKF type an aux filename implies, or null. */
+/**
+ * The OKF type an aux filename implies, or null.
+ *
+ * The type-to-filename mapping for the primary artifacts comes from
+ * `TYPE_LEAF` (the model's single source), so the migration cannot drift
+ * from the tools. `findings.md` and `CHANGELOG.md` are aux files the model
+ * does not name, so they are listed here.
+ */
 function auxTypeForFilename(file: string): string | null {
-  if (file === "spec.md") return "spec";
-  if (file === "arch-spec.md") return "arch spec";
+  for (const [type, name] of TYPE_LEAVES) {
+    if (name === file) return type;
+  }
   if (file === "findings.md") return "findings";
   if (file === "CHANGELOG.md") return "changelog";
   return null;
@@ -973,7 +1000,7 @@ function v4Home(
     const effort = loc.effort ?? effortFromFrontmatter(data) ?? (slug ?? "");
     if (effort === "") return null;
     const container = type === "task" ? "tasks" : "tickets";
-    const leaf = type === "task" ? "task.md" : "ticket.md";
+    const leaf = TYPE_LEAF[type] ?? `${type}.md`;
     return `${base}/${effort}/${container}/${slug}/${leaf}`;
   }
   if (AUX_TYPES.has(type)) {
@@ -1008,11 +1035,9 @@ function rebuildState(tree: TreePort, paths: string[], plan: Plan, from: number)
       /* a corrupt state file rebuilds empty */
     }
   }
-  const obj: Record<string, unknown> = {
-    schema_version: 4,
-    map: state.map,
-    task: state.task,
-  };
+  // The state module owns the shape: `toObject` puts the modeled pointers in
+  // place, and the migration is the only writer of the stamp.
+  const obj: Record<string, unknown> = { schema_version: 4, ...toObject(state) };
   const content = stringifyYaml(obj);
   if (safeRead(tree, STATE_PATH) !== content) {
     plan.writes.set(STATE_PATH, content);
