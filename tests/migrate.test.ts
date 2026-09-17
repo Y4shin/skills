@@ -454,7 +454,20 @@ describe("migrate: the root index", () => {
     expect(doc.data.okf_version).toBe("0.2");
     expect(doc.data.type).toBe("index");
     expect(doc.body).toContain("task-tools-overhaul");
-    expect(doc.body).toContain("old-map");
+  });
+
+  test("lists live efforts and archived efforts separately", () => {
+    const tree = port({ ...V3_FILES });
+    migrate(tree);
+    const body = parse(tree.snapshot()["docs/tasks/index.md"]).body;
+    expect(body).toMatch(/## Live/);
+    expect(body).toMatch(/## Archived/);
+    // The live effort is under Live, the archived one under Archived.
+    const live = body.slice(body.indexOf("## Live"), body.indexOf("## Archived"));
+    const archived = body.slice(body.indexOf("## Archived"));
+    expect(live).toContain("task-tools-overhaul");
+    expect(live).not.toContain("old-map");
+    expect(archived).toContain("old-map");
   });
 });
 
@@ -554,6 +567,106 @@ describe("migrate: reporting", () => {
       expect(h.path).not.toBe("");
       expect(h.detail).not.toBe("");
     }
+  });
+});
+
+describe("migrate: no two files collapse to one destination", () => {
+  test("per-task arch specs in one effort each keep their own home", () => {
+    // A v3 archive can hold several tasks in one effort, each with its own
+    // arch-spec.md. Collapsing them all to the effort root would silently
+    // lose all but one.
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/archive/alpha/task.md":
+        "---\nkind: task\ntype: feature\nslug: alpha\ntitle: Alpha\nmap: effort\nstatus: done\nblocked_by: []\n---\n",
+      "docs/tasks/archive/alpha/arch-spec.md": "# Alpha arch\n",
+      "docs/tasks/archive/beta/task.md":
+        "---\nkind: task\ntype: feature\nslug: beta\ntitle: Beta\nmap: effort\nstatus: done\nblocked_by: []\n---\n",
+      "docs/tasks/archive/beta/arch-spec.md": "# Beta arch\n",
+    });
+    migrate(tree);
+    const files = tree.snapshot();
+
+    const alpha = files["docs/tasks/archive/effort/tickets/alpha/arch-spec.md"];
+    const beta = files["docs/tasks/archive/effort/tickets/beta/arch-spec.md"];
+    expect(alpha).toBeDefined();
+    expect(beta).toBeDefined();
+    expect(alpha).toContain("Alpha arch");
+    expect(beta).toContain("Beta arch");
+  });
+
+  test("a frontmatter-carrying arch spec obeys the same rule", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/archive/alpha/task.md":
+        "---\nkind: task\ntype: feature\nslug: alpha\ntitle: Alpha\nmap: effort\nstatus: done\nblocked_by: []\n---\n",
+      "docs/tasks/archive/alpha/arch-spec.md":
+        "---\nkind: arch spec\ntitle: Alpha arch\n---\n\n# Alpha\n",
+      "docs/tasks/archive/beta/task.md":
+        "---\nkind: task\ntype: feature\nslug: beta\ntitle: Beta\nmap: effort\nstatus: done\nblocked_by: []\n---\n",
+      "docs/tasks/archive/beta/arch-spec.md":
+        "---\nkind: arch spec\ntitle: Beta arch\n---\n\n# Beta\n",
+    });
+    migrate(tree);
+    const files = tree.snapshot();
+    expect(files["docs/tasks/archive/effort/tickets/alpha/arch-spec.md"]).toContain("Alpha");
+    expect(files["docs/tasks/archive/effort/tickets/beta/arch-spec.md"]).toContain("Beta");
+  });
+
+  test("a multi-arch-spec effort is idempotent", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/archive/alpha/task.md":
+        "---\nkind: task\ntype: feature\nslug: alpha\ntitle: Alpha\nmap: effort\nstatus: done\nblocked_by: []\n---\n",
+      "docs/tasks/archive/alpha/arch-spec.md":
+        "---\nkind: arch spec\ntitle: Alpha arch\n---\n\n# Alpha\n",
+      "docs/tasks/archive/beta/task.md":
+        "---\nkind: task\ntype: feature\nslug: beta\ntitle: Beta\nmap: effort\nstatus: done\nblocked_by: []\n---\n",
+      "docs/tasks/archive/beta/arch-spec.md":
+        "---\nkind: arch spec\ntitle: Beta arch\n---\n\n# Beta\n",
+    });
+    migrate(tree);
+    const before = tree.snapshot();
+    const second = migrate(tree);
+    expect(second.noop).toBe(true);
+    expect(second.changes).toEqual([]);
+    expect(tree.snapshot()).toEqual(before);
+  });
+
+  test("a single-effort arch spec still lands at the effort root", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/solo/task.md":
+        "---\nkind: task\ntype: feature\nslug: solo\ntitle: Solo\nmap: effort\nstatus: ready\nblocked_by: []\n---\n",
+      "docs/tasks/solo/arch-spec.md": "# Solo arch\n",
+    });
+    migrate(tree);
+    expect(tree.snapshot()["docs/tasks/effort/arch-spec.md"]).toContain("Solo arch");
+  });
+
+  test("no destination is claimed by two different sources", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/archive/alpha/task.md":
+        "---\nkind: task\ntype: feature\nslug: alpha\ntitle: Alpha\nmap: effort\nstatus: done\nblocked_by: []\n---\n",
+      "docs/tasks/archive/alpha/spec.md": "# Alpha spec\n",
+      "docs/tasks/archive/beta/task.md":
+        "---\nkind: task\ntype: feature\nslug: beta\ntitle: Beta\nmap: effort\nstatus: done\nblocked_by: []\n---\n",
+      "docs/tasks/archive/beta/spec.md": "# Beta spec\n",
+    });
+    const report = migrate(tree);
+    const destinations = report.changes.map((c) => c.path);
+    expect(new Set(destinations).size).toBe(destinations.length);
   });
 });
 

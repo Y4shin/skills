@@ -644,6 +644,7 @@ function reorganize(
   // First pass: classify every primary artifact, so an aux file can be
   // placed beside the artifact it belongs to.
   const placement = new Map<string, { effort: string; container: string; archived: boolean }>();
+  const archSpecCount = new Map<string, number>();
   for (const path of markdown) {
     const loc = vintageLocation(path);
     const doc = readDoc(tree, path);
@@ -658,6 +659,16 @@ function reorganize(
       container,
       archived: loc.archived,
     });
+  }
+  // How many arch specs each effort root would receive: an effort with one
+  // may hoist it to the root, an effort with several must keep each in its
+  // own directory or all but one would be silently lost.
+  for (const path of markdown) {
+    if (basenameOf(path) !== "arch-spec.md") continue;
+    const place = placement.get(placeKey(vintageLocation(path)));
+    if (place === undefined) continue;
+    const rootKey = `${place.archived ? "archive" : "live"}/${place.effort}`;
+    archSpecCount.set(rootKey, (archSpecCount.get(rootKey) ?? 0) + 1);
   }
 
   for (const path of markdown) {
@@ -678,7 +689,7 @@ function reorganize(
       // A markdown file with no frontmatter: an aux file to backfill.
       const type = auxTypeForPath(path);
       if (type === null) continue;
-      const dest = auxHome(path, loc, placement);
+      const dest = auxHome(path, loc, placement, archSpecCount);
       const data: FrontmatterData = {
         type,
         title: titleFromBody(doc0(tree, path).body) ?? basenameOf(path).replace(/\.md$/, ""),
@@ -698,7 +709,7 @@ function reorganize(
     const type = effectiveType(doc.data);
     if (type === null) continue;
 
-    const dest = v4Home(path, type, doc.data, loc, placement);
+    const dest = v4Home(path, type, doc.data, loc, placement, archSpecCount);
     if (dest === null) continue;
 
     const shaped = shapeFrontmatter(doc.data, type, plan.needsHuman, dest);
@@ -748,23 +759,44 @@ function placeKey(loc: { archived: boolean; slug: string | null }): string {
   return `${loc.archived ? "archive/" : ""}${loc.slug ?? ""}`;
 }
 
+/**
+ * The v4 home for an aux file (spec, arch spec, findings, deviation report).
+ *
+ * An aux file sits beside the artifact it belongs to. `arch-spec.md` is the
+ * exception: it is shared by an effort's whole ticket chain, so it lives at
+ * the effort root. That move is only safe when the effort has exactly one
+ * arch spec; when several exist (a v3 archive can hold several tasks per
+ * effort, each with its own), collapsing them would silently lose all but
+ * one, so each keeps its own directory instead.
+ */
+function auxDest(
+  path: string,
+  file: string,
+  loc: { archived: boolean; effort: string | null; slug: string | null },
+  place: { effort: string; container: string; archived: boolean },
+  archSpecCount: Map<string, number>,
+): string {
+  const base = place.archived ? ARCHIVE : TASK_ROOT;
+  const rootKey = `${place.archived ? "archive" : "live"}/${place.effort}`;
+  if (file === "arch-spec.md" && (archSpecCount.get(rootKey) ?? 0) === 1) {
+    return `${base}/${place.effort}/arch-spec.md`;
+  }
+  const containerDir = segments(path).includes("deviation-reports")
+    ? "deviation-reports/"
+    : "";
+  return `${base}/${place.effort}/${place.container}/${loc.slug ?? ""}/${containerDir}${file}`;
+}
+
 /** The aux-file destination for a frontmatter-less markdown file. */
 function auxHome(
   path: string,
   loc: { archived: boolean; effort: string | null; slug: string | null },
   placement: Map<string, { effort: string; container: string; archived: boolean }>,
+  archSpecCount: Map<string, number>,
 ): string {
   const place = placement.get(placeKey(loc));
-  const file = basenameOf(path);
   if (place !== undefined) {
-    const base = place.archived ? ARCHIVE : TASK_ROOT;
-    // The arch spec is shared by the effort's whole ticket chain, so it lives
-    // at the effort root rather than beside one ticket.
-    if (file === "arch-spec.md") return `${base}/${place.effort}/arch-spec.md`;
-    const containerDir = segments(path).includes("deviation-reports")
-      ? "deviation-reports/"
-      : "";
-    return `${base}/${place.effort}/${place.container}/${loc.slug ?? ""}/${containerDir}${file}`;
+    return auxDest(path, basenameOf(path), loc, place, archSpecCount);
   }
   // No primary artifact to sit beside: keep the file where it is.
   return path;
@@ -797,6 +829,7 @@ function v4Home(
   data: FrontmatterData,
   loc: { archived: boolean; effort: string | null; slug: string | null },
   placement: Map<string, { effort: string; container: string; archived: boolean }>,
+  archSpecCount: Map<string, number>,
 ): string | null {
   const base = loc.archived ? ARCHIVE : TASK_ROOT;
   const slug = loc.slug;
@@ -814,6 +847,13 @@ function v4Home(
   if (type === "arch spec") {
     const effort = loc.effort ?? effortFromFrontmatter(data) ?? (slug ?? "");
     if (effort === "") return null;
+    // Shared by the effort's whole chain, so it lives at the effort root,
+    // unless several arch specs share that effort (then each keeps its own
+    // directory so none is lost).
+    const place = placement.get(placeKey(loc));
+    if (place !== undefined) {
+      return auxDest(path, "arch-spec.md", loc, place, archSpecCount);
+    }
     return `${base}/${effort}/arch-spec.md`;
   }
   if (type === "task" || type === "ticket") {
@@ -825,7 +865,7 @@ function v4Home(
   }
   if (AUX_TYPES.has(type)) {
     // An aux file sits beside the artifact it belongs to.
-    return auxHome(path, loc, placement);
+    return auxHome(path, loc, placement, archSpecCount);
   }
   return null;
 }
@@ -979,27 +1019,46 @@ function writeIndex(tree: TreePort, plan: Plan, paths: string[]): void {
   const moved = new Map(plan.moves.map((m) => [m.from, m.to]));
   const finalPaths = paths.map((p) => moved.get(p) ?? p);
 
-  const efforts = new Set<string>();
+  const live = new Set<string>();
+  const archived = new Set<string>();
   for (const path of finalPaths) {
     const parts = segments(path);
     const i = parts.indexOf("tasks", parts.indexOf("docs") === 0 ? 1 : 0);
     if (i === -1) continue;
     const rest = parts.slice(i + 1);
-    if (rest[0] === undefined) continue;
-    if (rest[0] === "archive" || rest[0] === "maps") {
-      if (rest[1] !== undefined) efforts.add(rest[1]);
+    const first = rest[0];
+    if (first === undefined) continue;
+    if (first === "out-of-scope") continue;
+    if (first === "archive") {
+      // `archive/<effort>/...` is an archived effort. The legacy
+      // `archive/<slug>/...` shape has already moved by this point, so a
+      // remaining second segment is the effort.
+      if (rest[1] !== undefined && rest.length > 2) archived.add(rest[1]);
       continue;
     }
-    if (rest[0] === "out-of-scope") continue;
+    if (first === "maps") {
+      if (rest[1] === "archive") {
+        if (rest[2] !== undefined) archived.add(rest[2]);
+      } else if (rest[1] !== undefined) {
+        live.add(rest[1]);
+      }
+      continue;
+    }
     if (rest.length === 1) continue;
-    efforts.add(rest[0]);
+    live.add(first);
   }
 
   const lines = ["", "# docs/tasks", ""];
-  if (efforts.size === 0) {
-    lines.push("(no efforts yet)", "");
-  } else {
-    for (const effort of sorted(efforts)) lines.push(`- ${effort}`);
+  lines.push("## Live", "");
+  if (live.size === 0) lines.push("(none)", "");
+  else {
+    for (const effort of sorted(live)) lines.push(`- ${effort}`);
+    lines.push("");
+  }
+  lines.push("## Archived", "");
+  if (archived.size === 0) lines.push("(none)", "");
+  else {
+    for (const effort of sorted(archived)) lines.push(`- ${effort}`);
     lines.push("");
   }
   const body = lines.join("\n");
