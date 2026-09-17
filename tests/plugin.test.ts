@@ -495,6 +495,18 @@ describe("task-workflow tools", () => {
       expect(parsed.task).toBe("login");
     });
 
+    test("empty or comment-only state.yaml yields defaults and the next write recreates the file", async () => {
+      const t = mkTmp(); seedTree(t);
+      writeFileSync(join(t, "docs/tasks/state.yaml"), "# only a comment\n");
+      const show = await tools.task_state.execute({}, ctx(t));
+      expect(show).toMatch(/map:\s+\(none\)/);
+      expect(show).toMatch(/task:\s+\(none\)/);
+      await tools.task_state_set.execute({ field: "task", value: "login" }, ctx(t));
+      const parsed = YAML.parse(readFileSync(join(t, "docs/tasks/state.yaml"), "utf-8")) as Record<string, unknown>;
+      expect(parsed.map).toBeNull();
+      expect(parsed.task).toBe("login");
+    });
+
     test("rejects the legacy slice field with an error naming map and task", async () => {
       const t = mkTmp(); seedTree(t);
       await expect(
