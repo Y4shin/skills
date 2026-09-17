@@ -48,3 +48,28 @@ module's.
 ## Blocked by
 
 - None (can start immediately).
+
+## Implementation notes
+
+### Slice — overhaul-state-module (landed)
+
+State module v4 landed on `slice/overhaul-state-module` (6 commits, merged
+into `task/overhaul-state-module`). `WorkflowState` is `{ map, task, rest }`;
+`rest` is the lossless bag that preserves `schema_version`, a legacy `slice`
+key, and a v1 `active` block verbatim through every read-modify-write.
+`task_state_set` accepts exactly `map`/`task`, rejects `slice` and unknown
+fields with a clear error, and rejects the literal value `"None"`. `toObject`
+never stamps `schema_version` and never writes a `slice` key of its own.
+
+Two implicit resolutions worth remembering: a v1 nested file gains flat
+`map`/`task` pointers alongside its preserved `active` block (normalization
+is the migration's job), and an empty or comment-only `state.yaml` yields
+defaults with the next write recreating the file. `loadState` returns a fresh
+default object each call so callers cannot pollute the shared `DEFAULT_STATE`.
+
+Verified: 453/453 non-integration tests, 16/16 integration session tests,
+`tsc --noEmit` clean; no lint script is configured. Carried forward:
+`skills/engineering/finalize-task/SKILL.md` and
+`skills/engineering/setup-workflow/SKILL.md` still reference the `slice`
+field and will break until `overhaul-execution-skills` and
+`overhaul-v4-migration` land.
