@@ -102,6 +102,18 @@ export class FsPort implements TreePort {
       journal.set(p, existsSync(abs) ? readFileSync(abs, "utf-8") : null);
     }
 
+    // Directories this commit may create. A failure must remove the ones that
+    // did not exist before, or the tree is left with empty scaffolding even
+    // though every file was restored.
+    const dirsBefore = new Set<string>();
+    for (const p of touched) {
+      let d = dirname(join(this.root, p));
+      while (d.length > this.root.length && d.startsWith(this.root)) {
+        if (existsSync(d)) dirsBefore.add(d);
+        d = dirname(d);
+      }
+    }
+
     let n = 0;
     const bump = (): void => {
       n++;
@@ -146,6 +158,23 @@ export class FsPort implements TreePort {
         } catch {
           // Best effort: keep restoring the remaining paths so one stubborn
           // path cannot leave the rest half-applied.
+        }
+      }
+      // Remove directories this commit created, deepest first, so a restored
+      // tree has no empty scaffolding left behind.
+      const created: string[] = [];
+      for (const p of touched) {
+        let d = dirname(join(this.root, p));
+        while (d.length > this.root.length && d.startsWith(this.root)) {
+          if (!dirsBefore.has(d) && existsSync(d)) created.push(d);
+          d = dirname(d);
+        }
+      }
+      for (const d of [...new Set(created)].sort((a, b) => b.length - a.length)) {
+        try {
+          if (readdirSync(d).length === 0) rmSync(d, { recursive: true, force: true });
+        } catch {
+          // Best effort.
         }
       }
       throw e;

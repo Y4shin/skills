@@ -93,7 +93,9 @@ not rewrite. `setup-workflow` keys its fresh/migrate/no-op detection on
 ordered list tracing each step to the effort spec's Migration section. All
 nine changed files are inside the spec's allowed set; the live `docs/tasks`
 tree is untouched. Verified independently: 601/601 tests (13 files),
-`tsc --noEmit` clean; no lint script is configured.
+`tsc --noEmit` clean; no lint script is configured. The second coherence pass
+below raises this to 616/616 and adds `src/core/fs-port.ts` plus its test
+(the module the corruption-safety fix required).
 
 Mutation-verified non-negotiables: removing the YAML round-trip check fails
 49 tests, forcing `noop: false` fails 5, removing the resumability marker
@@ -130,9 +132,48 @@ Carried forward, in priority order:
    item and the file is left byte-identical; the setup-workflow pointer
    itself is fixed, so the acceptance criterion is met where it matters.
    Confirm reporting-only is intended, since the spec's verb is "fix".
-4. **`VENDORED_NAMES` hardcodes `matt-skills`** rather than a general rule
-   (a directory with no OKF frontmatter anywhere). The single live instance
-   satisfies the criterion; recording the generality gap as a known choice.
+4. **`VENDORED_NAMES` hardcoded `matt-skills`** rather than a general rule.
+   Fixed in the second coherence pass: the rule is now structural (a subtree
+   with zero valid OKF artifacts, at least two non-OKF markdown files, and
+   either a nested directory or a real corpus, never an effort root or an
+   artifact container).
+
+### Second coherence pass (post-review)
+
+The whole-task review found correctness bugs, all fixed. Final numbers:
+**616/616 tests**, `tsc --noEmit` clean.
+
+- **Idempotence was broken whenever the tree held a vendored clone.** The
+  index was computed from the pre-migration path set, so the first run missed
+  the pointer file the plan itself adds and the second run saw it, staging an
+  index rewrite (`noop: false`, "migrated from 4 to 4"). The index now
+  describes the final tree (surviving originals at their destinations, plus
+  every planned add). Regression tests cover the vendored case and every
+  vintage fixture.
+- **One source could be staged to two destinations.** `reorganize` claimed a
+  vendored clone's files and `reportRest` staged the same sources for the
+  relocation, so the first move won and the vendored relocation silently
+  no-opped while the report claimed it moved. Vendored roots are now computed
+  once, `reorganize` excludes them, and `reportRest` refuses to plan an
+  ambiguous double-claim instead of failing silently.
+- **`docs/vendored/<basename>` was not namespaced**, so two efforts with a
+  same-named clone collided and the second overwrote the first. The
+  destination is now `docs/vendored/<effort>/<basename>`.
+- **The vendored heuristic misfired** on `maps/<effort>/notes/` (two loose
+  notes were relocated out of the bundle). The rule now requires the shape of
+  a tree, biasing against destructive false positives.
+- **`FsPort`'s journal restored files but not directories**, leaving empty
+  scaffolding after a failure. Created directories are now removed on
+  restore, and the tests compare directory listings as well as file contents.
+- **`AUX_TYPES` was not truly derived** (it still enumerated four literals).
+  It is now every known type that is not a primary artifact.
+- **`resources/upgrade-3-to-4.md` misdescribed its own executor**: it said
+  step 9 rewrites the dead pointer and stamps `schema_version` there. Step 9
+  is report-only and the stamp happens in step 5; the resource now says so,
+  and carries the resource-to-executor step mapping.
+- **The fresh-repo scaffold split is documented**: `migrate()` owns the bundle
+  (`state.yaml`, `index.md`, `CHANGELOG.md`); the repo-root scaffold belongs
+  to `setup-workflow`'s onboard branch.
 
 One live file, `docs/tasks/archive/gate-skills-prompt-and-help/task.md`, has
 frontmatter YAML that does not parse (an unquoted `: ` in its title). The

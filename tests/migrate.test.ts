@@ -278,6 +278,36 @@ describe("migrate: idempotence", () => {
     expect(second.noop).toBe(true);
     expect(tree.snapshot()).toEqual(before);
   });
+
+  test("idempotence holds when the tree has a vendored clone", () => {
+    // The regression: the index was computed from the pre-migration path set,
+    // so run 1 missed the pointer file the plan itself adds and run 2 saw it,
+    // staging an index rewrite and breaking the no-op guarantee.
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/archive/report/matt-skills/README.md": "# v\n",
+      "docs/tasks/archive/report/matt-skills/docs/a.md": "# a\n",
+    });
+    const first = migrate(tree);
+    expect(first.noop).toBe(false);
+    const before = tree.snapshot();
+    const second = migrate(tree);
+    expect(second.noop).toBe(true);
+    expect(second.changes).toEqual([]);
+    expect(tree.snapshot()).toEqual(before);
+  });
+
+  test("idempotence holds across every vintage fixture", () => {
+    for (const files of [V3_FILES, {}, { "docs/tasks/state.yaml": "active:\n  task: t\n  map: m\nlast_action: x\n" }]) {
+      const tree = port({ ...files });
+      migrate(tree);
+      const before = tree.snapshot();
+      const second = migrate(tree);
+      expect(second.noop).toBe(true);
+      expect(second.changes).toEqual([]);
+      expect(tree.snapshot()).toEqual(before);
+    }
+  });
 });
 
 describe("migrate: corruption safety", () => {
@@ -595,14 +625,16 @@ describe("migrate: reporting", () => {
     const report = migrate(tree);
     const files = tree.snapshot();
 
-    expect(files["docs/vendored/matt-skills/README.md"]).toBe("# vendored\n");
-    expect(files["docs/vendored/matt-skills/skills/tdd/SKILL.md"]).toBe("# tdd\n");
+    // Namespaced by its containing effort, so two efforts with a same-named
+    // clone cannot collide.
+    expect(files["docs/vendored/report/matt-skills/README.md"]).toBe("# vendored\n");
+    expect(files["docs/vendored/report/matt-skills/skills/tdd/SKILL.md"]).toBe("# tdd\n");
     expect(files["docs/tasks/archive/report/matt-skills/README.md"]).toBeUndefined();
 
     const pointer = files["docs/tasks/archive/report/matt-skills.pointer.md"];
     expect(pointer).toBeDefined();
     expect(parse(pointer).data.type).toBe("out-of-scope note");
-    expect(pointer).toContain("docs/vendored/matt-skills");
+    expect(pointer).toContain("docs/vendored/report/matt-skills");
 
     const item = report.needsHuman.find((h) => h.kind === "vendored-tree");
     expect(item).toBeDefined();
@@ -618,8 +650,63 @@ describe("migrate: reporting", () => {
     });
     const report = migrate(tree);
     const files = tree.snapshot();
-    expect(files["docs/vendored/other-vendor/README.md"]).toBe("# other\n");
+    expect(files["docs/vendored/report/other-vendor/README.md"]).toBe("# other\n");
     expect(report.needsHuman.some((h) => h.kind === "vendored-tree")).toBe(true);
+  });
+
+  test("a vendored clone is relocated even when its effort also holds an artifact", () => {
+    // The regression: reorganize used to claim the clone's files too, so the
+    // vendored move silently no-opped while the report claimed it moved.
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/archive/rep/task.md":
+        "---\nkind: task\ntype: feature\nslug: rep\ntitle: R\nmap: rep\nstatus: done\nblocked_by: []\n---\n",
+      "docs/tasks/archive/rep/matt-skills/README.md": "# vendored\n",
+      "docs/tasks/archive/rep/matt-skills/docs/a.md": "# a\n",
+    });
+    const report = migrate(tree);
+    const files = tree.snapshot();
+    expect(files["docs/vendored/rep/matt-skills/README.md"]).toBe("# vendored\n");
+    expect(files["docs/vendored/rep/matt-skills/docs/a.md"]).toBe("# a\n");
+    expect(files["docs/tasks/archive/rep/matt-skills/README.md"]).toBeUndefined();
+    // The effort's own task still migrated normally.
+    expect(files["docs/tasks/archive/rep/tickets/rep/ticket.md"]).toBeDefined();
+    expect(report.needsHuman.some((h) => h.kind === "vendored-tree")).toBe(true);
+  });
+
+  test("two efforts with a same-named clone do not collide", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: e1\ntask: null\n",
+      "docs/tasks/maps/e1/map.md":
+        "---\nkind: map\nslug: e1\ntitle: E1\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/maps/e2/map.md":
+        "---\nkind: map\nslug: e2\ntitle: E2\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/archive/r1/clone/README.md": "# one\n",
+      "docs/tasks/archive/r1/clone/docs/a.md": "# a\n",
+      "docs/tasks/archive/r2/clone/README.md": "# two\n",
+      "docs/tasks/archive/r2/clone/docs/b.md": "# b\n",
+    });
+    migrate(tree);
+    const files = tree.snapshot();
+    // Both clones survive, namespaced by their effort.
+    expect(files["docs/vendored/r1/clone/README.md"]).toBe("# one\n");
+    expect(files["docs/vendored/r2/clone/README.md"]).toBe("# two\n");
+  });
+
+  test("a notes subdirectory under a maps-subtree effort is NOT vendored", () => {
+    // Regression: two frontmatter-less notes under `maps/<effort>/notes/`
+    // used to be classified as a vendored clone and moved out of the bundle.
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: effort\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: E\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/maps/effort/notes/a.md": "# note a\n",
+      "docs/tasks/maps/effort/notes/b.md": "# note b\n",
+    });
+    const report = migrate(tree);
+    expect(report.needsHuman.some((h) => h.kind === "vendored-tree")).toBe(false);
+    const files = tree.snapshot();
+    expect(Object.keys(files).some((f) => f.startsWith("docs/vendored/"))).toBe(false);
   });
 
   test("a task directory with frontmatter-less aux files is NOT vendored", () => {

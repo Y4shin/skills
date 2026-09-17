@@ -492,19 +492,12 @@ const TASK_CATEGORIES = new Set<string>(TASK_SUBTYPES);
 
 /**
  * The OKF types that are auxiliary files beside a primary artifact, derived
- * from the model's known types so the two cannot drift.
+ * structurally from the model: every known type that is not itself a primary
+ * artifact (a task, ticket, map, spec, or arch spec). A new aux type in
+ * `art.ts` is therefore picked up automatically instead of drifting.
  */
-const AUX_TYPES = new Set<string>(
-  KNOWN_TYPES.filter((t) =>
-    t === "findings" || t === "deviation report" || t === "changelog" || t === "out-of-scope note",
-  ),
-);
-
-/** Where an artifact belongs in the v4 layout. */
-type Slot =
-  | { kind: "map" | "spec" | "arch-spec"; effort: string }
-  | { kind: "task" | "ticket"; effort: string; slug: string }
-  | { kind: "aux"; dir: string };
+const PRIMARY_TYPES = new Set<string>(["task", "ticket", "map", "spec", "arch spec"]);
+const AUX_TYPES = new Set<string>(KNOWN_TYPES.filter((t) => !PRIMARY_TYPES.has(t)));
 
 /**
  * The effort directory a v3 path belongs to, and whether it is archived.
@@ -595,10 +588,17 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
 
   const doneSteps = readProgress(tree, progressPath);
 
+  // Vendored subtrees are computed once, up front, because two steps must
+  // agree on them: `reorganize` must not claim their files (it would stage a
+  // source that the vendored move also stages, and one of the two would
+  // silently no-op), and `reportRest` relocates them.
+  const vendoredRoots = findVendoredRoots(tree, allPaths);
+  const isVendored = (p: string): boolean => vendoredRoots.some((r) => under(p, r) || p === r);
+
   // Step 1: reorganize the layout, unify frontmatter, backfill aux files,
   // reshape the archive. One pass over every markdown file in the tree.
   if (!doneSteps.has(1)) {
-    reorganize(tree, allPaths, plan);
+    reorganize(tree, allPaths.filter((p) => !isVendored(p)), plan);
   }
 
   // Step 2: rebuild state.yaml.
@@ -608,7 +608,7 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
 
   // Step 3: report the rest: slice dirs, vendored trees, unresolvable refs.
   if (!doneSteps.has(3)) {
-    reportRest(tree, allPaths, plan);
+    reportRest(tree, allPaths, plan, vendoredRoots);
   }
 
   // Step 3b: the maps/ subtree dies with the v3 layout, so its placeholder
@@ -1061,17 +1061,22 @@ function rebuildState(tree: TreePort, paths: string[], plan: Plan, from: number)
  * external skills repo kept for reference.
  *
  * The rule is general rather than name-based, so any repo's vendored clone is
- * caught. Three guards keep it from misfiring on ordinary content:
+ * caught. It is also deliberately conservative, because a false positive
+ * relocates a user's own notes out of the bundle:
  *
  * - A subtree must hold **zero valid OKF artifacts**. A task directory with a
  *   couple of frontmatter-less aux files is normal (the migration backfills
  *   them), whereas a vendored clone contains nothing this workflow owns.
- * - A subtree needs at least two non-OKF markdown files, so a single stray
- *   file is backfilled rather than relocated.
- * - Recognized artifact containers (`tasks/`, `tickets/`, `slices/`,
- *   `deviation-reports/`, `archive/`) are never treated as vendored.
+ * - A subtree must look like a *tree*, not a folder of loose notes: either it
+ *   has its own nested subdirectory, or it holds enough non-OKF markdown files
+ *   to be a real corpus. Two flat notes are backfilled, not relocated.
+ * - Effort roots and recognized artifact containers (`tasks/`, `tickets/`,
+ *   `slices/`, `deviation-reports/`, `archive/`) are never vendored.
  */
 const ARTIFACT_CONTAINERS = new Set(["tasks", "tickets", "slices", "deviation-reports", "archive"]);
+
+/** Non-OKF markdown files that make a flat directory a real corpus. */
+const VENDORED_FILE_THRESHOLD = 5;
 
 /** True when a markdown file's frontmatter is not a valid OKF artifact. */
 function isNonOkfMarkdown(text: string): boolean {
@@ -1101,9 +1106,11 @@ function isEffortDir(parts: string[], i: number): boolean {
 /** The vendored subtrees found under the bundle, shallowest first. */
 function findVendoredRoots(tree: TreePort, paths: string[]): string[] {
   // Per candidate directory subtree: how many non-OKF markdown files it holds,
-  // and whether it holds any valid artifact at all.
+  // whether it holds any valid artifact, and whether it has its own nested
+  // subdirectory (the structural signal of a tree rather than loose notes).
   const nonOkf = new Map<string, number>();
   const hasArtifact = new Set<string>();
+  const hasNestedDir = new Set<string>();
 
   for (const path of sorted(paths.filter(isMarkdown))) {
     if (!under(path, TASK_ROOT)) continue;
@@ -1122,15 +1129,20 @@ function findVendoredRoots(tree: TreePort, paths: string[]): string[] {
       if (!under(dir, TASK_ROOT)) continue;
       if (foreign) nonOkf.set(dir, (nonOkf.get(dir) ?? 0) + 1);
       else hasArtifact.add(dir);
+      // A markdown file at least two levels below the candidate root means the
+      // candidate contains a nested directory of its own.
+      if (parts.length - 1 >= i + 1) hasNestedDir.add(dir);
     }
   }
 
   // A candidate is vendored when it holds at least two non-OKF markdown files,
-  // holds no valid artifact, and no ancestor of it is already vendored (keep
-  // the shallowest root).
+  // holds no valid artifact, looks like a tree (nested directory or a real
+  // corpus), and no ancestor of it is already vendored (keep the shallowest
+  // root).
   const roots: string[] = [];
   for (const [dir, count] of [...nonOkf.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     if (count < 2) continue;
+    if (!hasNestedDir.has(dir) && count < VENDORED_FILE_THRESHOLD) continue;
     if (hasArtifact.has(dir)) continue;
     if (roots.some((r) => under(dir, r))) continue;
     roots.push(dir);
@@ -1138,18 +1150,43 @@ function findVendoredRoots(tree: TreePort, paths: string[]): string[] {
   return roots;
 }
 
-function reportRest(tree: TreePort, paths: string[], plan: Plan): void {
+/**
+ * The destination for a vendored tree: outside the bundle, namespaced by its
+ * containing effort so two efforts with a same-named clone cannot collide and
+ * silently overwrite each other.
+ */
+function vendoredDest(root: string): string {
+  const parts = segments(root);
+  // `docs/tasks/<effort>/...` (effort at index 2) or
+  // `docs/tasks/{archive,maps}/<effort>/...` (effort at index 3).
+  const afterBundle = parts[2] ?? "";
+  const effort = afterBundle === "archive" || afterBundle === "maps" ? parts[3] : parts[2];
+  const name = basenameOf(root);
+  return effort === undefined || effort === name ? `docs/vendored/${name}` : `docs/vendored/${effort}/${name}`;
+}
+
+function reportRest(tree: TreePort, paths: string[], plan: Plan, vendoredRoots: string[]): void {
   // Vendored trees: a non-OKF subtree inside the bundle. It moves outside the
   // bundle with a pointer left behind.
-  const vendoredRoots = new Set<string>(findVendoredRoots(tree, paths));
-  for (const root of sorted(vendoredRoots)) {
-    const dest = `docs/vendored/${basenameOf(root)}`;
+  const vendored = new Set<string>(vendoredRoots);
+  for (const root of sorted(vendored)) {
+    const dest = vendoredDest(root);
     plan.needsHuman.push({
       kind: "vendored-tree",
       path: root,
       detail: `vendored tree '${root}' moves outside the bundle to '${dest}' with a pointer left behind`,
     });
+    // Only move sources this step actually owns. `reorganize` claims every
+    // non-vendored markdown file, so a file inside a vendored subtree must be
+    // excluded there; asserting it here keeps a double-claim from silently
+    // no-opping the relocation.
+    const claimed = new Set(plan.moves.map((m) => m.from));
     for (const path of sorted(paths.filter((p) => under(p, root)))) {
+      if (claimed.has(path)) {
+        throw new Error(
+          `internal error: '${path}' is staged by two steps (reorganize and the vendored move); refusing to plan an ambiguous migration`,
+        );
+      }
       plan.moves.push({ from: path, to: path.replace(root, dest) });
       plan.changes.push({
         action: "move",
@@ -1230,7 +1267,15 @@ function dirnameOf(p: string): string {
  */
 function writeIndex(tree: TreePort, plan: Plan, paths: string[]): void {
   const moved = new Map(plan.moves.map((m) => [m.from, m.to]));
-  const finalPaths = paths.map((p) => moved.get(p) ?? p);
+  const deleted = new Set(plan.deletes);
+  // The index must describe the FINAL tree, not the pre-migration one, or a
+  // second run (which reads the migrated tree) computes a different listing
+  // and idempotence breaks. So the path set is: every surviving original path
+  // at its destination, plus every file this plan adds.
+  const finalPaths = [
+    ...paths.filter((p) => !deleted.has(p)).map((p) => moved.get(p) ?? p),
+    ...plan.writes.keys(),
+  ];
 
   const live = new Set<string>();
   const archived = new Set<string>();

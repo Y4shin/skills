@@ -88,6 +88,15 @@ idempotent: it detects its own already-applied state and skips.
 1. **Detect the vintage.** Read `docs/tasks/state.yaml` when present:
    `schema_version` 1 (nested `active:` block), 2, 3, or absent
    (unversioned). Also detect a fresh repo (no `docs/tasks`).
+
+   **Division of labor on a fresh repo.** `migrate()` owns the *bundle*:
+   `docs/tasks/state.yaml`, `index.md`, and `CHANGELOG.md`. The repo-root
+   scaffold (`CONTEXT.md`, `AGENTS.md`, `docs/testing.md`, `docs/dev-env.md`,
+   `docs/bugs/`, `docs/adr/`, `docs/agents/`, `out-of-scope/index.md`) belongs
+   to `setup-workflow`'s onboard branch, which is prose the human runs once.
+   A fresh repo therefore reaches the v4 bundle via the migration and the full
+   repo scaffold via the skill; the two are complementary, not two competing
+   "v4 scaffolds".
 2. **Reorganize the layout.** For each live effort, create
    `docs/tasks/<effort>/` holding `map.md`, `spec.md`, `arch-spec.md`, and
    `tasks/<task>/task.md` / `tickets/<ticket>/ticket.md`. Sort each artifact

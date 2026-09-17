@@ -13,6 +13,14 @@
 > and prints a `MigrateReport`. The steps below are what it does, in order;
 > the skill reads this list to explain the run, it does not perform the steps
 > by hand.
+>
+> **Step numbering.** The nine steps below are the *logical* transformation,
+> for tracing to the effort spec. The executor groups them into six numbered
+> steps (1 layout and frontmatter, 2 state, 3 reporting and vendored trees,
+> 3b maps placeholders, 4 the index, 5 the changelog, 6 the dead pointer),
+> and the `.migration-progress` marker records those six. The mapping is:
+> resource 1-4 -> executor 1; resource 5 -> executor 2; resource 6-7 ->
+> executor 3; resource 8 -> executor 4; resource 9 -> executor 6.
 
 ## Before you start
 
@@ -113,12 +121,19 @@ with a pointer file left behind at the old location naming the new home.
 `docs/tasks/index.md` is written carrying `okf_version: "0.2"` and a listing
 of the tree's efforts.
 
-## Step 9: Fix the dead pointer
+## Step 9: Report the dead pointer
 
 **Traces to:** Migration, "the dead pointer fix".
 
-The onboarding report's dead `/skill:task-overview` pointer becomes
-`/skill:task-workflow-overview`, and `schema_version` is stamped 4.
+The onboarding report's dead `/skill:task-overview` pointer is fixed in the
+`setup-workflow` skill text itself (that is the pointer's home, and the fix
+ships with this resource's release). Where the retired name survives in a
+repo's own documents, the migration **reports** each occurrence as a
+`dead-pointer` needs-human item rather than rewriting it: rewriting a live or
+archived document's prose would silently edit artifact content the migration
+does not own.
+
+`schema_version` is stamped 4 in step 5, not here.
 
 ## After the run
 

@@ -51,6 +51,27 @@ function snapshot(root: string): Record<string, string> {
   return out;
 }
 
+/**
+ * Every directory under `root`, so a restore that leaves empty scaffolding
+ * behind is caught. Files alone are not enough: the tree must be exactly as it
+ * was, directories included.
+ */
+function dirSnapshot(root: string): string[] {
+  const out: string[] = [];
+  const walk = (dir: string): void => {
+    if (!existsSync(dir)) return;
+    for (const name of readdirSync(dir).sort()) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) {
+        out.push(relative(root, p).split("\\").join("/"));
+        walk(p);
+      }
+    }
+  };
+  walk(root);
+  return out;
+}
+
 /** A v3 tree: a map under maps/, a flat task, and a v3 state file. */
 function seedV3(root: string): void {
   mkdirSync(join(root, "docs/tasks/maps/effort"), { recursive: true });
@@ -110,10 +131,14 @@ describe("FsPort: corruption safety on real disk", () => {
       try {
         seedV3(root);
         const before = snapshot(root);
+        const dirsBefore = dirSnapshot(root);
         const port = new FsPort(root);
         // Drive the real migration so the staged set is realistic.
         expect(() => migrate(port, { failAfterWrites: n })).toThrow();
         expect(snapshot(root)).toEqual(before);
+        // Directories too: a restore that leaves empty scaffolding behind is
+        // not "the tree untouched".
+        expect(dirSnapshot(root)).toEqual(dirsBefore);
       } finally {
         rmSync(root, { recursive: true, force: true });
       }
@@ -129,9 +154,11 @@ describe("FsPort: corruption safety on real disk", () => {
     try {
       seedV3(root);
       const before = snapshot(root);
+      const dirsBefore = dirSnapshot(root);
       // Pre-create the ticket destination read-only so a nested mkdir fails.
       const dest = join(root, "docs/tasks/effort/tickets");
       mkdirSync(dest, { recursive: true });
+      const dirsWithDest = dirSnapshot(root);
       chmodSync(dest, 0o500);
       try {
         const port = new FsPort(root);
@@ -140,6 +167,9 @@ describe("FsPort: corruption safety on real disk", () => {
         chmodSync(dest, 0o700);
       }
       expect(snapshot(root)).toEqual(before);
+      expect(dirSnapshot(root)).toEqual(dirsWithDest);
+      expect(dirsWithDest).toContain("docs/tasks/effort/tickets");
+      expect(dirsBefore).not.toContain("docs/tasks/effort/tickets");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
