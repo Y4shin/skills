@@ -40,6 +40,21 @@
   `"None"`), a sequence of two writes, and the legacy shape the module must
   preserve but no longer model. See `tests/state.test.ts` and the
   `task_state` / `task_state_set` blocks in `tests/plugin.test.ts`.
+- **Dual-shape parsers (the v3 to v4 transition):** when one parser must read
+  both an old and a new frontmatter shape, discriminate on the key that only
+  the old shape has (`kind`), never on the key both share (`type`, which means
+  different things in each). Test each shape separately plus a mixed tree, and
+  assert the shape field so a misclassification fails loudly. See
+  `tests/art.test.ts` (`fromFrontmatter v3 shape` / `v4 shape`).
+- **Location-derived checks need a path-aware rule, and a v3 guard:**
+  `findAnomalies` computes orphan and effort-scoping anomalies from paths, so
+  its heuristics must be shape-aware. A filename that is type-neutral in v3
+  (`task.md`) implies a type only under the v4 subtree; an anchor requirement
+  (an effort needs a map or spec) applies to v4 only, since a v3 flat task
+  directory is its own effort. Test both directions of every mismatch and
+  assert the v3 shapes are NOT flagged, or the check becomes a false-positive
+  pile on the live tree. Measure the real tree: `findAnomalies` over
+  `docs/tasks` must stay at zero.
 
 ## Integration harness (tests/integration/)
 

@@ -4,7 +4,7 @@
  */
 
 import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
 import YAML from "yaml";
 import { createTools } from "../src/pi.js";
@@ -56,6 +56,54 @@ function seedTree(t: string): void {
 
 const ctx = (directory: string) => ({ directory }) as any;
 
+function writeMd(path: string, frontmatter: string, body = ""): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `---\n${frontmatter}---\n${body}`);
+}
+
+/** The v4 effort-grouped layout: one directory per effort, tasks/ and tickets/ subtrees. */
+function seedV4Tree(t: string): void {
+  const base = join(t, "docs/tasks");
+  writeMd(join(base, "billing/map.md"), "type: map\ntitle: Billing\nstatus: draft\n");
+  writeMd(join(base, "billing/spec.md"), "type: spec\ntitle: Billing spec\nstatus: draft\n");
+  writeMd(join(base, "billing/arch-spec.md"), "type: arch spec\ntitle: Billing architecture\nstatus: draft\n");
+  writeMd(
+    join(base, "billing/tasks/research-cache/task.md"),
+    "type: task\nsubtype: research\ntitle: Research cache\nstatus: stable\nworkflow_state: todo\nblocked_by: []\n",
+  );
+  writeMd(
+    join(base, "billing/tasks/prototype-api/task.md"),
+    "type: task\nsubtype: prototype\ntitle: Prototype API\nstatus: stable\nworkflow_state: ready\nblocked_by: [research-cache]\n",
+  );
+  writeMd(
+    join(base, "billing/tickets/login-form/ticket.md"),
+    "type: ticket\nsubtype: feature\ntitle: Login form\nstatus: stable\nworkflow_state: ready\nsize: l\nblocked_by: []\n",
+  );
+  writeMd(
+    join(base, "billing/tickets/login-form/findings.md"),
+    "type: findings\ntitle: Login form findings\nstatus: stable\n",
+  );
+  writeMd(
+    join(base, "billing/tickets/login-form/deviation-reports/1-split.md"),
+    "type: deviation report\ntitle: Split report\nstatus: stable\n",
+  );
+  writeMd(
+    join(base, "billing/tickets/api-fix/ticket.md"),
+    "type: ticket\nsubtype: bug\ntitle: Fix API\nstatus: stable\nworkflow_state: todo\nblocked_by: [login-form]\n",
+  );
+  // A spec-only effort directory: no map, no tasks, no tickets.
+  writeMd(join(base, "spec-only/spec.md"), "type: spec\ntitle: Spec only\nstatus: stable\n");
+  // An arch-spec-only effort directory: the shared architecture spec with no
+  // map, spec, tasks, or tickets.
+  writeMd(join(base, "arch-only/arch-spec.md"), "type: arch spec\ntitle: Arch only\nstatus: draft\n");
+  // The archive mirrors the live layout.
+  writeMd(join(base, "archive/old-effort/map.md"), "type: map\ntitle: Old effort\nstatus: deprecated\n");
+  writeMd(
+    join(base, "archive/old-effort/tickets/old-ticket/ticket.md"),
+    "type: ticket\nsubtype: feature\ntitle: Old ticket\nstatus: deprecated\nworkflow_state: done\n",
+  );
+}
+
 describe("task-workflow tools", () => {
   let tools: Record<string, { description: string; execute: Function }>;
 
@@ -97,7 +145,7 @@ describe("task-workflow tools", () => {
       const t = mkTmp(); seedTree(t);
       const out = await tools.task_show.execute({ selector: "login", json: true }, ctx(t));
       const parsed = JSON.parse(out);
-      expect(parsed.kind).toBe("task");
+      expect(parsed.type).toBe("task");
       expect(parsed.slug).toBe("login");
     });
 
@@ -565,6 +613,236 @@ describe("task-workflow tools", () => {
       const path = join(t, "docs/tasks/login/slices/1-do-thing.md");
       const out = await tools.task_show.execute({ selector: path }, ctx(t));
       expect(out).toContain("slug: do-thing");
+    });
+  });
+});
+
+describe("task-workflow tools: v4 effort-grouped tree", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  describe("resolution by slug and by path", () => {
+    test("resolves the effort map by slug", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_show.execute({ selector: "billing" }, ctx(t));
+      expect(out).toContain("type: map");
+    });
+
+    test("resolves the effort map by path", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_show.execute({ selector: join(t, "docs/tasks/billing/map.md") }, ctx(t));
+      expect(out).toContain("type: map");
+    });
+
+    test("resolves the effort directory to its map", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_show.execute({ selector: join(t, "docs/tasks/billing") }, ctx(t));
+      expect(out).toContain("type: map");
+    });
+
+    test("resolves a task by slug", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_show.execute({ selector: "research-cache" }, ctx(t));
+      expect(out).toContain("type: task");
+    });
+
+    test("resolves a ticket by slug", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_show.execute({ selector: "login-form" }, ctx(t));
+      expect(out).toContain("type: ticket");
+    });
+
+    test("resolves a ticket by path", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_show.execute({ selector: join(t, "docs/tasks/billing/tickets/login-form/ticket.md") }, ctx(t));
+      expect(out).toContain("type: ticket");
+    });
+
+    test("resolves the spec by slug", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_show.execute({ selector: join(t, "docs/tasks/billing/spec.md") }, ctx(t));
+      expect(out).toContain("type: spec");
+    });
+
+    test("resolves a spec-only effort directory", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_show.execute({ selector: join(t, "docs/tasks/spec-only") }, ctx(t));
+      expect(out).toContain("type: spec");
+    });
+
+    test("resolves a deviated aux file", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_show.execute(
+        { selector: join(t, "docs/tasks/billing/tickets/login-form/deviation-reports/1-split.md") },
+        ctx(t),
+      );
+      expect(out).toContain("type: deviation report");
+    });
+
+    test("resolves the archived effort map", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_show.execute({ selector: join(t, "docs/tasks/archive/old-effort/map.md") }, ctx(t));
+      expect(out).toContain("Old effort");
+    });
+
+    test("resolves an arch-spec-only effort directory", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_show.execute({ selector: join(t, "docs/tasks/arch-only") }, ctx(t));
+      expect(out).toContain("type: arch spec");
+    });
+
+    test("honors the wanted type on a directory selector holding map and spec", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      // billing/ holds both map.md and spec.md. A want:"map" tool must pick
+      // map.md rather than erroring on whichever leaf it finds first.
+      const out = await tools.task_map_finalizable.execute({ selector: join(t, "docs/tasks/billing") }, ctx(t));
+      expect(out).toContain("ready to finalize");
+    });
+
+    test("errors naming the wanted type when a directory has no such artifact", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      await expect(
+        tools.task_map_finalizable.execute({ selector: join(t, "docs/tasks/spec-only") }, ctx(t)),
+      ).rejects.toThrow(/map/);
+    });
+
+    test("errors naming both paths when a slug is ambiguous within one type", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      // Two tickets share the slug 'dup' in different efforts.
+      mkdirSync(join(t, "docs/tasks/other/tickets/dup"), { recursive: true });
+      writeMd(join(t, "docs/tasks/other/tickets/dup/ticket.md"), "type: ticket\ntitle: Dup\nsubtype: feature\nstatus: stable\nworkflow_state: todo\n");
+      mkdirSync(join(t, "docs/tasks/billing/tickets/dup"), { recursive: true });
+      writeMd(join(t, "docs/tasks/billing/tickets/dup/ticket.md"), "type: ticket\ntitle: Dup\nsubtype: feature\nstatus: stable\nworkflow_state: todo\n");
+      await expect(tools.task_show.execute({ selector: "dup" }, ctx(t))).rejects.toThrow(/ambiguous/);
+    });
+  });
+
+  describe("task_get on new-shape artifacts", () => {
+    test("reads a field from a ticket", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_get.execute({ selector: "login-form", field: "subtype" }, ctx(t));
+      expect(out).toBe("feature");
+    });
+
+    test("reads a field from a spec", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_get.execute({ selector: join(t, "docs/tasks/billing/spec.md"), field: "title" }, ctx(t));
+      expect(out).toBe("Billing spec");
+    });
+
+    test("reads a field from a map", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_get.execute({ selector: "billing", field: "status" }, ctx(t));
+      expect(out).toBe("draft");
+    });
+
+    test("reads a field from a task", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_get.execute({ selector: "prototype-api", field: "workflow_state" }, ctx(t));
+      expect(out).toBe("ready");
+    });
+
+    test("reads a field from an aux findings file", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_get.execute(
+        { selector: join(t, "docs/tasks/billing/tickets/login-form/findings.md"), field: "type" },
+        ctx(t),
+      );
+      expect(out).toBe("findings");
+    });
+  });
+
+  describe("kind confusion regression", () => {
+    test("a wanted map against a ticket slug errors naming the actual type", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      await expect(
+        tools.task_resolve.execute({ selector: "login-form", kind: "map" }, ctx(t)),
+      ).rejects.toThrow(/ticket.*map|map.*ticket/s);
+    });
+
+    test("a wanted task against a ticket slug errors naming the actual type", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      await expect(
+        tools.task_resolve.execute({ selector: "login-form", kind: "task" }, ctx(t)),
+      ).rejects.toThrow(/ticket/);
+    });
+
+    test("a wanted map against a task slug errors naming the actual type", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      await expect(
+        tools.task_resolve.execute({ selector: "research-cache", kind: "map" }, ctx(t)),
+      ).rejects.toThrow(/task/);
+    });
+
+    test("a wanted map against a task slug does not silently return the task", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const out = await tools.task_resolve.execute({ selector: "research-cache", kind: "task" }, ctx(t));
+      expect(out).toContain("tasks/research-cache/task.md");
+    });
+
+    test("resolves each type when the wanted type matches", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      expect(await tools.task_resolve.execute({ selector: "billing", kind: "map" }, ctx(t))).toContain("map.md");
+      expect(await tools.task_resolve.execute({ selector: "login-form", kind: "ticket" }, ctx(t))).toContain("ticket.md");
+      expect(await tools.task_resolve.execute({ selector: "research-cache", kind: "task" }, ctx(t))).toContain("task.md");
+    });
+
+    test("an unresolvable slug names the wanted type", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      await expect(
+        tools.task_resolve.execute({ selector: "ghost", kind: "ticket" }, ctx(t)),
+      ).rejects.toThrow(/no ticket matches 'ghost'/);
+    });
+
+    test("an unresolvable slug with no wanted type stays generic", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      await expect(
+        tools.task_resolve.execute({ selector: "ghost" }, ctx(t)),
+      ).rejects.toThrow(/no artifact matches 'ghost'/);
+    });
+  });
+
+  describe("mixed tree", () => {
+    test("both shapes coexist and both resolve", async () => {
+      const t = mkTmp(); seedTree(t); seedV4Tree(t);
+      const old = await tools.task_show.execute({ selector: "login" }, ctx(t));
+      expect(old).toContain("kind: task");
+      const fresh = await tools.task_show.execute({ selector: "login-form" }, ctx(t));
+      expect(fresh).toContain("type: ticket");
+    });
+
+    test("a v3 slice still resolves by slug", async () => {
+      const t = mkTmp(); seedTree(t); seedV4Tree(t);
+      const out = await tools.task_show.execute({ selector: "do-thing" }, ctx(t));
+      expect(out).toContain("kind: slice");
+    });
+  });
+
+  describe("error cases", () => {
+    test("an empty effort directory produces a clear error, not a crash", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      mkdirSync(join(t, "docs/tasks/empty-effort"), { recursive: true });
+      await expect(
+        tools.task_show.execute({ selector: join(t, "docs/tasks/empty-effort") }, ctx(t)),
+      ).rejects.toThrow(/not a recognised artifact/);
+    });
+
+    test("an empty frontmatter block produces a clear error, not a crash", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      writeMd(join(t, "docs/tasks/billing/tickets/blank/ticket.md"), "title: Blank\n");
+      await expect(
+        tools.task_show.execute({ selector: join(t, "docs/tasks/billing/tickets/blank/ticket.md") }, ctx(t)),
+      ).rejects.toThrow(/type/);
+    });
+
+    test("a file with no frontmatter at all produces a clear error", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      mkdirSync(join(t, "docs/tasks/billing/tickets/raw"), { recursive: true });
+      writeFileSync(join(t, "docs/tasks/billing/tickets/raw/ticket.md"), "# no frontmatter\n");
+      await expect(
+        tools.task_show.execute({ selector: join(t, "docs/tasks/billing/tickets/raw/ticket.md") }, ctx(t)),
+      ).rejects.toThrow(/not a recognised artifact/);
     });
   });
 });

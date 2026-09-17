@@ -20,7 +20,7 @@ import { Type } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
-import { fromFrontmatter, sliceInfoFrom, dependencyLevels, type Artifact, type ArtifactKind, type SliceInfo, type WorkItemInfo } from "./core/art.js";
+import { fromFrontmatter, sliceInfoFrom, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, type Artifact, type SliceInfo, type WorkItemInfo } from "./core/art.js";
 import { toObject, fromObject, freshState, isPointerName, POINTER_NAMES, type WorkflowState } from "./core/state.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
@@ -214,113 +214,137 @@ function listSubdirs(base: string, skip: Set<string> = new Set()): string[] {
   return readdirSync(base).sort().filter((n) => isDir(join(base, n)) && !skip.has(n));
 }
 
-function parseArtifactFile(path: string, kind: ArtifactKind): { art: Artifact; doc: Document } {
+function parseArtifactFile(path: string): { art: Artifact; doc: Document } {
   const text = readFileSync(path, "utf-8");
   const doc = parse(text);
-  const art = fromFrontmatter(doc.data);
+  const art = fromFrontmatter(doc.data, slugDirFor(path));
+  art.path = path;
   return { art, doc };
 }
 
-/** Resolve a slug or path to an artifact file path and its frontmatter document. */
-function resolveArt(root: string, selector: string, want?: ArtifactKind): { path: string; doc: Document; art: Artifact } {
-  const base = taskRoot(root);
+/**
+ * The slug a file's location implies: its directory name, except under a
+ * container directory (tasks/, tickets/, slices/, ...) where the file's own
+ * name carries the slug.
+ */
+const CONTAINER_DIRS = new Set(["tasks", "tickets", "slices", "deviation-reports", "archive", "maps"]);
 
-  // Try as explicit path
+function slugDirFor(path: string): string {
+  const parent = basename(dirname(path));
+  if (!CONTAINER_DIRS.has(parent)) return parent;
+  // A container leaf carries the slug in its own name, without the
+  // `<n>-` ordering prefix the slice convention uses.
+  return basename(path).replace(/\.md$/, "").replace(/^\d+-/, "");
+}
+
+function walkMarkdown(dir: string, out: string[]): void {
+  if (!isDir(dir)) return;
+  for (const name of readdirSync(dir).sort()) {
+    if (name.startsWith(".")) continue;
+    const p = join(dir, name);
+    if (isDir(p)) walkMarkdown(p, out);
+    else if (isFile(p) && name.endsWith(".md")) out.push(p);
+  }
+}
+
+interface ScanHit { path: string; art: Artifact; doc: Document }
+
+/** Every artifact on disk, live and archived, in both shapes. */
+function scanArtifacts(root: string): ScanHit[] {
+  const files: string[] = [];
+  walkMarkdown(taskRoot(root), files);
+  const hits: ScanHit[] = [];
+  for (const p of files) {
+    try {
+      const { art, doc } = parseArtifactFile(p);
+      hits.push({ path: p, art, doc });
+    } catch { /* not an artifact: skip, never fatal */ }
+  }
+  return hits;
+}
+
+/** Preference order when one slug matches several artifact types. */
+const TYPE_PRIORITY = TYPE_LEAVES.map(([type]) => type);
+
+function typeRank(type: string): number {
+  const i = TYPE_PRIORITY.indexOf(type);
+  return i === -1 ? TYPE_PRIORITY.length : i;
+}
+
+/** The files a directory selector may stand for, in preference order. */
+const DIRECTORY_LEAVES = TYPE_LEAVES.map(([, file]) => file);
+
+/**
+ * Pick the file a directory selector stands for. When a wanted type is given,
+ * only that type's leaf is considered, so `want: "spec"` on a directory that
+ * holds both `map.md` and `spec.md` selects the spec instead of erroring.
+ */
+function directoryLeaf(dir: string, want?: string): string | null {
+  const leaves = want && TYPE_LEAF[want] ? [TYPE_LEAF[want]] : DIRECTORY_LEAVES;
+  return leaves.map((leaf) => join(dir, leaf)).find(isFile) ?? null;
+}
+
+/** Resolve a slug or path to an artifact file path and its frontmatter document. */
+function resolveArt(root: string, selector: string, want?: string): ScanHit {
+  // (1) An explicit path, or a path-like selector, resolved directly.
   let target = "";
   if (existsSync(selector)) target = resolvePath(selector);
   else if (existsSync(join(process.cwd(), selector))) target = resolvePath(process.cwd(), selector);
   else if (isAbsolute(selector) && existsSync(selector)) target = resolvePath(selector);
+  else if (existsSync(join(root, selector))) target = resolvePath(root, selector);
 
   if (target) {
     if (isDir(target)) {
-      const ep = join(target, "map.md");
-      const tp = join(target, "task.md");
-      target = isFile(ep) ? ep : isFile(tp) ? tp : target;
-    }
-    if (isFile(target)) {
-      try {
-        const { art, doc } = parseArtifactFile(target, want ?? "slice" as ArtifactKind);
-        if (want && art.kind !== want) throw new ResolutionError(`'${selector}' has kind '${art.kind}', not '${want}'`);
-        return { path: target, doc, art };
-      } catch (e) {
-        if (e instanceof FrontmatterError) throw new ResolutionError(`'${selector}' is not a recognised artifact`);
-        throw e;
+      const leaf = directoryLeaf(target, want);
+      if (leaf === null) {
+        throw new ResolutionError(
+          want ? `no ${want} in directory '${selector}'` : `'${selector}' is not a recognised artifact`,
+        );
       }
+      target = leaf;
     }
-    throw new ResolutionError(`'${selector}' is not a recognised artifact`);
-  }
-
-  // Try as slug: scan maps, tasks, then slices
-  const candidates: { path: string; art: Artifact; doc: Document }[] = [];
-  const scanFile = (p: string) => {
-    if (!isFile(p)) return;
+    if (!isFile(target)) throw new ResolutionError(`'${selector}' is not a recognised artifact`);
+    let parsed: { art: Artifact; doc: Document };
     try {
-      const { art, doc } = parseArtifactFile(p, "task" as ArtifactKind);
-      candidates.push({ path: p, art, doc });
-    } catch { /* skip unparseable */ }
-  };
-
-  // Scan maps
-  for (const sub of listSubdirs(join(base, "maps"))) {
-    scanFile(join(base, "maps", sub, "map.md"));
+      parsed = parseArtifactFile(target);
+    } catch (e) {
+      if (e instanceof FrontmatterError) throw new ResolutionError(`'${selector}' is not a recognised artifact`);
+      throw e;
+    }
+    if (want && parsed.art.type !== want) {
+      throw new ResolutionError(`'${selector}' has type '${parsed.art.type}', not '${want}'`);
+    }
+    return { path: target, art: parsed.art, doc: parsed.doc };
   }
 
-  // Scan tasks
-  const taskDirs = listSubdirs(base, new Set(["maps", "archive", "state.yaml", "CHANGELOG.md"]));
-  for (const sub of taskDirs) {
-    scanFile(join(base, sub, "task.md"));
+  // (2) A slug match against the index, honoring the wanted type first.
+  const bySlug = scanArtifacts(root).filter(
+    (h) => h.art.slug === selector || basename(dirname(h.path)) === selector,
+  );
+  const candidates = want ? bySlug.filter((h) => h.art.type === want) : bySlug;
+
+  if (candidates.length === 0) {
+    if (want && bySlug.length > 0) {
+      const best = [...bySlug].sort((a, b) => typeRank(a.art.type) - typeRank(b.art.type))[0];
+      throw new ResolutionError(`'${selector}' has type '${best.art.type}', not '${want}'`);
+    }
+    throw new ResolutionError(`no ${want ?? "artifact"} matches '${selector}'`);
   }
 
-  // Filter by slug
-  const hits = candidates.filter((c) => c.art.slug === selector || basename(dirname(c.path)) === selector);
-
-  // If not found and want allows slices, scan slices
-  if (hits.length === 0 && want !== "map" && want !== "task") {
-    // Try with active task context from state.yaml
-    const statePath = join(base, "state.yaml");
-    let activeTask: string | null = null;
-    if (existsSync(statePath)) {
-      try {
-        const parsed = readYaml(statePath) as any;
-        activeTask = parsed?.task ?? null;
-      } catch { /* ignore */ }
-    }
-    if (activeTask) {
-      const slicesDir = join(base, activeTask, "slices");
-      if (isDir(slicesDir)) {
-        for (const name of readdirSync(slicesDir).sort()) {
-          const m = name.match(SLICE_RE);
-          if (!m) continue;
-          const sp = join(slicesDir, name);
-          try {
-            const { art: sliceArt, doc: sliceDoc } = parseArtifactFile(sp, "slice" as ArtifactKind);
-            if (sliceArt.slug === selector || name === selector) {
-              return { path: sp, doc: sliceDoc, art: sliceArt };
-            }
-          } catch { /* skip */ }
-        }
-      }
-    }
-    // Full scan as fallback
-    for (const sub of taskDirs) {
-      const slicesDir = join(base, sub, "slices");
-      if (!isDir(slicesDir)) continue;
-      for (const name of readdirSync(slicesDir).sort()) {
-        if (name === "archive" || !name.match(SLICE_RE)) continue;
-        const sp = join(slicesDir, name);
-        try {
-          const { art: sliceArt, doc: sliceDoc } = parseArtifactFile(sp, "slice" as ArtifactKind);
-          if (sliceArt.slug === selector || name === selector) {
-            hits.push({ path: sp, art: sliceArt, doc: sliceDoc });
-          }
-        } catch { /* skip */ }
-      }
+  const byType = new Map<string, ScanHit[]>();
+  for (const hit of candidates) {
+    if (!byType.has(hit.art.type)) byType.set(hit.art.type, []);
+    byType.get(hit.art.type)!.push(hit);
+  }
+  for (const group of byType.values()) {
+    if (group.length > 1) {
+      throw new ResolutionError(
+        `'${selector}' is ambiguous: matches multiple artifacts: ${group.map((g) => g.path).join(", ")}`,
+      );
     }
   }
 
-  if (hits.length === 0) throw new ResolutionError(`no ${want ?? "artifact"} matches '${selector}'`);
-  if (hits.length > 1) throw new ResolutionError(`'${selector}' is ambiguous — matches multiple artifacts`);
-  return hits[0];
+  return [...candidates].sort((a, b) => typeRank(a.art.type) - typeRank(b.art.type))[0];
 }
 
 function activeSlices(root: string, taskSlug: string): { number: number; slug: string; path: string; status: string | null }[] {
@@ -333,7 +357,7 @@ function activeSlices(root: string, taskSlug: string): { number: number; slug: s
     if (!m) continue;
     const path = join(sd, name);
     try {
-      const { art } = parseArtifactFile(path, "slice" as ArtifactKind);
+      const { art } = parseArtifactFile(path);
       out.push({ number: parseInt(m[1], 10), slug: m[2], path, status: art.status });
     } catch { /* skip */ }
   }
@@ -342,7 +366,7 @@ function activeSlices(root: string, taskSlug: string): { number: number; slug: s
 
 function taskInfoFromPath(path: string): WorkItemInfo | null {
   try {
-    const { art } = parseArtifactFile(path, "task");
+    const { art } = parseArtifactFile(path);
     const blocked = art.data.blocked_by;
     return {
       slug: art.slug,
@@ -370,7 +394,7 @@ function taskPathForSlug(root: string, slug: string): string | null {
 }
 
 function mapChildInfos(root: string, mapPath: string): WorkItemInfo[] {
-  const { doc } = parseArtifactFile(mapPath, "map");
+  const { doc } = parseArtifactFile(mapPath);
   const children = Array.isArray(doc.data.tasks) ? doc.data.tasks : [];
   const out: WorkItemInfo[] = [];
   for (const child of children) {
@@ -515,21 +539,24 @@ export function createTools(): Record<string, Tool> {
 
     task_resolve: def(
       "Resolve a slug or path to the artifact's file path.",
-      { selector: Str("Slug or path"), kind: OptStr("map, task, or slice") },
+      { selector: Str("Slug or path"), kind: OptStr("Wanted OKF type (map, ticket, task, spec, arch spec)") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
-        return resolveArt(root, p.selector, p.kind as ArtifactKind | undefined).path;
+        return resolveArt(root, p.selector, p.kind as string | undefined).path;
       },
     ),
 
     task_assert_kind: def(
-      "Assert an artifact's kind (map/task/slice). Fails on mismatch.",
-      { selector: Str("Slug or path"), kind: { type: "string" as const, enum: ["map", "task", "slice"] } },
+      "Assert an artifact's type (map, ticket, task, spec, arch spec). Fails on mismatch.",
+      {
+        selector: Str("Slug or path"),
+        kind: { type: "string" as const, enum: ["map", "ticket", "task", "spec", "arch spec", "slice"] },
+      },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         const { art } = resolveArt(root, p.selector);
-        if (art.kind !== p.kind) throw new Error(`'${p.selector}' has kind '${art.kind}', not '${p.kind}'.`);
-        return `kind: ${p.kind} — OK`;
+        if (art.type !== p.kind) throw new Error(`'${p.selector}' has type '${art.type}', not '${p.kind}'.`);
+        return `type: ${p.kind} (OK)`;
       },
     ),
 
@@ -552,9 +579,9 @@ export function createTools(): Record<string, Tool> {
             const f = join(dir, sub, leaf);
             if (!isFile(f)) continue;
             try {
-              const { art } = parseArtifactFile(f, kind as ArtifactKind);
+              const { art } = parseArtifactFile(f);
               const map = art.data.map as string | undefined;
-              arts.push({ slug: art.slug, kind: art.kind, status: art.status, map });
+              arts.push({ slug: art.slug, kind: art.type, status: art.status, map });
             } catch { /* skip */ }
           }
         };
@@ -601,13 +628,13 @@ export function createTools(): Record<string, Tool> {
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         const resolved = resolveArt(root, p.selector);
-        if (resolved.art.kind === "map") {
+        if (resolved.art.type === "map") {
           const children = mapChildInfos(root, resolved.path);
           const remaining = children.filter((item) => item.status !== "done");
           const levels = dependencyLevels(remaining);
           return JSON.stringify({ levels, remaining_count: remaining.length, done_count: children.length - remaining.length }, null, 2);
         }
-        if (resolved.art.kind !== "task") throw new ResolutionError(`'${p.selector}' must resolve to a map or task`);
+        if (resolved.art.type !== "task") throw new ResolutionError(`'${p.selector}' must resolve to a map or task`);
         const rawSlices = activeSlices(root, resolved.art.slug);
         const remaining = rawSlices.filter((s) => s.status !== "done");
         const done = rawSlices.filter((s) => s.status === "done");
