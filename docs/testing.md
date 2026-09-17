@@ -55,6 +55,27 @@
   assert the v3 shapes are NOT flagged, or the check becomes a false-positive
   pile on the live tree. Measure the real tree: `findAnomalies` over
   `docs/tasks` must stay at zero.
+- **Test the PRODUCTION port, not only the test double.** When a module does
+  its I/O through a port interface, a test double that implements its own
+  atomicity proves the *double's* atomicity, not the code's. `FsPort` had no
+  undo at all while `MemPort` had a scratch-copy swap, so the "a failure
+  leaves the tree untouched" test passed against a defect that would corrupt
+  a real repo. Keep the port in its own module (not in a CLI entry point that
+  calls `process.exit`, which kills an importing test process), then drive it
+  against a real temp directory. Assert the whole tree, not just files:
+  compare the directory listing too, or a restore that leaves empty
+  scaffolding behind passes.
+- **Induce a real failure, not only an injected one.** A hook like
+  `failAfterWrites` tests the hook; a genuine OS error tests the recovery
+  path. `chmod 500` on a destination directory makes `mkdir` fail with EACCES
+  partway through an apply, which is exactly the half-applied case the
+  guarantee is about. Note that `chmod` semantics are POSIX, so such a test
+  is not portable to Windows.
+- **Idempotence tests need a fixture with every feature that can break it.**
+  The migration was idempotent on a plain tree but not on one holding a
+  vendored clone, because the index was computed from the pre-migration path
+  set and missed a file the plan itself adds. A no-op assertion over one
+  fixture is not a no-op guarantee; run it over the whole fixture set.
 
 ## Integration harness (tests/integration/)
 
