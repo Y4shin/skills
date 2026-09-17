@@ -139,14 +139,42 @@ function stringifyYaml(data: unknown): string {
 }
 
 /**
- * Verify a staged write before it lands: markdown must carry parseable YAML
- * frontmatter, and every other file must parse as YAML. This is the check the
- * port calls at the commit boundary, so a malformed rewrite throws before a
- * single byte is written.
+ * Serialize a document and verify it round-trips before it is staged.
+ *
+ * The check is against the source data, not merely self-consistency: a value
+ * the frontmatter format cannot represent (a `!!set` tag, which parses to an
+ * object but dumps back as a list) is caught here, before the write is
+ * staged, so a rewrite that cannot round-trip never reaches the port.
+ */
+function dumpVerified(path: string, data: FrontmatterData, body: string): string {
+  const content = dump({ data, body });
+  const reparsed = parse(content).data;
+  if (JSON.stringify(reparsed) !== JSON.stringify(data)) {
+    throw new Error(
+      `staged write to '${path}' does not round-trip through YAML: its frontmatter cannot be represented verbatim`,
+    );
+  }
+  return content;
+}
+
+/**
+ * Verify a staged write before it lands.
+ *
+ * Markdown must carry parseable YAML frontmatter that is a stable fixpoint
+ * (parse, dump, parse again yields the same data); every other file must
+ * parse as YAML. The migration's own writes are additionally verified
+ * against their source data by `dumpVerified`; this check is the port-level
+ * backstop any TreePort can call at its commit boundary.
  */
 export function verifyStagedWrite(path: string, content: string): void {
   if (isMarkdown(path)) {
-    parse(content);
+    const doc = parse(content);
+    const reparsed = parse(dump(doc));
+    if (JSON.stringify(reparsed.data) !== JSON.stringify(doc.data)) {
+      throw new Error(
+        `staged write to '${path}' does not round-trip through YAML: its frontmatter cannot be represented verbatim`,
+      );
+    }
     return;
   }
   if (path.endsWith(".yaml") || path.endsWith(".yml")) {
@@ -548,12 +576,16 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
   for (const [path, content] of plan.writes) tree.stageWrite(path, content);
 
   // The marker records the steps this run completed. It is staged in the
-  // same commit as the changes, so a crash between the two commits below
-  // leaves a marker that a re-run reads and skips; every step is
+  // same commit as the changes, so an interruption between the two commits
+  // below leaves a marker a re-run reads and skips; every step is
   // independently idempotent, so a marker that goes missing still converges.
   writeProgress(tree, progressPath);
 
+  // The atomicity boundary: verify that every staged write round-trips
+  // through YAML before a single byte reaches the port. A malformed rewrite
+  // throws here, with the tree untouched.
   try {
+    for (const [path, content] of plan.writes) verifyStagedWrite(path, content);
     tree.commit({ failAfterWrites: opts.failAfterWrites });
   } catch (e) {
     // On any failure the tree is left untouched.
@@ -652,7 +684,7 @@ function reorganize(
         status: "stable",
       };
       stageMoveIfNeeded(path, dest, plan);
-      plan.writes.set(dest, dump({ data, body: doc0(tree, path).body }));
+      plan.writes.set(dest, dumpVerified(dest, data, doc0(tree, path).body));
       plan.changes.push({
         action: dest === path ? "rewrite" : "move",
         path: dest,
@@ -669,7 +701,7 @@ function reorganize(
     if (dest === null) continue;
 
     const shaped = shapeFrontmatter(doc.data, type, plan.needsHuman, dest);
-    const content = dump({ data: shaped, body: doc.body });
+    const content = dumpVerified(dest, shaped, doc.body);
     stageMoveIfNeeded(path, dest, plan);
     if (content !== safeRead(tree, path) || dest !== path) {
       plan.writes.set(dest, content);
@@ -875,14 +907,15 @@ function reportRest(tree: TreePort, paths: string[], plan: Plan): void {
     const pointer = `${dirnameOf(root)}/${basenameOf(root)}.pointer.md`;
     plan.writes.set(
       pointer,
-      dump({
-        data: {
+      dumpVerified(
+        pointer,
+        {
           type: "out-of-scope note",
           title: `Vendored tree moved: ${basenameOf(root)}`,
           status: "stable",
         },
-        body: `\nThe vendored tree formerly at \`${root}\` now lives at \`${dest}\`.\n`,
-      }),
+        `\nThe vendored tree formerly at \`${root}\` now lives at \`${dest}\`.\n`,
+      ),
     );
     plan.changes.push({
       action: "add",
@@ -975,7 +1008,7 @@ function writeIndex(tree: TreePort, plan: Plan, paths: string[]): void {
     okf_version: OKF_VERSION,
     title: "docs/tasks",
   };
-  const content = dump({ data, body });
+  const content = dumpVerified(INDEX_PATH, data, body);
   if (safeRead(tree, INDEX_PATH) === content) return;
   plan.writes.set(INDEX_PATH, content);
   plan.changes.push({
@@ -993,7 +1026,7 @@ function backfillBundleFiles(tree: TreePort, paths: string[], plan: Plan): void 
     const doc = readDoc(tree, CHANGELOG_PATH);
     const body = doc?.body ?? "\n# Task Changelog\n";
     const data: FrontmatterData = { type: "changelog", title: "Task Changelog" };
-    const content = dump({ data, body });
+    const content = dumpVerified(CHANGELOG_PATH, data, body);
     if (safeRead(tree, CHANGELOG_PATH) !== content) {
       plan.writes.set(CHANGELOG_PATH, content);
       plan.changes.push({
@@ -1004,7 +1037,7 @@ function backfillBundleFiles(tree: TreePort, paths: string[], plan: Plan): void 
     }
   } else {
     const data: FrontmatterData = { type: "changelog", title: "Task Changelog" };
-    plan.writes.set(CHANGELOG_PATH, dump({ data, body: "\n# Task Changelog\n" }));
+    plan.writes.set(CHANGELOG_PATH, dumpVerified(CHANGELOG_PATH, data, "\n# Task Changelog\n"));
     plan.changes.push({
       action: "add",
       path: CHANGELOG_PATH,
@@ -1023,7 +1056,7 @@ function backfillBundleFiles(tree: TreePort, paths: string[], plan: Plan): void 
       status: "stable",
     };
     plan.moves.push({ from: oosReadme, to: oosIndex });
-    plan.writes.set(oosIndex, dump({ data, body }));
+    plan.writes.set(oosIndex, dumpVerified(oosIndex, data, body));
     plan.changes.push({
       action: "move",
       path: oosIndex,

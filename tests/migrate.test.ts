@@ -290,11 +290,39 @@ describe("migrate: corruption safety", () => {
     }
   });
 
+  test("the migration itself verifies every rewrite, not just the port", () => {
+    // A naive port that writes whatever it is given and verifies nothing:
+    // the migration must still verify its own staged writes before they land.
+    class NaivePort extends MemPort {
+      commit(): void {
+        for (const [from, to] of (this as any).moves as Array<[string, string]>) {
+          const content = (this as any).files.get(from);
+          (this as any).files.delete(from);
+          (this as any).files.set(to, content);
+        }
+        for (const [path, content] of (this as any).writes as Map<string, string>) {
+          (this as any).files.set(path, content);
+        }
+        (this as any).writes.clear();
+        (this as any).moves = [];
+        (this as any).deletes = [];
+      }
+    }
+    const tree = new NaivePort({ ...V3_FILES });
+    // A `!!set` tag parses to an object but dumps back as a list: the value
+    // cannot be represented verbatim. The migration must refuse to write it.
+    (tree as any).files.set(
+      "docs/tasks/my-task/findings.md",
+      "---\nkind: finding\ntitle: F\ntags: !!set {a: null}\n---\n\nbody\n",
+    );
+    const before = tree.snapshot();
+    expect(() => migrate(tree)).toThrow(/round-trip/);
+    expect(tree.snapshot()).toEqual(before);
+  });
+
   test("a malformed staged rewrite throws before anything lands", () => {
     const tree = port({ ...V3_FILES });
     const before = tree.snapshot();
-    // A port whose commit verifies every staged write: the verification
-    // itself is what makes the guarantee hold.
     expect(() => {
       tree.stageWrite("docs/tasks/broken.md", "no frontmatter fence here");
       tree.commit();
