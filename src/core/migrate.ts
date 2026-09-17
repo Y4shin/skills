@@ -523,6 +523,8 @@ interface Plan {
   moves: Array<{ from: string; to: string }>;
   /** Destination path -> new content, for rewrites and adds. */
   writes: Map<string, string>;
+  /** Paths to remove. */
+  deletes: string[];
   /** Paths reported but left in place. */
   needsHuman: HumanItem[];
   changes: Change[];
@@ -546,6 +548,7 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
   const plan: Plan = {
     moves: [],
     writes: new Map(),
+    deletes: [],
     needsHuman: [],
     changes: [],
   };
@@ -566,6 +569,21 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
   // Step 3: report the rest: slice dirs, vendored trees, unresolvable refs.
   if (!doneSteps.has(3)) {
     reportRest(tree, allPaths, plan);
+  }
+
+  // Step 3b: the maps/ subtree dies with the v3 layout, so its placeholder
+  // files (a .gitkeep that kept an empty directory in git) go too.
+  if (!doneSteps.has(3)) {
+    for (const path of allPaths) {
+      if (under(path, MAPS) && basenameOf(path) === ".gitkeep") {
+        plan.deletes.push(path);
+        plan.changes.push({
+          action: "delete",
+          path,
+          detail: `deleted '${path}': the maps/ subtree is gone in v4`,
+        });
+      }
+    }
   }
 
   // Step 4: write the root index.
@@ -595,6 +613,7 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
 
   for (const { from: src, to } of plan.moves) tree.stageMove(src, to);
   for (const [path, content] of plan.writes) tree.stageWrite(path, content);
+  for (const path of plan.deletes) tree.stageDelete(path);
 
   // The marker records the steps this run completed. It is staged in the
   // same commit as the changes, so an interruption between the two commits

@@ -760,6 +760,18 @@ describe("migrate: map-level aux files", () => {
     expect(files["docs/tasks/maps/effort/handoff.md"]).toBeUndefined();
   });
 
+  test("the maps subtree dies entirely, including its placeholder files", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/live/map.md":
+        "---\nkind: map\nslug: live\ntitle: Live\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/maps/archive/.gitkeep": "",
+    });
+    migrate(tree);
+    const files = tree.snapshot();
+    expect(Object.keys(files).filter((p) => p.includes("/maps/"))).toEqual([]);
+  });
+
   test("the maps subtree is empty after the migration", () => {
     const tree = port({
       "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
