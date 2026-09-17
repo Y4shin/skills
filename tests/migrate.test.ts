@@ -466,6 +466,48 @@ describe("migrate: every vintage reaches the same end state", () => {
   });
 });
 
+describe("migrate: edge cases", () => {
+  test("an empty docs/tasks with a stamp still reaches the v4 scaffold", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/archive/.gitkeep": "",
+    });
+    const report = migrate(tree);
+    expect(report.from).toBe(3);
+    const files = tree.snapshot();
+    expect(files["docs/tasks/state.yaml"]).toBe("schema_version: 4\nmap: null\ntask: null\n");
+    expect(files["docs/tasks/index.md"]).toContain('okf_version: "0.2"');
+    expect(files["docs/tasks/CHANGELOG.md"]).toContain("type: changelog");
+  });
+
+  test("a stamp with an unversioned tree shape still migrates", () => {
+    // schema_version is present but no legacy layout markers exist: the
+    // migration reads the stamp and reshapes whatever it finds.
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: e\ntask: null\n",
+      "docs/tasks/effort/map.md":
+        "---\ntype: map\ntitle: Effort\nstatus: stable\n---\n",
+      "docs/tasks/effort/tickets/t/ticket.md":
+        "---\ntype: ticket\nsubtype: feature\ntitle: T\nstatus: stable\nworkflow_state: ready\n---\n",
+    });
+    const report = migrate(tree);
+    expect(report.from).toBe(3);
+    const files = tree.snapshot();
+    expect(files["docs/tasks/effort/map.md"]).toBeDefined();
+    expect(files["docs/tasks/effort/tickets/t/ticket.md"]).toBeDefined();
+    expect(files["docs/tasks/state.yaml"]).toBe("schema_version: 4\nmap: e\ntask: null\n");
+  });
+
+  test("a fresh repo's state.yaml has real nulls, not the string None", () => {
+    const tree = port({});
+    migrate(tree);
+    const state = parseYamlFileForTest(tree.snapshot()["docs/tasks/state.yaml"]);
+    expect(state.map).toBeNull();
+    expect(state.task).toBeNull();
+    expect(tree.snapshot()["docs/tasks/state.yaml"]).not.toContain("None");
+  });
+});
+
 describe("migrate: the root index", () => {
   test("carries okf_version 0.2 and lists the tree", () => {
     const tree = port({ ...V3_FILES });
