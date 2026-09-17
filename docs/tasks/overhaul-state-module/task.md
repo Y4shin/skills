@@ -73,3 +73,20 @@ Verified: 453/453 non-integration tests, 16/16 integration session tests,
 `skills/engineering/setup-workflow/SKILL.md` still reference the `slice`
 field and will break until `overhaul-execution-skills` and
 `overhaul-v4-migration` land.
+
+### Knowledge harvest (post-review)
+
+- `docs/testing.md`: corrected the stale "harness currently broken on the
+  installed pi" section (the `AuthStorage.inMemory` failure no longer
+  reproduces; the harness now uses `ModelRuntime.create` +
+  `InMemoryCredentialStore` and the integration suite passes on `main` and on
+  this branch), and added a "lossless round-trip modules" mock-convention
+  entry recording the `rest`-bag pattern and how to test it.
+- `CONTEXT.md`: added the **State pointer** term (`map` / `task`, everything
+  else unmodeled and preserved) and extended **schema_version** to say the
+  module preserves it verbatim while only the migration stamps it.
+- Review follow-up: the two em-dashes this ticket's own artifacts carried were
+  removed. Their source is the workflow's agent templates
+  (`agents/deviation-reporter.md`, `agents/land-worker.md`), which emit the
+  em-dash form and are outside this ticket's scope; recorded as workflow
+  feedback.
