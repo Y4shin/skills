@@ -3,9 +3,10 @@
  * Tests every tool directly via createTools() with no pi runtime.
  */
 
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
+import YAML from "yaml";
 import { createTools } from "../src/pi.js";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
@@ -400,47 +401,135 @@ describe("task-workflow tools", () => {
   });
 
   describe("task_state", () => {
-    test("returns defaults on fresh tree", async () => {
+    test("shows both map and task pointers on a fresh tree", async () => {
       const t = mkTmp(); seedTree(t);
       const out = await tools.task_state.execute({}, ctx(t));
+      expect(out).toContain("map:");
       expect(out).toContain("task:");
-      expect(out).toContain("slice:");
+      expect(out).toContain("(none)");
     });
 
-    test("reflects saved state", async () => {
+    test("reflects saved state: both pointers shown", async () => {
       const t = mkTmp(); seedTree(t);
+      await tools.task_state_set.execute({ field: "map", value: "auth" }, ctx(t));
       await tools.task_state_set.execute({ field: "task", value: "login" }, ctx(t));
-      await tools.task_state_set.execute({ field: "slice", value: "do-thing" }, ctx(t));
       const out = await tools.task_state.execute({}, ctx(t));
-      expect(out).toContain("login");
-      expect(out).toContain("do-thing");
+      expect(out).toMatch(/map:\s+auth/);
+      expect(out).toMatch(/task:\s+login/);
     });
   });
 
   describe("task_state_set", () => {
-    test("sets task field", async () => {
+    test("sets the map field", async () => {
+      const t = mkTmp(); seedTree(t);
+      const out = await tools.task_state_set.execute({ field: "map", value: "auth" }, ctx(t));
+      expect(out).toContain("auth");
+      const show = await tools.task_state.execute({}, ctx(t));
+      expect(show).toMatch(/map:\s+auth/);
+    });
+
+    test("sets the task field", async () => {
       const t = mkTmp(); seedTree(t);
       const out = await tools.task_state_set.execute({ field: "task", value: "login" }, ctx(t));
       expect(out).toContain("login");
     });
 
-    test("sets slice field", async () => {
+    test("fresh repo: first write creates state.yaml with real nulls", async () => {
       const t = mkTmp(); seedTree(t);
-      await tools.task_state_set.execute({ field: "slice", value: "do-thing" }, ctx(t));
-      const out = await tools.task_state.execute({}, ctx(t));
-      expect(out).toContain("do-thing");
+      const before = existsSync(join(t, "docs/tasks/state.yaml"));
+      expect(before).toBe(false);
+      await tools.task_state_set.execute({ field: "task", value: "login" }, ctx(t));
+      const text = readFileSync(join(t, "docs/tasks/state.yaml"), "utf-8");
+      expect(text).not.toContain("None");
+      const parsed = YAML.parse(text) as Record<string, unknown>;
+      expect(parsed.task).toBe("login");
+      expect(parsed.map).toBeNull();
+      // The module never stamps schema_version; the file's business.
+      expect(parsed).not.toHaveProperty("schema_version");
     });
 
-    test("clears field with null", async () => {
+    test("clears a pointer with 'null' and writes a real null, not 'None'", async () => {
       const t = mkTmp(); seedTree(t);
-      await tools.task_state_set.execute({ field: "task", value: "null" }, ctx(t));
-      const out = await tools.task_state.execute({}, ctx(t));
-      expect(out).toContain("(none)");
+      await tools.task_state_set.execute({ field: "task", value: "login" }, ctx(t));
+      const out = await tools.task_state_set.execute({ field: "task", value: "null" }, ctx(t));
+      expect(out).toContain("task = null");
+      const text = readFileSync(join(t, "docs/tasks/state.yaml"), "utf-8");
+      expect(text).not.toContain("None");
+      const parsed = YAML.parse(text) as Record<string, unknown>;
+      expect(parsed.task).toBeNull();
+      const show = await tools.task_state.execute({}, ctx(t));
+      expect(show).toContain("(none)");
     });
 
-    test("throws for unknown field", async () => {
+    test("the demonstrated bug: a planted schema_version key survives a state write", async () => {
       const t = mkTmp(); seedTree(t);
-      await expect(tools.task_state_set.execute({ field: "bad", value: "x" }, ctx(t))).rejects.toThrow(/unknown/);
+      mkdirSync(join(t, "docs/tasks"), { recursive: true });
+      writeFileSync(join(t, "docs/tasks/state.yaml"), "map: null\ntask: null\nschema_version: 3\n");
+      await tools.task_state_set.execute({ field: "task", value: "login" }, ctx(t));
+      const parsed = YAML.parse(readFileSync(join(t, "docs/tasks/state.yaml"), "utf-8")) as Record<string, unknown>;
+      expect(parsed.schema_version).toBe(3);
+      expect(parsed.task).toBe("login");
+    });
+
+    test("a v3 file with unknown keys plus a legacy slice key keeps all of them through a write", async () => {
+      const t = mkTmp(); seedTree(t);
+      writeFileSync(
+        join(t, "docs/tasks/state.yaml"),
+        "map: auth\ntask: login\nslice: login-form\nschema_version: 3\nfuture_key: keep me\n",
+      );
+      await tools.task_state_set.execute({ field: "task", value: "sso" }, ctx(t));
+      const parsed = YAML.parse(readFileSync(join(t, "docs/tasks/state.yaml"), "utf-8")) as Record<string, unknown>;
+      expect(parsed.slice).toBe("login-form");
+      expect(parsed.schema_version).toBe(3);
+      expect(parsed.future_key).toBe("keep me");
+      expect(parsed.map).toBe("auth");
+      expect(parsed.task).toBe("sso");
+    });
+
+    test("preservation holds across two consecutive writes", async () => {
+      const t = mkTmp(); seedTree(t);
+      writeFileSync(join(t, "docs/tasks/state.yaml"), "map: null\ntask: null\nschema_version: 3\n");
+      await tools.task_state_set.execute({ field: "task", value: "login" }, ctx(t));
+      await tools.task_state_set.execute({ field: "map", value: "auth" }, ctx(t));
+      const parsed = YAML.parse(readFileSync(join(t, "docs/tasks/state.yaml"), "utf-8")) as Record<string, unknown>;
+      expect(parsed.schema_version).toBe(3);
+      expect(parsed.map).toBe("auth");
+      expect(parsed.task).toBe("login");
+    });
+
+    test("empty or comment-only state.yaml yields defaults and the next write recreates the file", async () => {
+      const t = mkTmp(); seedTree(t);
+      writeFileSync(join(t, "docs/tasks/state.yaml"), "# only a comment\n");
+      const show = await tools.task_state.execute({}, ctx(t));
+      expect(show).toMatch(/map:\s+\(none\)/);
+      expect(show).toMatch(/task:\s+\(none\)/);
+      await tools.task_state_set.execute({ field: "task", value: "login" }, ctx(t));
+      const parsed = YAML.parse(readFileSync(join(t, "docs/tasks/state.yaml"), "utf-8")) as Record<string, unknown>;
+      expect(parsed.map).toBeNull();
+      expect(parsed.task).toBe("login");
+    });
+
+    test("rejects the legacy slice field with an error naming map and task", async () => {
+      const t = mkTmp(); seedTree(t);
+      await expect(
+        tools.task_state_set.execute({ field: "slice", value: "do-thing" }, ctx(t)),
+      ).rejects.toThrow(/map.*task|task.*map/s);
+    });
+
+    test("rejects any other unknown field with an error naming map and task", async () => {
+      const t = mkTmp(); seedTree(t);
+      await expect(
+        tools.task_state_set.execute({ field: "bad", value: "x" }, ctx(t)),
+      ).rejects.toThrow(/map.*task|task.*map/s);
+    });
+
+    test("rejects the literal string 'None' as a pointer value", async () => {
+      const t = mkTmp(); seedTree(t);
+      await expect(
+        tools.task_state_set.execute({ field: "task", value: "None" }, ctx(t)),
+      ).rejects.toThrow(/None/);
+      // The write is rejected before touching disk: no state.yaml is created.
+      expect(existsSync(join(t, "docs/tasks/state.yaml"))).toBe(false);
     });
   });
 

@@ -397,10 +397,14 @@ function mapChildInfos(root: string, mapPath: string): WorkItemInfo[] {
 
 // ─── State helpers ─────────────────────────────────────────────────────────────
 
+function freshDefault(): WorkflowState {
+  return { map: null, task: null, rest: {} };
+}
+
 function loadState(root: string): WorkflowState {
   const sp = join(taskRoot(root), "state.yaml");
-  if (!existsSync(sp)) return { task: null, slice: null };
-  try { return fromObject(readYaml(sp)); } catch { return { task: null, slice: null }; }
+  if (!existsSync(sp)) return freshDefault();
+  try { return fromObject(readYaml(sp)); } catch { return freshDefault(); }
 }
 
 function saveState(root: string, state: WorkflowState): void {
@@ -685,31 +689,36 @@ export function createTools(): Record<string, Tool> {
     ),
 
     task_state: def(
-      "Show the current workflow state from state.yaml.",
+      "Show the current workflow state (map and task pointers) from state.yaml.",
       {},
       async (_p, ctx) => {
         const root = findRoot(ctx.directory);
         const s = loadState(root);
         return [
-          `task:  ${s.task ?? "(none)"}`,
-          `slice: ${s.slice ?? "(none)"}`,
+          `map:  ${s.map ?? "(none)"}`,
+          `task: ${s.task ?? "(none)"}`,
         ].join("\n");
       },
     ),
 
     task_state_set: def(
-      "Set a workflow state field (task or slice). Use 'null' to clear.",
-      { field: Str("Field: 'task' or 'slice'"), value: Str("New value (or 'null')") },
+      "Set a workflow state field (map or task). Use 'null' to clear.",
+      { field: Str("Field: 'map' or 'task'"), value: Str("New value (or 'null')") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         if (!isInitialized(root)) mkdirSync(taskRoot(root), { recursive: true });
         const s = loadState(root);
+        const field = p.field as string;
+        if (field !== "map" && field !== "task") {
+          throw new Error(`unknown field '${field}': use 'map' or 'task'`);
+        }
+        if (p.value === "None") {
+          throw new Error(`invalid pointer value 'None': use 'null' to clear '${field}'`);
+        }
         const v = p.value === "null" ? null : p.value;
-        if (p.field === "task") s.task = v;
-        else if (p.field === "slice") s.slice = v;
-        else throw new Error(`unknown field '${p.field}' — use 'task' or 'slice'`);
+        s[field] = v;
         saveState(root, s);
-        return `${p.field} = ${v ?? "null"}`;
+        return `${field} = ${v ?? "null"}`;
       },
     ),
 
