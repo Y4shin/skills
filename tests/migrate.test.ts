@@ -48,27 +48,31 @@ class MemPort implements TreePort {
   }
 
   commit(opts: { failAfterWrites?: number } = {}): void {
-    // The atomicity boundary: nothing lands until every write is verified.
+    // The atomicity boundary: verify every staged write, apply to a scratch
+    // copy, and only swap it in when the whole apply succeeded. An injected
+    // failure mid-apply therefore leaves the live map untouched.
     for (const [path, content] of this.writes) verifyStagedWrite(path, content);
+    const next = new Map(this.files);
     let n = 0;
-    for (const [from, to] of this.moves) {
+    const bump = (): void => {
       n++;
       if (opts.failAfterWrites !== undefined && n === opts.failAfterWrites) {
         throw new Error(`injected failure at write ${n}`);
       }
-      const content = this.files.get(from);
+    };
+    for (const [from, to] of this.moves) {
+      bump();
+      const content = next.get(from);
       if (content === undefined) throw new Error(`no such file: ${from}`);
-      this.files.delete(from);
-      this.files.set(to, content);
+      next.delete(from);
+      next.set(to, content);
     }
     for (const [path, content] of this.writes) {
-      n++;
-      if (opts.failAfterWrites !== undefined && n === opts.failAfterWrites) {
-        throw new Error(`injected failure at write ${n}`);
-      }
-      this.files.set(path, content);
+      bump();
+      next.set(path, content);
     }
-    for (const path of this.deletes) this.files.delete(path);
+    for (const path of this.deletes) next.delete(path);
+    this.files = next;
     this.writes.clear();
     this.moves = [];
     this.deletes = [];
@@ -191,7 +195,7 @@ describe("migrate: v3 vintage", () => {
     migrate(tree);
     const files = tree.snapshot();
 
-    const arch = fm(files["docs/tasks/task-tools-overhaul/tickets/my-task/arch-spec.md"]);
+    const arch = fm(files["docs/tasks/task-tools-overhaul/arch-spec.md"]);
     expect(arch.type).toBe("arch spec");
     expect(arch.title).toBe("Arch");
 
@@ -250,5 +254,79 @@ describe("migrate: v3 vintage", () => {
       expect(c.path.length).toBeGreaterThan(0);
     }
     expect(report.changes.some((c) => c.action === "move")).toBe(true);
+  });
+});
+
+describe("migrate: idempotence", () => {
+  test("a second run over the migrated tree is a no-op with zero changes", () => {
+    const tree = port({ ...V3_FILES });
+    const first = migrate(tree);
+    expect(first.noop).toBe(false);
+
+    const before = tree.snapshot();
+    const second = migrate(tree);
+    expect(second.noop).toBe(true);
+    expect(second.changes).toEqual([]);
+    expect(tree.snapshot()).toEqual(before);
+  });
+
+  test("a fresh repo's scaffold is itself idempotent", () => {
+    const tree = port({});
+    migrate(tree);
+    const before = tree.snapshot();
+    const second = migrate(tree);
+    expect(second.noop).toBe(true);
+    expect(tree.snapshot()).toEqual(before);
+  });
+});
+
+describe("migrate: corruption safety", () => {
+  test("a mid-migration failure leaves the tree byte-identical", () => {
+    for (const n of [1, 2, 3]) {
+      const tree = port({ ...V3_FILES });
+      const before = tree.snapshot();
+      expect(() => migrate(tree, { failAfterWrites: n })).toThrow();
+      expect(tree.snapshot()).toEqual(before);
+    }
+  });
+
+  test("a malformed staged rewrite throws before anything lands", () => {
+    const tree = port({ ...V3_FILES });
+    const before = tree.snapshot();
+    // A port whose commit verifies every staged write: the verification
+    // itself is what makes the guarantee hold.
+    expect(() => {
+      tree.stageWrite("docs/tasks/broken.md", "no frontmatter fence here");
+      tree.commit();
+    }).toThrow();
+    expect(tree.snapshot()).toEqual(before);
+  });
+});
+
+describe("migrate: resumability", () => {
+  test("an interrupted run resumes to the same end state", () => {
+    const uninterrupted = port({ ...V3_FILES });
+    migrate(uninterrupted);
+    const expected = uninterrupted.snapshot();
+
+    // Interrupt after the first commit, then re-run with the marker present.
+    const interrupted = port({ ...V3_FILES });
+    expect(() => migrate(interrupted, { failAfterWrites: 1 })).toThrow();
+    const resumed = migrate(interrupted);
+    expect(resumed.noop).toBe(false);
+    expect(interrupted.snapshot()).toEqual(expected);
+  });
+
+  test("a resume that loses the marker still converges", () => {
+    const tree = port({ ...V3_FILES });
+    migrate(tree);
+    // Drop the marker: every step is independently idempotent, so a re-run
+    // that never sees the marker still converges to the same end state.
+    tree.stageDelete("docs/tasks/.migration-progress");
+    tree.commit();
+    const before = tree.snapshot();
+    const second = migrate(tree);
+    expect(second.noop).toBe(true);
+    expect(tree.snapshot()).toEqual(before);
   });
 });

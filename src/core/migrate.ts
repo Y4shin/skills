@@ -188,7 +188,10 @@ export function detectVintage(tree: TreePort): number {
 
 /** The workflow category a v3 artifact carried, mapped to a v4 subtype. */
 function subtypeOf(data: FrontmatterData, type: string): string | null {
-  const raw = data.subtype ?? data.type;
+  // v3 carried the category in `type:` beside `kind:`; v4 carries it in
+  // `subtype:`. Only a v3 file (one with `kind:`) may read the old key, so a
+  // re-run over an already-v4 file never mistakes its own `type:` for one.
+  const raw = data.subtype ?? (data.kind !== undefined ? data.type : undefined);
   if (typeof raw !== "string" || raw.trim() === "") return null;
   // A bare `kind: task, type: task` carries no workflow category.
   if (raw === type) return null;
@@ -264,7 +267,8 @@ function workflowStateOf(v3Status: string | null): string | null {
  * `kind` to `type`, the old `type` to `subtype`, `slug` and `map` dropped,
  * `status` split into OKF `status` + `workflow_state`, and the legacy
  * `slices:`, `started_at`, `completed_at`, `bug:`, and slice-level `mode`
- * fields stripped. Unknown keys survive verbatim.
+ * fields stripped. Unknown keys survive verbatim, in their original order,
+ * so a re-run over an already-v4 file reproduces it byte for byte.
  */
 function shapeFrontmatter(
   data: FrontmatterData,
@@ -272,7 +276,38 @@ function shapeFrontmatter(
   needsHuman: HumanItem[],
   path: string,
 ): FrontmatterData {
+  const alreadyV4 = data.kind === undefined;
   const out: FrontmatterData = {};
+
+  const v3Status = typeof data.status === "string" ? data.status : null;
+  const hasWorkflow = type === "task" || type === "ticket";
+  const workflowState = hasWorkflow ? workflowStateOf(v3Status) : null;
+  let status = okfStatusOf(v3Status, workflowState);
+  let normalizedState = workflowState;
+
+  if (!alreadyV4) {
+    // Normalize invalid combinations: draft only pairs with todo, deprecated
+    // only with done. A normalized pair is recorded for human eyes.
+    if (status === "draft" && normalizedState !== null && normalizedState !== "todo") {
+      normalizedState = "todo";
+    }
+    if (
+      status === "deprecated" &&
+      normalizedState !== null &&
+      normalizedState !== "done"
+    ) {
+      normalizedState = "done";
+    }
+    if (validateCombination(status, normalizedState) !== null) status = "stable";
+    if (status !== okfStatusOf(v3Status, workflowState) || normalizedState !== workflowState) {
+      needsHuman.push({
+        kind: "normalized-combination",
+        path,
+        detail: `normalized '${path}': status '${okfStatusOf(v3Status, workflowState)}' with workflow_state '${workflowState}' is not a valid OKF pair`,
+      });
+    }
+  }
+
   for (const [k, v] of Object.entries(data)) {
     if (
       k === "kind" ||
@@ -288,48 +323,39 @@ function shapeFrontmatter(
     }
     // The map's `tasks:` array is deleted: the directory is the registration.
     if (k === "tasks" && type === "map") continue;
-    if (k === "type") continue; // rewritten below
-    if (k === "subtype") continue; // rewritten below
-    if (k === "status") continue; // rewritten below
-    if (k === "workflow_state") continue; // rewritten below
     if (k === "mode" && type === "slice") continue;
+    if (k === "type") {
+      out.type = type;
+      continue;
+    }
+    if (k === "subtype") {
+      // Keep an already-v4 file's key position, so a re-run is byte-identical.
+      if (alreadyV4) out.subtype = v;
+      continue;
+    }
+    if (k === "status") {
+      out.status = alreadyV4 ? v : status;
+      continue;
+    }
+    if (k === "workflow_state") {
+      if (alreadyV4 || normalizedState !== null) {
+        out.workflow_state = alreadyV4 ? v : normalizedState;
+      }
+      continue;
+    }
     out[k] = v;
   }
 
-  out.type = type;
+  // A file that carried no `type` key at all still needs one.
+  if (!("type" in out)) out.type = type;
 
   const subtype = subtypeOf(data, type);
-  if (subtype !== null) out.subtype = subtype;
+  if (subtype !== null && !("subtype" in out)) out.subtype = subtype;
 
-  const v3Status = typeof data.status === "string" ? data.status : null;
-  const hasWorkflow = type === "task" || type === "ticket";
-  const workflowState = hasWorkflow ? workflowStateOf(v3Status) : null;
-  const status = okfStatusOf(v3Status, workflowState);
-
-  // Normalize invalid combinations: draft only pairs with todo, deprecated
-  // only with done. A normalized pair is recorded for human eyes.
-  let normalized = status;
-  let normalizedState = workflowState;
-  if (normalized === "draft" && normalizedState !== null && normalizedState !== "todo") {
-    normalizedState = "todo";
+  if (!("status" in out)) out.status = status;
+  if (normalizedState !== null && !("workflow_state" in out)) {
+    out.workflow_state = normalizedState;
   }
-  if (normalized === "deprecated" && normalizedState !== null && normalizedState !== "done") {
-    normalizedState = "done";
-  }
-  const reason = validateCombination(normalized, normalizedState);
-  if (reason !== null) {
-    normalized = "stable";
-  }
-  if (normalized !== status || normalizedState !== workflowState) {
-    needsHuman.push({
-      kind: "normalized-combination",
-      path,
-      detail: `normalized '${path}': status '${status}' with workflow_state '${workflowState}' is not a valid OKF pair`,
-    });
-  }
-
-  out.status = normalized;
-  if (normalizedState !== null) out.workflow_state = normalizedState;
   return out;
 }
 
@@ -399,6 +425,10 @@ function vintageLocation(
   // `archive/<dir>/...`: the v3 archive. For a map the dir is the effort;
   // for a task it is the slug and the effort comes from its `map:` field.
   if (rest[0] === "archive") {
+    // Already-v4 archive: `archive/<effort>/<tasks|tickets>/<slug>/...`.
+    if ((rest[2] === "tickets" || rest[2] === "tasks") && rest[3] !== undefined) {
+      return { archived: true, effort: rest[1] ?? null, slug: rest[3] };
+    }
     return { archived: true, effort: null, slug: rest[1] ?? null };
   }
   // `out-of-scope/...` and the bundle's own root files have no effort.
@@ -444,6 +474,9 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
   const progressPath = opts.progressPath ?? DEFAULT_PROGRESS_PATH;
   const allPaths = tree.list().map(posix);
 
+  // Idempotence: an already-v4 tree needs no plan, and every step below
+  // detects its own already-applied state and stages nothing. The marker is
+  // an optimization, not the correctness mechanism.
   const plan: Plan = {
     moves: [],
     writes: new Map(),
@@ -456,7 +489,7 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
   // Step 1: reorganize the layout, unify frontmatter, backfill aux files,
   // reshape the archive. One pass over every markdown file in the tree.
   if (!doneSteps.has(1)) {
-    reorganize(tree, allPaths, plan, opts.dryRun === true);
+    reorganize(tree, allPaths, plan);
   }
 
   // Step 2: rebuild state.yaml.
@@ -471,7 +504,7 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
 
   // Step 4: write the root index.
   if (!doneSteps.has(4)) {
-    writeIndex(plan, allPaths);
+    writeIndex(tree, plan, allPaths);
   }
 
   // Step 5: backfill CHANGELOG.md and out-of-scope/README.md.
@@ -484,41 +517,44 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
     fixDeadPointer(tree, allPaths, plan);
   }
 
-  const noop = isV4(tree, allPaths) && plan.moves.length === 0 && plan.writes.size === 0;
-
-  if (!opts.dryRun) {
-    for (const { from: src, to } of plan.moves) tree.stageMove(src, to);
-    for (const [path, content] of plan.writes) tree.stageWrite(path, content);
-    if (noop) {
-      // Idempotence: nothing staged, nothing to commit.
-    } else {
-      tree.commit({ failAfterWrites: opts.failAfterWrites });
-      // The marker is written after the commit, so an interrupted run
-      // resumes from the last completed step.
-      writeProgress(tree, progressPath);
-      if (from >= 4) tree.stageDelete(progressPath);
-    }
+  if (opts.dryRun) {
+    return {
+      from,
+      to: 4,
+      changes: plan.changes,
+      needsHuman: plan.needsHuman,
+      noop: plan.moves.length === 0 && plan.writes.size === 0,
+    };
   }
+
+  for (const { from: src, to } of plan.moves) tree.stageMove(src, to);
+  for (const [path, content] of plan.writes) tree.stageWrite(path, content);
+
+  // The marker records the steps this run completed. It is staged in the
+  // same commit as the changes, so a crash between the two commits below
+  // leaves a marker that a re-run reads and skips; every step is
+  // independently idempotent, so a marker that goes missing still converges.
+  writeProgress(tree, progressPath);
+
+  try {
+    tree.commit({ failAfterWrites: opts.failAfterWrites });
+  } catch (e) {
+    // On any failure the tree is left untouched.
+    tree.rollback();
+    throw e;
+  }
+
+  // The marker is deleted on success: a completed migration leaves none.
+  tree.stageDelete(progressPath);
+  tree.commit({});
 
   return {
     from,
     to: 4,
     changes: plan.changes,
     needsHuman: plan.needsHuman,
-    noop,
+    noop: plan.moves.length === 0 && plan.writes.size === 0,
   };
-}
-
-/** True when the tree already carries the v4 stamp and the v4 layout. */
-function isV4(tree: TreePort, paths: string[]): boolean {
-  if (!paths.includes(STATE_PATH)) return false;
-  try {
-    const raw = parseYamlFile(tree.read(STATE_PATH));
-    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return false;
-    return (raw as Record<string, unknown>).schema_version === 4;
-  } catch {
-    return false;
-  }
 }
 
 function readProgress(tree: TreePort, progressPath: string): Set<number> {
@@ -551,7 +587,6 @@ function reorganize(
   tree: TreePort,
   paths: string[],
   plan: Plan,
-  dryRun: boolean,
 ): void {
   const markdown = sorted(paths.filter(isMarkdown));
   const legacySliceDirs = new Set<string>();
@@ -673,6 +708,9 @@ function auxHome(
   const file = basenameOf(path);
   if (place !== undefined) {
     const base = place.archived ? ARCHIVE : TASK_ROOT;
+    // The arch spec is shared by the effort's whole ticket chain, so it lives
+    // at the effort root rather than beside one ticket.
+    if (file === "arch-spec.md") return `${base}/${place.effort}/arch-spec.md`;
     const containerDir = segments(path).includes("deviation-reports")
       ? "deviation-reports/"
       : "";
@@ -881,10 +919,17 @@ function dirnameOf(p: string): string {
 /**
  * Write `docs/tasks/index.md` carrying `okf_version: "0.2"` and a listing of
  * the tree.
+ *
+ * The listing is derived from the tree's final shape (each source path mapped
+ * through the planned moves), so a re-run over the migrated tree computes the
+ * same listing and stages nothing.
  */
-function writeIndex(plan: Plan, paths: string[]): void {
+function writeIndex(tree: TreePort, plan: Plan, paths: string[]): void {
+  const moved = new Map(plan.moves.map((m) => [m.from, m.to]));
+  const finalPaths = paths.map((p) => moved.get(p) ?? p);
+
   const efforts = new Set<string>();
-  for (const path of paths) {
+  for (const path of finalPaths) {
     const parts = segments(path);
     const i = parts.indexOf("tasks", parts.indexOf("docs") === 0 ? 1 : 0);
     if (i === -1) continue;
@@ -895,15 +940,6 @@ function writeIndex(plan: Plan, paths: string[]): void {
       continue;
     }
     if (rest[0] === "out-of-scope") continue;
-    if (rest.length === 1) continue;
-    efforts.add(rest[0]);
-  }
-  for (const move of plan.moves) {
-    const parts = segments(move.to);
-    const i = parts.indexOf("tasks");
-    if (i === -1) continue;
-    const rest = parts.slice(i + 1);
-    if (rest[0] === undefined || rest[0] === "archive") continue;
     if (rest.length === 1) continue;
     efforts.add(rest[0]);
   }
@@ -923,6 +959,7 @@ function writeIndex(plan: Plan, paths: string[]): void {
     title: "docs/tasks",
   };
   const content = dump({ data, body });
+  if (safeRead(tree, INDEX_PATH) === content) return;
   plan.writes.set(INDEX_PATH, content);
   plan.changes.push({
     action: "add",
@@ -939,12 +976,15 @@ function backfillBundleFiles(tree: TreePort, paths: string[], plan: Plan): void 
     const doc = readDoc(tree, CHANGELOG_PATH);
     const body = doc?.body ?? "\n# Task Changelog\n";
     const data: FrontmatterData = { type: "changelog", title: "Task Changelog" };
-    plan.writes.set(CHANGELOG_PATH, dump({ data, body }));
-    plan.changes.push({
-      action: "rewrite",
-      path: CHANGELOG_PATH,
-      detail: `backfilled frontmatter on '${CHANGELOG_PATH}'`,
-    });
+    const content = dump({ data, body });
+    if (safeRead(tree, CHANGELOG_PATH) !== content) {
+      plan.writes.set(CHANGELOG_PATH, content);
+      plan.changes.push({
+        action: "rewrite",
+        path: CHANGELOG_PATH,
+        detail: `backfilled frontmatter on '${CHANGELOG_PATH}'`,
+      });
+    }
   } else {
     const data: FrontmatterData = { type: "changelog", title: "Task Changelog" };
     plan.writes.set(CHANGELOG_PATH, dump({ data, body: "\n# Task Changelog\n" }));
