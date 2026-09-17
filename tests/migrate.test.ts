@@ -670,6 +670,42 @@ describe("migrate: no two files collapse to one destination", () => {
   });
 });
 
+describe("migrate: free-form aux notes", () => {
+  test("a note beside a ticket is backfilled and moved with it", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: effort\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/alpha/task.md":
+        "---\nkind: task\ntype: feature\nslug: alpha\ntitle: Alpha\nmap: effort\nstatus: done\nblocked_by: []\n---\n",
+      "docs/tasks/alpha/limitations.md": "# Limitations\n\nknown gaps\n",
+    });
+    migrate(tree);
+    const files = tree.snapshot();
+    const note = files["docs/tasks/effort/tickets/alpha/limitations.md"];
+    expect(note).toBeDefined();
+    expect(note).toContain("known gaps");
+    const data = parse(note).data;
+    expect(typeof data.type).toBe("string");
+    expect(data.type).not.toBe("");
+    expect(data.title).toBe("Limitations");
+    expect(files["docs/tasks/alpha/limitations.md"]).toBeUndefined();
+  });
+
+  test("every non-slice markdown in the migrated tree carries a non-empty type", () => {
+    const tree = port({ ...V3_FILES });
+    migrate(tree);
+    for (const [path, content] of Object.entries(tree.snapshot())) {
+      if (!path.endsWith(".md")) continue;
+      // Legacy slice docs are reported and left untouched by design.
+      if (path.split("/").includes("slices")) continue;
+      const data = parse(content).data;
+      expect(typeof data.type, `${path} has no type`).toBe("string");
+      expect(data.type, `${path} has an empty type`).not.toBe("");
+    }
+  });
+});
+
 describe("migrate: map-level aux files", () => {
   test("a handoff beside the map moves with the effort", () => {
     const tree = port({

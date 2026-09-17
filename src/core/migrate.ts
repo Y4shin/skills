@@ -700,12 +700,16 @@ function reorganize(
       const type = auxTypeForPath(path);
       if (type === null) {
         // An unrecognized markdown beside an effort anchor (a handoff, a
-        // comparison note) still belongs to that effort: move it with the
-        // anchor so the maps/ subtree empties and nothing is orphaned.
-        const anchor = effortRoots.get(placeKey(loc));
+        // comparison note, a limitations list) still belongs to that effort:
+        // move it with the anchor and give it conformant frontmatter, so the
+        // maps/ subtree empties and the bundle stays OKF-conformant.
+        const anchor = effortRoots.get(placeKey(loc)) ?? placement.get(placeKey(loc));
         if (anchor !== undefined) {
           const base = anchor.archived ? ARCHIVE : TASK_ROOT;
-          const dest = `${base}/${anchor.effort}/${basenameOf(path)}`;
+          const inContainer = "container" in anchor;
+          const dest = inContainer
+            ? `${base}/${anchor.effort}/${(anchor as { container: string }).container}/${loc.slug ?? ""}/${basenameOf(path)}`
+            : `${base}/${anchor.effort}/${basenameOf(path)}`;
           stageMoveIfNeeded(path, dest, plan);
           plan.writes.set(
             dest,
