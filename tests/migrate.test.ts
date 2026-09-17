@@ -670,6 +670,27 @@ describe("migrate: no two files collapse to one destination", () => {
   });
 });
 
+describe("migrate: unparseable frontmatter", () => {
+  test("a file whose frontmatter will not parse is reported, not rewritten", () => {
+    // A title with an unquoted ': ' makes the YAML invalid. The migration
+    // must not guess: it reports the file and leaves it byte-identical.
+    const broken =
+      "---\nkind: task\ntype: feature\nslug: broken\ntitle: Fix: the thing\n" +
+      "map: effort\nstatus: ready\nblocked_by: []\n---\n\nbody\n";
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: effort\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/broken/task.md": broken,
+    });
+    const report = migrate(tree);
+    expect(tree.snapshot()["docs/tasks/broken/task.md"]).toBe(broken);
+    const item = report.needsHuman.find((h) => h.kind === "unparseable");
+    expect(item).toBeDefined();
+    expect(item!.path).toBe("docs/tasks/broken/task.md");
+  });
+});
+
 describe("migrate: free-form aux notes", () => {
   test("a note beside a ticket is backfilled and moved with it", () => {
     const tree = port({

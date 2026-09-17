@@ -70,6 +70,7 @@ export interface HumanItem {
     | "vendored-tree"
     | "unresolvable-ref"
     | "dead-pointer"
+    | "unparseable"
     | "normalized-combination";
   path: string;
   detail: string;
@@ -405,20 +406,39 @@ function shapeFrontmatter(
   return out;
 }
 
-/** Read an artifact's frontmatter and body, or null when it has none. */
-function readDoc(tree: TreePort, path: string): { data: FrontmatterData; body: string } | null {
+/**
+ * Read an artifact's frontmatter and body.
+ *
+ * Returns null when the file has no frontmatter at all, and a distinct
+ * `broken` marker when it has a frontmatter fence but the YAML inside will
+ * not parse. The two cases are different: a file with no frontmatter is an
+ * aux file to backfill, while a file with unparseable frontmatter is a
+ * pre-existing defect the migration must report rather than guess at.
+ */
+function readDoc(
+  tree: TreePort,
+  path: string,
+): { data: FrontmatterData; body: string } | { broken: true } | null {
   let text: string;
   try {
     text = tree.read(path);
   } catch {
     return null;
   }
+  if (!text.startsWith("---")) return null;
   try {
     const doc = parse(text);
     return { data: doc.data, body: doc.body };
   } catch {
-    return null;
+    return { broken: true };
   }
+}
+
+/** True when readDoc found a frontmatter fence the YAML parser rejects. */
+function isBroken(
+  doc: ReturnType<typeof readDoc>,
+): doc is { broken: true } {
+  return doc !== null && "broken" in doc;
 }
 
 /** The first heading of a markdown body, as a title fallback. */
@@ -650,7 +670,7 @@ function reorganize(
   for (const path of markdown) {
     const loc = vintageLocation(path);
     const doc = readDoc(tree, path);
-    if (doc === null) continue;
+    if (doc === null || isBroken(doc)) continue;
     const type = effectiveType(doc.data);
     if (type !== "task" && type !== "ticket") {
       // A map or spec anchors its effort root, so an aux file beside it has
@@ -695,6 +715,17 @@ function reorganize(
     if (under(path, `${TASK_ROOT}/out-of-scope`)) continue;
 
     const doc = readDoc(tree, path);
+    if (isBroken(doc)) {
+      // The file has a frontmatter fence the YAML parser rejects. The
+      // migration never guesses at a broken document: it reports it and
+      // leaves it byte-identical.
+      plan.needsHuman.push({
+        kind: "unparseable",
+        path,
+        detail: `'${path}' has frontmatter that does not parse as YAML; fix it by hand and re-run`,
+      });
+      continue;
+    }
     if (doc === null) {
       // A markdown file with no frontmatter: an aux file to backfill.
       const type = auxTypeForPath(path);
@@ -1010,13 +1041,13 @@ function reportRest(tree: TreePort, paths: string[], plan: Plan): void {
   for (const path of paths) {
     if (!isMarkdown(path)) continue;
     const doc = readDoc(tree, path);
-    if (doc === null) continue;
+    if (doc === null || isBroken(doc)) continue;
     const slug = slugOf(path);
     if (slug !== null) provided.add(slug);
   }
   for (const path of sorted(paths.filter(isMarkdown))) {
     const doc = readDoc(tree, path);
-    if (doc === null) continue;
+    if (doc === null || isBroken(doc)) continue;
     const blocked = doc.data.blocked_by;
     if (!Array.isArray(blocked)) continue;
     for (const target of blocked.map(String)) {
@@ -1124,7 +1155,7 @@ function writeIndex(tree: TreePort, plan: Plan, paths: string[]): void {
 function backfillBundleFiles(tree: TreePort, paths: string[], plan: Plan): void {
   if (paths.includes(CHANGELOG_PATH)) {
     const doc = readDoc(tree, CHANGELOG_PATH);
-    const body = doc?.body ?? "\n# Task Changelog\n";
+    const body = doc !== null && !isBroken(doc) ? doc.body : "\n# Task Changelog\n";
     const data: FrontmatterData = { type: "changelog", title: "Task Changelog" };
     const content = dumpVerified(CHANGELOG_PATH, data, body);
     if (safeRead(tree, CHANGELOG_PATH) !== content) {
@@ -1149,7 +1180,7 @@ function backfillBundleFiles(tree: TreePort, paths: string[], plan: Plan): void 
   const oosIndex = `${TASK_ROOT}/out-of-scope/index.md`;
   if (paths.includes(oosReadme)) {
     const doc = readDoc(tree, oosReadme);
-    const body = doc?.body ?? "\n# out-of-scope\n";
+    const body = doc !== null && !isBroken(doc) ? doc.body : "\n# out-of-scope\n";
     const data: FrontmatterData = {
       type: "out-of-scope note",
       title: "out-of-scope",
