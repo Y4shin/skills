@@ -98,27 +98,18 @@ arch-spec's enumerated set). No deviation report was written for this slice.
 The live `docs/tasks` tree is untouched and still v3; the v3 fallbacks are
 what keep it served until the migration runs. `state.yaml` is unchanged.
 
-Carried forward, one blocker for the very next step:
+Carried forward, one blocker for the very next step, **resolved in
+`ffad626` and hardened in the review follow-up**:
 
-1. **The new `task_finalizable` breaks the live v3 finalize gate.** The
-   arch-spec promised the tools "keep serving the v3 tree unchanged while
-   gaining v4 semantics", and gave `task_finalizable` a status-based primary
-   check with the v3 slice-count check kept as a secondary gate. The primary
-   check has no v3 fallback: `itemFinalizable` reads `workflow_state` alone,
-   and no live v3 task doc carries that field (all ten live task docs have
-   `status` only). Verified against the live tree through the registered
-   tool: `task_finalizable overhaul-graph-tools` now throws "has no
-   workflow_state; finalizable requires workflow_state 'done'", where the
-   pre-slice code returned "ready to finalize". The same holds for every live
-   task, and for the map selector (`task-tools-overhaul`). This lands
-   directly on `/skill:finalize-task` Step 0, which calls
-   `task_finalizable <slug>` and requires "ready to finalize", so the
-   finalize step for this task cannot pass until either the live tree is
-   migrated (a user call, and the migration's natural moment is later) or
-   `itemFinalizable` gains a v3 fallback that reads `status: done` when
-   `workflow_state` is absent. The suite does not catch it: the v3 fixture in
-   `tests/plugin.test.ts` was patched to carry `workflow_state: done`, which
-   is exactly the mechanical edit that hides the gap, and no test drives the
-   tool against the live v3 shape. The other three rewired tools
-   (`task_frontier`, `task_dependency_levels`, `task_map_finalizable`) keep
-   their v3 fallbacks and are unaffected.
+1. ~~**The new `task_finalizable` breaks the live v3 finalize gate.**~~
+   `itemFinalizable` gained the v3 fallback this note asked for: when
+   `workflow_state` is absent (the v3 shape), legacy `status` is the
+   done-ness source, so live v3 task docs get status-based answers instead
+   of a `workflow_state` error. Verified against the live tree through the
+   registered tool (`task_finalizable overhaul-graph-tools` now names
+   `status 'ready', not 'done'`; a done v3 task passes). Regression coverage:
+   `tests/graph.test.ts` (v3 fallback, both directions) and
+   `tests/plugin.test.ts` (the live v3 shape: status-only frontmatter).
+   The v3 fixtures keep a schema-valid pair (`status: stable` plus
+   `workflow_state: done`) after review flagged the first draft's
+   `draft`/`done` combination as a conformance violation.

@@ -141,13 +141,17 @@ exists, at least one ticket exists.
 _Avoid_: map array (the v3 registration mechanism the scan replaced)
 
 **Anomaly** (v4):
-A graph defect the tools report instead of silently dropping: an orphaned
-artifact (type disagrees with location, or a task/ticket in an effort with
-no map and no spec), a `blocked_by` target no artifact in the same effort
-provides, an invalid `status`/`workflow_state` combination, or a deprecated
-artifact (treated as done, kept visible in a `## Deprecated` block).
-Produced by `findAnomalies` in `src/core/art.ts`, surfaced by every graph
-tool as a `## Anomalies` block (or an `anomalies` array under `--json`).
+A graph defect the tools report instead of silently dropping, produced by
+`findAnomalies` in `src/core/art.ts` in four kinds: `missing-type`
+(frontmatter without a non-empty OKF type), `invalid-combination` (a
+`status`/`workflow_state` pair the conformance rules forbid), `orphan`
+(type disagrees with location, or a task/ticket in an effort with no map
+and no spec), and `missing-blocked-by-target` (a `blocked_by` entry no
+artifact in the same effort provides). Graph tools surface them as a
+`## Anomalies` block in text output or an `anomalies` array under
+`--json`. A deprecated artifact is a separate visibility channel, not an
+anomaly kind: it counts as done, sits out of the graph, and stays visible
+through the `## Deprecated (out of the graph)` block on `task_frontier`.
 _Avoid_: error (an anomaly never fails the tool; it is reported alongside
 the answer)
 

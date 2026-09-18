@@ -28,7 +28,7 @@ function seedTree(t: string): void {
   );
   writeFileSync(
     join(t, "docs/tasks/login/task.md"),
-    "---\nkind: task\ntitle: Login\nslug: login\nstatus: draft\nworkflow_state: done\nslices:\n  - do-thing\n  - other-thing\nmap: auth\nstarted_at: 42\n---\n",
+    "---\nkind: task\ntitle: Login\nslug: login\nstatus: stable\nworkflow_state: done\nslices:\n  - do-thing\n  - other-thing\nmap: auth\nstarted_at: 42\n---\n",
   );
   writeFileSync(
     join(t, "docs/tasks/login/slices/1-do-thing.md"),
@@ -233,7 +233,7 @@ describe("task-workflow tools", () => {
     test("returns a field value", async () => {
       const t = mkTmp(); seedTree(t);
       const out = await tools.task_get.execute({ selector: "login", field: "status" }, ctx(t));
-      expect(out).toBe("draft");
+      expect(out).toBe("stable");
     });
 
     test("returns empty string for missing field", async () => {
@@ -369,7 +369,7 @@ describe("task-workflow tools", () => {
 
     test("filters by status", async () => {
       const t = mkTmp(); seedTree(t);
-      const out = await tools.task_list.execute({ status: "draft" }, ctx(t));
+      const out = await tools.task_list.execute({ status: "stable" }, ctx(t));
       expect(out).toContain("login");
       expect(out).not.toContain("config");
     });
@@ -870,6 +870,32 @@ describe("task-workflow tools: scan-based graph tools", () => {
       const out = await tools.task_frontier.execute({ selector: "billing" }, ctx(t));
       expect(out).toContain("legacy-shim");
       expect(out).toMatch(/deprecated/i);
+    });
+
+    test("dependency levels carry the deprecated set", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_dependency_levels.execute({ selector: "billing" }, ctx(t));
+      const parsed = JSON.parse(out);
+      expect(parsed.deprecated.map((a: any) => a.slug)).toContain("legacy-shim");
+    });
+
+    test("map finalizable reports the deprecated set once everything is done", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      // Finish every open item: the effort goes finalizable with the
+      // deprecated ticket still visible.
+      const open = [
+        "tasks/prototype-api/task.md",
+        "tickets/login-form/ticket.md",
+        "tickets/api-fix/ticket.md",
+        "tickets/ghost-blocked/ticket.md",
+      ];
+      for (const rel of open) {
+        const file = join(t, "docs/tasks/billing", rel);
+        writeFileSync(file, readFileSync(file, "utf-8").replace("workflow_state: todo", "workflow_state: done"), "utf-8");
+      }
+      const out = await tools.task_map_finalizable.execute({ selector: "billing" }, ctx(t));
+      expect(out).toContain("ready to finalize");
+      expect(out).toContain("legacy-shim");
     });
   });
 

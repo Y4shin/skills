@@ -1,6 +1,15 @@
 # Architecture spec: overhaul-graph-tools
 
-Status: awaiting user approval.
+Status: approved by the user (2026-09-18), implemented. Two landed deviations
+from this text, both reviewed and accepted: `src/core/art.ts` gained **two**
+exports (`effortKeyOf` and `effortDirOf`; the map's grouping key needs the
+directory rule, and duplicating it would have been worse), and
+`tests/integration/harness.ts` grew the same mechanical `workflow_state`
+fixture field as `tests/plugin.test.ts`. `itemFinalizable` also gained a v3
+fallback (legacy `status` is the done-ness source when `workflow_state` is
+absent); the original text specified the status-based check without one,
+contradicting the "keep serving the v3 tree unchanged" invariant, and the
+land-worker caught it against the live tree.
 Scope: `src/core/graph.ts` (new), `src/pi.ts` (rewire the graph tools and the
 schema reference), `tests/graph.test.ts` (new), and the v3 graph-tool tests in
 `tests/plugin.test.ts` (mechanically re-pointed at the new fixture shape).

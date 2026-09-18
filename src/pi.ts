@@ -745,7 +745,8 @@ export function createTools(): Record<string, Tool> {
           const graph = graphForPath(effortGraphs(index), resolved.path);
           if (hasScanChildren(graph)) {
             const levels = effortLevels(graph!);
-            return JSON.stringify({ ...levels, anomalies: graph!.anomalies }, null, 2);
+            const deprecated = graph!.deprecated.map((a) => ({ slug: a.slug, type: a.type }));
+            return JSON.stringify({ ...levels, deprecated, anomalies: graph!.anomalies }, null, 2);
           }
           // v3 fallback: the map's own array is the graph.
           const children = mapChildInfos(root, resolved.path);
@@ -786,6 +787,7 @@ export function createTools(): Record<string, Tool> {
               efforts.map((g) => ({
                 slug: g.slug,
                 frontier: effortFrontier(g).map((a) => ({ slug: a.slug, type: a.type })),
+                deprecated: g.deprecated.map((a) => ({ slug: a.slug, type: a.type })),
                 anomalies: g.anomalies,
               })),
               null, 2,
@@ -798,7 +800,7 @@ export function createTools(): Record<string, Tool> {
                 const lines = items.length === 0
                   ? [`${g.slug}: (empty frontier)`]
                   : [`${g.slug}:`, ...items.map((a) => `  ${a.slug} (${a.type})`)];
-                return withAnomalies(lines.join("\n"), g.anomalies);
+                return withDeprecated(withAnomalies(lines.join("\n"), g.anomalies), g.deprecated);
               }).join("\n");
           return text;
         }
@@ -868,12 +870,15 @@ export function createTools(): Record<string, Tool> {
         if (hasScanChildren(graph)) {
           const reason = effortFinalizable(graph!);
           if (reason !== null) throw new Error(reason);
-          return withAnomalies("ready to finalize: all children done", graph!.anomalies);
+          return withDeprecated(
+            withAnomalies("ready to finalize: all children done", graph!.anomalies),
+            graph!.deprecated,
+          );
         }
         // v3 fallback: the map's own array is the source of truth.
         const tasks = Array.isArray(resolved.doc.data["tasks"]) ? resolved.doc.data["tasks"] : [];
         const undone = tasks.filter((t: any) => !t.done).map((t: any) => t.slug || "?");
-        if (undone.length === 0) return "ready to finalize — all children done";
+        if (undone.length === 0) return "ready to finalize: all children done";
         throw new Error(`unfinished children: ${undone.join(", ")}`);
       },
     ),
