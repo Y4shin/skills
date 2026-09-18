@@ -111,6 +111,15 @@ describe("effortGraphs", () => {
     expect(graphFor(idx, "spec-only").map).toBeNull();
     expect(graphFor(idx, "spec-only").spec?.slug).toBe("spec-only");
   });
+
+  test("a spec-only effort is not finalizable (the false-finalizable class)", () => {
+    // The pi-harness-evals class: an effort whose only artifact is a spec
+    // must never read as finalizable, map or no map.
+    const idx = index([spec("spec-only", "spec-only")]);
+    const reason = effortFinalizable(graphFor(idx, "spec-only"));
+    expect(reason).not.toBeNull();
+    expect(reason).toMatch(/no tickets/);
+  });
 });
 
 describe("effortFrontier", () => {
@@ -297,5 +306,19 @@ describe("itemFinalizable", () => {
     const reason = itemFinalizable(task("research", "billing", { workflow_state: null }));
     expect(reason).not.toBeNull();
     expect(reason).toMatch(/workflow_state/);
+  });
+
+  test("a v3-shape artifact falls back to status: done", () => {
+    expect(
+      itemFinalizable(task("legacy", "legacy", { shape: "v3", status: "done", workflow_state: null })),
+    ).toBeNull();
+  });
+
+  test("a v3-shape artifact with an unfinished status names it", () => {
+    const reason = itemFinalizable(
+      task("legacy", "legacy", { shape: "v3", status: "ready", workflow_state: null }),
+    );
+    expect(reason).not.toBeNull();
+    expect(reason).toContain("ready");
   });
 });

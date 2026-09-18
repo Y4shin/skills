@@ -815,6 +815,26 @@ describe("task-workflow tools: scan-based graph tools", () => {
       const t = mkTmp(); seedTree(t);
       await expect(tools.task_finalizable.execute({ selector: "login" }, ctx(t))).rejects.toThrow(/open slice/);
     });
+
+    test("falls back to status: done on the live v3 shape (no workflow_state)", async () => {
+      const t = mkTmp();
+      // The live v3 tree carries status only, never workflow_state. The
+      // pre-overhaul tool returned "ready to finalize" for these; the
+      // status-based rewrite must keep serving them.
+      writeMd(
+        join(t, "docs/tasks/legacy-done/task.md"),
+        "kind: task\ntitle: Legacy done\nslug: legacy-done\nstatus: done\nslices: []\nmap: auth\n",
+      );
+      writeMd(
+        join(t, "docs/tasks/legacy-open/task.md"),
+        "kind: task\ntitle: Legacy open\nslug: legacy-open\nstatus: ready\nslices: []\nmap: auth\n",
+      );
+      const out = await tools.task_finalizable.execute({ selector: "legacy-done" }, ctx(t));
+      expect(out).toContain("ready to finalize");
+      await expect(
+        tools.task_finalizable.execute({ selector: "legacy-open" }, ctx(t)),
+      ).rejects.toThrow(/ready/);
+    });
   });
 
   describe("anomaly classes are reported, never silently dropped", () => {

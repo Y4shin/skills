@@ -203,11 +203,22 @@ export function liveFrontier(index: ScanIndexLike): EffortGraph[] {
   });
 }
 
-/** Null when finalizable, else a human-readable reason. Status-based. */
+/**
+ * Null when finalizable, else a human-readable reason. Status-based.
+ *
+ * v4 artifacts gate on `workflow_state: done`. A v3-shape artifact carries
+ * no `workflow_state` at all, so its legacy `status` field is the done-ness
+ * source: `status: done` passes, anything else names the status. This keeps
+ * the live v3 tree finalizable until the migration runs.
+ */
 export function itemFinalizable(art: Artifact): string | null {
   if (art.workflow_state === "done") return null;
-  if (art.workflow_state === null) {
-    return `artifact '${art.slug}' has no workflow_state; finalizable requires workflow_state 'done'`;
+  if (art.workflow_state !== null) {
+    return `artifact '${art.slug}' has workflow_state '${art.workflow_state}', not 'done'`;
   }
-  return `artifact '${art.slug}' has workflow_state '${art.workflow_state}', not 'done'`;
+  if (art.shape === "v3") {
+    if (art.status === "done") return null;
+    return `artifact '${art.slug}' has status '${art.status ?? "(absent)"}', not 'done'`;
+  }
+  return `artifact '${art.slug}' has no workflow_state; finalizable requires workflow_state 'done'`;
 }

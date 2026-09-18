@@ -868,7 +868,7 @@ export function createTools(): Record<string, Tool> {
         if (hasScanChildren(graph)) {
           const reason = effortFinalizable(graph!);
           if (reason !== null) throw new Error(reason);
-          return withAnomalies("ready to finalize — all children done", graph!.anomalies);
+          return withAnomalies("ready to finalize: all children done", graph!.anomalies);
         }
         // v3 fallback: the map's own array is the source of truth.
         const tasks = Array.isArray(resolved.doc.data["tasks"]) ? resolved.doc.data["tasks"] : [];
