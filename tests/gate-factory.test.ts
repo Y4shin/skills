@@ -44,23 +44,23 @@ const trackedRepos: string[] = [];
 let globalSettings: { dir: string; cleanup: () => void } | undefined;
 
 const GATED_NAMES = [
-  "task_show",
-  "task_get",
-  "task_set",
-  "task_set_slices",
-  "task_resolve",
-  "task_assert_kind",
-  "task_list",
-  "task_slices",
-  "task_finalizable",
-  "task_dependency_levels",
-  "task_frontier",
-  "task_map_tasks",
-  "task_map_tick",
-  "task_map_finalizable",
-  "task_state",
-  "task_state_set",
-  "task_context",
+  "tw_show",
+  "tw_get",
+  "tw_set",
+  "tw_set_slices",
+  "tw_resolve",
+  "tw_assert_kind",
+  "tw_list",
+  "tw_slices",
+  "tw_finalizable",
+  "tw_dependency_levels",
+  "tw_frontier",
+  "tw_map_tasks",
+  "tw_map_tick",
+  "tw_map_finalizable",
+  "tw_state",
+  "tw_state_set",
+  "tw_context",
   "notify_user",
   "get_guidelines",
   "list_guidelines",
@@ -638,5 +638,18 @@ describe("factory gate", () => {
       expect(result.systemPrompt).toContain("<name>wayfinder</name>");
       expect(result.systemPrompt).toContain("<name>oracle</name>");
     });
+  });
+
+  test("registered tw_ tools derive their label from the tw_ prefix", () => {
+    setupPersonalRepo();
+    const stub = createStub();
+    factory(stub);
+
+    const labels = new Map(stub.tools.map((t: any) => [t.name, t.label]));
+    for (const name of GATED_NAMES) {
+      const suffix = name.replace(/^tw_/, "");
+      const expected = suffix.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      expect(labels.get(name)).toBe(expected);
+    }
   });
 });

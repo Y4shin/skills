@@ -52,86 +52,86 @@ async function session(extra?: Parameters<typeof createTaskSession>[0]): Promise
 // ─── 1. Tool dispatch + filesystem round-trip ────────────────────────────────
 
 describe("tool dispatch and filesystem round-trip", () => {
-  test("task_list sees the on-disk tree", async () => {
+  test("tw_list sees the on-disk tree", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_list", {})]),
-      (ctx: Context) => reply(`Tasks: ${latestToolResultText(ctx, "task_list") ?? "(none)"}`),
+      reply([call("tw_list", {})]),
+      (ctx: Context) => reply(`Tasks: ${latestToolResultText(ctx, "tw_list") ?? "(none)"}`),
     ]);
     await s.session.prompt("List tasks.");
-    expect(toolCallNames(s.events)).toContain("task_list");
-    expect(toolResultTexts(s.session, "task_list")[0]).toContain("login");
+    expect(toolCallNames(s.events)).toContain("tw_list");
+    expect(toolResultTexts(s.session, "tw_list")[0]).toContain("login");
     expect(lastAssistantText(s.session)).toContain("login");
   });
 
-  test("task_show returns frontmatter", async () => {
+  test("tw_show returns frontmatter", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_show", { selector: "login" })]),
-      (ctx: Context) => reply(`kind is ${(/kind: (\w+)/.exec(latestToolResultText(ctx, "task_show") ?? "")?.[1]) ?? "?"}`),
+      reply([call("tw_show", { selector: "login" })]),
+      (ctx: Context) => reply(`kind is ${(/kind: (\w+)/.exec(latestToolResultText(ctx, "tw_show") ?? "")?.[1]) ?? "?"}`),
     ]);
     await s.session.prompt("Show login.");
-    expect(toolResultTexts(s.session, "task_show")[0]).toContain("kind: task");
+    expect(toolResultTexts(s.session, "tw_show")[0]).toContain("kind: task");
     expect(lastAssistantText(s.session)).toContain("kind is task");
   });
 
-  test("task_assert_kind rejects a mismatch as a tool error", async () => {
+  test("tw_assert_kind rejects a mismatch as a tool error", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_assert_kind", { selector: "login", kind: "map" })]),
+      reply([call("tw_assert_kind", { selector: "login", kind: "map" })]),
       (ctx: Context) => {
-        const result = latestToolResultText(ctx, "task_assert_kind") ?? "";
+        const result = latestToolResultText(ctx, "tw_assert_kind") ?? "";
         return reply(result.includes("not") ? "mismatch as expected" : "unexpected success");
       },
     ]);
     await s.session.prompt("Assert login is a map.");
-    const results = toolResultTexts(s.session, "task_assert_kind");
+    const results = toolResultTexts(s.session, "tw_assert_kind");
     expect(results.some((t) => /not/.test(t))).toBe(true);
     expect(lastAssistantText(s.session)).toContain("mismatch as expected");
   });
 
-  test("task_get reads a field after task_set mutates it", async () => {
+  test("tw_get reads a field after tw_set mutates it", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_set", { selector: "login", field: "status", value: "in-progress" })]),
-      reply([call("task_get", { selector: "login", field: "status" })]),
-      (ctx: Context) => reply(`status now: ${latestToolResultText(ctx, "task_get") ?? "?"}`),
+      reply([call("tw_set", { selector: "login", field: "status", value: "in-progress" })]),
+      reply([call("tw_get", { selector: "login", field: "status" })]),
+      (ctx: Context) => reply(`status now: ${latestToolResultText(ctx, "tw_get") ?? "?"}`),
     ]);
     await s.session.prompt("Set login to in-progress, then read it back.");
-    expect(toolCallNames(s.events)).toEqual(["task_set", "task_get"]);
+    expect(toolCallNames(s.events)).toEqual(["tw_set", "tw_get"]);
     expect(lastAssistantText(s.session)).toContain("status now: in-progress");
     const onDisk = readFileSync(join(s.cwd, "docs/tasks/login/task.md"), "utf-8");
     expect(onDisk).toContain("status: in-progress");
   });
 
-  test("task_finalizable blocks while a slice is open", async () => {
+  test("tw_finalizable blocks while a slice is open", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_finalizable", { selector: "login" })]),
-      (ctx: Context) => reply(latestToolResultText(ctx, "task_finalizable") ?? "?"),
+      reply([call("tw_finalizable", { selector: "login" })]),
+      (ctx: Context) => reply(latestToolResultText(ctx, "tw_finalizable") ?? "?"),
     ]);
     await s.session.prompt("Can we finalize login?");
-    expect(toolResultTexts(s.session, "task_finalizable")[0]).toMatch(/open slice/);
+    expect(toolResultTexts(s.session, "tw_finalizable")[0]).toMatch(/open slice/);
   });
 
-  test("task_show works on slices by slug", async () => {
+  test("tw_show works on slices by slug", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_show", { selector: "do-thing" })]),
-      (ctx: Context) => reply(latestToolResultText(ctx, "task_show") ?? "?"),
+      reply([call("tw_show", { selector: "do-thing" })]),
+      (ctx: Context) => reply(latestToolResultText(ctx, "tw_show") ?? "?"),
     ]);
     await s.session.prompt("Show do-thing slice.");
-    const result = toolResultTexts(s.session, "task_show")[0];
+    const result = toolResultTexts(s.session, "tw_show")[0];
     expect(result).toContain("kind: slice");
     expect(result).toContain("slug: do-thing");
   });
 
-  test("task_set works on slices by slug", async () => {
+  test("tw_set works on slices by slug", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_set", { selector: "do-thing", field: "status", value: "in-progress" })]),
+      reply([call("tw_set", { selector: "do-thing", field: "status", value: "in-progress" })]),
       (ctx: Context) => {
-        const result = latestToolResultText(ctx, "task_set") ?? "";
+        const result = latestToolResultText(ctx, "tw_set") ?? "";
         return reply(result.includes("in-progress") ? "set ok" : "set failed");
       },
     ]);
@@ -141,25 +141,25 @@ describe("tool dispatch and filesystem round-trip", () => {
     expect(onDisk).toContain("status: in-progress");
   });
 
-  test("task_dependency_levels returns levels", async () => {
+  test("tw_dependency_levels returns levels", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_dependency_levels", { selector: "login" })]),
-      (ctx: Context) => reply(latestToolResultText(ctx, "task_dependency_levels") ?? "?"),
+      reply([call("tw_dependency_levels", { selector: "login" })]),
+      (ctx: Context) => reply(latestToolResultText(ctx, "tw_dependency_levels") ?? "?"),
     ]);
     await s.session.prompt("Get dependency levels for login.");
-    const result = toolResultTexts(s.session, "task_dependency_levels")[0];
+    const result = toolResultTexts(s.session, "tw_dependency_levels")[0];
     expect(result).toContain("levels");
     const parsed = JSON.parse(result);
     expect(parsed.levels.length).toBeGreaterThanOrEqual(1);
     expect(parsed.remaining_count).toBe(2);
   });
 
-  test("task_context returns schema", async () => {
+  test("tw_context returns schema", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_context", {})]),
-      (ctx: Context) => reply(latestToolResultText(ctx, "task_context") ?? "?"),
+      reply([call("tw_context", {})]),
+      (ctx: Context) => reply(latestToolResultText(ctx, "tw_context") ?? "?"),
     ]);
     await s.session.prompt("Get context.");
     expect(lastAssistantText(s.session)).toContain("Frontmatter schema");
@@ -169,24 +169,24 @@ describe("tool dispatch and filesystem round-trip", () => {
 // ─── 2. Multi-turn conversations ─────────────────────────────────────────────
 
 describe("multi-turn state mutations", () => {
-  test("task_map_tick + task_map_finalizable cross-turn", async () => {
+  test("tw_map_tick + tw_map_finalizable cross-turn", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_map_tick", { selector: "auth", task_slug: "login" })]),
-      reply([call("task_map_tick", { selector: "auth", task_slug: "sso" })]),
-      reply([call("task_map_finalizable", { selector: "auth" })]),
-      (ctx: Context) => reply(latestToolResultText(ctx, "task_map_finalizable") ?? "?"),
+      reply([call("tw_map_tick", { selector: "auth", task_slug: "login" })]),
+      reply([call("tw_map_tick", { selector: "auth", task_slug: "sso" })]),
+      reply([call("tw_map_finalizable", { selector: "auth" })]),
+      (ctx: Context) => reply(latestToolResultText(ctx, "tw_map_finalizable") ?? "?"),
     ]);
     await s.session.prompt("Tick both children done, then check map.");
     expect(lastAssistantText(s.session)).toContain("ready to finalize");
   });
 
-  test("task_state_set writes, task_state reads back", async () => {
+  test("tw_state_set writes, tw_state reads back", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_state_set", { field: "task", value: "login" })]),
-      reply([call("task_state", {})]),
-      (ctx: Context) => reply(`active: ${latestToolResultText(ctx, "task_state") ?? "?"}`),
+      reply([call("tw_state_set", { field: "task", value: "login" })]),
+      reply([call("tw_state", {})]),
+      (ctx: Context) => reply(`active: ${latestToolResultText(ctx, "tw_state") ?? "?"}`),
     ]);
     await s.session.prompt("Set state and read it.");
     expect(lastAssistantText(s.session)).toContain("login");
@@ -228,12 +228,12 @@ describe("guidelines extension", () => {
 // ─── 4. Edge cases ──────────────────────────────────────────────────────────
 
 describe("edge cases", () => {
-  test("task_list on tree without docs/tasks is graceful", async () => {
+  test("tw_list on tree without docs/tasks is graceful", async () => {
     const s = await createTaskSession({ extensions: ALL_EXTENSIONS, projectFiles: {} });
     sessions.push(s);
     s.setResponses([
-      reply([call("task_list", {})]),
-      (ctx: Context) => reply(latestToolResultText(ctx, "task_list") ?? "?"),
+      reply([call("tw_list", {})]),
+      (ctx: Context) => reply(latestToolResultText(ctx, "tw_list") ?? "?"),
     ]);
     await s.session.prompt("List tasks.");
     expect(lastAssistantText(s.session)).toMatch(/\(empty\)|no docs\/tasks/);
@@ -242,9 +242,9 @@ describe("edge cases", () => {
   test("resolve of nonexistent slug errors gracefully", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("task_resolve", { selector: "does-not-exist" })]),
+      reply([call("tw_resolve", { selector: "does-not-exist" })]),
       (ctx: Context) => {
-        const result = latestToolResultText(ctx, "task_resolve") ?? "";
+        const result = latestToolResultText(ctx, "tw_resolve") ?? "";
         return reply(result.includes("matches") ? "not found as expected" : "unexpected");
       },
     ]);
@@ -252,12 +252,12 @@ describe("edge cases", () => {
     expect(lastAssistantText(s.session)).toContain("not found as expected");
   });
 
-  test("task_state works on fresh tree", async () => {
+  test("tw_state works on fresh tree", async () => {
     const s = await createTaskSession({ extensions: ALL_EXTENSIONS, projectFiles: {} });
     sessions.push(s);
     s.setResponses([
-      reply([call("task_state", {})]),
-      (ctx: Context) => reply(latestToolResultText(ctx, "task_state") ?? "?"),
+      reply([call("tw_state", {})]),
+      (ctx: Context) => reply(latestToolResultText(ctx, "tw_state") ?? "?"),
     ]);
     await s.session.prompt("Check state.");
     expect(lastAssistantText(s.session)).toContain("(none)");

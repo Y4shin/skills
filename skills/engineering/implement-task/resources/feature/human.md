@@ -20,7 +20,7 @@ no slice code, including tests, may be written before that handoff.
 
 ## 2. Handoff each slice to the human
 
-Use `task_dependency_levels` and the task's `blocked_by` graph to process slices
+Use `tw_dependency_levels` and the task's `blocked_by` graph to process slices
 in dependency order. Before each slice, present a handoff containing:
 
 - the slice goal, current task context, dependencies, and non-code context;

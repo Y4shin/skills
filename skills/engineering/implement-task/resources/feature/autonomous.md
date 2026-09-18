@@ -4,12 +4,12 @@ Implements every non-done slice of a feature task. Steps are: architecture spec 
 
 ## Step 0 -- Prerequisites
 
-Task doc exists with `slices:` list. Each slice has `## Test plan`, `size`, `blocked_by`. Run `task_slices <slug>` to enumerate.
+Task doc exists with `slices:` list. Each slice has `## Test plan`, `size`, `blocked_by`. Run `tw_slices <slug>` to enumerate.
 
 ```
 const taskSlug = "<task-slug>"
 const taskPath = `docs/tasks/${taskSlug}/task.md`
-const pendingSlices = task_slices(taskSlug)
+const pendingSlices = tw_slices(taskSlug)
   .filter(s => s.status !== "done")
 ```
 
@@ -42,8 +42,8 @@ Once approved, write to `docs/tasks/${taskSlug}/arch-spec.md`.
 The task's slices form a **task graph** with blocking relationships: each
 slice declares its `blocked_by` dependencies, and the **frontier** is the set
 of ready, unfinished slices (all blockers done). Call
-`task_dependency_levels <taskSlug>` to get BFS levels. The graph model is
-the same one `task_frontier` exposes: a level is a wave of slices whose
+`tw_dependency_levels <taskSlug>` to get BFS levels. The graph model is
+the same one `tw_frontier` exposes: a level is a wave of slices whose
 blockers are all in prior levels.
 
 **Communication via context pointers.** Communicate to and from subagents
@@ -69,11 +69,11 @@ truly independent. The choice does not change the chain itself -- only
 whether chains run serially on one cwd or concurrently across worktrees.
 
 ```
-levels = JSON.parse(task_dependency_levels(taskSlug)).levels
+levels = JSON.parse(tw_dependency_levels(taskSlug)).levels
 
 for each level in levels:
     for each slice in level:   // sequential: chains share the repo cwd
-        size = task_get(<slice-path>, "size")
+        size = tw_get(<slice-path>, "size")
         budgets = { s: [15, 120], m: [30, 300], l: [60, 600], xl: [90, 1200] }
         [maxTurns, timeoutMs] = budgets[size] || budgets.m
 
@@ -193,7 +193,7 @@ Task doc: ${taskPath}
 TDD output: {outputs.tdd}. Verify output: {outputs.verify}.
 
 Merge the slice branch into the task branch, archive the slice doc, commit.
-Set task_set status done on slice.`
+Set tw_set status done on slice.`
                 }
             ],
             failFast: true
@@ -222,8 +222,8 @@ Set task_set status done on slice.`
         // (diagnose → split → retry +50% → escalate). Never fix code yourself.
 
         // success path: slice landed
-        task_set <slice-path> status done
-        task_state_set task <taskSlug>
+        tw_set <slice-path> status done
+        tw_state_set task <taskSlug>
 
     // After each level: read deviation reports for slices that flagged
     // user-attention-needed. Update the arch spec for pending slices if API
