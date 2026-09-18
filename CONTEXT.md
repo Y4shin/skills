@@ -129,6 +129,28 @@ with `todo`, `deprecated` only with `done`, `stable` with any. Absent status
 means `stable`; spec, map, and aux files carry no `workflow_state`.
 _Avoid_: status (that is the OKF field; this is the workflow half)
 
+**Effort graph** (v4):
+The scan-derived view of one effort: the map, the optional spec, the tasks,
+the tickets, and the deprecated items, grouped from a directory scan of the
+tree rather than read from the map's frontmatter. Computed by
+`src/core/graph.ts` (`effortGraphs`); the map holds no per-child state, the
+directory is the registration. Frontiers and dependency levels are computed
+per kind within an effort (task chains and ticket chains independently); an
+effort is finalizable when every task and ticket is done and, if a spec
+exists, at least one ticket exists.
+_Avoid_: map array (the v3 registration mechanism the scan replaced)
+
+**Anomaly** (v4):
+A graph defect the tools report instead of silently dropping: an orphaned
+artifact (type disagrees with location, or a task/ticket in an effort with
+no map and no spec), a `blocked_by` target no artifact in the same effort
+provides, an invalid `status`/`workflow_state` combination, or a deprecated
+artifact (treated as done, kept visible in a `## Deprecated` block).
+Produced by `findAnomalies` in `src/core/art.ts`, surfaced by every graph
+tool as a `## Anomalies` block (or an `anomalies` array under `--json`).
+_Avoid_: error (an anomaly never fails the tool; it is reported alongside
+the answer)
+
 **Skill bucket**:
 One of five directories under `skills/`: `engineering/` (daily code work,
 promoted), `productivity/` (non-code workflow, promoted), `misc/` (kept,
