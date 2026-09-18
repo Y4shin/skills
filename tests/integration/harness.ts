@@ -190,7 +190,7 @@ export function seedTaskTree(cwd: string): void {
   mkdirSync(join(cwd, "docs/tasks/login/slices"), { recursive: true });
   writeFileSync(
     join(cwd, "docs/tasks/login/task.md"),
-    "---\nkind: task\ntitle: Login\nslug: login\nstatus: draft\nslices:\n  - do-thing\n  - other-thing\nmap: auth\n---\n",
+    "---\nkind: task\ntitle: Login\nslug: login\nstatus: draft\nworkflow_state: done\nslices:\n  - do-thing\n  - other-thing\nmap: auth\n---\n",
   );
   mkdirSync(join(cwd, "docs/tasks/maps/auth"), { recursive: true });
   writeFileSync(

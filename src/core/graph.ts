@@ -74,20 +74,6 @@ export function effortGraphs(index: ScanIndexLike): Map<string, EffortGraph> {
     else groups.set(key, [hit.art]);
   }
 
-  // A map whose slug names an effort that also has its own group folds into
-  // that group. The slug fallback covers a v3 map whose children carry a
-  // `map:` field instead of living in the effort directory.
-  for (const [key, arts] of [...groups]) {
-    if (!key.startsWith("dir:")) continue;
-    if (!arts.every((a) => a.type === "map")) continue;
-    const slug = slugFromKey(key);
-    const target = groups.get(`map:${slug}`);
-    if (target) {
-      target.push(...arts);
-      groups.delete(key);
-    }
-  }
-
   const graphs = new Map<string, EffortGraph>();
   for (const [key, arts] of groups) {
     graphs.set(key, buildGraph(slugFromKey(key), arts, index.anomalies));
