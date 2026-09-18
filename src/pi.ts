@@ -486,6 +486,17 @@ function withAnomalies(text: string, anomalies: Anomaly[]): string {
   return `${text}\n\n## Anomalies\n\n${anomalies.map((a) => `- [${a.kind}] ${a.detail}`).join("\n")}`;
 }
 
+/**
+ * Append the deprecated block. Deprecated artifacts count as done and sit out
+ * of the graph, so the report is how they stay visible instead of silently
+ * disappearing.
+ */
+function withDeprecated(text: string, deprecated: Artifact[]): string {
+  if (deprecated.length === 0) return text;
+  const lines = deprecated.map((a) => `- ${a.slug} (${a.type})`);
+  return `${text}\n\n## Deprecated (out of the graph)\n\n${lines.join("\n")}`;
+}
+
 // ─── State helpers ─────────────────────────────────────────────────────────────
 
 function loadState(root: string): WorkflowState {
@@ -802,7 +813,7 @@ export function createTools(): Record<string, Tool> {
           const text = frontier.length === 0
             ? "(empty frontier)"
             : frontier.map((a) => `${a.slug} (${a.type})`).join("\n");
-          return withAnomalies(text, graph!.anomalies);
+          return withDeprecated(withAnomalies(text, graph!.anomalies), graph!.deprecated);
         }
 
         // v3 fallback: the map's own array, resolved through the legacy path.

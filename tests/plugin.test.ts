@@ -702,12 +702,13 @@ describe("task-workflow tools: scan-based graph tools", () => {
     test("lists the per-kind frontier and omits the deprecated ticket", async () => {
       const t = mkTmp(); seedGraphTree(t);
       const out = await tools.task_frontier.execute({ selector: "billing" }, ctx(t));
-      expect(out).toContain("prototype-api");
-      expect(out).toContain("login-form");
-      expect(out).toContain("ghost-blocked");
-      expect(out).not.toContain("api-fix");
-      expect(out).not.toContain("legacy-shim");
-      expect(out).not.toContain("research-cache");
+      const frontierSection = out.split("## ")[0]!;
+      expect(frontierSection).toContain("prototype-api");
+      expect(frontierSection).toContain("login-form");
+      expect(frontierSection).toContain("ghost-blocked");
+      expect(frontierSection).not.toContain("api-fix");
+      expect(frontierSection).not.toContain("legacy-shim");
+      expect(frontierSection).not.toContain("research-cache");
     });
 
     test("appends the anomalies block", async () => {
@@ -784,6 +785,20 @@ describe("task-workflow tools: scan-based graph tools", () => {
         tools.task_map_finalizable.execute({ selector: "billing" }, ctx(t)),
       ).rejects.toThrow(/prototype-api/);
     });
+
+    test("the spec-only false-finalizable fixture reads as unfinished", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      // The spec-only effort has no map, so it is not a map selector target.
+      // The reachable false-finalizable case is the map-plus-spec effort whose
+      // only child is a spec: it must be refused, naming the ticket rule.
+      await expect(
+        tools.task_map_finalizable.execute({ selector: "spec-zero" }, ctx(t)),
+      ).rejects.toThrow(/ticket/);
+      // And the spec-only effort contributes no unfinished work to the root
+      // frontier: it is not silently reported as ready either.
+      const out = await tools.task_frontier.execute({ selector: join(t, "docs/tasks") }, ctx(t));
+      expect(out).not.toContain("spec-only");
+    });
   });
 
   describe("task_finalizable", () => {
@@ -828,6 +843,13 @@ describe("task-workflow tools: scan-based graph tools", () => {
       const parsed = JSON.parse(out);
       expect(parsed.frontier.map((a: any) => a.slug)).not.toContain("legacy-shim");
       expect(parsed.deprecated.map((a: any) => a.slug)).toContain("legacy-shim");
+    });
+
+    test("a deprecated artifact is reported in the text output too", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_frontier.execute({ selector: "billing" }, ctx(t));
+      expect(out).toContain("legacy-shim");
+      expect(out).toMatch(/deprecated/i);
     });
   });
 
