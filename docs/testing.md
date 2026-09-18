@@ -39,7 +39,7 @@
   value types (numbers stay numbers, real nulls never become the string
   `"None"`), a sequence of two writes, and the legacy shape the module must
   preserve but no longer model. See `tests/state.test.ts` and the
-  `task_state` / `task_state_set` blocks in `tests/plugin.test.ts`.
+  `tw_state` / `tw_state_set` blocks in `tests/plugin.test.ts`.
 - **Dual-shape parsers (the v3 to v4 transition):** when one parser must read
   both an old and a new frontmatter shape, discriminate on the key that only
   the old shape has (`kind`), never on the key both share (`type`, which means

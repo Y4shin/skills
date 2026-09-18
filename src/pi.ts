@@ -585,7 +585,7 @@ const OptBool = { type: "boolean" as const, optional: true as const };
 
 export function createTools(): Record<string, Tool> {
   return {
-    task_show: def(
+    tw_show: def(
       "Show artifact frontmatter (map, task, or slice).",
       { selector: Str("Slug or path"), json: OptBool },
       async (p, ctx) => {
@@ -599,7 +599,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_get: def(
+    tw_get: def(
       "Print a single frontmatter field of an artifact.",
       { selector: Str("Slug or path"), field: Str("Field name") },
       async (p, ctx) => {
@@ -609,7 +609,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_set: def(
+    tw_set: def(
       "Set a scalar frontmatter field (auto-typed: int, bool, null, string).",
       { selector: Str("Slug or path"), field: Str("Field name"), value: Str("New value") },
       async (p, ctx) => {
@@ -628,7 +628,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_set_slices: def(
+    tw_set_slices: def(
       "Set a task's `slices:` list to the given slice slugs.",
       { selector: Str("Task slug or path"), slugs: { type: "array" as const, items: Str("Slice slug") } },
       async (p, ctx) => {
@@ -640,7 +640,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_resolve: def(
+    tw_resolve: def(
       "Resolve a slug or path to the artifact's file path.",
       { selector: Str("Slug or path"), kind: OptStr("Wanted OKF type (map, ticket, task, spec, arch spec)") },
       async (p, ctx) => {
@@ -649,7 +649,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_assert_kind: def(
+    tw_assert_kind: def(
       "Assert an artifact's type (map, ticket, task, spec, arch spec). Fails on mismatch.",
       {
         selector: Str("Slug or path"),
@@ -663,7 +663,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_list: def(
+    tw_list: def(
       "List artifacts. Excludes archived by default.",
       {
         kind: { type: "string" as const, optional: true, enum: ["map", "task"] },
@@ -701,7 +701,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_slices: def(
+    tw_slices: def(
       "List a task's active (non-archived) slice docs.",
       { selector: Str("Task slug or path"), json: OptBool },
       async (p, ctx) => {
@@ -713,7 +713,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_finalizable: def(
+    tw_finalizable: def(
       "Check an artifact is ready to finalize (workflow_state done; legacy tasks also need no open slices).",
       { selector: Str("Task or ticket slug or path") },
       async (p, ctx) => {
@@ -734,7 +734,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_dependency_levels: def(
+    tw_dependency_levels: def(
       "Compute BFS dependency levels from an effort map's scan or a legacy task's remaining slices.",
       { selector: Str("Map or task slug") },
       async (p, ctx) => {
@@ -772,7 +772,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_frontier: def(
+    tw_frontier: def(
       "List the ready edge of an effort's graph: unfinished tasks and tickets whose blockers are done.",
       { selector: Str("Map slug or path, or the tasks root for the effort frontier"), json: OptBool },
       async (p, ctx) => {
@@ -827,7 +827,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_map_tasks: def(
+    tw_map_tasks: def(
       "List a map's planned child tasks with their done state.",
       { selector: Str("Map slug or path"), json: OptBool },
       async (p, ctx) => {
@@ -840,7 +840,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_map_tick: def(
+    tw_map_tick: def(
       "Mark a map's child task as finalized (done: true).",
       { selector: Str("Map slug or path"), task_slug: Str("Child task slug") },
       async (p, ctx) => {
@@ -859,7 +859,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_map_finalizable: def(
+    tw_map_finalizable: def(
       "Check every task and ticket of an effort is done (and, with a spec, that tickets exist).",
       { selector: Str("Map slug or path") },
       async (p, ctx) => {
@@ -883,7 +883,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_state: def(
+    tw_state: def(
       "Show the current workflow state (map and task pointers) from state.yaml.",
       {},
       async (_p, ctx) => {
@@ -896,7 +896,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_state_set: def(
+    tw_state_set: def(
       `Set a workflow state field (${POINTER_NAMES.join(" or ")}). Use 'null' to clear.`,
       { field: Str(`Field: ${POINTER_NAMES.map((n) => `'${n}'`).join(" or ")}`), value: Str("New value (or 'null')") },
       async (p, ctx) => {
@@ -918,7 +918,7 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    task_context: def(
+    tw_context: def(
       "Return project context: artifact schema + optional profile.",
       {},
       async (_p, ctx) => {
@@ -966,7 +966,7 @@ export default function (pi: ExtensionAPI) {
 
       pi.registerTool({
         name,
-        label: name.replace(/^task_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        label: name.replace(/^tw_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
         description: def.description,
         parameters: Type.Object(params),
         async execute(_id: string, args: any, _sig: any, _upd: any, ctx: any) {

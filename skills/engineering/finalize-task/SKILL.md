@@ -16,7 +16,7 @@ metadata:
 
 ## Step 0, Prerequisites
 
-`task_finalizable <slug>`, must return "ready to finalize" (no open slices).
+`tw_finalizable <slug>`, must return "ready to finalize" (no open slices).
 
 ## Step 1, CI gate
 
@@ -25,7 +25,7 @@ git checkout task/{taskSlug}
 git merge main 2>/dev/null || true
 ```
 
-Run the project's CI command (from `task_context` profile or detected from repo tooling). If it fails: STOP. Fix forward on the task branch. Do not merge a red branch.
+Run the project's CI command (from `tw_context` profile or detected from repo tooling). If it fails: STOP. Fix forward on the task branch. Do not merge a red branch.
 
 Fix-forward is a designed-for adjustment, record that it fired so its
 frequency can be correlated. Call `submit_feedback({ kind: "expected", data })`
@@ -105,8 +105,8 @@ Read the task doc frontmatter.
 
 ## Step 7, Archive
 
-Step 7 interleaves **Pi tool calls** with shell commands. `task_map_tick` and
-`task_state_set` are tools you invoke as functions, **not** shell binaries:
+Step 7 interleaves **Pi tool calls** with shell commands. `tw_map_tick` and
+`tw_state_set` are tools you invoke as functions, **not** shell binaries:
 wrapping them in a `set -e` block makes them fail with `command not found`
 (exit 127) and abort the sequence. Call them as tools, and run the shell steps
 in a separate bash block.
@@ -114,7 +114,7 @@ in a separate bash block.
 1. **If the task belongs to a map**, call the Pi tool:
 
    ```
-   task_map_tick <map-slug> {taskSlug}  # Pi tool, not a shell command
+   tw_map_tick <map-slug> {taskSlug}  # Pi tool, not a shell command
    ```
 
    (If the map has no matching child task, it errors harmlessly; fall back to
@@ -123,8 +123,8 @@ in a separate bash block.
 2. **Call the Pi tool** to clear workflow state:
 
    ```
-   task_state_set task null   # Pi tool, not a shell command
-   task_state_set slice null  # Pi tool, not a shell command
+   tw_state_set task null   # Pi tool, not a shell command
+   tw_state_set slice null  # Pi tool, not a shell command
    ```
 
 3. **Archive the task directory and merge the branch** (shell, safe under
@@ -143,7 +143,7 @@ in a separate bash block.
 
 ## Step 8, Map finalization (if last child)
 
-If `task_map_finalizable` returns ready for the map:
+If `tw_map_finalizable` returns ready for the map:
 - Summarize the map to CHANGELOG.md
 - Archive the map: `git mv docs/tasks/maps/<slug>/ docs/tasks/maps/archive/<slug>/`
 - Finalize map doc

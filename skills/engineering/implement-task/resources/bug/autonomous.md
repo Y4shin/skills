@@ -10,10 +10,10 @@ Bug task doc exists with `type: bug`, `bug: <slug>`, and a `slices:` list. The s
 ```
 const taskSlug = "<task-slug>"
 const taskPath = `docs/tasks/${taskSlug}/task.md`
-const bugSlug = task_get(taskPath, "bug")
+const bugSlug = tw_get(taskPath, "bug")
 const bugPath = `docs/bugs/${bugSlug}.md`
 const reproPath = `docs/tasks/${taskSlug}/repro.md`
-const slice = task_slices(taskSlug)[0]
+const slice = tw_slices(taskSlug)[0]
 ```
 
 ## Step 1  --  Single chain dispatch
@@ -26,7 +26,7 @@ Run one sequential chain that shares the repo working directory: `tdd-worker →
 > interruptible, and steerable.
 
 ```
-size = task_get(<slice-path>, "size")
+size = tw_get(<slice-path>, "size")
 budgets = { s: [15, 120], m: [30, 300], l: [60, 600], xl: [90, 1200] }
 [maxTurns, timeoutMs] = budgets[size] || budgets.m
 
@@ -75,7 +75,7 @@ Task doc: ${taskPath}
 TDD output: {outputs.tdd}. Verify output: {outputs.verify}.
 
 Merge the slice branch into the task branch, archive the slice doc, commit.
-Set task_set status done on slice.`
+Set tw_set status done on slice.`
         }
     ],
     failFast: true

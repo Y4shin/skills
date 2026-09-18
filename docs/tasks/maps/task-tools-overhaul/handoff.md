@@ -27,15 +27,15 @@ noted below.
 - Every ticket lives at `docs/tasks/<slug>/task.md` plus
   `slices/1-<slug>.md` (v3 frontmatter shape, `mode: afk`, one slice
   per ticket, test plans distilled from acceptance criteria). The
-  pipeline enumerates them via `task_slices`; verified before commit:
-  `task_slices overhaul-state-module` reports its slice todo.
-- Dependency levels (task_dependency_levels task-tools-overhaul):
+  pipeline enumerates them via `tw_slices`; verified before commit:
+  `tw_slices overhaul-state-module` reports its slice todo.
+- Dependency levels (tw_dependency_levels task-tools-overhaul):
   1 overhaul-state-module → 2 overhaul-artifact-model →
   3 overhaul-v4-migration → 4 overhaul-graph-tools →
   5 overhaul-tw-rename → 6/7 overhaul-planning-skills ∥
   overhaul-execution-skills (parallel) → 8 overhaul-dead-surface.
   Frontier: overhaul-state-module.
-- `task_finalizable` was pinned down while publishing: it is neither
+- `tw_finalizable` was pinned down while publishing: it is neither
   deleted nor lost. It survives, reworked to a status-based
   predicate in ticket 4, renamed in ticket 5, consumed by finalize
   prose in ticket 7. The spec's survivor/delete lists omit it; the
@@ -80,7 +80,7 @@ tool names and the OLD conventions where it touches live artifacts.
 `docs/tasks/state.yaml` reads `task: null / slice: null /
 schema_version: 3` (hand-restored; the current tool wipes the
 version key on every write, the confirmed bug ticket 1 kills).
-After any `task_state_set` call, check that file and restore
+After any `tw_state_set` call, check that file and restore
 `schema_version: 3` if the tool dropped it.
 
 ## Known in-flight work, not yours to finish

@@ -53,18 +53,18 @@ Invokes, by heading:
   array." No tool is named; none exists for creation.
 - "Hand off, don't build": escape-hatch telemetry, "record that it fired
   by calling `submit_feedback({ kind: "expected", data })`".
-- "Resuming": step 2, "Inspect the current frontier with `task_frontier`".
+- "Resuming": step 2, "Inspect the current frontier with `tw_frontier`".
   This is the only `task_*` invocation in the whole skill.
 - Final Feedback note: `submit_feedback({ kind, data })`.
 
-Never mentions: task_show, task_get, task_set, task_set_slices,
-task_resolve, task_assert_kind, task_list, task_slices, task_finalizable,
-task_dependency_levels, task_map_tasks, task_map_tick, task_map_finalizable,
-task_state, task_state_set, task_context, notify_user, get_guidelines,
+Never mentions: tw_show, tw_get, tw_set, tw_set_slices,
+tw_resolve, tw_assert_kind, tw_list, tw_slices, tw_finalizable,
+tw_dependency_levels, tw_map_tasks, tw_map_tick, tw_map_finalizable,
+tw_state, tw_state_set, tw_context, notify_user, get_guidelines,
 list_guidelines, subagent, ask_user_question.
 
 Implicit dependencies: the `docs/tasks/` tree and state.yaml that
-setup-workflow scaffolds (never named here, but task_frontier fails
+setup-workflow scaffolds (never named here, but tw_frontier fails
 without the tree); CONTEXT.md and ADRs ("Entry": "inspect ... existing
 `CONTEXT.md`, ADRs").
 
@@ -107,22 +107,22 @@ Invokes, by heading:
 - Frontmatter description: "using the task_* tools for the graph". A
   generic claim; no creation tool exists and none is named.
 - "### 5. Publish the tickets under docs/tasks/", step 3: "The graph is
-  now queryable via `task_dependency_levels <map-slug>` (BFS levels) and
-  `task_frontier <map-slug>` (ready, unfinished tasks)." Both are
+  now queryable via `tw_dependency_levels <map-slug>` (BFS levels) and
+  `tw_frontier <map-slug>` (ready, unfinished tasks)." Both are
   post-hoc queries; the publication steps 1-2 (write `task.md`, register
   in the map's `tasks` array, wire `blocked_by` in a second pass) name no
   tool and are pure file editing.
 
-Never mentions: task_show, task_get, task_set, task_set_slices,
-task_resolve, task_assert_kind, task_list, task_slices, task_finalizable,
-task_map_tasks, task_map_tick, task_map_finalizable, task_state,
-task_state_set, task_context, notify_user, get_guidelines, list_guidelines,
+Never mentions: tw_show, tw_get, tw_set, tw_set_slices,
+tw_resolve, tw_assert_kind, tw_list, tw_slices, tw_finalizable,
+tw_map_tasks, tw_map_tick, tw_map_finalizable, tw_state,
+tw_state_set, tw_context, notify_user, get_guidelines, list_guidelines,
 subagent, telemetry_skill_context, submit_feedback, ask_user_question.
 
 Slice prose: "### 3. Draft vertical slices" defines tracer-bullet rules
 and puts `slices: [<slice-slug>, ...]` in the ticket frontmatter, but the
 "### 5" publication step writes only `task.md` per ticket; no step
-creates the `slices/<n>-*.md` docs and no step names `task_set_slices`.
+creates the `slices/<n>-*.md` docs and no step names `tw_set_slices`.
 
 ### implement-task
 
@@ -133,26 +133,26 @@ Invokes, by location:
 - Telemetry note (top): "`telemetry_skill_context` tool with `{
   skill_name: "implement-task", sliceCount, map }` -- `sliceCount` = the
   number of slices in the task (from the task doc's `slices:` list or
-  `task_slices`)". The `slices:` list reading is prose; the tool only
+  `tw_slices`)". The `slices:` list reading is prose; the tool only
   counts legacy slice docs.
 - "Async dispatch (hard rule)" note: "every `subagent(...)` call in this
   skill's resources -- feature chains, bug chains, and any fan-out --
   MUST be launched with `async: true`", followed by `wait({ id })`.
-- Intro router: "Reads the task's `type` frontmatter via `task_get` and
+- Intro router: "Reads the task's `type` frontmatter via `tw_get` and
   dispatches to the appropriate resource. If `type:` is absent, default
-  to the existing feature path"; `const taskType = task_get(taskPath,
+  to the existing feature path"; `const taskType = tw_get(taskPath,
   "type") || "feature"`.
 - "Skill delegation for planning types": delegation to the `research` and
   `prototype` skills; and the paragraph "When invoked with a map, work
-  the ready frontier from `task_frontier`, routing each child task by its
+  the ready frontier from `tw_frontier`, routing each child task by its
   type."
 - Final Feedback note: `submit_feedback({ kind, data })`, plus "The
   tdd-worker, slice-verifier, deviation-reporter, and land-worker agents
   also call this tool themselves".
 
-Never mentions: task_show, task_list, task_set_slices, task_resolve,
-task_assert_kind, task_map_tasks, task_map_tick, task_map_finalizable,
-task_state, task_context, notify_user, list_guidelines.
+Never mentions: tw_show, tw_list, tw_set_slices, tw_resolve,
+tw_assert_kind, tw_map_tasks, tw_map_tick, tw_map_finalizable,
+tw_state, tw_context, notify_user, list_guidelines.
 
 Resources, per file:
 
@@ -164,22 +164,22 @@ Resources, per file:
 - `resources/feature/autonomous.md`:
   - "## Step 0 -- Prerequisites": "Task doc exists with `slices:` list.
     Each slice has `## Test plan`, `size`, `blocked_by`. Run
-    `task_slices <slug>` to enumerate."; `const pendingSlices =
-    task_slices(taskSlug).filter(s => s.status !== "done")`; if none
+    `tw_slices <slug>` to enumerate."; `const pendingSlices =
+    tw_slices(taskSlug).filter(s => s.status !== "done")`; if none
     pending: "All slices done. Run `/skill:finalize-task`."
   - "## Step 1 -- Architecture spec (user-approved)": writes
     `docs/tasks/${taskSlug}/arch-spec.md`; no tool.
   - "## Step 2 -- Per-slice chain dispatch": "Call
-    `task_dependency_levels <taskSlug>` to get BFS levels. The graph
-    model is the same one `task_frontier` exposes";
-    `levels = JSON.parse(task_dependency_levels(taskSlug)).levels`;
-    `size = task_get(<slice-path>, "size")`; the subagent chain
+    `tw_dependency_levels <taskSlug>` to get BFS levels. The graph
+    model is the same one `tw_frontier` exposes";
+    `levels = JSON.parse(tw_dependency_levels(taskSlug)).levels`;
+    `size = tw_get(<slice-path>, "size")`; the subagent chain
     (tdd-worker, slice-verifier, deviation-reporter, ui-noter,
     land-worker) with `async: true`, `failFast: true`, `wait({ id:
     runId })`; the tdd-worker prompt says "Call get_guidelines for
-    relevant languages."; the land-worker prompt says "Set task_set
+    relevant languages."; the land-worker prompt says "Set tw_set
     status done on slice."; the success path runs
-    `task_set <slice-path> status done` then `task_state_set task
+    `tw_set <slice-path> status done` then `tw_state_set task
     <taskSlug>`; the uncertainty path runs
     `submit_feedback({ kind: "expected", data: ... })` then
     `ask_user_question({...})`; the ui-noter dispatch references an
@@ -199,18 +199,18 @@ Resources, per file:
     data })` per action.
   - "## Workflow feedback": `submit_feedback`.
 - `resources/feature/human.md`: "## 2. Handoff each slice to the human"
-  uses `task_dependency_levels` ("Use `task_dependency_levels` and the
+  uses `tw_dependency_levels` ("Use `tw_dependency_levels` and the
   task's `blocked_by` graph to process slices in dependency order");
   sections 3-4 dispatch slice-verifier, deviation-reporter, code-reviewer,
-  land-worker; no task_* writes, no task_set, no task_state_set.
+  land-worker; no task_* writes, no tw_set, no tw_state_set.
 - `resources/bug/autonomous.md`:
   - "## Step 0  --  Prerequisites": "Bug task doc exists with `type:
     bug`, `bug: <slug>`, and a `slices:` list"; `const bugSlug =
-    task_get(taskPath, "bug")`; `const slice = task_slices(taskSlug)[0]`.
-  - "## Step 1  --  Single chain dispatch": `size = task_get(<slice-path>,
+    tw_get(taskPath, "bug")`; `const slice = tw_slices(taskSlug)[0]`.
+  - "## Step 1  --  Single chain dispatch": `size = tw_get(<slice-path>,
     "size")`; the chain (tdd-worker with skill `diagnosing-bugs`,
     slice-verifier, land-worker); tdd-worker prompt "Call get_guidelines
-    for relevant languages."; land-worker prompt "Set task_set status
+    for relevant languages."; land-worker prompt "Set tw_set status
     done on slice."; `wait({ id: runId })`.
   - "## Code review (advisory)": code-reviewer subagent.
   - "## Step 2  --  Report": finalize pointer.
@@ -232,29 +232,29 @@ Invokes, by heading:
 
 - Telemetry note: `telemetry_skill_context` with `{ skill_name:
   "finalize-task", map }`.
-- "## Step 0, Prerequisites": "`task_finalizable <slug>`, must return
+- "## Step 0, Prerequisites": "`tw_finalizable <slug>`, must return
   'ready to finalize' (no open slices)."
 - "## Step 1, CI gate": "Run the project's CI command (from
-  `task_context` profile or detected from repo tooling)"; fix-forward
+  `tw_context` profile or detected from repo tooling)"; fix-forward
   telemetry `submit_feedback({ kind: "expected", data })`.
 - "## Step 2, Impeccable note check": reads
   `docs/tasks/${taskSlug}/impeccable-note-*.md`; no tool.
 - "## Step 3, Knowledge harvest" through "## Step 6, Bug closure": file
   edits and git; Step 6 reads the `bug:` frontmatter by prose ("Get the
   linked bug slug from the task doc frontmatter"), never naming
-  `task_get`.
+  `tw_get`.
 - "## Step 7, Archive": "Step 7 interleaves **Pi tool calls** with shell
-  commands. `task_map_tick` and `task_state_set` are tools you invoke as
-  functions, **not** shell binaries"; then `task_map_tick <map-slug>
-  {taskSlug}`, `task_state_set task null`, `task_state_set slice null`,
+  commands. `tw_map_tick` and `tw_state_set` are tools you invoke as
+  functions, **not** shell binaries"; then `tw_map_tick <map-slug>
+  {taskSlug}`, `tw_state_set task null`, `tw_state_set slice null`,
   and the git block.
 - "## Step 8, Map finalization (if last child)": "If
-  `task_map_finalizable` returns ready for the map".
+  `tw_map_finalizable` returns ready for the map".
 - Final Feedback note: `submit_feedback`.
 
-Never mentions: task_show, task_get, task_set, task_set_slices,
-task_resolve, task_assert_kind, task_list, task_slices,
-task_dependency_levels, task_frontier, task_map_tasks, task_state,
+Never mentions: tw_show, tw_get, tw_set, tw_set_slices,
+tw_resolve, tw_assert_kind, tw_list, tw_slices,
+tw_dependency_levels, tw_frontier, tw_map_tasks, tw_state,
 notify_user, get_guidelines, list_guidelines, subagent,
 ask_user_question.
 
@@ -274,7 +274,7 @@ mentions `package.json` `pi.subagents` (a Pi package fact, not a tool).
 Implicit dependencies: `docs/tasks/state.yaml` (the
 `missing-state-yaml.md` symptom "The current task or slice is lost
 between sessions" assumes state.yaml actually carries that role, which
-today only task_state_set and the feature pipeline maintain).
+today only tw_state_set and the feature pipeline maintain).
 
 ### setup-workflow
 
@@ -448,10 +448,10 @@ Invokes, by heading:
 - "## The main flow: idea to ship": step 3 says tickets are declared
   "using the `task_*` tools for the graph" (generic), and step 2's
   grilling/prototype/handoff routing names skills only.
-- "## Read-only queries": `task_finalizable <slug>` ("Is this task
-  ready?"), `task_slices <slug>` "for legacy tasks" and `task_frontier
-  <map>` ("What's left on task X?"), `task_list` ("List tasks / maps"),
-  `task_show <slug>` ("Show artifact X"), `task_state` ("Where am I?"),
+- "## Read-only queries": `tw_finalizable <slug>` ("Is this task
+  ready?"), `tw_slices <slug>` "for legacy tasks" and `tw_frontier
+  <map>` ("What's left on task X?"), `tw_list` ("List tasks / maps"),
+  `tw_show <slug>` ("Show artifact X"), `tw_state` ("Where am I?"),
   plus a bash grep for the bug queue.
 - "## Actions": routes to skills only.
 - Final Feedback note: `submit_feedback({ kind, data })`.
@@ -465,85 +465,85 @@ Classification key: **load-bearing** (removing it breaks a named workflow
 step), **mentioned-but-unused** (a skill names it, but no pipeline step
 depends on it), **never-mentioned** (no skill names it at all).
 
-1. `task_show`: mentioned-but-unused. Only
+1. `tw_show`: mentioned-but-unused. Only
    `skills/engineering/task-workflow-overview/SKILL.md` "Read-only
-   queries" ("Show artifact X" | `task_show <slug>`). No flow skill calls
+   queries" ("Show artifact X" | `tw_show <slug>`). No flow skill calls
    it in a step.
-2. `task_get`: load-bearing. Router:
+2. `tw_get`: load-bearing. Router:
    `skills/engineering/implement-task/SKILL.md` intro ("Reads the task's
-   `type` frontmatter via `task_get` ... `const taskType =
-   task_get(taskPath, "type") || "feature"`"). Size budgets:
-   `resources/feature/autonomous.md` "Step 2" (`size = task_get(<slice-path>,
+   `type` frontmatter via `tw_get` ... `const taskType =
+   tw_get(taskPath, "type") || "feature"`"). Size budgets:
+   `resources/feature/autonomous.md` "Step 2" (`size = tw_get(<slice-path>,
    "size")`) and `resources/bug/autonomous.md` "Step 1" (same) plus
-   "Step 0" (`const bugSlug = task_get(taskPath, "bug")`).
-3. `task_set`: load-bearing. `resources/feature/autonomous.md` "Step 2"
-   success path (`task_set <slice-path> status done`) and the land-worker
-   prompt ("Set task_set status done on slice.");
+   "Step 0" (`const bugSlug = tw_get(taskPath, "bug")`).
+3. `tw_set`: load-bearing. `resources/feature/autonomous.md` "Step 2"
+   success path (`tw_set <slice-path> status done`) and the land-worker
+   prompt ("Set tw_set status done on slice.");
    `resources/bug/autonomous.md` "Step 1" land-worker prompt (same).
-4. `task_set_slices`: never-mentioned. No skill names it (grep across
+4. `tw_set_slices`: never-mentioned. No skill names it (grep across
    `skills/` finds only tests and `src/pi.ts` registration). The failure
    toolbelt's "update the task doc `slices:` list"
    (`resources/feature/autonomous.md` "Failure toolbelt";
    `resources/bug/autonomous.md` "Failure toolbelt") is the one workflow
    operation it exists for, and even there it is not named.
-5. `task_resolve`: never-mentioned. No skill names it.
-6. `task_assert_kind`: never-mentioned. No skill names it.
-7. `task_list`: mentioned-but-unused. Only
+5. `tw_resolve`: never-mentioned. No skill names it.
+6. `tw_assert_kind`: never-mentioned. No skill names it.
+7. `tw_list`: mentioned-but-unused. Only
    `skills/engineering/task-workflow-overview/SKILL.md` "Read-only
-   queries" ("List tasks / maps" | `task_list`). No pipeline step calls
+   queries" ("List tasks / maps" | `tw_list`). No pipeline step calls
    it.
-8. `task_slices`: load-bearing for the legacy pipelines only.
-   `resources/feature/autonomous.md` "Step 0" ("Run `task_slices <slug>`
-   to enumerate"; `const pendingSlices = task_slices(taskSlug)`),
+8. `tw_slices`: load-bearing for the legacy pipelines only.
+   `resources/feature/autonomous.md` "Step 0" ("Run `tw_slices <slug>`
+   to enumerate"; `const pendingSlices = tw_slices(taskSlug)`),
    `resources/bug/autonomous.md` "Step 0" (`const slice =
-   task_slices(taskSlug)[0]`), the implement-task telemetry note
+   tw_slices(taskSlug)[0]`), the implement-task telemetry note
    (sliceCount), and the router's "Read-only queries" ("for legacy
    tasks"). It enumerates only `slices/<n>-*.md` files
    (`src/pi.ts` `activeSlices`, `SLICE_RE`), never the `slices:`
    frontmatter list, so it is load-bearing exactly when legacy slice
    docs exist (see Slice machinery).
-9. `task_finalizable`: load-bearing.
+9. `tw_finalizable`: load-bearing.
    `skills/engineering/finalize-task/SKILL.md` "Step 0, Prerequisites"
-   ("`task_finalizable <slug>`, must return 'ready to finalize' (no open
+   ("`tw_finalizable <slug>`, must return 'ready to finalize' (no open
    slices)"); also the router's "Read-only queries".
-10. `task_dependency_levels`: load-bearing.
+10. `tw_dependency_levels`: load-bearing.
     `resources/feature/autonomous.md` "Step 2" ("Call
-    `task_dependency_levels <taskSlug>` to get BFS levels";
-    `levels = JSON.parse(task_dependency_levels(taskSlug)).levels`),
+    `tw_dependency_levels <taskSlug>` to get BFS levels";
+    `levels = JSON.parse(tw_dependency_levels(taskSlug)).levels`),
     `resources/feature/human.md` "2. Handoff each slice to the human"
-    ("Use `task_dependency_levels` and the task's `blocked_by` graph"),
+    ("Use `tw_dependency_levels` and the task's `blocked_by` graph"),
     `skills/engineering/to-tickets/SKILL.md` "### 5" (queryable-via
     mention). Its task branch is legacy-slice-only (same blind spot as
-    task_slices); its map branch is the live v3 path.
-11. `task_frontier`: load-bearing. `skills/engineering/wayfinder/SKILL.md`
+    tw_slices); its map branch is the live v3 path.
+11. `tw_frontier`: load-bearing. `skills/engineering/wayfinder/SKILL.md`
     "Resuming" step 2 ("Inspect the current frontier with
-    `task_frontier`"), `skills/engineering/implement-task/SKILL.md`
+    `tw_frontier`"), `skills/engineering/implement-task/SKILL.md`
     "Skill delegation for planning types" paragraph ("work the ready
-    frontier from `task_frontier`, routing each child task by its type"),
+    frontier from `tw_frontier`, routing each child task by its type"),
     `skills/engineering/to-tickets/SKILL.md` "### 5".
-12. `task_map_tasks`: never-mentioned. No skill names it. Wayfinder
-    "Resuming" inspects the frontier with `task_frontier` instead, and
+12. `tw_map_tasks`: never-mentioned. No skill names it. Wayfinder
+    "Resuming" inspects the frontier with `tw_frontier` instead, and
     to-tickets "### 5" registers tickets in the map's `tasks` array by
     editing the map doc.
-13. `task_map_tick`: load-bearing.
+13. `tw_map_tick`: load-bearing.
     `skills/engineering/finalize-task/SKILL.md` "Step 7, Archive" ("call
-    the Pi tool: `task_map_tick <map-slug> {taskSlug}`").
-14. `task_map_finalizable`: load-bearing.
+    the Pi tool: `tw_map_tick <map-slug> {taskSlug}`").
+14. `tw_map_finalizable`: load-bearing.
     `skills/engineering/finalize-task/SKILL.md` "Step 8, Map finalization
-    (if last child)" ("If `task_map_finalizable` returns ready for the
+    (if last child)" ("If `tw_map_finalizable` returns ready for the
     map").
-15. `task_state`: mentioned-but-unused. Only
+15. `tw_state`: mentioned-but-unused. Only
     `skills/engineering/task-workflow-overview/SKILL.md` "Read-only
-    queries" ("Where am I?" | `task_state`). Nothing in a pipeline reads
+    queries" ("Where am I?" | `tw_state`). Nothing in a pipeline reads
     it.
-16. `task_state_set`: load-bearing, with a confirmed data-loss bug.
-    `resources/feature/autonomous.md` "Step 2" (`task_state_set task
+16. `tw_state_set`: load-bearing, with a confirmed data-loss bug.
+    `resources/feature/autonomous.md` "Step 2" (`tw_state_set task
     <taskSlug>`) and `skills/engineering/finalize-task/SKILL.md` "Step 7"
-    (`task_state_set task null`, `task_state_set slice null`). Bug
+    (`tw_state_set task null`, `tw_state_set slice null`). Bug
     evidence under Contradictions: every write drops `schema_version`.
-17. `task_context`: mentioned-but-unused in the operative sense.
+17. `tw_context`: mentioned-but-unused in the operative sense.
     `skills/engineering/finalize-task/SKILL.md` "Step 1, CI gate" is the
-    only mention ("from `task_context` profile or detected from repo
+    only mention ("from `tw_context` profile or detected from repo
     tooling"); the tool returns the artifact schema plus an optional
     `docs/tasks/profile.md` (`src/pi.ts` `profileText`), not a CI
     command, and no `profile.md` exists in this repo and setup-workflow
@@ -601,7 +601,7 @@ depends on it), **never-mentioned** (no skill names it at all).
 
 Each entry names the prose, the behavior, and the owner of each side.
 
-1. **task_context's schema text denies the ticket phase** (confirmed
+1. **tw_context's schema text denies the ticket phase** (confirmed
    instance from the map). Behavior: `src/pi.ts` `artifactSchemaRef()`
    ends "The map and task bodies are the specification; there is no
    separate ticket-generation phase." Prose: the v3 flow's named phases
@@ -610,9 +610,9 @@ Each entry names the prose, the behavior, and the owner of each side.
    `skills/engineering/to-tickets/SKILL.md` ("### 5. Publish the tickets
    under docs/tasks/"), routed by
    `skills/engineering/task-workflow-overview/SKILL.md` "The main flow:
-   idea to ship" step 3. Any agent that calls task_context for guidance
+   idea to ship" step 3. Any agent that calls tw_context for guidance
    is told the flow's second and third phases do not exist.
-2. **task_context's documented task schema omits `slices:`**. Behavior:
+2. **tw_context's documented task schema omits `slices:`**. Behavior:
    the schema text's Task section lists kind, slug, title, type, map,
    blocked_by, status, size, started_at, completed_at; no `slices` field.
    Prose: `skills/engineering/to-tickets/SKILL.md` "### 3" puts `slices:
@@ -622,41 +622,41 @@ Each entry names the prose, the behavior, and the owner of each side.
    sliceCount "from the task doc's `slices:` list". The flow's canonical
    task shape is undocumented by the only tool that documents the
    schema.
-3. **task_slices ignores the `slices:` list the prose tells it to
+3. **tw_slices ignores the `slices:` list the prose tells it to
    read**. Prose: `resources/feature/autonomous.md` "Step 0 --
    Prerequisites" says "Task doc exists with `slices:` list. ... Run
-   `task_slices <slug>` to enumerate." Behavior: `src/pi.ts` `activeSlices`
+   `tw_slices <slug>` to enumerate." Behavior: `src/pi.ts` `activeSlices`
    lists only files matching `SLICE_RE` (`slices/<n>-<slug>.md`); the
    frontmatter `slices:` list is never read by anything (the only writer
-   is `task_set_slices`, which no skill calls). For a to-tickets task
-   (which has the list but no slice docs), task_slices returns "(no open
+   is `tw_set_slices`, which no skill calls). For a to-tickets task
+   (which has the list but no slice docs), tw_slices returns "(no open
    slices)", the Step 0 filter yields an empty set, and the pipeline
    jumps straight to "All slices done. Run `/skill:finalize-task`." with
-   nothing implemented. Same blind spot in `task_finalizable` and in
-   `task_dependency_levels`' task branch.
+   nothing implemented. Same blind spot in `tw_finalizable` and in
+   `tw_dependency_levels`' task branch.
 4. **"Ready to finalize" cannot distinguish done from never-created.**
-   Behavior: `task_finalizable` is "no active slice docs"
+   Behavior: `tw_finalizable` is "no active slice docs"
    (`src/pi.ts`); a task with zero slice docs passes vacuously. Prose:
    `skills/engineering/finalize-task/SKILL.md` "Step 0, Prerequisites"
    treats the return as a completion gate. Combined with contradiction 3
    this is the mechanism behind the false-finalizable class (see
    No-tool-support).
-5. **task_state_set silently drops state.yaml keys, including the field
+5. **tw_state_set silently drops state.yaml keys, including the field
    setup-workflow keys on** (map-confirmed bug, live in the tree).
    Behavior: `src/core/state.ts` `toObject` emits only `task` and
    `slice`, and `src/pi.ts` `saveState` writes exactly that, so any
    other key (today: `schema_version`) is deleted on every
-   task_state_set call. Prose owners of both sides:
+   tw_state_set call. Prose owners of both sides:
    `skills/engineering/setup-workflow/SKILL.md` "Detection" ("No
    `schema_version` field (or no `state.yaml`): the repo is fresh")
    and "## Onboard" step 2 (writes `schema_version: 3`), versus
-   `resources/feature/autonomous.md` "Step 2" (`task_state_set task
+   `resources/feature/autonomous.md` "Step 2" (`tw_state_set task
    <taskSlug>`) and `finalize-task` "Step 7" (clear both fields). No
    skill prose mentions the interaction. Live confirmation in the
    working tree: `docs/tasks/state.yaml` currently reads `task:
    tool-surface-inventory / slice: None` with no `schema_version`, while
    `git show HEAD:docs/tasks/state.yaml` has `schema_version: 3`; the
-   field was dropped again by a task_state_set write after the
+   field was dropped again by a tw_state_set write after the
    2026-09-12 restore the map records. (The literal `slice: None`
    string rather than null is a second, smaller state-shape wart: YAML
    parses it as the string "None".)
@@ -679,22 +679,22 @@ Each entry names the prose, the behavior, and the owner of each side.
    graph") and "### 5" ("The graph is now queryable via ..."). Behavior:
    the extension has no task-creation or map-registration tool; every
    creation step in "### 5" is file editing, and the only task_* tools
-   that touch a map's `tasks` array are read/tick (`task_map_tasks`,
-   never mentioned; `task_map_tick`, finalize only). The claim is true
+   that touch a map's `tasks` array are read/tick (`tw_map_tasks`,
+   never mentioned; `tw_map_tick`, finalize only). The claim is true
    only of post-hoc queries.
 8. **The land-worker prompt instructs tool calls its allowlist forbids.**
    Prose: `resources/feature/autonomous.md` "Step 2" and
    `resources/bug/autonomous.md` "Step 1" land-worker prompts say "Set
-   task_set status done on slice." Behavior:
+   tw_set status done on slice." Behavior:
    `agents/land-worker.md` frontmatter grants `tools: read, edit, bash`
-   only; land-worker has no `task_set` and no `task_*` tool, and its own
+   only; land-worker has no `tw_set` and no `task_*` tool, and its own
    body says "Update state.yaml" as a file edit. The same prompts are
-   also duplicated by the parent's success path (`task_set <slice-path>
+   also duplicated by the parent's success path (`tw_set <slice-path>
    status done` after `wait`), so the instruction is both unexecutable
    by the named agent and redundant with the parent's bookkeeping.
 9. **The implement-task router reads only `type`; no mode field exists
    anywhere.** Prose: `skills/engineering/implement-task/SKILL.md`
-   intro (`const taskType = task_get(taskPath, "type") || "feature"`)
+   intro (`const taskType = tw_get(taskPath, "type") || "feature"`)
    and the human/autonomous routers (`resources/feature.md`,
    `resources/bug.md`), which select mode from invocation prose
    ("If the prose clearly says to implement the task yourself ...").
@@ -704,7 +704,7 @@ Each entry names the prose, the behavior, and the owner of each side.
    frontmatter marker exists; the pi-harness-evals map now requires one
    (see Known-future). There is no contradiction inside the current
    prose, but the router's pseudo-code has no slot for any marker, and
-   task_get is the only read primitive, so any marker lands as
+   tw_get is the only read primitive, so any marker lands as
    untyped prose the router must remember to read.
 10. **Slice `mode: hitl | afk` is written and never read.** Prose:
     `skills/engineering/wayfinder/resources/feature.md` "Slice planning"
@@ -723,7 +723,7 @@ Each entry names the prose, the behavior, and the owner of each side.
     "task-overview (name kept)". No skill named `task-overview` is
     registered (`package.json` `pi.skills`), so the onboarding report
     names a dead command.
-12. **`task_map_tick`'s "harmless error" is a thrown error the skill must
+12. **`tw_map_tick`'s "harmless error" is a thrown error the skill must
     catch in prose.** Minor: `skills/engineering/finalize-task/SKILL.md`
     "Step 7" says "(If the map has no matching child task, it errors
     harmlessly; fall back to editing the map doc directly.)" while the
@@ -738,7 +738,7 @@ Each entry names the prose, the behavior, and the owner of each side.
    creates `docs/tasks/maps/<slug>/map.md` and lists tasks in the
    frontmatter array by file editing; to-tickets "### 5" step 1
    registers tickets the same way. No tool creates maps, creates tasks,
-   or appends to a map's `tasks` array (`task_map_tick` only flips
+   or appends to a map's `tasks` array (`tw_map_tick` only flips
    `done`).
 2. **Task creation generally.** wayfinder's planning resources and
    to-tickets' ticket template both write `task.md` files directly; the
@@ -753,16 +753,16 @@ Each entry names the prose, the behavior, and the owner of each side.
    directory holds nothing else, and the map's `tasks` array lists only
    eval-stack-research and pi-headless-isolation-spike, both `done:
    true`). Code-verified mechanics: `src/pi.ts` `mapChildInfos` skips
-   any slug with no task.md, and `task_map_finalizable` reads only the
+   any slug with no task.md, and `tw_map_finalizable` reads only the
    array's `done` flags, so the map reports ready to finalize while its
    largest child exists but is invisible. The same mechanism produces
    the mirror failure: a child listed in the array whose task.md was
-   never created vanishes from `task_frontier` (skipped) yet still
-   blocks `task_map_finalizable` if `done: false`.
+   never created vanishes from `tw_frontier` (skipped) yet still
+   blocks `tw_map_finalizable` if `done: false`.
 4. **Fog.** wayfinder "The map" `## Fog` is a prose-only concept; no
    tool can list unsharpened questions.
 5. **The `slices:` frontmatter list.** to-tickets "### 3" and wayfinder's
-   feature/bug resources write it; `task_set_slices` can write it; no
+   feature/bug resources write it; `tw_set_slices` can write it; no
    tool reads it (see Slice machinery). The v3 flow's canonical slice
    declaration has zero readers.
 6. **Slice `mode`, `started_at`, `completed_at`.** Written by the
@@ -789,18 +789,18 @@ Each entry names the prose, the behavior, and the owner of each side.
    tool involvement (the only tools in the skill are the five named
    above).
 10. **The bug domain.** No tool covers `docs/bugs/` at all:
-    `task_list` scans `docs/tasks/` only, bug closure reads the `bug:`
+    `tw_list` scans `docs/tasks/` only, bug closure reads the `bug:`
     field by prose, and the router's bug-queue answer is a bash grep
     (`task-workflow-overview` "Read-only queries").
 11. **The current-map pointer.** The map's Fog asks whether state.yaml
     needs a first-class map pointer; today the pointer is prose-only:
-    the `map:` field in task frontmatter (readable via `task_list`'s map
+    the `map:` field in task frontmatter (readable via `tw_list`'s map
     filter) and the map slug passed around in skill invocations.
     `src/core/state.ts` carries only `task` and `slice`.
 12. **setup-workflow's schema detection.** "## Detection" reads
     `docs/tasks/state.yaml`'s `schema_version` as a file; no tool
-    exposes it (`task_state` shows task/slice only), which is what makes
-    the task_state_set key-wipe (Contradictions 5) a silent corruption
+    exposes it (`tw_state` shows task/slice only), which is what makes
+    the tw_state_set key-wipe (Contradictions 5) a silent corruption
     of the migration detector's input.
 
 ## Slice-machinery verdict evidence
@@ -810,32 +810,32 @@ so G1 can decide demote/freeze/delete.
 
 Tool invocations:
 
-- `task_slices`: `skills/engineering/implement-task/SKILL.md` telemetry
-  note ("from the task doc's `slices:` list or `task_slices`");
+- `tw_slices`: `skills/engineering/implement-task/SKILL.md` telemetry
+  note ("from the task doc's `slices:` list or `tw_slices`");
   `resources/feature/autonomous.md` "Step 0 -- Prerequisites" (lines
-  "Run `task_slices <slug>` to enumerate." and `const pendingSlices =
-  task_slices(taskSlug)`); `resources/bug/autonomous.md` "Step 0 --
-  Prerequisites" (`const slice = task_slices(taskSlug)[0]`);
+  "Run `tw_slices <slug>` to enumerate." and `const pendingSlices =
+  tw_slices(taskSlug)`); `resources/bug/autonomous.md` "Step 0 --
+  Prerequisites" (`const slice = tw_slices(taskSlug)[0]`);
   `skills/engineering/task-workflow-overview/SKILL.md` "Read-only
-  queries" (`task_slices <slug>` "for legacy tasks"). Four call sites,
+  queries" (`tw_slices <slug>` "for legacy tasks"). Four call sites,
   all in the two autonomous implementation pipelines or answer-table
   prose, and all operating on legacy slice docs only.
-- `task_set_slices`: zero invocations anywhere in `skills/`. Only
+- `tw_set_slices`: zero invocations anywhere in `skills/`. Only
   `tests/plugin.test.ts` and the registration in `src/pi.ts` reference
   it. The nearest workflow prose is the failure toolbelt's "update the
   task doc `slices:` list" (`resources/feature/autonomous.md`
   "Failure toolbelt"; `resources/bug/autonomous.md` "Failure toolbelt"),
   which does not name the tool.
-- `task_finalizable`: `skills/engineering/finalize-task/SKILL.md` "Step
+- `tw_finalizable`: `skills/engineering/finalize-task/SKILL.md` "Step
   0, Prerequisites"; `skills/engineering/task-workflow-overview/SKILL.md`
   "Read-only queries". Its check is "no active slice docs"
   (`src/pi.ts`), i.e. legacy-doc absence, not list-derived completion.
-- `task_state_set` with `slice`: exactly two prose sites, both clears:
-  `finalize-task` "Step 7" (`task_state_set slice null`). Nothing in any
+- `tw_state_set` with `slice`: exactly two prose sites, both clears:
+  `finalize-task` "Step 7" (`tw_state_set slice null`). Nothing in any
   skill ever sets `slice` to a value; `resources/feature/autonomous.md`
   "Step 2" sets only `task`. The state field has a clearer and no
   setter.
-- `task_dependency_levels` task branch (legacy slices):
+- `tw_dependency_levels` task branch (legacy slices):
   `resources/feature/autonomous.md` "Step 2" and
   `resources/feature/human.md` "2. Handoff each slice to the human". Its
   map branch (v3 tasks) is the live path used by to-tickets "### 5" and
@@ -866,7 +866,7 @@ Slice prose across the skills:
 - `skills/engineering/finalize-task/SKILL.md` "Step 0" ("no open
   slices").
 - `skills/engineering/task-workflow-overview/SKILL.md` "Read-only
-  queries": `task_slices <slug>` for legacy tasks.
+  queries": `tw_slices <slug>` for legacy tasks.
 - `skills/engineering/tdd/SKILL.md`: "one red-green slice at a time"
   vocabulary (referenced from the router's main flow), tdd-worker
   consults it per slice.
@@ -882,8 +882,8 @@ state.yaml slice field usage: `src/core/state.ts` `WorkflowState` is
 `{ task, slice }` and `toObject`/`fromObject` carry both; the working
 tree's `docs/tasks/state.yaml` reads `task: tool-surface-inventory` /
 `slice: None` (a string, not null). Writers in the flow: only
-`task_state_set` (set `task` in the feature pipeline; clear both in
-finalize-task). Readers in the flow: none (`task_state` is an
+`tw_state_set` (set `task` in the feature pipeline; clear both in
+finalize-task). Readers in the flow: none (`tw_state` is an
 answer-table query; the `slice` value feeds only `resolveArt`'s
 active-task slice scan, `src/pi.ts`, which no v3 skill exercises).
 
@@ -898,12 +898,12 @@ Summary for G1: the slice machinery's load-bearing consumers are exactly
 the two autonomous implementation pipelines, which only function when
 legacy slice docs exist; the sanctioned v3 producers (to-tickets) emit a
 list the machinery never reads; the tool built to write that list
-(task_set_slices) has zero callers; the `slice` state field has no setter;
+(tw_set_slices) has zero callers; the `slice` state field has no setter;
 and the corpus contains no live legacy slices. Every slice tool also has
 at least one non-slice consumer to consider before deletion:
-`task_dependency_levels` and `task_frontier` have live map branches,
-`task_set`/`task_get`/`task_state_set` serve non-slice fields, and
-`task_finalizable` is finalize's gate regardless of slice semantics.
+`tw_dependency_levels` and `tw_frontier` have live map branches,
+`tw_set`/`tw_get`/`tw_state_set` serve non-slice fields, and
+`tw_finalizable` is finalize's gate regardless of slice semantics.
 
 ## Known-future requirements check
 
@@ -914,15 +914,15 @@ at least one non-slice consumer to consider before deletion:
    decision that creation stays file-based and the "task_* tools for the
    graph" claim is rescoped to queries); (c) a slice notion that either
    reads the `slices:` list or stops being emitted by to-tickets. What
-   exists today: nothing on any of the three. `task_context`'s schema
+   exists today: nothing on any of the three. `tw_context`'s schema
    text actively denies the phase (Contradictions 1); a spec-only
    directory is invisible to `resolveArt` (it scans for `task.md`/
-   `map.md`), to `mapChildInfos`, and to `task_map_finalizable`
+   `map.md`), to `mapChildInfos`, and to `tw_map_finalizable`
    (No-tool-support 3); no tool creates anything; and the slice
    question is the entire Slice-machinery section. The only v3-aligned
-   tool support that does exist is the map-side graph: `task_frontier`,
-   `task_dependency_levels` (map branch), `task_map_tick`,
-   `task_map_finalizable`, and `task_list`'s map filter.
+   tool support that does exist is the map-side graph: `tw_frontier`,
+   `tw_dependency_levels` (map branch), `tw_map_tick`,
+   `tw_map_finalizable`, and `tw_list`'s map filter.
 2. **Manual-mode marker** (pi-harness-evals map "Decisions so far":
    "Manual-mode gate"; Fog: "Exact frontmatter field name and router
    mechanics ... To be fixed in to-spec"; the consuming spec
@@ -933,13 +933,13 @@ at least one non-slice consumer to consider before deletion:
    on tasks and/or slices, plus a router step that reads it before
    dispatch and a hard-refuse behavior. What exists today: no field is
    defined anywhere; the implement-task router reads only `type`
-   (`task_get(taskPath, "type") || "feature"`), the mode routers
+   (`tw_get(taskPath, "type") || "feature"`), the mode routers
    (`resources/feature.md`, `resources/bug.md`) parse invocation prose,
    and the recorded decision
    (`docs/tasks/archive/decide-human-implementation-mode/task.md`) is
    deliberately prose-only with the marker recorded as its "narrow,
-   documented exception". `task_get` could read any field once named,
-   and `task_assert_kind` shows the shape of a refusing tool, but no
+   documented exception". `tw_get` could read any field once named,
+   and `tw_assert_kind` shows the shape of a refusing tool, but no
    prose reads a marker today and no tool enforces one.
 
 ## Uncovered areas
@@ -947,7 +947,7 @@ at least one non-slice consumer to consider before deletion:
 - No workflow tool was executed during this audit. All tool-behavior
   claims were verified by reading `src/pi.ts` and `src/core/{art,state}.ts`
   in the working tree; a live cross-check (for example actually running
-  `task_map_finalizable` on the pi-harness-evals map, or `task_slices` on
+  `tw_map_finalizable` on the pi-harness-evals map, or `tw_slices` on
   a to-tickets-shaped task) would upgrade Contradictions 3-4 and
   No-tool-support 3 from code-verified to run-verified.
 - The R1 catalog (`docs/tasks/tool-surface-inventory/findings.md`) was

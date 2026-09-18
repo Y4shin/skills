@@ -11,23 +11,23 @@ behavior, contract, or description-text changes beyond the prefix.
 
 | Old | New |
 |---|---|
-| `task_show` | `tw_show` |
-| `task_get` | `tw_get` |
-| `task_set` | `tw_set` |
-| `task_set_slices` | `tw_set_slices` |
-| `task_resolve` | `tw_resolve` |
-| `task_assert_kind` | `tw_assert_kind` |
-| `task_list` | `tw_list` |
-| `task_slices` | `tw_slices` |
-| `task_finalizable` | `tw_finalizable` |
-| `task_dependency_levels` | `tw_dependency_levels` |
-| `task_frontier` | `tw_frontier` |
-| `task_map_tasks` | `tw_map_tasks` |
-| `task_map_tick` | `tw_map_tick` |
-| `task_map_finalizable` | `tw_map_finalizable` |
-| `task_state` | `tw_state` |
-| `task_state_set` | `tw_state_set` |
-| `task_context` | `tw_context` |
+| `tw_show` | `tw_show` |
+| `tw_get` | `tw_get` |
+| `tw_set` | `tw_set` |
+| `tw_set_slices` | `tw_set_slices` |
+| `tw_resolve` | `tw_resolve` |
+| `tw_assert_kind` | `tw_assert_kind` |
+| `tw_list` | `tw_list` |
+| `tw_slices` | `tw_slices` |
+| `tw_finalizable` | `tw_finalizable` |
+| `tw_dependency_levels` | `tw_dependency_levels` |
+| `tw_frontier` | `tw_frontier` |
+| `tw_map_tasks` | `tw_map_tasks` |
+| `tw_map_tick` | `tw_map_tick` |
+| `tw_map_finalizable` | `tw_map_finalizable` |
+| `tw_state` | `tw_state` |
+| `tw_state_set` | `tw_state_set` |
+| `tw_context` | `tw_context` |
 
 The soon-to-die tools (`resolve`, `assert_kind`, `map_tasks`, `map_tick`,
 `slices`, `set_slices`) rename too, so `overhaul-dead-surface` stays a pure
@@ -39,10 +39,10 @@ the rename covers exactly the 17 tool identifiers above.
 ## Sweep plan
 
 1. **Longest-first identifier replacement** over the file set, so
-   `task_map_finalizable` never half-matches `task_finalizable`. Order the
+   `tw_map_finalizable` never half-matches `tw_finalizable`. Order the
    table by descending old-name length; apply as whole-word replacements
-   (word boundary on both sides, so `task_finalizable` inside
-   `task_map_finalizable` is never seen twice).
+   (word boundary on both sides, so `tw_finalizable` inside
+   `tw_map_finalizable` is never seen twice).
 2. **File set**: every file under the package root that grep finds carrying
    an old-prefix reference, excluding `node_modules/`, `.git/`, and
    `docs/tasks/archive/` (archived task docs are historical records; their

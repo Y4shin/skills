@@ -99,8 +99,8 @@ task frontmatter above. Then:
    `{ slug, blocked_by, done: false }` entry to the map frontmatter).
 2. Wire `blocked_by` edges in a **second pass** (all slugs must exist before
    they can reference each other).
-3. The graph is now queryable via `task_dependency_levels <map-slug>` (BFS
-   levels) and `task_frontier <map-slug>` (ready, unfinished tasks).
+3. The graph is now queryable via `tw_dependency_levels <map-slug>` (BFS
+   levels) and `tw_frontier <map-slug>` (ready, unfinished tasks).
 
 Work the **frontier**: any ticket whose blockers are all done. For a purely
 linear chain that means top to bottom.

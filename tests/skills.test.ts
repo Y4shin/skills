@@ -539,7 +539,7 @@ describe("skill cross-references", () => {
 
   test("implement-task wrapper reads type and dispatches to resources", () => {
     const content = readFile("skills/engineering/implement-task/SKILL.md");
-    expect(content).toContain("task_get");
+    expect(content).toContain("tw_get");
     expect(content).toContain("type");
     expect(content).toContain("resources/feature.md");
     expect(content).toContain("resources/bug.md");
@@ -563,7 +563,7 @@ describe("skill cross-references", () => {
     expect(content).toContain("feature");
     expect(content).toContain("bug");
     expect(content).toContain("blocked_by");
-    expect(content).toMatch(/task_dependency_levels|task_frontier/);
+    expect(content).toMatch(/tw_dependency_levels|tw_frontier/);
   });
 
   test("wayfinder has one planning resource per task type", () => {
@@ -580,9 +580,9 @@ describe("skill cross-references", () => {
     expect(content).toContain("reassess the map");
   });
 
-  test("implement-task feature resource references task_dependency_levels", () => {
+  test("implement-task feature resource references tw_dependency_levels", () => {
     const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
-    expect(content).toContain("task_dependency_levels");
+    expect(content).toContain("tw_dependency_levels");
   });
 
   test("implement-task feature resource references tdd-worker agent", () => {
@@ -656,14 +656,14 @@ describe("skill cross-references", () => {
     }
   });
 
-  test("finalize-task references task_finalizable", () => {
+  test("finalize-task references tw_finalizable", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toContain("task_finalizable");
+    expect(content).toContain("tw_finalizable");
   });
 
-  test("finalize-task references task_map_tick", () => {
+  test("finalize-task references tw_map_tick", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toContain("task_map_tick");
+    expect(content).toContain("tw_map_tick");
   });
 
   test("finalize-task Step 7 separates Pi tool calls from the shell archive block", () => {
@@ -674,7 +674,7 @@ describe("skill cross-references", () => {
     const step7 = step8Start > -1 ? content.slice(step7Start, step8Start) : content.slice(step7Start);
 
     // The git shell block (containing `git merge --no-ff`) must not interleave
-    // Pi tool calls (task_state_set / task_map_tick) as if they were shell
+    // Pi tool calls (tw_state_set / tw_map_tick) as if they were shell
     // binaries, under `set -e` that aborts the archive mid-sequence (see
     // docs/bugs/finalize-task-set-e-tool-confusion.md).
     const fence = /```[^\n]*\n([\s\S]*?)```/g;
@@ -687,19 +687,19 @@ describe("skill cross-references", () => {
       }
     }
     expect(shellBlock).not.toBeNull();
-    expect(shellBlock!).not.toMatch(/task_state_set/);
-    expect(shellBlock!).not.toMatch(/task_map_tick/);
+    expect(shellBlock!).not.toMatch(/tw_state_set/);
+    expect(shellBlock!).not.toMatch(/tw_map_tick/);
 
     // The Pi tool calls must still appear in Step 7, clearly marked as tool
     // invocations rather than shell commands.
-    expect(step7).toContain("task_state_set");
-    expect(step7).toContain("task_map_tick");
+    expect(step7).toContain("tw_state_set");
+    expect(step7).toContain("tw_map_tick");
     expect(step7).toMatch(/Pi tool|tool call|tool invocation|invoke .*tool|not .*shell command/i);
   });
 
-  test("finalize-task references task_map_finalizable", () => {
+  test("finalize-task references tw_map_finalizable", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toContain("task_map_finalizable");
+    expect(content).toContain("tw_map_finalizable");
   });
 
   test("finalize-task has a type: bug branch", () => {
@@ -746,7 +746,7 @@ describe("skill cross-references", () => {
   test("task-overview routes planning to wayfinder", () => {
     const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
     expect(content).toContain("/skill:wayfinder");
-    expect(content).toContain("task_frontier");
+    expect(content).toContain("tw_frontier");
   });
 
   test("task-overview lists triage queue query", () => {
@@ -937,4 +937,59 @@ describe("skill-review wiring", () => {
     expect(reviewer).toMatch(/final once fixed/);
     expect(reviewer).toMatch(/at most \*{0,2}5 axes\*{0,2}/);
     expect(reviewer).toMatch(/Aggregate.*Include the review-plan|review-plan preamble/);
-  });});
+  });
+});
+
+// ─── Tool prefix rename (corpus check) ───────────────────────────────
+
+// The old tool prefix and the tool suffixes are assembled from parts so this
+// test file itself carries no old-prefix literal.
+const OLD_PREFIX = "task" + "_";
+const TOOL_SUFFIXES = [
+  "show",
+  "get",
+  "set",
+  "set_slices",
+  "resolve",
+  "assert_kind",
+  "list",
+  "slices",
+  "finalizable",
+  "dependency_levels",
+  "frontier",
+  "map_tasks",
+  "map_tick",
+  "map_finalizable",
+  "state",
+  "state_set",
+  "context",
+];
+const OLD_TOOL_PATTERN = new RegExp(`\\b${OLD_PREFIX}(${TOOL_SUFFIXES.join("|")})\\b`);
+
+// Mirrors the sweep verification: every file under the package root, minus
+// node_modules/.git and any archive directory (archived docs are historical
+// records and keep the names that were live when they ran).
+function corpusFiles(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "archive") continue;
+      corpusFiles(join(dir, entry.name), out);
+    } else if (entry.isFile()) {
+      out.push(join(dir, entry.name));
+    }
+  }
+  return out;
+}
+
+describe("tool prefix rename", () => {
+  test("no old-prefix tool reference remains outside archive", () => {
+    const offenders: string[] = [];
+    for (const file of corpusFiles(PROJECT)) {
+      const content = readFileSync(file, "utf-8");
+      if (OLD_TOOL_PATTERN.test(content)) {
+        offenders.push(file.slice(PROJECT.length + 1));
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
