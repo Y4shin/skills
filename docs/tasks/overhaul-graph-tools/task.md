@@ -4,7 +4,7 @@ type: feature
 slug: overhaul-graph-tools
 title: Scan-based graph tools and an honest schema reference
 map: task-tools-overhaul
-status: ready
+status: done
 blocked_by:
 - overhaul-v4-migration
 slices: [overhaul-graph-tools]
