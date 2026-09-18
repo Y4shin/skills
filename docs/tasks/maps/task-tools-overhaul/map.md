@@ -96,7 +96,7 @@ it designs the way out.
 
 - **Audit scope (grilling round 1, Q1).** Cover the extension's full
   registered surface in the inventory, because we do not know yet what the
-  workflow uses; depth is reserved for the workflow-facing slice (task_* at
+  workflow uses; depth is reserved for the workflow-facing slice (tw_* at
   depth, everything else shallow). R1 catalogues all of it; R2 audits at
   depth only what the flow from wayfinder to implement-task (and
   supporting skills) actually touches.
@@ -117,7 +117,7 @@ it designs the way out.
   of scope.
 - **Facts established before the map (session of 2026-09-12, to be folded
   into R1 as verified facts, not re-derived).**
-  - The extension registers 20 tools: 17 task_* tools, notify_user,
+  - The extension registers 20 tools: 17 tw_* tools, notify_user,
     get_guidelines, list_guidelines (plus the repo-gate and guidelines
     hooks). Current implementation: `src/pi.ts` (one file, ~1070 lines),
     core modules `src/core/{art,err,frontmatter,repo-gate,state}.ts`.

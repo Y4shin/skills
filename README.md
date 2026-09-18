@@ -14,7 +14,7 @@
 - **Verifier retry path**, re-dispatches TDD worker with error output
 - **Checkpoint commits**, TDD worker commits after each GREEN
 - **Size-based turn budgets**, S/M/L/XL from task frontmatter
-- **Legacy slice resolution preserved**, existing task_* tools still accept slices
+- **Legacy slice resolution preserved**, existing tw_* tools still accept slices
 
 ## Install
 

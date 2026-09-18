@@ -1,7 +1,7 @@
 /**
  * task-workflow v2 — single extension entry point.
  *
- * Registers task_* tools for artifact operations on the docs/tasks/ planning
+ * Registers tw_* tools for artifact operations on the docs/tasks/ planning
  * tree, plus lifecycle hooks for coding guidelines and pi-subagents checks.
  *
  * Principles:

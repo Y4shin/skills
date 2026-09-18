@@ -981,13 +981,23 @@ function corpusFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+// Historical-record exemptions, same class as the archive: dated changelog
+// entries keep the names that were live when written, and the rename task's
+// own arch-spec must keep its old-to-new mapping table to stay meaningful.
+const CORPUS_EXEMPTIONS = new Set([
+  "docs/tasks/CHANGELOG.md",
+  "docs/tasks/overhaul-tw-rename/arch-spec.md",
+]);
+
 describe("tool prefix rename", () => {
   test("no old-prefix tool reference remains outside archive", () => {
     const offenders: string[] = [];
     for (const file of corpusFiles(PROJECT)) {
+      const rel = file.slice(PROJECT.length + 1);
+      if (CORPUS_EXEMPTIONS.has(rel)) continue;
       const content = readFileSync(file, "utf-8");
       if (OLD_TOOL_PATTERN.test(content)) {
-        offenders.push(file.slice(PROJECT.length + 1));
+        offenders.push(rel);
       }
     }
     expect(offenders).toEqual([]);

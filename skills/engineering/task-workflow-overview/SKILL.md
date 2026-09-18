@@ -34,7 +34,7 @@ The route most work travels. You have an idea and want it built.
    - **Yes** to **`/skill:to-spec`** (turn the thread into a spec), then
      **`/skill:to-tickets`** to split it into tracer-bullet feature/bug tickets,
      each declaring its **blocking edges** under `docs/tasks/` using the
-     `task_*` tools for the graph. Kick off **`/skill:implement-task`** per
+     `tw_*` tools for the graph. Kick off **`/skill:implement-task`** per
      ticket, clearing context between each one.
    - **No** to **`/skill:implement-task`** right here, in the same context
      window.

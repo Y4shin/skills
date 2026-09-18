@@ -18,7 +18,7 @@ Reachable only when you type them (`disable-model-invocation: true`).
 Model- or user-reachable.
 
 - **[task-overview](./task-workflow-overview/SKILL.md)**: Entry point. Routes queries
-  to `task_*` tools and actions to skills.
+  to `tw_*` tools and actions to skills.
 - **[setup-workflow](./setup-workflow/SKILL.md)**: Initialize a
   repository for the task-workflow.
 - **[implement-task](./implement-task/SKILL.md)**: Implements all remaining

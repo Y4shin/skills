@@ -2,7 +2,7 @@
  * Factory-level gate tests for task-workflow.
  *
  * Drives the real extension factory with a stub ExtensionAPI to verify that
- * task_* tools, utility tools, and session_start peer warnings are skipped
+ * tw_* tools, utility tools, and session_start peer warnings are skipped
  * when the repo gate is active (work repo) and present when inactive (personal).
  */
 
@@ -210,7 +210,7 @@ describe("factory gate", () => {
     mockControl.mode = "passthrough";
   });
 
-  test("work repo (gate active) does not register task_* tools", () => {
+  test("work repo (gate active) does not register tw_* tools", () => {
     globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
     process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
     const repo = makeRepo("git@github.com:QNCGmbH/openai.git");

@@ -129,7 +129,7 @@ planning_flow:
         no interview."
     - step: "to-tickets"
       role: "breaks spec into tracer-bullet feature/bug tasks with
-        blocked_by edges using task_* tools + the map's tasks array;
+        blocked_by edges using tw_* tools + the map's tasks array;
         includes wide-refactor expand-contract exception."
     - step: "implement-task"
       role: "executes the frontier by type; borrows implement-spec's
@@ -176,7 +176,7 @@ conventions:
 # ── Keep-as-ours (no Matt equivalent; concrete reason recorded) ────────
 
 keep_as_ours:
-  - item: "dependency graph + task_* tools (tw_dependency_levels,
+  - item: "dependency graph + tw_* tools (tw_dependency_levels,
       tw_frontier, tw_map_tick)"
     reason: "no Matt equivalent; we use docs/tasks/ files, not a tracker"
     decision: "Q11.2"

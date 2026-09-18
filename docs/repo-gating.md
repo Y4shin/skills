@@ -2,7 +2,7 @@
 
 `task-workflow` is a **global** pi package, so by default it would load in every
 repo, including work repos where it doesn't belong (the work repo has its own
-canon; the `task_*` tools write to a `docs/tasks/` tree the work repo doesn't
+canon; the `tw_*` tools write to a `docs/tasks/` tree the work repo doesn't
 use; the injected guidelines clutter the system prompt). The gate auto-disables
 all of the package's resources in work repos based on the repo's `git origin`
 remote, with **zero per-repo config** required to get the default behaviour:
@@ -11,7 +11,7 @@ override them locally.
 
 ## What gets gated in a work repo
 
-- **No tools register:** none of the `task_*` tools, and none of `notify_user`,
+- **No tools register:** none of the `tw_*` tools, and none of `notify_user`,
   `get_guidelines`, `list_guidelines`. The model never sees them.
 - **No `before_agent_start` injection:** the guidelines / "Use
   `list_guidelines()`" preamble is not appended to the system prompt.

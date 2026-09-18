@@ -214,7 +214,7 @@ _Avoid_: blacklist (too negative)
 
 - "Issue tracker" (Matt Pocock's skills use an issue tracker as the
   substrate for maps, tickets, specs, and triage). We do **not**: our
-  substrate is `docs/tasks/` files managed by the `task_*` tools. Resolved:
+  substrate is `docs/tasks/` files managed by the `tw_*` tools. Resolved:
   the term is not used as a domain term here; our skills that reference a
   tracker are adapted to read/write `docs/tasks/` + `docs/bugs/` instead.
   Where a skill still says "issue tracker", read it as "the `docs/tasks/`
