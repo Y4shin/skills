@@ -28,7 +28,7 @@ function seedTree(t: string): void {
   );
   writeFileSync(
     join(t, "docs/tasks/login/task.md"),
-    "---\nkind: task\ntitle: Login\nslug: login\nstatus: draft\nslices:\n  - do-thing\n  - other-thing\nmap: auth\nstarted_at: 42\n---\n",
+    "---\nkind: task\ntitle: Login\nslug: login\nstatus: draft\nworkflow_state: done\nslices:\n  - do-thing\n  - other-thing\nmap: auth\nstarted_at: 42\n---\n",
   );
   writeFileSync(
     join(t, "docs/tasks/login/slices/1-do-thing.md"),
@@ -101,6 +101,80 @@ function seedV4Tree(t: string): void {
   writeMd(
     join(base, "archive/old-effort/tickets/old-ticket/ticket.md"),
     "type: ticket\nsubtype: feature\ntitle: Old ticket\nstatus: deprecated\nworkflow_state: done\n",
+  );
+}
+
+/**
+ * The v4 graph fixture: one effort with a spec, a task chain, a ticket chain,
+ * a deprecated ticket, and an anomaly (a missing blocked_by target); a second
+ * effort blocked on the first; and a spec-only effort.
+ */
+function seedGraphTree(t: string): void {
+  const base = join(t, "docs/tasks");
+  // Effort one: the anchor effort, with work in flight.
+  writeMd(join(base, "billing/map.md"), "type: map\ntitle: Billing\nstatus: stable\n");
+  writeMd(join(base, "billing/spec.md"), "type: spec\ntitle: Billing spec\nstatus: stable\n");
+  writeMd(
+    join(base, "billing/tasks/research-cache/task.md"),
+    "type: task\nsubtype: research\ntitle: Research cache\nstatus: stable\nworkflow_state: done\nblocked_by: []\n",
+  );
+  writeMd(
+    join(base, "billing/tasks/prototype-api/task.md"),
+    "type: task\nsubtype: prototype\ntitle: Prototype API\nstatus: stable\nworkflow_state: todo\nblocked_by: [research-cache]\n",
+  );
+  writeMd(
+    join(base, "billing/tickets/login-form/ticket.md"),
+    "type: ticket\nsubtype: feature\ntitle: Login form\nstatus: stable\nworkflow_state: todo\nblocked_by: []\n",
+  );
+  writeMd(
+    join(base, "billing/tickets/api-fix/ticket.md"),
+    "type: ticket\nsubtype: bug\ntitle: Fix API\nstatus: stable\nworkflow_state: todo\nblocked_by: [login-form]\n",
+  );
+  // A deprecated ticket: done by definition, out of the graph, still reported.
+  writeMd(
+    join(base, "billing/tickets/legacy-shim/ticket.md"),
+    "type: ticket\nsubtype: feature\ntitle: Legacy shim\nstatus: deprecated\nworkflow_state: done\n",
+  );
+  // An anomaly: a blocked_by target no artifact provides.
+  writeMd(
+    join(base, "billing/tickets/ghost-blocked/ticket.md"),
+    "type: ticket\nsubtype: feature\ntitle: Ghost blocked\nstatus: stable\nworkflow_state: todo\nblocked_by: [ghost]\n",
+  );
+  // Effort two: blocked on effort one at the feature level.
+  writeMd(join(base, "shipping/map.md"), "type: map\ntitle: Shipping\nstatus: stable\nblocked_by: [billing]\n");
+  writeMd(
+    join(base, "shipping/tickets/ship-form/ticket.md"),
+    "type: ticket\nsubtype: feature\ntitle: Ship form\nstatus: stable\nworkflow_state: todo\nblocked_by: []\n",
+  );
+  // Effort three: a spec with zero tickets, the false-finalizable class.
+  writeMd(join(base, "spec-only/spec.md"), "type: spec\ntitle: Spec only\nstatus: stable\n");
+  // Effort four: a map and spec with all work done but zero tickets.
+  writeMd(join(base, "spec-zero/map.md"), "type: map\ntitle: Spec zero\nstatus: stable\n");
+  writeMd(join(base, "spec-zero/spec.md"), "type: spec\ntitle: Spec zero spec\nstatus: stable\n");
+  writeMd(
+    join(base, "spec-zero/tasks/decide/task.md"),
+    "type: task\nsubtype: research\ntitle: Decide\nstatus: stable\nworkflow_state: done\n",
+  );
+  // Effort five: a map and spec with all work done and one ticket.
+  writeMd(join(base, "done-effort/map.md"), "type: map\ntitle: Done effort\nstatus: stable\n");
+  writeMd(join(base, "done-effort/spec.md"), "type: spec\ntitle: Done spec\nstatus: stable\n");
+  writeMd(
+    join(base, "done-effort/tasks/decide/task.md"),
+    "type: task\nsubtype: research\ntitle: Decide\nstatus: stable\nworkflow_state: done\n",
+  );
+  writeMd(
+    join(base, "done-effort/tickets/land/ticket.md"),
+    "type: ticket\nsubtype: feature\ntitle: Land\nstatus: stable\nworkflow_state: done\n",
+  );
+  // An orphan: a task in an effort directory with neither map nor spec.
+  writeMd(
+    join(base, "orphan-effort/tasks/decide/task.md"),
+    "type: task\nsubtype: research\ntitle: Decide\nstatus: stable\nworkflow_state: todo\n",
+  );
+  // An invalid combination: draft pairs only with todo.
+  writeMd(
+    join(base, "billing/tasks/draft-done/task.md"),
+    "type: task\nsubtype: research\ntitle: Draft done\nstatus: draft\nworkflow_state: done\n",
   );
 }
 
@@ -348,6 +422,8 @@ describe("task-workflow tools", () => {
   describe("task_finalizable", () => {
     test("rejects when slices are open", async () => {
       const t = mkTmp(); seedTree(t);
+      // The v3 fixture carries workflow_state: done, so the primary status
+      // check passes and the secondary slice-count gate is what fires.
       await expect(tools.task_finalizable.execute({ selector: "login" }, ctx(t))).rejects.toThrow(/open slice/);
     });
 
@@ -587,7 +663,7 @@ describe("task-workflow tools", () => {
       const t = mkTmp(); seedTree(t);
       const out = await tools.task_context.execute({}, ctx(t));
       expect(out).toContain("Frontmatter schema");
-      expect(out).toContain("kind: task");
+      expect(out).toContain("type: task");
     });
 
     test("includes profile when present", async () => {
@@ -613,6 +689,190 @@ describe("task-workflow tools", () => {
       const path = join(t, "docs/tasks/login/slices/1-do-thing.md");
       const out = await tools.task_show.execute({ selector: path }, ctx(t));
       expect(out).toContain("slug: do-thing");
+    });
+  });
+});
+
+describe("task-workflow tools: scan-based graph tools", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  describe("task_frontier on an effort map", () => {
+    test("lists the per-kind frontier and omits the deprecated ticket", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_frontier.execute({ selector: "billing" }, ctx(t));
+      const frontierSection = out.split("## ")[0]!;
+      expect(frontierSection).toContain("prototype-api");
+      expect(frontierSection).toContain("login-form");
+      expect(frontierSection).toContain("ghost-blocked");
+      expect(frontierSection).not.toContain("api-fix");
+      expect(frontierSection).not.toContain("legacy-shim");
+      expect(frontierSection).not.toContain("research-cache");
+    });
+
+    test("appends the anomalies block", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_frontier.execute({ selector: "billing" }, ctx(t));
+      expect(out).toContain("## Anomalies");
+      expect(out).toContain("[missing-blocked-by-target]");
+      expect(out).toContain("ghost");
+    });
+
+    test("reports anomalies under --json too", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_frontier.execute({ selector: "billing", json: true }, ctx(t));
+      const parsed = JSON.parse(out);
+      expect(parsed.anomalies.length).toBeGreaterThan(0);
+      expect(parsed.anomalies.map((a: any) => a.kind)).toContain("missing-blocked-by-target");
+    });
+  });
+
+  describe("task_frontier on the tasks root", () => {
+    test("the blocked second effort is absent until the first is done", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const root = join(t, "docs/tasks");
+      const out = await tools.task_frontier.execute({ selector: root }, ctx(t));
+      expect(out).toContain("billing");
+      expect(out).not.toContain("shipping");
+    });
+
+    test("the blocked second effort appears once the first is done", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const root = join(t, "docs/tasks");
+      // Finish every billing item, including the anomaly fixture.
+      for (const slug of ["prototype-api", "login-form", "api-fix", "ghost-blocked", "legacy-shim"]) {
+        const p = join(t, `docs/tasks/billing/tickets/${slug}/ticket.md`);
+        const direct = join(t, `docs/tasks/billing/tasks/${slug}/task.md`);
+        const file = existsSync(p) ? p : direct;
+        writeFileSync(file, readFileSync(file, "utf-8").replace("workflow_state: todo", "workflow_state: done"), "utf-8");
+      }
+      const out = await tools.task_frontier.execute({ selector: root }, ctx(t));
+      expect(out).toContain("shipping");
+    });
+  });
+
+  describe("task_dependency_levels on an effort map", () => {
+    test("levels tasks and tickets independently", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_dependency_levels.execute({ selector: "billing" }, ctx(t));
+      const parsed = JSON.parse(out);
+      expect(parsed.tasks).toEqual([["prototype-api"]]);
+      expect(parsed.tickets[0]).toEqual(expect.arrayContaining(["login-form", "ghost-blocked"]));
+      expect(parsed.tickets[parsed.tickets.length - 1]).toEqual(["api-fix"]);
+      expect(parsed.remaining_count).toBe(4);
+      expect(parsed.done_count).toBe(3);
+    });
+  });
+
+  describe("task_map_finalizable", () => {
+    test("refuses a spec-plus-zero-tickets effort, naming the rule", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      await expect(
+        tools.task_map_finalizable.execute({ selector: "spec-zero" }, ctx(t)),
+      ).rejects.toThrow(/ticket/);
+    });
+
+    test("passes an all-done effort with a spec and one ticket", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_map_finalizable.execute({ selector: "done-effort" }, ctx(t));
+      expect(out).toContain("ready to finalize");
+    });
+
+    test("names the unfinished items when work remains", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      await expect(
+        tools.task_map_finalizable.execute({ selector: "billing" }, ctx(t)),
+      ).rejects.toThrow(/prototype-api/);
+    });
+
+    test("the spec-only false-finalizable fixture reads as unfinished", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      // The spec-only effort has no map, so it is not a map selector target.
+      // The reachable false-finalizable case is the map-plus-spec effort whose
+      // only child is a spec: it must be refused, naming the ticket rule.
+      await expect(
+        tools.task_map_finalizable.execute({ selector: "spec-zero" }, ctx(t)),
+      ).rejects.toThrow(/ticket/);
+      // And the spec-only effort contributes no unfinished work to the root
+      // frontier: it is not silently reported as ready either.
+      const out = await tools.task_frontier.execute({ selector: join(t, "docs/tasks") }, ctx(t));
+      expect(out).not.toContain("spec-only");
+    });
+  });
+
+  describe("task_finalizable", () => {
+    test("passes a done ticket and names the state otherwise", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_finalizable.execute({ selector: "research-cache" }, ctx(t));
+      expect(out).toContain("ready to finalize");
+      await expect(
+        tools.task_finalizable.execute({ selector: "prototype-api" }, ctx(t)),
+      ).rejects.toThrow(/todo/);
+    });
+
+    test("still surfaces the v3 slice contradiction", async () => {
+      const t = mkTmp(); seedTree(t);
+      await expect(tools.task_finalizable.execute({ selector: "login" }, ctx(t))).rejects.toThrow(/open slice/);
+    });
+  });
+
+  describe("anomaly classes are reported, never silently dropped", () => {
+    test("an orphan is reported", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_frontier.execute({ selector: join(t, "docs/tasks") }, ctx(t));
+      expect(out).toContain("[orphan]");
+      expect(out).toContain("orphan-effort");
+    });
+
+    test("a missing blocked_by target is reported", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_frontier.execute({ selector: "billing" }, ctx(t));
+      expect(out).toContain("[missing-blocked-by-target]");
+    });
+
+    test("an invalid status/workflow_state combination is reported", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_frontier.execute({ selector: "billing" }, ctx(t));
+      expect(out).toContain("[invalid-combination]");
+    });
+
+    test("a deprecated artifact treated as done is reported", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_frontier.execute({ selector: "billing", json: true }, ctx(t));
+      const parsed = JSON.parse(out);
+      expect(parsed.frontier.map((a: any) => a.slug)).not.toContain("legacy-shim");
+      expect(parsed.deprecated.map((a: any) => a.slug)).toContain("legacy-shim");
+    });
+
+    test("a deprecated artifact is reported in the text output too", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_frontier.execute({ selector: "billing" }, ctx(t));
+      expect(out).toContain("legacy-shim");
+      expect(out).toMatch(/deprecated/i);
+    });
+  });
+
+  describe("task_context schema reference", () => {
+    test("describes the v4 types, fields, and two-phase flow", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_context.execute({}, ctx(t));
+      expect(out).toContain("subtype");
+      expect(out).toContain("workflow_state");
+      expect(out).toContain("mode");
+      expect(out).toContain("size");
+      expect(out).toContain("ticket");
+      expect(out).toMatch(/to-tickets|ticket generation/i);
+    });
+
+    test("carries no slice block and no killed fields", async () => {
+      const t = mkTmp(); seedGraphTree(t);
+      const out = await tools.task_context.execute({}, ctx(t));
+      expect(out).not.toContain("kind:");
+      expect(out).not.toContain("slices:");
+      expect(out).not.toContain("started_at");
+      expect(out).not.toContain("completed_at");
+      expect(out).not.toMatch(/no separate ticket-generation phase/i);
     });
   });
 });
@@ -695,9 +955,12 @@ describe("task-workflow tools: v4 effort-grouped tree", () => {
     test("honors the wanted type on a directory selector holding map and spec", async () => {
       const t = mkTmp(); seedV4Tree(t);
       // billing/ holds both map.md and spec.md. A want:"map" tool must pick
-      // map.md rather than erroring on whichever leaf it finds first.
-      const out = await tools.task_map_finalizable.execute({ selector: join(t, "docs/tasks/billing") }, ctx(t));
-      expect(out).toContain("ready to finalize");
+      // map.md rather than erroring on whichever leaf it finds first: the
+      // scan-based check reports the effort's unfinished work, which only the
+      // map's effort can produce.
+      await expect(
+        tools.task_map_finalizable.execute({ selector: join(t, "docs/tasks/billing") }, ctx(t)),
+      ).rejects.toThrow(/unfinished/);
     });
 
     test("errors naming the wanted type when a directory has no such artifact", async () => {
