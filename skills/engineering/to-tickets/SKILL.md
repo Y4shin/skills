@@ -1,6 +1,6 @@
 ---
 name: to-tickets
-description: "Break a plan, spec, or the current conversation into tracer-bullet feature/bug tasks with blocked_by edges under docs/tasks/, using the task_* tools for the graph."
+description: "Break a plan, spec, or the current conversation into tracer-bullet feature/bug tasks with blocked_by edges under docs/tasks/, using the tw_* tools for the graph."
 disable-model-invocation: true
 ---
 

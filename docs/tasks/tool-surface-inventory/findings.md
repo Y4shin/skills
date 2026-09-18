@@ -14,8 +14,8 @@ the extension. `src/pi.ts` is 1065 lines in the working tree.
 
 Quoting convention: tool outputs and error messages are quoted verbatim
 with one exception, the repo's no-em-dash rule: the em-dash character in
-the extension's own runtime strings (e.g. `tw_map_tick`'s `→ done`,
-`tw_state_set`'s error text, `tw_show`'s map output) is transcribed
+the extension's own runtime strings (e.g. `task_map_tick`'s `→ done`,
+`task_state_set`'s error text, `task_show`'s map output) is transcribed
 as a plain hyphen.
 
 Live verification: run against a real `pi -p` session with only this
@@ -106,7 +106,7 @@ Everything the extension registers is conditional on `gate.active`:
   `Type.Boolean` / `Type.Array(Type.String)`, with enums as
   `Type.Union(Type.Literal(...))` and optional flags as `Type.Optional`.
   Labels are derived mechanically: strip `task_`, underscores to spaces,
-  title-case words (src/pi.ts:761), e.g. `tw_dependency_levels` ->
+  title-case words (src/pi.ts:761), e.g. `task_dependency_levels` ->
   label "Dependency Levels". A `json` boolean flag is a common optional
   parameter that switches the tool to JSON output.
 - Generic tool error path: an executor throw surfaces as a failed tool
@@ -122,7 +122,7 @@ written; every write uses `writeFileSync(path, dump(doc))` (or YAML
 serialization for state), with no backup, no git operations, and no
 mkdir except where noted.
 
-### tw_show
+### task_show
 
 - Code: `createTools` entry, src/pi.ts:461-474.
 - Label: "Show". Registered: ungated only.
@@ -144,7 +144,7 @@ mkdir except where noted.
   spec.md) throw `not a recognised artifact` (verified live against
   `docs/tasks/build-eval-creator-skill`).
 
-### tw_get
+### task_get
 
 - Code: src/pi.ts:475-483.
 - Label: "Get". Registered: ungated only.
@@ -157,7 +157,7 @@ mkdir except where noted.
 - Errors: `ResolutionError` from resolution; no field validation.
 - Edge cases: none beyond resolution.
 
-### tw_set
+### task_set
 
 - Code: src/pi.ts:485-502.
 - Label: "Set". Registered: ungated only.
@@ -175,7 +175,7 @@ mkdir except where noted.
   auto-typing is on the raw string, so a title "42" becomes the integer 42
   (lossy). Verified live.
 
-### tw_set_slices
+### task_set_slices
 
 - Code: src/pi.ts:504-513.
 - Label: "Set Slices". Registered: ungated only.
@@ -189,11 +189,11 @@ mkdir except where noted.
   branch).
 - Edge cases: nothing in the extension ever reads `doc.data["slices"]`
   back (grep confirms the only read/write sites are this tool's lines
-  510-512). Verified live: after `tw_set_slices`, `tw_slices`,
-  `tw_finalizable`, and `tw_dependency_levels` still see only legacy
+  510-512). Verified live: after `task_set_slices`, `task_slices`,
+  `task_finalizable`, and `task_dependency_levels` still see only legacy
   `slices/<n>-*.md` files. The written list is write-only data.
 
-### tw_resolve
+### task_resolve
 
 - Code: src/pi.ts:516-522.
 - Label: "Resolve". Registered: ungated only.
@@ -205,13 +205,13 @@ mkdir except where noted.
 - Errors: `ResolutionError` on no match/ambiguity.
 - Edge cases: when the selector resolves by slug scan, the `kind`
   parameter is not enforced (the slug branch of `resolveArt` ignores
-  `want`): verified live, `tw_resolve {selector: "task-tools-overhaul",
+  `want`): verified live, `task_resolve {selector: "task-tools-overhaul",
   kind: "task"}` returns the map's path, and `{selector:
   "tool-surface-inventory", kind: "slice"}` returns the task's path.
   Spec-only directories are invisible (verified live: "no artifact matches
   'build-eval-creator-skill'").
 
-### tw_assert_kind
+### task_assert_kind
 
 - Code: src/pi.ts:525-533.
 - Label: "Assert Kind". Registered: ungated only.
@@ -226,7 +226,7 @@ mkdir except where noted.
 - Edge cases: no separate not-found message; resolution errors name the
   selector.
 
-### tw_list
+### task_list
 
 - Code: src/pi.ts:536-572.
 - Label: "List". Registered: ungated only.
@@ -248,7 +248,7 @@ mkdir except where noted.
   cannot be listed by kind. Filtering by `map` matches the task
   frontmatter's `map:` field, not a directory relation.
 
-### tw_slices
+### task_slices
 
 - Code: src/pi.ts:574-583, delegating to `activeSlices` (src/pi.ts:326).
 - Label: "Slices". Registered: ungated only.
@@ -261,14 +261,14 @@ mkdir except where noted.
 - Return: "(no open slices)" when empty.
 - Errors: `ResolutionError`; note the `want="task"` is only enforced on
   the explicit-path branch, so a map slug passes too (verified live:
-  `tw_slices {selector: "task-tools-overhaul"}` -> "(no open slices)").
+  `task_slices {selector: "task-tools-overhaul"}` -> "(no open slices)").
 - Edge cases: legacy-only. A task whose `slices:` frontmatter lists slugs
   but has no `slices/<n>-*.md` files returns "(no open slices)" (verified
   live in a scratch tree). Conversely the tool never reads the
   frontmatter list. Slice files that fail frontmatter parsing are skipped
   silently.
 
-### tw_finalizable
+### task_finalizable
 
 - Code: src/pi.ts:586-595.
 - Label: "Finalizable". Registered: ungated only.
@@ -279,12 +279,12 @@ mkdir except where noted.
 - Return: "ready to finalize" or throw
   `task '<slug>' has <n> open slice(s): <numbers>`.
 - Errors: as above; plus `ResolutionError`.
-- Edge cases: same legacy-only semantics as `tw_slices`: a task with
+- Edge cases: same legacy-only semantics as `task_slices`: a task with
   only a `slices:` frontmatter list is "ready to finalize" (verified
   live). A map slug also returns "ready to finalize" (kind not enforced
   on slug scan, verified live).
 
-### tw_dependency_levels
+### task_dependency_levels
 
 - Code: src/pi.ts:598-626, delegating to `dependencyLevels`
   (src/core/art.ts:59) and `mapChildInfos` (src/pi.ts:372).
@@ -309,7 +309,7 @@ mkdir except where noted.
   null, blocked_by: []}` when a slice file cannot be parsed
   (src/pi.ts:617-620).
 
-### tw_frontier
+### task_frontier
 
 - Code: src/pi.ts:628-640, delegating to `mapChildInfos` (src/pi.ts:372).
 - Label: "Frontier". Registered: ungated only.
@@ -326,7 +326,7 @@ mkdir except where noted.
   itself is built from task files plus map overrides; tasks done per map
   but missing files are simply absent.
 
-### tw_map_tasks
+### task_map_tasks
 
 - Code: src/pi.ts:642-653.
 - Label: "Map Tasks". Registered: ungated only.
@@ -338,14 +338,14 @@ mkdir except where noted.
 - Return: "(no child tasks planned yet)" when `tasks:` is not an array;
   else lines or the raw JSON of the tasks array.
 - Errors: `ResolutionError`; on the slug-scan branch `want="map"` is
-  unenforced (verified live: `tw_map_tasks` on a task slug returns "(no
+  unenforced (verified live: `task_map_tasks` on a task slug returns "(no
   child tasks planned yet)").
 - Edge cases: unlike the other map tools, this one does not look at task
   files at all, so spec-only children DO appear here (verified live:
   a spec-only child shows with its map-level done state). The ✓ is the
   map-listed `done` flag only, never the task file's status.
 
-### tw_map_tick
+### task_map_tick
 
 - Code: src/pi.ts:655-672.
 - Label: "Map Tick". Registered: ungated only.
@@ -363,7 +363,7 @@ mkdir except where noted.
   not touch the child's own task.md status field. Only the first match is
   ticked if a slug is listed twice.
 
-### tw_map_finalizable
+### task_map_finalizable
 
 - Code: src/pi.ts:674-685.
 - Label: "Map Finalizable". Registered: ungated only.
@@ -378,12 +378,12 @@ mkdir except where noted.
 - Edge cases: pure frontmatter check; task files are never opened. A
   spec-only child with `done: false` in the map makes the map
   non-finalizable (verified live), but the same directory is invisible to
-  `tw_resolve`/`tw_frontier`/`tw_dependency_levels` (they drop
+  `task_resolve`/`task_frontier`/`task_dependency_levels` (they drop
   fileless children), so the only tools that can "see" the blocker are
-  this one and `tw_map_tasks`. Conversely, an entry with no
+  this one and `task_map_tasks`. Conversely, an entry with no
   corresponding directory that is marked `done: true` satisfies the check.
 
-### tw_state
+### task_state
 
 - Code: src/pi.ts:687-697, delegating to `loadState` (src/pi.ts:400).
 - Label: "State". Registered: ungated only.
@@ -400,7 +400,7 @@ mkdir except where noted.
   `saveState`. Live-verified in this repo: state.yaml
   `{task: tool-surface-inventory, slice: None}` prints both fields.
 
-### tw_state_set
+### task_state_set
 
 - Code: src/pi.ts:700-713, delegating to `loadState`/`saveState`
   (src/pi.ts:400/406).
@@ -420,12 +420,12 @@ mkdir except where noted.
   (see Confirmed facts). Verified live in a scratch tree: a state.yaml
   `{task: scratch-task, slice: null, schema_version: 3}` becomes
   `{task: scratch-task, slice: "1-slice-a"}` after
-  `tw_state_set {field: slice, value: 1-slice-a}`; `schema_version` is
+  `task_state_set {field: slice, value: 1-slice-a}`; `schema_version` is
   gone. In this repo the working tree state.yaml has already lost its
   `schema_version: 3` (the HEAD version has it, the working tree does
   not; see In-flight changes).
 
-### tw_context
+### task_context
 
 - Code: src/pi.ts:716-723 + `artifactSchemaRef` (src/pi.ts:418) and
   `profileText` (src/pi.ts:412).
@@ -651,7 +651,7 @@ types.d.ts:842-872.
   only `active.task` and `active.slice`. Anything else in the raw object
   (e.g. `schema_version`) is parsed into nothing and dropped by the next
   `toObject`. Live-verified.
-- Consequence: `tw_state_set` + `saveState` round-trips state.yaml
+- Consequence: `task_state_set` + `saveState` round-trips state.yaml
   through this lossy pair; see Confirmed facts.
 
 ### src/core/frontmatter.ts (51 lines)
@@ -719,19 +719,19 @@ These were established in the 2026-09-12 session and are restated here as
 verified facts with current code references (re-confirmed in this
 inventory, live where noted).
 
-1. **tw_state_set drops unknown state.yaml keys including
+1. **task_state_set drops unknown state.yaml keys including
    schema_version (toObject/fromObject round-trip).** Code:
    `saveState` (src/pi.ts:406) -> `toObject` (src/core/state.ts:20-26)
    writes only `{task, slice}`; `fromObject`
    (src/core/state.ts:35-52) parses only those two fields. Live-verified
    again in a scratch tree: `{task, slice: null, schema_version: 3}`
-   becomes a two-key file after one `tw_state_set`. Concrete evidence in
+   becomes a two-key file after one `task_state_set`. Concrete evidence in
    this repo: `git diff docs/tasks/state.yaml` shows the working tree
    lost `schema_version: 3` relative to HEAD. `setup-workflow` keys its
    fresh/migrate/no-op detection on `schema_version`
    (skills/engineering/setup-workflow/SKILL.md:3, 21-26), so any
-   `tw_state_set` call silently resets the repo to the "fresh" branch.
-2. **tw_context schema text denies the ticket-generation phase.**
+   `task_state_set` call silently resets the repo to the "fresh" branch.
+2. **task_context schema text denies the ticket-generation phase.**
    `artifactSchemaRef` ends with "The map and task bodies are the
    specification; there is no separate ticket-generation phase."
    (src/pi.ts:442, live-verified in the tool's output). This contradicts
@@ -740,17 +740,17 @@ inventory, live where noted).
 3. **Slice machinery sees only legacy `slices/<n>-*.md` files, never the
    `slices:` frontmatter list.** Code: `activeSlices` (src/pi.ts:326-340)
    filters on `SLICE_RE` (src/pi.ts:172) over the slices directory only;
-   consumers are `tw_slices`, `tw_finalizable`,
-   `tw_dependency_levels` (task branch). Live-verified in a scratch
+   consumers are `task_slices`, `task_finalizable`,
+   `task_dependency_levels` (task branch). Live-verified in a scratch
    tree: a task with a populated `slices:` frontmatter list and no slice
    files reports "(no open slices)" and "ready to finalize"; after
    adding one legacy file it is listed and blocks finalization.
-4. **tw_set_slices writes a list nothing reads.** Code: the write is
+4. **task_set_slices writes a list nothing reads.** Code: the write is
    src/pi.ts:510-512; grep for `data["slices"]` / `.slices` reads finds
-   no reader anywhere in `src/`. Live-verified: after `tw_set_slices`,
+   no reader anywhere in `src/`. Live-verified: after `task_set_slices`,
    no slice tool's output changes.
-5. **Spec-only directories are invisible to tw_resolve and
-   tw_map_finalizable's peers.** Code: `mapChildInfos`
+5. **Spec-only directories are invisible to task_resolve and
+   task_map_finalizable's peers.** Code: `mapChildInfos`
    (src/pi.ts:372-396) drops children whose `<slug>/task.md` is missing
    (via `taskPathForSlug`, src/pi.ts:359); the slug scan in `resolveArt`
    reads only `maps/*/map.md` and `*/task.md` (src/pi.ts:252-270).
@@ -758,14 +758,14 @@ inventory, live where noted).
    (contains only `spec.md`) resolves to nothing, and a scratch map
    listing a fileless child drops it from frontier/dependency levels.
    Refinement discovered in this inventory (not previously recorded):
-   `tw_map_finalizable` (src/pi.ts:674-685) and `tw_map_tasks`
+   `task_map_finalizable` (src/pi.ts:674-685) and `task_map_tasks`
    (src/pi.ts:642-653) DO see spec-only children because they read the
    raw map frontmatter; so a spec-only child marked `done: false`
    surfaces in exactly two tools and is invisible to every other one,
    and a map listing only spec-only done children reports "ready to
    finalize - all children done" (live-verified against
    `pi-harness-evals`, whose third planned child `build-eval-creator-skill`
-   exists as a spec-only directory and is absent from `tw_list`).
+   exists as a spec-only directory and is absent from `task_list`).
 6. **The extension registers 20 tools: 17 task_* plus notify_user,
    get_guidelines, list_guidelines.** Code: 17 entries in `createTools()`
    (src/pi.ts:459-729, `def(` count = 17 task tools + the `def` helper)
@@ -791,10 +791,10 @@ surface.
 
 - Ungated (personal repo, this repo's origin does not match the
   QNCGmbH/anwaltde patterns): the session listed exactly
-  `tw_show, tw_get, tw_set, tw_set_slices, tw_resolve,
-  tw_assert_kind, tw_list, tw_slices, tw_finalizable,
-  tw_dependency_levels, tw_frontier, tw_map_tasks, tw_map_tick,
-  tw_map_finalizable, tw_state, tw_state_set, tw_context,
+  `task_show, task_get, task_set, task_set_slices, task_resolve,
+  task_assert_kind, task_list, task_slices, task_finalizable,
+  task_dependency_levels, task_frontier, task_map_tasks, task_map_tick,
+  task_map_finalizable, task_state, task_state_set, task_context,
   notify_user, get_guidelines, list_guidelines` (20 names). With a
   `-t` allowlist naming all 20 plus the four builtins, all 20 were
   present and callable.
@@ -840,7 +840,7 @@ in-flight changes are labeled, not treated as provisional).
 - `docs/tasks/state.yaml` [IN-FLIGHT]: working tree is
   `{task: tool-surface-inventory, slice: None}`; the `schema_version: 3`
   key present at HEAD is gone (consistent with fact 1: a
-  `tw_state_set` call was made on this tree).
+  `task_state_set` call was made on this tree).
 - Other uncommitted files (skills/engineering/README.md,
   skills/engineering/task-workflow-overview/SKILL.md,
   skills/productivity/handoff/SKILL.md, .changeset/eval-review-skill.md,

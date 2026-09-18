@@ -220,8 +220,9 @@ describe("factory gate", () => {
     factory(stub);
 
     const names = stub.tools.map((t) => t.name);
-    const taskNames = GATED_NAMES.filter((n) => n.startsWith("task_"));
-    for (const name of taskNames) {
+    const gatedToolNames = GATED_NAMES.filter((n) => n.startsWith("tw_"));
+    expect(gatedToolNames.length).toBeGreaterThan(0);
+    for (const name of gatedToolNames) {
       expect(names).not.toContain(name);
     }
   });

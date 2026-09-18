@@ -177,7 +177,7 @@ docs/tasks/), Q7 (router keeps name).
 - Add `to-spec` (engineering/user): synthesizes conversation/map into
   `docs/tasks/<slug>/spec.md`; no interview.
 - Add `to-tickets` (engineering/user): breaks spec into tracer-bullet
-  feature/bug tasks with `blocked_by` edges; uses our `task_*` tools +
+  feature/bug tasks with `blocked_by` edges; uses our `tw_*` tools +
   the map's tasks array; includes the wide-refactor expand-contract
   exception.
 - Reshape `wayfinder` to decisions-only: remove `## Dynamic growth` and

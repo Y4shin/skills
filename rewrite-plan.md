@@ -63,7 +63,7 @@ original v1 codebase and from real pipeline runs (see `FEEDBACK.md`).
 ## Clean-Slate Design: Principles
 
 1. **Three layers, not five.**
-   - **One extension** (TypeScript) — registers `task_*` tools
+   - **One extension** (TypeScript): registers `tw_*` tools
    - **Agent definitions** (markdown) — subagent behavior
    - **N skills** (SKILL.md) — orchestration instructions for the parent
    No chain JSON files. No barrel exports. No `dist/` build output.

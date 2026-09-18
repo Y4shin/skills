@@ -60,7 +60,7 @@ v3-era flow is missing. This task produces evidence, not decisions.
     cite the skill file and line for every claim).
   - A prose-vs-behavior contradiction list: every place skill prose
     describes tool behavior the tool does not have, or vice versa (the
-    tw_context schema text is one confirmed instance; find all others).
+    task_context schema text is one confirmed instance; find all others).
   - A no-tool-support list: workflow steps that are pure prose with no
     tool backing (e.g. to-spec's spec.md has no tool awareness; the
     spec-only-directory invisibility that caused the false finalizable on
@@ -68,8 +68,8 @@ v3-era flow is missing. This task produces evidence, not decisions.
   - The two known-future requirements (two-phase model, manual-mode
     marker) checked against the audit: what tool support each implies and
     whether the current surface has any of it.
-  - Slice-machinery verdict evidence: every invocation of tw_slices,
-    tw_set_slices, tw_finalizable, and slice-related prose across all
+  - Slice-machinery verdict evidence: every invocation of task_slices,
+    task_set_slices, task_finalizable, and slice-related prose across all
     skills, named and cited, so G1 can decide demote/freeze/delete on
     evidence.
 - Every claim cites the skill file (and resource file) that owns it.

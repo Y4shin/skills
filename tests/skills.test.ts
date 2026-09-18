@@ -965,6 +965,9 @@ const TOOL_SUFFIXES = [
   "context",
 ];
 const OLD_TOOL_PATTERN = new RegExp(`\\b${OLD_PREFIX}(${TOOL_SUFFIXES.join("|")})\\b`);
+// The wildcard family reference (`task_*`) is also an old-prefix reference;
+// assembled from parts for the same reason as OLD_PREFIX.
+const OLD_WILDCARD_PATTERN = new RegExp(`${OLD_PREFIX}\\*`);
 
 // Mirrors the sweep verification: every file under the package root, minus
 // node_modules/.git and any archive directory (archived docs are historical
@@ -981,12 +984,45 @@ function corpusFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-// Historical-record exemptions, same class as the archive: dated changelog
-// entries keep the names that were live when written, and the rename task's
-// own arch-spec must keep its old-to-new mapping table to stay meaningful.
+// Historical-record exemptions, same class as the archive: documents that
+// record the old surface as it was keep the names that were live when
+// written. Dated changelog entries, decision records, audit findings, and
+// the rename task's own arch-spec (its old-to-new mapping table must keep
+// the old names to stay meaningful).
 const CORPUS_EXEMPTIONS = new Set([
   "docs/tasks/CHANGELOG.md",
   "docs/tasks/overhaul-tw-rename/arch-spec.md",
+  "docs/tasks/maps/task-tools-overhaul/handoff.md",
+  "docs/tasks/overhaul-synthesis-grilling/task.md",
+  "docs/tasks/tool-surface-inventory/findings.md",
+  "docs/tasks/tool-surface-inventory/task.md",
+  "docs/tasks/workflow-tool-usage-audit/findings.md",
+  "docs/tasks/workflow-tool-usage-audit/task.md",
+  "docs/tasks/eval-stack-research/findings.md",
+]);
+
+// Wildcard (`task_*`) exemptions, a wider class: historical records that
+// describe the old surface as it was (decision records, audit findings,
+// ideas docs) keep the name that was live when written, including the
+// ruling lines that must name the old prefix to stay meaningful (the map
+// doc's rename ruling, this task's own docs, and this test file's
+// comments).
+const WILDCARD_EXEMPTIONS = new Set([
+  "docs/tasks/CHANGELOG.md",
+  "docs/tasks/overhaul-tw-rename/arch-spec.md",
+  "docs/tasks/overhaul-tw-rename/task.md",
+  "docs/tasks/maps/task-tools-overhaul/handoff.md",
+  "docs/tasks/maps/task-tools-overhaul/map.md",
+  "docs/tasks/overhaul-synthesis-grilling/task.md",
+  "docs/tasks/tool-surface-inventory/findings.md",
+  "docs/tasks/tool-surface-inventory/task.md",
+  "docs/tasks/workflow-tool-usage-audit/findings.md",
+  "docs/tasks/workflow-tool-usage-audit/task.md",
+  "docs/tasks/eval-stack-research/findings.md",
+  "docs/adr/0001-largely-adopt-mp-skills.md",
+  "docs/ideas/bug-workflow.md",
+  "docs/ideas/gate-skills-by-repo.md",
+  "tests/skills.test.ts",
 ]);
 
 describe("tool prefix rename", () => {
@@ -997,6 +1033,19 @@ describe("tool prefix rename", () => {
       if (CORPUS_EXEMPTIONS.has(rel)) continue;
       const content = readFileSync(file, "utf-8");
       if (OLD_TOOL_PATTERN.test(content)) {
+        offenders.push(rel);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("no old-prefix wildcard reference remains in living docs", () => {
+    const offenders: string[] = [];
+    for (const file of corpusFiles(PROJECT)) {
+      const rel = file.slice(PROJECT.length + 1);
+      if (WILDCARD_EXEMPTIONS.has(rel)) continue;
+      const content = readFileSync(file, "utf-8");
+      if (OLD_WILDCARD_PATTERN.test(content)) {
         offenders.push(rel);
       }
     }

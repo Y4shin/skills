@@ -54,7 +54,7 @@ decide anything; it produces the factual baseline.
     parsers), frontmatter.ts parse/dump round-trip behavior, repo-gate.ts
     gate resolution (working-tree version, labeled in-flight).
   - A "confirmed facts" section carrying over the pre-map findings
-    (schema_version wipe, legacy-slice-only machinery, tw_context
+    (schema_version wipe, legacy-slice-only machinery, task_context
     contradiction, 20 registered tools count, v3 "keep-as-ours" scope) as
     verified facts with code references, not re-derived.
   - In-flight labels wherever the working tree differs from committed

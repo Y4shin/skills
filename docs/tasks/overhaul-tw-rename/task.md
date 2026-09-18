@@ -79,15 +79,27 @@ Verified independently on the merged branch: 666/666 tests across 15 files,
 (`\btask_\(show|get|set|...|context\)\b`, excluding `node_modules`, `.git`,
 `archive`) returns zero hits.
 
-Two cosmetic observations, neither a blocker. First, the arch-spec's
-Old/New table renamed its own "Old" column, so both columns now read `tw_`;
-the prose around it still explains the rename correctly. Second, the sweep
-also replaced tool names inside the dated historical entries of
-`docs/tasks/CHANGELOG.md` (the `overhaul-graph-tools`, `overhaul-state-module`,
-and `finalize-task-set-e-tool-confusion` entries). That is what the arch-spec
-asked for (living docs are swept, only `archive/` is exempt), but it does
-mean past entries now name tools by names that did not exist when those
-slices landed.
+Two sweep defects found at verification and fixed in review follow-up
+commits. First, the sweep renamed the arch-spec's own Old/New table,
+collapsing both columns to `tw_`; the table is restored from the pre-sweep
+commit, and the arch-spec joins the exemption set (it must keep the old
+names to stay meaningful). Second, the sweep replaced tool names inside the
+dated historical entries of `docs/tasks/CHANGELOG.md`; those entries are
+restored to the names that were live when written, and the changelog joins
+the exemption set, same class as the archive.
+
+The whole-task review then widened the historical-record class: decision
+records (the synthesis grilling, ADR 0001), audit findings (the inventory
+and the usage audit), ideas docs, and the handoff keep their original
+tool names, fixing the never-existent mixed state the exact-identifier
+sweep had left them in. Living docs swept completely, wildcard included:
+`src/pi.ts`, `README.md`, `CONTEXT.md`, `docs/migration-target.yaml`,
+`docs/repo-gating.md`, the skills READMEs, the overview, the map doc,
+`rewrite-plan.md`, `upgrade-2-to-3.md`, and the to-tickets description.
+Two test defects fixed along the way: the gate-active absence test had gone
+vacuous (its `task_` filter matched nothing after the rename), and the
+corpus assertion gained a wildcard pattern so `task_*` prose references are
+guarded too, not only exact identifiers.
 
 `state.yaml` is unchanged and still reads `task: null`. Task status stays
 `ready` for finalize-task.
