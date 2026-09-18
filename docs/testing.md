@@ -76,6 +76,15 @@
   vendored clone, because the index was computed from the pre-migration path
   set and missed a file the plan itself adds. A no-op assertion over one
   fixture is not a no-op guarantee; run it over the whole fixture set.
+- **A fixture patched to make a new check pass can violate the schema the
+  suite stands for.** When a new status-based check landed, the v3 fixture
+  was patched to carry the new field (`workflow_state: done`) on top of
+  `status: draft`, a pair the conformance rules forbid, and the suite went
+  green while the live tree (which carries neither field) broke. Two guards:
+  fixtures must stay schema-valid even when it costs a test rewrite, and any
+  check that changes what the live tree sees needs one test driving the
+  tool against the live tree's actual shape (status-only frontmatter), not
+  only against fixtures.
 
 ## Integration harness (tests/integration/)
 

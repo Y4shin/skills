@@ -113,3 +113,22 @@ Carried forward, one blocker for the very next step, **resolved in
    The v3 fixtures keep a schema-valid pair (`status: stable` plus
    `workflow_state: done`) after review flagged the first draft's
    `draft`/`done` combination as a conformance violation.
+
+### Architecture lessons (harvested at finalize)
+
+- **A spec invariant and a spec mechanism can contradict; the invariant
+  wins.** "Keep serving the v3 tree unchanged" versus a status-based check
+  with no v3 fallback: the land-worker caught it only because it ran the
+  tool against the live tree. The suite could not, because the fixture had
+  been patched into the new shape. Live-tree smoke checks are now part of
+  this workflow's finalize discipline for any tool that reads the tree.
+- **Deprecated-as-done needs a visibility channel per tool, not per
+  codebase.** The first cut reported the deprecated set only on
+  `task_frontier`; review caught that `task_dependency_levels` and
+  `task_map_finalizable` silently omitted it. The rule that stuck: every
+  graph tool that answers about an effort also reports its deprecated set
+  and its anomalies.
+- **Grouping keys and scoping keys are different things.** `effortKeyOf`
+  buckets every map into one `maps:` scope (right for `blocked_by`
+  resolution), so effort grouping needs the directory rule (`effortDirOf`)
+  separately. Promoting both to exports beat duplicating the path logic.
