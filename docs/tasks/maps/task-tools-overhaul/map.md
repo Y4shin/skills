@@ -29,7 +29,7 @@ tasks:
 - slug: overhaul-graph-tools
   blocked_by:
   - overhaul-v4-migration
-  done: false
+  done: true
 - slug: overhaul-tw-rename
   blocked_by:
   - overhaul-graph-tools
