@@ -203,7 +203,7 @@ function basenameOf(path: string): string {
  *   is its own scope instead of collapsing into one bucket.
  * - v3 flat task: `docs/tasks/<task>/...` -> `<task>` (its own effort).
  */
-function effortDirOf(path: string): string | null {
+export function effortDirOf(path: string): string | null {
   const parts = pathParts(path);
   let marker = -1;
   for (let i = 0; i < parts.length - 1; i++) {
@@ -302,7 +302,7 @@ function isV4TaskPath(path: string): boolean {
  *
  * The prefixes keep the namespaces from colliding.
  */
-function effortKeyOf(art: Artifact): string {
+export function effortKeyOf(art: Artifact): string {
   if (art.type === "map") return "maps:";
   if (art.shape === "v3") {
     const m = art.data.map;
