@@ -20,7 +20,17 @@ import { Type } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
-import { fromFrontmatter, sliceInfoFrom, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, type Artifact, type SliceInfo, type WorkItemInfo } from "./core/art.js";
+import { fromFrontmatter, findAnomalies, sliceInfoFrom, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, type Artifact, type SliceInfo, type WorkItemInfo, type Anomaly } from "./core/art.js";
+import {
+  effortGraphs,
+  effortFrontier,
+  effortLevels,
+  effortFinalizable,
+  liveFrontier,
+  itemFinalizable,
+  type EffortGraph,
+  type ScanIndexLike,
+} from "./core/graph.js";
 import { toObject, fromObject, freshState, isPointerName, POINTER_NAMES, type WorkflowState } from "./core/state.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
@@ -419,6 +429,74 @@ function mapChildInfos(root: string, mapPath: string): WorkItemInfo[] {
   return out;
 }
 
+// ─── Scan layer ────────────────────────────────────────────────────────────────
+
+interface ScanIndex { hits: ScanHit[]; anomalies: Anomaly[] }
+
+/** One scan of the tree plus one anomaly pass over everything it found. */
+function scanIndex(root: string): ScanIndex {
+  const hits = scanArtifacts(root);
+  return { hits, anomalies: findAnomalies(hits.map((h) => h.art)) };
+}
+
+/**
+ * A per-invocation memo: each tool invocation scans once and every graph
+ * helper it calls reads the same index. No invalidation machinery, since the
+ * memo never outlives the `execute` call that created it.
+ */
+function scanMemo(root: string): () => ScanIndex {
+  let cached: ScanIndex | null = null;
+  return () => (cached ??= scanIndex(root));
+}
+
+/** The effort graph a resolved artifact path belongs to, or null. */
+function graphForPath(graphs: Map<string, EffortGraph>, path: string): EffortGraph | null {
+  for (const g of graphs.values()) {
+    for (const a of [g.map, g.spec, ...g.tasks, ...g.tickets, ...g.deprecated]) {
+      if (a?.path === path) return g;
+    }
+  }
+  return null;
+}
+
+/**
+ * True when the effort has scanned tasks or tickets, so the scan is the
+ * source of truth. A v3 map whose children live in flat task dirs has none,
+ * and its legacy array-based path is what must serve it.
+ */
+function hasScanChildren(graph: EffortGraph | null): boolean {
+  if (graph === null) return false;
+  return graph.tasks.length + graph.tickets.length + graph.deprecated.length > 0;
+}
+
+/** True when the selector names the maps scope: the tasks root or `maps/`. */
+function isMapsScope(root: string, selector: string): boolean {
+  const wanted = new Set([resolvePath(taskRoot(root)), resolvePath(join(taskRoot(root), "maps"))]);
+  for (const candidate of [selector, join(process.cwd(), selector), join(root, selector)]) {
+    try {
+      if (existsSync(candidate) && isDir(candidate) && wanted.has(resolvePath(candidate))) return true;
+    } catch { /* not a resolvable path */ }
+  }
+  return false;
+}
+
+/** Append the formatted anomaly block, or return the text unchanged. */
+function withAnomalies(text: string, anomalies: Anomaly[]): string {
+  if (anomalies.length === 0) return text;
+  return `${text}\n\n## Anomalies\n\n${anomalies.map((a) => `- [${a.kind}] ${a.detail}`).join("\n")}`;
+}
+
+/**
+ * Append the deprecated block. Deprecated artifacts count as done and sit out
+ * of the graph, so the report is how they stay visible instead of silently
+ * disappearing.
+ */
+function withDeprecated(text: string, deprecated: Artifact[]): string {
+  if (deprecated.length === 0) return text;
+  const lines = deprecated.map((a) => `- ${a.slug} (${a.type})`);
+  return `${text}\n\n## Deprecated (out of the graph)\n\n${lines.join("\n")}`;
+}
+
 // ─── State helpers ─────────────────────────────────────────────────────────────
 
 function loadState(root: string): WorkflowState {
@@ -443,23 +521,48 @@ function artifactSchemaRef(): string {
   return [
     "## Frontmatter schema",
     "",
-    "### Task (task.md)",
-    "kind: task | slug: <kebab> | title: <text> | type: research | prototype | grilling | manual | feature | bug |",
-    "  map: <slug> | blocked_by: [<slug>, ...] | status: proposed | blocked | ready | in-progress | done |",
-    "  size: s | m | l | xl | started_at: <ISO> | completed_at: <ISO>",
+    "Every non-reserved `.md` under `docs/tasks/` carries parseable YAML frontmatter with a non-empty `type`.",
+    "Unknown keys and unknown values are tolerated.",
     "",
-    "### Legacy Slice (slices/<n>-<slug>.md)",
-    "kind: slice | slug: <kebab> | title: <text> | task: ../task.md |",
-    "  mode: hitl | afk | status: todo | in-progress | done |",
-    "  size: s | m | l | xl | blocked_by: [<slug>, ...] |",
-    "  started_at: <ISO> | completed_at: <ISO>",
+    "### The flow",
     "",
-    "### Map (map.md)",
-    "kind: map | slug: <kebab> | title: <text> |",
-    "  tasks: [{slug, blocked_by, done}, ...] | status: draft | active | done |",
-    "  started_at: <ISO> | completed_at: <ISO>",
+    "wayfinder decision tasks, then to-spec (writes `spec.md`), then to-tickets (generates implementation tickets).",
+    "Tasks and tickets are graph nodes; the map is the effort index.",
     "",
-    "The map and task bodies are the specification; there is no separate ticket-generation phase.",
+    "### Task (`docs/tasks/<effort>/tasks/<task>/task.md`)",
+    "type: task | subtype: research | prototype | grilling | manual | title: <text> |",
+    "  status: draft | stable | deprecated | workflow_state: todo | ready | in-progress | blocked | done |",
+    "  blocked_by: [<slug>, ...] | mode: human (optional)",
+    "",
+    "### Ticket (`docs/tasks/<effort>/tickets/<ticket>/ticket.md`)",
+    "type: ticket | subtype: feature | bug | title: <text> |",
+    "  status: draft | stable | deprecated | workflow_state: todo | ready | in-progress | blocked | done |",
+    "  blocked_by: [<slug>, ...] | mode: human (optional) | size: s | m | l | xl (optional, absent means m)",
+    "",
+    "### Map (`docs/tasks/<effort>/map.md`)",
+    "type: map | title: <text> | status: draft | stable | deprecated |",
+    "  blocked_by: [<effort-slug>, ...] holding feature-to-feature edges.",
+    "A map has no workflow_state: effort done-ness is derived by scanning its tasks and tickets.",
+    "",
+    "### Spec (`docs/tasks/<effort>/spec.md`)",
+    "type: spec | title: <text> | status: draft (while writing) | stable (when published).",
+    "A spec has no workflow_state.",
+    "",
+    "### Auxiliary artifacts",
+    "type: arch spec | findings | deviation report | changelog | out-of-scope note | title: <text> | status: draft | stable | deprecated.",
+    "Auxiliary artifacts have no workflow_state.",
+    "",
+    "### Lifecycle vocabularies",
+    "status: draft | stable | deprecated",
+    "workflow_state: todo | ready | in-progress | blocked | done",
+    "Done-ness gates on workflow_state: done. A deprecated artifact counts as done and sits out of the graph.",
+    "",
+    "### Conformance rules",
+    "status draft pairs only with workflow_state todo; status deprecated pairs only with workflow_state done;",
+    "status stable pairs with anything. An absent status means stable.",
+    "blocked_by edges are kind-scoped (tasks to tasks, tickets to tickets) and effort-scoped;",
+    "a map's blocked_by carries feature-to-feature edges.",
+    "An effort is finalizable when every task and ticket is done and, if a spec exists, at least one ticket exists.",
   ].join("\n");
 }
 
@@ -611,24 +714,41 @@ export function createTools(): Record<string, Tool> {
     ),
 
     task_finalizable: def(
-      "Check a task is ready to finalize (no active slice docs).",
-      { selector: Str("Task slug or path") },
+      "Check an artifact is ready to finalize (workflow_state done; legacy tasks also need no open slices).",
+      { selector: Str("Task or ticket slug or path") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
-        const { art } = resolveArt(root, p.selector, "task");
+        const { art } = resolveArt(root, p.selector);
+        const reason = itemFinalizable(art);
+        if (reason !== null) throw new Error(reason);
+        // Secondary gate, v3-shape tasks only: a done task with open slice
+        // docs is a contradiction worth surfacing. v4 tasks have no slice
+        // files, so this is a no-op there.
         const slices = activeSlices(root, art.slug);
-        if (slices.length === 0) return "ready to finalize";
-        throw new Error(`task '${art.slug}' has ${slices.length} open slice(s): ${slices.map((s) => `${s.number}`).join(", ")}`);
+        if (slices.length > 0) {
+          throw new Error(`task '${art.slug}' has ${slices.length} open slice(s): ${slices.map((s) => `${s.number}`).join(", ")}`);
+        }
+        const index = scanMemo(root)();
+        const graph = graphForPath(effortGraphs(index), art.path ?? "");
+        return withAnomalies("ready to finalize", graph?.anomalies ?? []);
       },
     ),
 
     task_dependency_levels: def(
-      "Compute BFS dependency levels from a map's unfinished tasks or a legacy task's remaining slices.",
+      "Compute BFS dependency levels from an effort map's scan or a legacy task's remaining slices.",
       { selector: Str("Map or task slug") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         const resolved = resolveArt(root, p.selector);
         if (resolved.art.type === "map") {
+          const index = scanMemo(root)();
+          const graph = graphForPath(effortGraphs(index), resolved.path);
+          if (hasScanChildren(graph)) {
+            const levels = effortLevels(graph!);
+            const deprecated = graph!.deprecated.map((a) => ({ slug: a.slug, type: a.type }));
+            return JSON.stringify({ ...levels, deprecated, anomalies: graph!.anomalies }, null, 2);
+          }
+          // v3 fallback: the map's own array is the graph.
           const children = mapChildInfos(root, resolved.path);
           const remaining = children.filter((item) => item.status !== "done");
           const levels = dependencyLevels(remaining);
@@ -653,11 +773,52 @@ export function createTools(): Record<string, Tool> {
     ),
 
     task_frontier: def(
-      "List a map's unfinished tasks whose blockers are complete.",
-      { selector: Str("Map slug or path"), json: OptBool },
+      "List the ready edge of an effort's graph: unfinished tasks and tickets whose blockers are done.",
+      { selector: Str("Map slug or path, or the tasks root for the effort frontier"), json: OptBool },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
+        const index = scanMemo(root)();
+        const graphs = effortGraphs(index);
+        // The maps scope: the cross-effort frontier.
+        if (isMapsScope(root, p.selector)) {
+          const efforts = liveFrontier(index);
+          if (p.json) {
+            return JSON.stringify(
+              efforts.map((g) => ({
+                slug: g.slug,
+                frontier: effortFrontier(g).map((a) => ({ slug: a.slug, type: a.type })),
+                deprecated: g.deprecated.map((a) => ({ slug: a.slug, type: a.type })),
+                anomalies: g.anomalies,
+              })),
+              null, 2,
+            );
+          }
+          const text = efforts.length === 0
+            ? "(empty frontier)"
+            : efforts.map((g) => {
+                const items = effortFrontier(g);
+                const lines = items.length === 0
+                  ? [`${g.slug}: (empty frontier)`]
+                  : [`${g.slug}:`, ...items.map((a) => `  ${a.slug} (${a.type})`)];
+                return withDeprecated(withAnomalies(lines.join("\n"), g.anomalies), g.deprecated);
+              }).join("\n");
+          return text;
+        }
+
         const resolved = resolveArt(root, p.selector, "map");
+        const graph = graphForPath(graphs, resolved.path);
+        if (hasScanChildren(graph)) {
+          const frontier = effortFrontier(graph!);
+          if (p.json) {
+            return JSON.stringify({ frontier, deprecated: graph!.deprecated, anomalies: graph!.anomalies }, null, 2);
+          }
+          const text = frontier.length === 0
+            ? "(empty frontier)"
+            : frontier.map((a) => `${a.slug} (${a.type})`).join("\n");
+          return withDeprecated(withAnomalies(text, graph!.anomalies), graph!.deprecated);
+        }
+
+        // v3 fallback: the map's own array, resolved through the legacy path.
         const children = mapChildInfos(root, resolved.path);
         const done = new Set(children.filter((item) => item.status === "done").map((item) => item.slug));
         const frontier = children.filter((item) => item.status !== "done" && item.blocked_by.every((blocker) => done.has(blocker)));
@@ -699,14 +860,25 @@ export function createTools(): Record<string, Tool> {
     ),
 
     task_map_finalizable: def(
-      "Check every child task of a map is finalized.",
+      "Check every task and ticket of an effort is done (and, with a spec, that tickets exist).",
       { selector: Str("Map slug or path") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
-        const { doc } = resolveArt(root, p.selector, "map");
-        const tasks = Array.isArray(doc.data["tasks"]) ? doc.data["tasks"] : [];
+        const resolved = resolveArt(root, p.selector, "map");
+        const index = scanMemo(root)();
+        const graph = graphForPath(effortGraphs(index), resolved.path);
+        if (hasScanChildren(graph)) {
+          const reason = effortFinalizable(graph!);
+          if (reason !== null) throw new Error(reason);
+          return withDeprecated(
+            withAnomalies("ready to finalize: all children done", graph!.anomalies),
+            graph!.deprecated,
+          );
+        }
+        // v3 fallback: the map's own array is the source of truth.
+        const tasks = Array.isArray(resolved.doc.data["tasks"]) ? resolved.doc.data["tasks"] : [];
         const undone = tasks.filter((t: any) => !t.done).map((t: any) => t.slug || "?");
-        if (undone.length === 0) return "ready to finalize — all children done";
+        if (undone.length === 0) return "ready to finalize: all children done";
         throw new Error(`unfinished children: ${undone.join(", ")}`);
       },
     ),
