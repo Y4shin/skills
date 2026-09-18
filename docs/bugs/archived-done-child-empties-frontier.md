@@ -1,11 +1,11 @@
 ---
 title: Archiving a done map child empties the map frontier forever
-status: open
+status: fixed
 severity: major
 reported: 2026-09-17
 confirmed_by: reproduction (task_frontier returns [] while an unblocked child exists)
-fix_commit:
-promoted_to:
+fix_commit: 4fa98d83957625d4b60f2e2b08af1bff0b41ddf4
+promoted_to: overhaul-graph-tools
 skill: finalize-task
 ---
 
@@ -30,30 +30,25 @@ needs it most: after the first child lands.
 
 ## Root cause
 
-`task_frontier` computes readiness through `mapChildInfos` (src/pi.ts), which
-resolves each listed child by looking up its `task.md` on disk:
+`task_frontier` computed readiness through `mapChildInfos` (src/pi.ts), which
+resolved each listed child by looking up its `task.md` on disk.
+`taskPathForSlug` searched `docs/tasks/<slug>/task.md` and the live
+subdirectories, but **not** `docs/tasks/archive/`, so a finalized (archived)
+child was silently dropped from the child list, vanished from the `done` set,
+and blocked its dependents forever.
 
-```ts
-const p = taskPathForSlug(root, slug);
-const info = p ? taskInfoFromPath(p) : null;
-if (info) { ... out.push(info); }
-```
+## Fix summary
 
-`taskPathForSlug` searches `docs/tasks/<slug>/task.md` and the live
-subdirectories, but **not** `docs/tasks/archive/`. Finalize-task archives a
-finished child with `git mv docs/tasks/<slug>/ docs/tasks/archive/<slug>/`,
-which deletes the file `taskPathForSlug` looks for. The child is therefore
-silently dropped from `out`, even though the map still lists it as
-`done: true`.
-
-The drop cascades: `task_frontier` builds its `done` set from the children
-`mapChildInfos` returned, so the archived child is not in `done`. Its
-dependent's `blocked_by.every((b) => done.has(b))` is then false forever. A
-map whose first child is finalized can never report a frontier again, and the
-blockage propagates down the whole chain.
-
-Two sibling tools disagree, which is why this hides: `task_map_tasks` reads
-the raw map array and shows the child as done, so the map looks healthy.
+Fixed by `overhaul-graph-tools` (merged as `4fa98d8`). The graph tools no
+longer resolve children through `taskPathForSlug` at all: `task_frontier`,
+`task_dependency_levels`, and `task_map_finalizable` compute from a full
+directory scan of the tree, archive included, reading each artifact's own
+frontmatter. An archived done child is scanned like any other artifact, so it
+stays in the `done` set and its dependents unblock. The map's `tasks:` array
+is no longer read on the scan path, which also retires the listed-vs-fileless
+drift class. The legacy array path remains only as a v3 fallback for maps
+whose children have no scanned artifacts, and it is deleted by
+`overhaul-dead-surface`.
 
 ## Expected
 
