@@ -76,6 +76,17 @@
   vendored clone, because the index was computed from the pre-migration path
   set and missed a file the plan itself adds. A no-op assertion over one
   fixture is not a no-op guarantee; run it over the whole fixture set.
+- **A package-wide rename sweep must exempt its historical records up front,
+  and the exemption set is part of the design.** A mechanical identifier sweep
+  over the whole package will eat its own rename table (the arch-spec's
+  old-to-new mapping collapses to the new name on both sides), dated changelog
+  entries, decision records, and audit findings, producing a never-existent
+  mixed state. The durable guard is a **corpus assertion** that walks the
+  package, checks every file against the old-name regex (assembled from parts
+  so the test file itself carries no old literal), and holds an explicit
+  exemption set for the historical-record class. Guard the wildcard form too
+  (`<prefix>*`), not only exact identifiers. See the `tool prefix rename`
+  block in `tests/skills.test.ts`.
 - **A fixture patched to make a new check pass can violate the schema the
   suite stands for.** When a new status-based check landed, the v3 fixture
   was patched to carry the new field (`workflow_state: done`) on top of
