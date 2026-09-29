@@ -59,3 +59,71 @@ itself lands in the dead-surface ticket.
 
 - overhaul-tw-rename (prose is written against final tool names);
       runs parallel with overhaul-planning-skills.
+
+## Implementation notes
+
+### Slice - overhaul-execution-skills (landed)
+
+Landed on `slice/overhaul-execution-skills` (7 commits, merged into
+`task/overhaul-execution-skills`). All nine acceptance criteria landed
+test-first as structure tests in `tests/skills.test.ts` (51 new/flipped
+assertions across 9 describe blocks, plus the template-conformance seam
+extended to the arch-spec, deviation-report, and findings templates).
+Gates on the merged branch: 767/767 tests (15 files), `tsc --noEmit`
+clean; no lint script is configured (typecheck is the designated gate).
+Verified independently before landing: same numbers on the slice branch.
+
+What landed: the implement-task wrapper routes on `subtype` from
+frontmatter (falls back to `type`, then feature; absent mode keeps today's
+prose-driven routing), with effort-frontier dispatch via
+`tw_frontier <effort-slug>`; `mode: human` hard-refuses autonomous
+dispatch and hands back `/skill:implement-task <slug>`; the feature and
+bug pipelines are rebased to per-ticket chains over the effort frontier
+(effort-root arch spec at `docs/tasks/<effort>/arch-spec.md`, levels via
+`tw_dependency_levels`, strict barriers, budgets keyed off `size` with
+the m default, chains on the workflow API with an ok-gate before land);
+failure splits become sub-tickets registered in the effort with the
+original superseded (`status: deprecated` plus `workflow_state: done`);
+the ui-noter dispatch is gone; finalize-task is rewritten to v4
+(workflow state via `tw_set`, archiving gated on `tw_finalizable` and
+`tw_map_finalizable`, pointers cleared, root index regenerated, note
+check gone); code-review and the tdd prompts read standards files
+directly with no guidelines tool in the middle; land-worker loses its
+archive duty.
+
+Carried forward, in priority order:
+
+1. **Landing-branch chaining rule.** The first ticket's landing branch
+   is created off the starting branch; each subsequent ticket's is
+   created off the branch the previous ticket's chain landed on, so a
+   chain sees the code its blockers delivered. The arch spec's letter
+   ("created off the starting branch") is corrected by this rule; future
+   chains and the coherence pass must follow it.
+2. **Worktree-concurrency removal.** The old feature pipeline's optional
+   per-slice worktree isolation mode has no v4 successor: the v4 chain
+   model is sequential per level on a shared repo cwd, and the worktree
+   path had no defined v4 landing story. The removal is deliberate; a
+   future effort would need to design worktree concurrency for the
+   branch-chaining model.
+3. **Worker-telemetry friction (pre-existing, not introduced here).**
+   The tdd-worker and slice-verifier agent prose instruct `submit_feedback`
+   calls, but their tool allowlists have never included the tool, so the
+   designed-for worker telemetry is silently impossible from those
+   agents. The dead-surface ticket or a telemetry follow-up should
+   resolve this drift.
+4. **Docs pages deferred.** The docs pages for implement-task and
+   finalize-task are stale relative to their SKILL.md files until
+   `backfill-skill-docs-pages` runs (its criteria already name them);
+   the arch spec overrides the repo's re-sync rule for this effort.
+5. **Telemetry field name kept, semantics re-pointed.** The wrapper still
+   passes `sliceCount` (the external pi-telemetry extension's field name)
+   but defines it as the pending-ticket count from
+   `tw_frontier <effort-slug>`; `map` is the effort slug.
+6. **Smaller deliberate divergences.** Finalize renumbers to Steps 0-8
+   after the deleted impeccable-note check; `CLAUDE.md` is dropped from
+   the standards-read list (not a Pi-native convention file); the
+   tdd-worker's `// rule:` comments are reformatted to
+   `// rule: <name>: reason` (no em-dashes repo-wide); the bug chain is a
+   lean tdd to slice-verifier to land chain with the bug doc and
+   reproduction referenced from the ticket body (wherever they live),
+   not pinned to a fixed repro path.
