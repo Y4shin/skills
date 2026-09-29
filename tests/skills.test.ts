@@ -3,9 +3,13 @@
  * Verifies that all files have the expected structure and references.
  */
 
-import { readFileSync, existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, existsSync, readdirSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { describe, expect, test } from "vitest";
+import { parse } from "../src/core/frontmatter.js";
+import { findAnomalies, fromFrontmatter, validateArtifact, type Artifact } from "../src/core/art.js";
+import { createTools } from "../src/pi.js";
 
 const PROJECT = process.cwd();
 
@@ -550,12 +554,16 @@ describe("skill cross-references", () => {
     expect(content).toMatch(/absent.*feature|feature.*default|\btype:\s*feature\b/i);
   });
 
-  test("wayfinder owns planning task creation and direct handoff", () => {
+  test("wayfinder creates planning tasks only; to-tickets owns feature and bug creation", () => {
     const content = readFile("skills/engineering/wayfinder/SKILL.md");
-    expect(content).toContain("`create-task`, `to-spec`, and `to-tickets`");
-    expect(content).toContain("mandatory grilling session");
+    expect(content).toContain("to-tickets");
+    expect(content).toMatch(/feature and bug/i);
     expect(content).toContain("blocked_by");
     expect(content).toMatch(/decisions, not deliverables|hand off, don't build/i);
+    // The stale "replaces create-task, to-spec, and to-tickets" sentence is
+    // gone: wayfinder hands off to to-spec and to-tickets (two-phase model).
+    expect(content).not.toContain("create-task");
+    expect(content).not.toContain("It replaces");
   });
 
   test("to-tickets owns implementation task creation", () => {
@@ -566,12 +574,17 @@ describe("skill cross-references", () => {
     expect(content).toMatch(/tw_dependency_levels|tw_frontier/);
   });
 
-  test("wayfinder has one planning resource per task type", () => {
-    for (const type of ["feature", "bug", "research", "prototype", "grilling", "manual"]) {
-      const content = readFile(`skills/engineering/wayfinder/resources/${type}.md`);
+  test("wayfinder has one planning resource per planning subtype, no feature/bug resources", () => {
+    for (const subtype of ["research", "prototype", "grilling", "manual"]) {
+      const content = readFile(`skills/engineering/wayfinder/resources/${subtype}.md`);
       expect(content).toContain("Wayfinder Planning Resource");
-      expect(content).toContain(`type: ${type}`);
+      expect(content).toMatch(new RegExp(`^type: task$`, "m"));
+      expect(content).toMatch(new RegExp(`^subtype: ${subtype}$`, "m"));
     }
+    // Feature and bug planning resources are deleted: feature and bug
+    // creation is to-tickets' job, aligned with its Boundary.
+    expect(existsSync(join(PROJECT, "skills/engineering/wayfinder/resources/feature.md"))).toBe(false);
+    expect(existsSync(join(PROJECT, "skills/engineering/wayfinder/resources/bug.md"))).toBe(false);
   });
 
   test("implement-task re-enters wayfinder after a map frontier", () => {
@@ -1055,5 +1068,285 @@ describe("tool prefix rename", () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+});
+// ─── Planning skills v4 (overhaul-planning-skills) ──────────────────
+
+// The tool names the new planning prose may reference: the surviving surface
+// after the overhaul rename.
+const SURVIVING_TOOLS = new Set([
+  "tw_show",
+  "tw_get",
+  "tw_set",
+  "tw_list",
+  "tw_frontier",
+  "tw_dependency_levels",
+  "tw_finalizable",
+  "tw_map_finalizable",
+  "tw_state",
+  "tw_state_set",
+  "tw_context",
+]);
+
+function toolNamesIn(content: string): string[] {
+  return [...content.matchAll(/\btw_[a-z_]+\b/g)].map((m) => m[0]);
+}
+
+// The YAML frontmatter templates a skill's prose carries: fenced blocks whose
+// first line is the opening `---` fence.
+function extractFrontmatterTemplates(content: string): string[] {
+  const out: string[] = [];
+  const fence = /```[^\n]*\n([\s\S]*?)```/g;
+  let m: RegExpExecArray | null;
+  while ((m = fence.exec(content)) !== null) {
+    if (m[1].startsWith("---")) out.push(m[1]);
+  }
+  return out;
+}
+
+// The killed v3 fields: no producer template may carry them.
+const KILLED_KEYS = new Set(["kind", "slug", "map", "slices"]);
+
+function frontmatterKeys(template: string): string[] {
+  const keys: string[] = [];
+  for (const line of template.split("\n").slice(1)) {
+    const trimmed = line.trim();
+    if (trimmed === "---") break;
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
+    const colonIdx = trimmed.indexOf(":");
+    if (colonIdx === -1) continue;
+    keys.push(trimmed.slice(0, colonIdx).trim());
+  }
+  return keys;
+}
+
+/** Substitute the prose placeholders so a template parses as real frontmatter. */
+function substituteTemplate(template: string): string {
+  return template
+    .replace(/\[[^\]]*<[^>]*>[^\]]*\]/g, "[]")
+    .replace(/<[^>]+>/g, "example");
+}
+
+/** Run one substituted template through the repo's conformance chain. */
+function conform(template: string): Artifact {
+  const doc = parse(substituteTemplate(template));
+  const art = fromFrontmatter(doc.data, "fixture");
+  const anomalies = [...validateArtifact(art), ...findAnomalies([art])];
+  expect(anomalies).toEqual([]);
+  return art;
+}
+
+function wayfinderFile(rel: string): string {
+  return readFile(join("skills/engineering/wayfinder", rel));
+}
+
+describe("wayfinder v4 (overhaul-planning-skills)", () => {
+  const content = readFile("skills/engineering/wayfinder/SKILL.md");
+  const templates = extractFrontmatterTemplates(content);
+  const mapTemplate = templates.find((t) => /^type: map$/m.test(t))!;
+  const taskTemplate = templates.find((t) => /^type: task$/m.test(t))!;
+
+  test("map template carries the v4 fields and no killed keys", () => {
+    expect(mapTemplate).toBeDefined();
+    const keys = frontmatterKeys(mapTemplate);
+    expect(keys).toContain("type");
+    expect(keys).toContain("title");
+    expect(keys).toContain("status");
+    for (const killed of KILLED_KEYS) expect(keys).not.toContain(killed);
+  });
+
+  test("decision-task template carries the v4 fields and no killed keys", () => {
+    expect(taskTemplate).toBeDefined();
+    const keys = frontmatterKeys(taskTemplate);
+    expect(keys).toContain("type");
+    expect(keys).toContain("subtype");
+    expect(keys).toContain("title");
+    expect(keys).toContain("status");
+    expect(keys).toContain("workflow_state");
+    expect(keys).toContain("blocked_by");
+    for (const killed of KILLED_KEYS) expect(keys).not.toContain(killed);
+  });
+
+  test("map sits at the effort root and tasks under the effort's tasks/ subtree", () => {
+    expect(content).toMatch(/docs\/tasks\/<effort>\/map\.md/);
+    expect(content).toMatch(/docs\/tasks\/<effort>\/tasks\/<task-slug>\/task\.md/);
+    // The maps/ subtree is gone from the target layout.
+    expect(content).not.toMatch(/docs\/tasks\/maps/);
+  });
+
+  test("sets the state pointers on map creation", () => {
+    expect(content).toContain("tw_state_set map <effort-slug>");
+    expect(content).toMatch(/tw_state_set task null/);
+  });
+
+  test("sets the state pointers on resume", () => {
+    expect(content).toContain("tw_state_set task <task-slug>");
+  });
+
+  test("regenerates the root index on map creation", () => {
+    expect(content).toContain("docs/tasks/index.md");
+    expect(content).toMatch(/## Live/);
+    expect(content).toMatch(/sorted/i);
+  });
+
+  test("frontier prose runs tw_frontier over the effort", () => {
+    expect(content).toContain("tw_frontier <effort-slug>");
+    expect(content).toMatch(/ready when every task in its .blocked_by. list is done/);
+  });
+
+  test("telemetry names the effort directory, not the maps subtree", () => {
+    expect(content).toMatch(/effort slug/);
+    expect(content).not.toContain("docs/tasks/maps/");
+  });
+
+  test("references only surviving tools", () => {
+    for (const name of toolNamesIn(content)) {
+      expect(SURVIVING_TOOLS.has(name), name).toBe(true);
+    }
+  });
+
+  test("every frontmatter template conforms by construction", () => {
+    for (const template of templates) {
+      conform(template);
+    }
+  });
+});
+
+describe("wayfinder planning resources v4", () => {
+  test("each planning resource's task template carries its v4 subtype", () => {
+    for (const subtype of ["research", "prototype", "grilling", "manual"]) {
+      const content = wayfinderFile(join("resources", `${subtype}.md`));
+      const templates = extractFrontmatterTemplates(content);
+      expect(templates.length).toBeGreaterThan(0);
+      for (const template of templates) {
+        expect(frontmatterKeys(template)).toContain("subtype");
+        expect(template).toMatch(new RegExp(`^subtype: ${subtype}$`, "m"));
+        conform(template);
+      }
+    }
+  });
+});
+
+// ─── Conformance seam: fixture efforts built from the prose templates ──
+
+const WAYFINDER_DIR = "skills/engineering/wayfinder";
+
+function writeFm(base: string, rel: string, frontmatter: string, body = "body text\n"): string {
+  const p = join(base, rel);
+  mkdirSync(dirname(p), { recursive: true });
+  writeFileSync(p, `${frontmatter.trimEnd()}\n${body}`, "utf-8");
+  return p;
+}
+
+/** Assemble a v4 effort on a temp tree from the extracted prose templates. */
+function buildFixtureEffort(t: string): { root: string; effort: string } {
+  const mapTemplate = extractFrontmatterTemplates(readFile(join(WAYFINDER_DIR, "SKILL.md")))
+    .find((tpl) => /^type: map$/m.test(tpl))!;
+  const taskTemplate = extractFrontmatterTemplates(
+    wayfinderFile(join("resources", "research.md")),
+  )[0]!;
+  writeFm(t, "docs/tasks/demo/map.md", substituteTemplate(mapTemplate));
+  writeFm(t, "docs/tasks/demo/tasks/first-question/task.md", substituteTemplate(taskTemplate));
+  return { root: t, effort: "demo" };
+}
+
+/** Scan a fixture tree's artifact files the way the scan layer does. */
+function fixtureArtifacts(t: string, rels: string[]): Artifact[] {
+  return rels.map((rel) => {
+    const doc = parse(readFileSync(join(t, rel), "utf-8"));
+    const dirName = rel.split("/").at(-2)!;
+    const art = fromFrontmatter(doc.data, dirName);
+    art.path = join(t, rel);
+    return art;
+  });
+}
+
+/** The doctor's bash sweep as a predicate: frontmatter presence + non-empty type. */
+function sweepIssues(text: string): string[] {
+  const lines = text.split("\n");
+  if (lines[0]?.trim() !== "---") return ["no frontmatter"];
+  const issues: string[] = [];
+  let sawType = false;
+  for (const line of lines.slice(1)) {
+    if (line.trim() === "---") break;
+    if (/^type:[ \t]*$/.test(line)) issues.push("empty type");
+    if (/^type:\s*\S/.test(line)) sawType = true;
+  }
+  if (!sawType) issues.push("no type");
+  return issues;
+}
+
+describe("conformance seam: fixture efforts from the prose templates", () => {
+  test("wayfinder's map plus task tree produces zero anomalies", () => {
+    const t = mkdtempSync(join(tmpdir(), "okf-fixture-"));
+    try {
+      const { effort } = buildFixtureEffort(t);
+      const rels = [`docs/tasks/${effort}/map.md`, `docs/tasks/${effort}/tasks/first-question/task.md`];
+      for (const rel of rels) expect(existsSync(join(t, rel))).toBe(true);
+      const anomalies = findAnomalies(fixtureArtifacts(t, rels));
+      expect(anomalies).toEqual([]);
+    } finally {
+      rmSync(t, { recursive: true, force: true });
+    }
+  });
+
+  test("resume: state pointers set from an existing effort read back", async () => {
+    const t = mkdtempSync(join(tmpdir(), "okf-fixture-"));
+    try {
+      buildFixtureEffort(t);
+      const tools = createTools();
+      const ctx = { directory: t } as any;
+      await tools.tw_state_set.execute({ field: "map", value: "demo" }, ctx);
+      await tools.tw_state_set.execute({ field: "task", value: "first-question" }, ctx);
+      const out = await tools.tw_state.execute({}, ctx);
+      expect(out).toMatch(/map:\s+demo/);
+      expect(out).toMatch(/task:\s+first-question/);
+      // Clearing the task pointer is the create-time counterpart.
+      await tools.tw_state_set.execute({ field: "task", value: "null" }, ctx);
+      const cleared = await tools.tw_state.execute({}, ctx);
+      expect(cleared).toMatch(/task:\s+\(none\)/);
+    } finally {
+      rmSync(t, { recursive: true, force: true });
+    }
+  });
+
+  test("a planted invalid pair is reported by findAnomalies", () => {
+    const t = mkdtempSync(join(tmpdir(), "okf-fixture-"));
+    try {
+      const { effort } = buildFixtureEffort(t);
+      const taskTemplate = extractFrontmatterTemplates(
+        wayfinderFile(join("resources", "research.md")),
+      )[0]!;
+      // status: draft pairs only with workflow_state: todo; this fixture
+      // pairs draft with done, the exact combination rule the doctor reads.
+      const planted = substituteTemplate(taskTemplate)
+        .replace(/^status: stable$/m, "status: draft")
+        .replace(/^workflow_state: ready$/m, "workflow_state: done");
+      writeFm(t, `docs/tasks/${effort}/tasks/planted/task.md`, planted);
+      const anomalies = findAnomalies(fixtureArtifacts(t, [
+        `docs/tasks/${effort}/map.md`,
+        `docs/tasks/${effort}/tasks/first-question/task.md`,
+        `docs/tasks/${effort}/tasks/planted/task.md`,
+      ]));
+      expect(anomalies.map((a) => a.kind)).toContain("invalid-combination");
+      expect(anomalies.some((a) => a.detail.includes("draft") && a.detail.includes("done"))).toBe(true);
+    } finally {
+      rmSync(t, { recursive: true, force: true });
+    }
+  });
+
+  test("a planted type-less file is flagged by the sweep predicate", () => {
+    const t = mkdtempSync(join(tmpdir(), "okf-fixture-"));
+    try {
+      const { effort } = buildFixtureEffort(t);
+      // Frontmatter present but no type: fromFrontmatter throws, the scan
+      // skips the file silently, and the doctor's bash sweep is what finds it.
+      writeFm(t, `docs/tasks/${effort}/tasks/typeless/task.md`, "---\ntitle: Typeless\n---\n");
+      const issues = sweepIssues(readFileSync(join(t, `docs/tasks/${effort}/tasks/typeless/task.md`), "utf-8"));
+      expect(issues).toContain("no type");
+      expect(() => fromFrontmatter(parse(readFileSync(join(t, `docs/tasks/${effort}/tasks/typeless/task.md`), "utf-8")).data, "typeless")).toThrow();
+    } finally {
+      rmSync(t, { recursive: true, force: true });
+    }
   });
 });
