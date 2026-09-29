@@ -41,59 +41,69 @@ const timeoutMs = (budgetMinutes[size] || budgetMinutes.m) * 60 * 1000
 
 runId = subagent({
     async: true,
-    workflowScript: (runs) => {
+    timeoutMs,
+    workflowScript: `
         // Step 1: tdd-worker fixes the bug on ticket/<ticket-slug>.
-        runs.run({
+        const tdd = await runs.run("tdd", {
             agent: "tdd-worker",
-            as: "tdd",
-            output: `tdd-${ticket}/result.md`,
             skill: "diagnosing-bugs",
-            task: `Implement ticket "${ticket}" for bug effort "${effortSlug}".
-
-You are on a \`subtype: bug\` ticket; consult the \`/diagnosing-bugs\` skill for
-the 6-phase debugging discipline (Phase 1 non-skippable; others skippable with
-a recorded reason).
-
-Bug doc: ${bugPath}
-Reproduction: ${reproPath}
-Ticket doc: ${ticketPath}
-
-Before writing code:
-1. Read the bug doc, the reproduction, and the ticket doc.
-2. Read the existing source files referenced by the bug.
-3. Read the standards files directly (AGENTS.md, CONTEXT.md, docs/standards.md,
-   docs/testing.md).
-4. Commit after each GREEN (checkpoint).
-
-First, convert the reproduction into a regression test that is RED against the
-unfixed code (the test rule), then make it GREEN, then run the full suite.`,
-            timeoutMs
+            label: "Fix ${ticket}",
+            output: "tdd-${ticket}/result.md",
+            task: [
+                'Implement ticket "${ticket}" for bug effort "${effortSlug}".',
+                "",
+                "You are on a subtype: bug ticket; consult the /diagnosing-bugs skill for the",
+                "6-phase debugging discipline (Phase 1 non-skippable; others skippable with a",
+                "recorded reason).",
+                "",
+                "Bug doc: ${bugPath}",
+                "Reproduction: ${reproPath}",
+                "Ticket doc: ${ticketPath}",
+                "",
+                "Before writing code:",
+                "1. Read the bug doc, the reproduction, and the ticket doc.",
+                "2. Read the existing source files referenced by the bug.",
+                "3. Read the standards files directly (AGENTS.md, CONTEXT.md,",
+                "   docs/standards.md, docs/testing.md).",
+                "4. Commit after each GREEN (checkpoint).",
+                "",
+                "First, convert the reproduction into a regression test that is RED against the",
+                "unfixed code (the test rule), then make it GREEN, then run the full suite."
+            ].join("\n")
         });
+        if (!tdd.ok) return { failed: "tdd", tdd };
+        const tddRef = tdd.outputReference || tdd.output;
+
         // Step 2: verify; the ok-gate blocks landing on it.
-        const verify = runs.run({
+        const verify = await runs.run("verify", {
             agent: "slice-verifier",
-            as: "verify",
-            output: `verify-${ticket}/result.md`,
-            task: `Verify ticket "${ticket}".
-Implementation: {outputs.tdd}.
-Run lint and tests. Block on failure.`,
-            timeoutMs
+            label: "Verify ${ticket}",
+            output: "verify-${ticket}/result.md",
+            task: [
+                'Verify ticket "${ticket}".',
+                "Implementation: " + tddRef,
+                "Run lint and tests. Block on failure."
+            ].join("\n")
         });
-        if (verify.ok) {
-            runs.run({
-                agent: "land-worker",
-                as: "land",
-                output: `land-${ticket}/result.md`,
-                task: `Land ticket "${ticket}" for effort "${effortSlug}".
-Ticket doc: ${ticketPath}
-TDD output: {outputs.tdd}. Verify output: {outputs.verify}.
+        if (!verify.ok) return { failed: "verify", verify };
+        const verifyRef = verify.outputReference || verify.output;
 
-Merge ticket/${ticket} into task/${ticket} with --no-ff, delete the working
-branch, append the implementation note to the ticket doc, commit.`,
-                timeoutMs
-            });
-        }
-    }
+        // Step 3: land-worker merges and appends the implementation note.
+        return runs.run("land", {
+            agent: "land-worker",
+            label: "Land ${ticket}",
+            output: "land-${ticket}/result.md",
+            task: [
+                'Land ticket "${ticket}" for effort "${effortSlug}".',
+                "Ticket doc: ${ticketPath}",
+                "TDD output: " + tddRef,
+                "Verify output: " + verifyRef,
+                "",
+                "Merge ticket/${ticket} into task/${ticket} with --no-ff, delete the working",
+                "branch, append the implementation note to the ticket doc, commit."
+            ].join("\n")
+        });
+    `
 })
 
 // No independent work between dispatch and result  --  block for the chain.
@@ -113,7 +123,6 @@ reviewId = subagent({
   async: true,
   agent: "code-reviewer",
   skill: "code-review",
-  as: "review",
   output: "review/result.md",
   task: `Review the bug-fix diff for ticket ${ticket}. Fixed point: the starting branch. Spec source: the bug doc plus its reproduction. Report Standards + Spec findings side by side.`
 })

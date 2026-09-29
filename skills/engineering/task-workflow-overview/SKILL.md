@@ -42,10 +42,11 @@ The route most work travels. You have an idea and want it built.
    - **No** to **`/skill:implement-task`** right here, in the same context
      window.
 
-   Either way, **`/skill:implement-task`** builds each ticket by driving
-   **`/skill:tdd`** internally (one red-green slice at a time), then closes out
-   by running **`/skill:code-review`**, a two-axis review (Standards + Spec) of
-   the diff, before committing.
+   Either way, **`/skill:implement-task`** builds each ticket through a
+   per-ticket agent chain (a tdd-worker driving the red-green loop, then
+   verification, deviation reporting, and landing), and closes with an
+   advisory **two-axis review** (Standards + Spec) of the whole-effort diff
+   before you run **`/skill:finalize-task`**.
 
 ### Context hygiene
 

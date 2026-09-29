@@ -106,76 +106,89 @@ for each level in levels:
 
         runId = subagent({
             async: true,
-            workflowScript: (runs) => {
+            timeoutMs,
+            workflowScript: `
                 // Step 1: tdd-worker implements the ticket on ticket/<ticket-slug>.
-                runs.run({
+                const tdd = await runs.run("tdd", {
                     agent: "tdd-worker",
-                    as: "tdd",
-                    output: `tdd-${ticket}/result.md`,
                     skill: "tdd",
-                    task: `Implement ticket "${ticket}" for effort "${effortSlug}".
-
-Ticket doc: ${ticketPath}
-Arch spec: docs/tasks/${effortSlug}/arch-spec.md
-
-Before writing code:
-1. Read the arch spec for this ticket's interface contract and abstraction notes.
-2. Read the existing source files listed in the arch spec.
-3. Read the standards files directly (AGENTS.md, CONTEXT.md, docs/standards.md,
-   docs/testing.md).
-4. Commit after each GREEN (checkpoint).
-
-If uncertain, write docs/tasks/${effortSlug}/tickets/${ticket}/.work/uncertainty.md and stop.`,
-                    timeoutMs
+                    label: "Implement ${ticket}",
+                    output: "tdd-${ticket}/result.md",
+                    task: [
+                        'Implement ticket "${ticket}" for effort "${effortSlug}".',
+                        "",
+                        "Ticket doc: ${ticketPath}",
+                        "Arch spec: docs/tasks/${effortSlug}/arch-spec.md",
+                        "",
+                        "Before writing code:",
+                        "1. Read the arch spec for this ticket's interface contract and abstraction notes.",
+                        "2. Read the existing source files listed in the arch spec.",
+                        "3. Read the standards files directly (AGENTS.md, CONTEXT.md,",
+                        "   docs/standards.md, docs/testing.md).",
+                        "4. Commit after each GREEN (checkpoint).",
+                        "",
+                        "If uncertain, write docs/tasks/${effortSlug}/tickets/${ticket}/.work/uncertainty.md and stop."
+                    ].join("\n")
                 });
+                if (!tdd.ok) return { failed: "tdd", tdd };
+                const tddRef = tdd.outputReference || tdd.output;
+
                 // Step 2: verify plus deviation in parallel; both must pass.
-                const [verify, deviation] = runs.all([
+                const pair = await runs.all([
                     {
+                        key: "verify",
                         agent: "slice-verifier",
-                        as: "verify",
-                        output: `verify-${ticket}/result.md`,
-                        task: `Verify ticket "${ticket}".
-Implementation: {outputs.tdd}.
-Run lint and tests. Block on failure.`,
-                        timeoutMs
+                        label: "Verify ${ticket}",
+                        output: "verify-${ticket}/result.md",
+                        task: [
+                            'Verify ticket "${ticket}".',
+                            "Implementation: " + tddRef,
+                            "Run lint and tests. Block on failure."
+                        ].join("\n")
                     },
                     {
+                        key: "deviation",
                         agent: "deviation-reporter",
-                        as: "deviation",
-                        output: `deviation-${ticket}/result.md`,
-                        task: `Check ticket "${ticket}" for deviations from the arch spec and ticket doc.
-
-Ticket doc: ${ticketPath}
-Arch spec: docs/tasks/${effortSlug}/arch-spec.md
-Implementation: {outputs.tdd}.
-
-Compare the implementation against the spec. Write a frontmattered deviation
-report to docs/tasks/${effortSlug}/tickets/${ticket}/deviation-reports/ covering:
-- API surface changes (planned vs actual)
-- Abstraction usage (used what was specified?)
-- Out-of-scope additions
-- Any divergence from the ticket doc's acceptance criteria
-
-If the ticket doc's ## Implementation notes needs updating, note it.`,
-                        timeoutMs
+                        label: "Report ${ticket} deviations",
+                        output: "deviation-${ticket}/result.md",
+                        task: [
+                            'Check ticket "${ticket}" for deviations from the arch spec and ticket doc.',
+                            "",
+                            "Ticket doc: ${ticketPath}",
+                            "Arch spec: docs/tasks/${effortSlug}/arch-spec.md",
+                            "Implementation: " + tddRef,
+                            "",
+                            "Compare the implementation against the spec. Write a frontmattered deviation",
+                            "report to docs/tasks/${effortSlug}/tickets/${ticket}/deviation-reports/ covering:",
+                            "- API surface changes (planned vs actual)",
+                            "- Abstraction usage (used what was specified?)",
+                            "- Out-of-scope additions",
+                            "- Any divergence from the ticket doc's acceptance criteria",
+                            "",
+                            "If the ticket doc's ## Implementation notes needs updating, note it."
+                        ].join("\n")
                     }
                 ]);
                 // Ok-gate: landing is blocked on verify plus deviation.
-                if (verify.ok && deviation.ok) {
-                    runs.run({
-                        agent: "land-worker",
-                        as: "land",
-                        output: `land-${ticket}/result.md`,
-                        task: `Land ticket "${ticket}" for effort "${effortSlug}".
-Ticket doc: ${ticketPath}
-TDD output: {outputs.tdd}. Verify output: {outputs.verify}.
+                if (!pair[0].ok) return { failed: "verify", pair };
+                const verifyRef = pair[0].outputReference || pair[0].output;
 
-Merge ticket/${ticket} into task/${ticket} with --no-ff, delete the working
-branch, append the implementation note to the ticket doc, commit.`,
-                        timeoutMs
-                    });
-                }
-            }
+                // Step 3: land-worker merges and appends the implementation note.
+                return runs.run("land", {
+                    agent: "land-worker",
+                    label: "Land ${ticket}",
+                    output: "land-${ticket}/result.md",
+                    task: [
+                        'Land ticket "${ticket}" for effort "${effortSlug}".',
+                        "Ticket doc: ${ticketPath}",
+                        "TDD output: " + tddRef,
+                        "Verify output: " + verifyRef,
+                        "",
+                        "Merge ticket/${ticket} into task/${ticket} with --no-ff, delete the working",
+                        "branch, append the implementation note to the ticket doc, commit."
+                    ].join("\n")
+                });
+            `
         })
 
         // Tickets within a level run sequentially (shared repo cwd), so block
@@ -222,7 +235,6 @@ reviewId = subagent({
   async: true,
   agent: "code-reviewer",
   skill: "code-review",
-  as: "review",
   output: "review/result.md",
   task: `Review the whole-effort diff for effort ${effortSlug}. Fixed point: the starting branch. Spec source: the ticket docs plus the effort-root arch spec. Report Standards + Spec findings side by side.`
 })

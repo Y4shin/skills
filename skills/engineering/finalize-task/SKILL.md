@@ -29,8 +29,9 @@ git checkout task/<ticket-slug>
 git merge main 2>/dev/null || true
 ```
 
-Run the project's CI command (detected from repo tooling: package.json
-scripts, Makefile, CI config; ask the user when ambiguous). If it fails: STOP.
+Run the project's CI command (from the `tw_context` profile or detected
+from repo tooling: package.json scripts, Makefile, CI config; ask the user
+when ambiguous). If it fails: STOP.
 Fix forward on the landing branch. Do not merge a red branch.
 
 Fix-forward is a designed-for adjustment, record that it fired so its
@@ -155,14 +156,14 @@ If it returns ready:
    tw_set <artifact-path> status deprecated   # Pi tool, not a shell command
    ```
 
-2. **Archive the effort directory and merge** (shell, safe under `set -e`):
+2. **Archive the effort directory** (shell, safe under `set -e`; this runs
+   on main, where the per-ticket close-outs left the landed work):
 
    ```bash
    set -e
    git mv docs/tasks/<effort>/ docs/tasks/archive/<effort>/
+   git add docs/tasks/archive/<effort>/
    git commit -m "chore(effort): archive <effort>"
-   git checkout main
-   git merge --no-ff main -m "effort: finalize <effort>" || true
    ```
 
 3. **Regenerate the root index**: edit `docs/tasks/index.md`, moving the
@@ -175,7 +176,7 @@ If it returns ready:
    tw_state_set map null    # Pi tool, not a shell command
    ```
 
-5. Commit, merge, push:
+5. Commit and push (already on main, nothing to merge):
 
    ```bash
    set -e
