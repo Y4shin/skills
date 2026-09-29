@@ -1092,6 +1092,13 @@ function toolNamesIn(content: string): string[] {
   return [...content.matchAll(/\btw_[a-z_]+\b/g)].map((m) => m[0]);
 }
 
+/** Assert every tw_* tool named in a prose text is in the surviving set. */
+function expectOnlySurvivingTools(content: string): void {
+  for (const name of toolNamesIn(content)) {
+    expect(SURVIVING_TOOLS.has(name), name).toBe(true);
+  }
+}
+
 // The YAML frontmatter templates a skill's prose carries: fenced blocks whose
 // first line is the opening `---` fence.
 function extractFrontmatterTemplates(content: string): string[] {
@@ -1127,13 +1134,12 @@ function substituteTemplate(template: string): string {
     .replace(/<[^>]+>/g, "example");
 }
 
-/** Run one substituted template through the repo's conformance chain. */
-function conform(template: string): Artifact {
+/** Assert one substituted template passes the repo's conformance chain. */
+function assertTemplateConforms(template: string): void {
   const doc = parse(substituteTemplate(template));
   const art = fromFrontmatter(doc.data, "fixture");
   const anomalies = [...validateArtifact(art), ...findAnomalies([art])];
   expect(anomalies).toEqual([]);
-  return art;
 }
 
 function wayfinderFile(rel: string): string {
@@ -1200,14 +1206,12 @@ describe("wayfinder v4 (overhaul-planning-skills)", () => {
   });
 
   test("references only surviving tools", () => {
-    for (const name of toolNamesIn(content)) {
-      expect(SURVIVING_TOOLS.has(name), name).toBe(true);
-    }
+    expectOnlySurvivingTools(content);
   });
 
   test("every frontmatter template conforms by construction", () => {
     for (const template of templates) {
-      conform(template);
+      assertTemplateConforms(template);
     }
   });
 });
@@ -1221,7 +1225,7 @@ describe("wayfinder planning resources v4", () => {
       for (const template of templates) {
         expect(frontmatterKeys(template)).toContain("subtype");
         expect(template).toMatch(new RegExp(`^subtype: ${subtype}$`, "m"));
-        conform(template);
+        assertTemplateConforms(template);
       }
     }
   });
@@ -1238,16 +1242,20 @@ function writeFm(base: string, rel: string, frontmatter: string, body = "body te
   return p;
 }
 
-/** Assemble a v4 effort on a temp tree from the extracted prose templates. */
-function buildFixtureEffort(t: string): { root: string; effort: string } {
-  const mapTemplate = extractFrontmatterTemplates(readFile(join(WAYFINDER_DIR, "SKILL.md")))
+/** The wayfinder map template extracted from the skill's prose. */
+function wayfinderMapTemplate(): string {
+  return extractFrontmatterTemplates(readFile(join(WAYFINDER_DIR, "SKILL.md")))
     .find((tpl) => /^type: map$/m.test(tpl))!;
+}
+
+/** Assemble a v4 effort on a temp tree from the extracted prose templates. */
+function buildFixtureEffort(t: string): string {
   const taskTemplate = extractFrontmatterTemplates(
     wayfinderFile(join("resources", "research.md")),
   )[0]!;
-  writeFm(t, "docs/tasks/demo/map.md", substituteTemplate(mapTemplate));
+  writeFm(t, "docs/tasks/demo/map.md", substituteTemplate(wayfinderMapTemplate()));
   writeFm(t, "docs/tasks/demo/tasks/first-question/task.md", substituteTemplate(taskTemplate));
-  return { root: t, effort: "demo" };
+  return "demo";
 }
 
 /** Scan a fixture tree's artifact files the way the scan layer does. */
@@ -1280,7 +1288,7 @@ describe("conformance seam: fixture efforts from the prose templates", () => {
   test("wayfinder's map plus task tree produces zero anomalies", () => {
     const t = mkdtempSync(join(tmpdir(), "okf-fixture-"));
     try {
-      const { effort } = buildFixtureEffort(t);
+      const effort = buildFixtureEffort(t);
       const rels = [`docs/tasks/${effort}/map.md`, `docs/tasks/${effort}/tasks/first-question/task.md`];
       for (const rel of rels) expect(existsSync(join(t, rel))).toBe(true);
       const anomalies = findAnomalies(fixtureArtifacts(t, rels));
@@ -1313,7 +1321,7 @@ describe("conformance seam: fixture efforts from the prose templates", () => {
   test("a planted invalid pair is reported by findAnomalies", () => {
     const t = mkdtempSync(join(tmpdir(), "okf-fixture-"));
     try {
-      const { effort } = buildFixtureEffort(t);
+      const effort = buildFixtureEffort(t);
       const taskTemplate = extractFrontmatterTemplates(
         wayfinderFile(join("resources", "research.md")),
       )[0]!;
@@ -1338,7 +1346,7 @@ describe("conformance seam: fixture efforts from the prose templates", () => {
   test("a planted type-less file is flagged by the sweep predicate", () => {
     const t = mkdtempSync(join(tmpdir(), "okf-fixture-"));
     try {
-      const { effort } = buildFixtureEffort(t);
+      const effort = buildFixtureEffort(t);
       // Frontmatter present but no type: fromFrontmatter throws, the scan
       // skips the file silently, and the doctor's bash sweep is what finds it.
       writeFm(t, `docs/tasks/${effort}/tasks/typeless/task.md`, "---\ntitle: Typeless\n---\n");
@@ -1385,7 +1393,7 @@ describe("to-spec v4 (overhaul-planning-skills)", () => {
   });
 
   test("every frontmatter template conforms by construction", () => {
-    for (const template of templates) conform(template);
+    for (const template of templates) assertTemplateConforms(template);
   });
 
   test("a spec-only effort at planning time produces zero anomalies", () => {
@@ -1443,9 +1451,7 @@ describe("to-tickets v4 (overhaul-planning-skills)", () => {
   test("queries the graph via the surviving tools", () => {
     expect(content).toContain("tw_dependency_levels <effort-slug>");
     expect(content).toContain("tw_frontier <effort-slug>");
-    for (const name of toolNamesIn(content)) {
-      expect(SURVIVING_TOOLS.has(name), name).toBe(true);
-    }
+    expectOnlySurvivingTools(content);
   });
 
   test("one-ticket efforts are fine", () => {
@@ -1453,15 +1459,13 @@ describe("to-tickets v4 (overhaul-planning-skills)", () => {
   });
 
   test("every frontmatter template conforms by construction", () => {
-    for (const template of templates) conform(template);
+    for (const template of templates) assertTemplateConforms(template);
   });
 
   test("a one-off effort (map with exactly one ticket, empty tasks/) produces zero anomalies", () => {
     const t = mkdtempSync(join(tmpdir(), "okf-one-off-"));
     try {
-      const mapTemplate = extractFrontmatterTemplates(readFile(join(WAYFINDER_DIR, "SKILL.md")))
-        .find((tpl) => /^type: map$/m.test(tpl))!;
-      writeFm(t, "docs/tasks/one-off/map.md", substituteTemplate(mapTemplate));
+      writeFm(t, "docs/tasks/one-off/map.md", substituteTemplate(wayfinderMapTemplate()));
       writeFm(t, "docs/tasks/one-off/tickets/the-thing/ticket.md", substituteTemplate(ticketTemplate));
       const anomalies = findAnomalies(fixtureArtifacts(t, [
         "docs/tasks/one-off/map.md",
@@ -1508,11 +1512,7 @@ describe("task-workflow-doctor v4 (overhaul-planning-skills)", () => {
   });
 
   test("doctor prose references only surviving tools", () => {
-    for (const text of [content, readFile(resourcePath)]) {
-      for (const name of toolNamesIn(text)) {
-        expect(SURVIVING_TOOLS.has(name), name).toBe(true);
-      }
-    }
+    for (const text of [content, readFile(resourcePath)]) expectOnlySurvivingTools(text);
   });
 
   test("missing-tasks-tree resource describes the v4 tree shape", () => {
@@ -1564,9 +1564,7 @@ describe("task-workflow-overview v4 (overhaul-planning-skills)", () => {
   });
 
   test("references only surviving tools", () => {
-    for (const name of toolNamesIn(content)) {
-      expect(SURVIVING_TOOLS.has(name), name).toBe(true);
-    }
+    expectOnlySurvivingTools(content);
   });
 });
 
@@ -1604,7 +1602,7 @@ describe("planning skills structure facts (overhaul-planning-skills)", () => {
         for (const killed of KILLED_KEYS) {
           expect(keys, `${file} carries the killed key '${killed}'`).not.toContain(killed);
         }
-        conform(template);
+        assertTemplateConforms(template);
       }
     }
     // The three producers still carry their templates; the doctor and the

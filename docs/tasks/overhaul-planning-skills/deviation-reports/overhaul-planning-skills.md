@@ -1,4 +1,4 @@
-## Deviation report — overhaul-planning-skills
+## Deviation report: overhaul-planning-skills
 
 Verification basis: `git diff task/overhaul-planning-skills..slice/overhaul-planning-skills`
 (17 files, +897/−265), the five skills' prose read in full, and a fresh run of
@@ -62,7 +62,7 @@ None. All 17 changed files are inside the arch spec's file list; no
 implement-task, finalize-task, tdd, or code-review prose was touched; the
 repo's own docs/tasks tree stays v3 untouched; no docs pages were created
 (arch spec decision 2 defers them to a follow-up task); PHASE-BOUNDARIES.md
-untouched as spec'd. Zero new em-dashes in the diff; zero references to dead
+untouched as spec'd. Zero new em-dashes in the slice diff; zero references to dead
 tools (`tw_slices`, `tw_set_slices`, `tw_resolve`, `tw_assert_kind`,
 `tw_map_tasks`, `tw_map_tick`, `get_guidelines`, `list_guidelines`) in the
 five skills.

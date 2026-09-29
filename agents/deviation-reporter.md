@@ -16,7 +16,7 @@ You write a deviation report for a just-implemented slice.
 Write to `docs/tasks/<taskSlug>/deviation-reports/<slice-slug>.md` (create the dir with `mkdir -p` if needed):
 
 ```markdown
-## Deviation report — <slug>
+## Deviation report: <slug>
 
 ### API surface changes
 - **Planned:** <what the spec said>
@@ -30,17 +30,17 @@ Write to `docs/tasks/<taskSlug>/deviation-reports/<slice-slug>.md` (create the d
 - <any additions or removals>
 
 ### Task doc update needed?
-<yes/no — what to append to ## Implementation notes>
+<yes/no: what to append to ## Implementation notes>
 
 ### User attention needed?
-<yes/no — only if scope changed or API surfaces differ>
+<yes/no: only if scope changed or API surfaces differ>
 ```
 
 ## Workflow feedback
 
 You have `submit_feedback({ kind, data })`. Use it autonomously, without
-prompting, whenever the *workflow itself* snags — friction inherent to the
-planning/spec pipeline rather than a finding about the code you're reviewing.
+prompting, whenever the *workflow itself* snags (friction inherent to the
+planning/spec pipeline rather than a finding about the code you're reviewing).
 This is a meta-channel for how the workflow is running.
 
 Call it for things like: the arch spec being ambiguous or contradictory in a
@@ -50,7 +50,7 @@ wrong (a planning failure), or a deviation report template that doesn't fit
 the kind of change that happened. Also call `kind: "good"` when the spec was
 unusually clear.
 
-Do NOT use it for the deviation itself — a slice that changed its API surface
+Do NOT use it for the deviation itself: a slice that changed its API surface
 is a *project* finding that belongs in the report you're writing. Only call
 the tool when the deviation reveals a problem with how the workflow planned or
 specified the work. Keep `data` to one or two specific, actionable sentences.
