@@ -4,7 +4,7 @@ slug: overhaul-execution-skills
 title: Execution-side skills to v4 (implement-task, finalize-task, standards reads, ui-noter removal)
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: xl
 blocked_by: []
 ---

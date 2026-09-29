@@ -15,8 +15,9 @@ answering one design or behavior question, not production implementation.
    HITL question on the user's behalf.
 6. Preserve the decision-rich artifact or link to it, then record the chosen
    direction and its implications for dependent tasks.
-7. Mark the task `done` only after the task question has an evidence-backed
-   answer. Delete throwaway code unless the task explicitly says to keep it.
+7. Mark the task done with `tw_set <task-path> workflow_state done` only
+   after the task question has an evidence-backed answer. Delete throwaway
+   code unless the task explicitly says to keep it.
 
 ## Completion evidence
 

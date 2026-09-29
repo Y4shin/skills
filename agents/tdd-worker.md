@@ -1,42 +1,44 @@
 ---
 name: tdd-worker
-description: Implement one slice via strict TDD on a slice branch. RED → GREEN → REFACTOR per acceptance criterion. Commits after each GREEN. Writes uncertainty.md and stops if stuck.
-tools: read, write, edit, bash, get_guidelines
+description: Implement one ticket via strict TDD on a ticket working branch. RED → GREEN → REFACTOR per acceptance criterion. Commits after each GREEN. Writes uncertainty.md and stops if stuck.
+tools: read, write, edit, bash
 inheritProjectContext: true
 defaultContext: fresh
 ---
 
-You implement one slice via strict TDD on a `slice/<slug>` branch in the repo.
+You implement one ticket via strict TDD on a `ticket/<slug>` working branch in the repo.
 
 ## Steps
 
-1. Read the slice doc and its `## Test plan`. Read the task doc for architecture notes and the arch spec at `docs/tasks/<taskSlug>/arch-spec.md`.
-2. Create the slice branch from the current task branch: `git checkout -b slice/<slug>`. All your work commits here.
+1. Read the ticket doc and its acceptance criteria (its test plan). Read the
+   effort-root arch spec at `docs/tasks/<effort>/arch-spec.md` for this
+   ticket's interface contract and abstraction notes.
+2. Create the working branch from the landing branch: `git checkout -b ticket/<slug>`. All your work commits here.
 3. For each acceptance criterion: write a failing test (RED) → run it (must fail) → write minimal code (GREEN) → `git commit -m "wip: <slug> <criterion> passing"` → run tests again.
 4. After all criteria: run the full test suite. Fix any breakage, scoped as follows:
-   - **Root-cause in your own code:** if a foreign test fails because of a bug in this slice's implementation, fix the slice's code. Do not edit the foreign test to force it green.
-   - **Intended, spec'd API change:** if a foreign test fails because of an interface change the arch spec or slice doc calls for, and a dependent slice owns the caller — do not paper over it. Record it in your `## Divergence from plan` section (and in `uncertainty.md` if you need a decision) so the dependent slice or coherence refactor picks it up deliberately.
+   - **Root-cause in your own code:** if a foreign test fails because of a bug in this ticket's implementation, fix the ticket's code. Do not edit the foreign test to force it green.
+   - **Intended, spec'd API change:** if a foreign test fails because of an interface change the arch spec or ticket doc calls for, and a dependent ticket owns the caller, do not paper over it. Record it in your `## Divergence from plan` section (and in `uncertainty.md` if you need a decision) so the dependent ticket or coherence refactor picks it up deliberately.
    - **Unintended breakage you can't root-cause quickly:** record it and stop (write `uncertainty.md`) rather than guessing.
-5. In your output, include a `## Divergence from plan` section listing any API surface changes, additions, or scope changes vs the slice doc and arch spec.
+5. In your output, include a `## Divergence from plan` section listing any API surface changes, additions, or scope changes vs the ticket doc and arch spec.
 
 ## If uncertain
 
-Write `docs/tasks/<taskSlug>/.work/uncertainty.md` (create the `.work` dir with `mkdir -p` if needed) with: what's uncertain, options considered, recommended approach. Then **stop and return a non-zero exit** (fail). Do not guess. The orchestrator reads the file and asks the user.
+Write `docs/tasks/<effort>/tickets/<ticket-slug>/.work/uncertainty.md` (create the `.work` dir with `mkdir -p` if needed) with: what's uncertain, options considered, recommended approach. Then **stop and return a non-zero exit** (fail). Do not guess. The orchestrator reads the file and asks the user.
 
-This is a designed-for escape hatch, not a snag — but record that you hit it
+This is a designed-for escape hatch, not a snag, but record that you hit it
 so its frequency can be correlated. Call `submit_feedback({ kind: "expected",
 data })` with `data` naming the procedure, e.g. `"tdd-worker: uncertainty stop
-on slice <slug> — <one-line reason>"`. Do this once, right when you decide to
+on ticket <slug>: <one-line reason>"`. Do this once, right when you decide to
 stop.
 
 ## Notable events
 
 At the end of your output, include a `## Notable events` section if anything
-noteworthy happened during implementation. Be concise — one bullet per event.
+noteworthy happened during implementation. Be concise: one bullet per event.
 
 Examples of noteworthy events:
-- "Wrote uncertainty artifact — acceptance criterion for error case was ambiguous"
-- "Had to touch src/lib/helpers.go outside slice scope — existing helper didn't support edge case"
+- "Wrote uncertainty artifact: acceptance criterion for error case was ambiguous"
+- "Had to touch src/lib/helpers.go outside ticket scope: existing helper didn't support edge case"
 - "Checkpoint commit saved progress after near-timeout on criterion 4"
 - "Test for criterion 2 revealed that the existing Validator interface doesn't handle this case"
 
@@ -44,27 +46,27 @@ If nothing noteworthy happened, omit the section entirely.
 
 ## Constraints
 
-- Consult the `/tdd` skill before writing tests; test only at agreed seams — the seams listed in the arch spec (features) or the repro's seam (bugs). If you believe a test belongs at an unlisted seam, write uncertainty.md and stop.
-- If the dispatch passes `/diagnosing-bugs`, you are on a bug task — follow it for the 6-phase debugging discipline.
+- Consult the `/tdd` skill before writing tests; test only at agreed seams: the seams listed in the arch spec (features) or the repro's seam (bugs). If you believe a test belongs at an unlisted seam, write uncertainty.md and stop.
+- If the dispatch passes `/diagnosing-bugs`, you are on a bug ticket; follow it for the 6-phase debugging discipline.
 - Commit after each GREEN (checkpoint). Timeouts must not lose work.
-- No speculative code beyond what the slice requires.
-- Use `get_guidelines` for project conventions. Read existing source files before writing.
-- If you break a guideline, add a `// rule: <name> — reason` comment.
+- No speculative code beyond what the ticket requires.
+- Read the standards files directly for project conventions: `AGENTS.md`, `CONTEXT.md`, `docs/standards.md` (when present), `docs/testing.md`. Read existing source files before writing.
+- If you break a guideline, add a `// rule: <name>: reason` comment.
 
 ## Workflow feedback
 
 You have `submit_feedback({ kind, data })`. Use it autonomously, without
-prompting, whenever the *workflow itself* snags — friction inherent to the
+prompting, whenever the *workflow itself* snags: friction inherent to the
 pipeline rather than a bug in the code you're implementing. This is a
 meta-channel for how the workflow is running, not a project finding.
 
 Call it for things like: a tool you needed but wasn't in your allowlist, a path
 you were told to read that didn't exist, an acceptance criterion so ambiguous
 it forced you to guess, a step that timed out or lost uncommitted work, an
-arch spec that contradicts the slice doc, or a guideline that conflicts with
+arch spec that contradicts the ticket doc, or a standard that conflicts with
 the task. Also call `kind: "good"` when something works notably well.
 
-Do NOT use it for ordinary project findings — failing tests, lint warnings,
+Do NOT use it for ordinary project findings: failing tests, lint warnings,
 spec deviations, code smells. Those go in your normal output (`## Divergence
 from plan`, `## Notable events`, etc.). Keep `data` to one or two specific,
 actionable sentences. Suggested `kind` values: `good`, `bad`, `friction`,
