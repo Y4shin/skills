@@ -116,3 +116,21 @@ Carried forward, in priority order:
    resource).
 5. **The repo's own `docs/tasks` tree stays v3 by design** until the
    user runs `/skill:setup-workflow` (migrate branch of the overhaul).
+
+### Finalize harvest
+
+Whole-task code review (fresh-context, two-axis): merge verdict OK with
+notes; no P0s, the spec axis clean. The one P1 (an em-dash in the new
+deviation report's title, plus the same character in the
+deviation-reporter agent template that kept generating it) is fixed,
+along with the small test smells (helper extraction, renames); the
+whole-task diff now carries zero em-dashes on added lines.
+
+The docs-page deferral is now tracked: the map carries
+`backfill-skill-docs-pages` (blocked by overhaul-dead-surface) per the
+arch spec approval decision 2.
+
+Durable testing patterns folded into `docs/testing.md` (Skill prose
+testing): producer prose is tested by running its extracted frontmatter
+templates through the repo's own conformance engine, and rewritten
+prose carries a surviving-tool allowlist assertion.
