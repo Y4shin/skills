@@ -1,13 +1,13 @@
 # Implement Task (bug human mode)
 
-The bug router selects this protocol only for clear human/manual intent, or
-when the human confirms an ambiguous invocation. This is an orchestration
-resource: the human owns the fix and the existing autonomous bug path remains
-unchanged.
+The bug router selects this protocol only for clear human/manual intent, when
+the human confirms an ambiguous invocation, or when a `mode: human` marker
+routes the re-invocation here. This is an orchestration resource: the human
+owns the fix and the existing autonomous bug path remains unchanged.
 
 ## 1. Collaboratively reproduce and diagnose
 
-1. Read the bug task, its reproduction evidence, slice documents, and the
+1. Read the bug ticket, its reproduction evidence, and the
    diagnosing-bugs/reproduction workflow. Do not send a bug through feature architecture
    planning.
 2. Work with the human to make a diagnosis plan that records the reproduction
@@ -20,7 +20,7 @@ unchanged.
 
 ## 2. Human implementation handoff
 
-After consent, hand each slice to the human with its diagnosis context,
+After consent, hand the ticket to the human with its diagnosis context,
 non-code context, scope, and concrete verification contract. Do not write fix code
 or tests before this handoff; no other repository edits are allowed. The human
 implements the fix and reports completion. Code assistance (including writing
@@ -41,16 +41,16 @@ They must not edit source, tests, task documents, or configuration, and must
 not commit or invoke `land-worker`. This is a verifier-first, read-only,
 fast-fail chain: if `slice-verifier` fails, stop immediately, return the
 failure and command evidence to the human; return failure promptly and do not invoke later checks,
-landing, or task progression. The human decides whether to revise and request
+landing, or ticket progression. The human decides whether to revise and request
 another verification run.
 
 ## 4. Findings approval and separate landing
 
 Present all verifier and review findings, reproduction results, test commands,
 and residual risks to the human. Require explicit human approval of the
-findings and require explicit approval before landing, moving to the next slice,
-or declaring task completion. Only after that approval may the separate `land-worker` run; it is
-the sole role permitted to merge/archive/commit or change task state. Landing
+findings and require explicit approval before landing, moving to the next ticket,
+or declaring ticket completion. Only after that approval may the separate `land-worker` run; it is
+the sole role permitted to merge/commit or change ticket state. Landing
 must never be automatic or part of the read-only verifier chain.
 
 Preserve the lean autonomous bug resource at

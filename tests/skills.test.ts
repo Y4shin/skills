@@ -394,11 +394,15 @@ describe("human-mode feature pipeline", () => {
     expect(content).toMatch(/architecture[- ]spec/i);
     expect(content).toMatch(/collaborat(e|ively).*review|review.*architecture/i);
     expect(content).toMatch(/explicit (user|human) consent|consent.*before/i);
-    expect(content).toMatch(/no slice (code|implementation).*before.*handoff/i);
+    expect(content).toMatch(/no ticket (code|implementation).*before.*handoff/i);
+    // v4: the architecture spec lives at the effort root, shared by the
+    // effort's ticket chains; ordering reads the effort graph.
+    expect(content).toMatch(/docs\/tasks\/<effort>\/arch-spec\.md/);
+    expect(content).toContain("tw_dependency_levels <effort-slug>");
   });
 
-  test("defines per-slice handoff and human-owned implementation boundary", () => {
-    expect(content).toMatch(/per[- ]slice.*handoff/i);
+  test("defines per-ticket handoff and human-owned implementation boundary", () => {
+    expect(content).toMatch(/per[- ]ticket.*handoff/i);
     expect(content).toMatch(/non[- ]code context/i);
     expect(content).toMatch(/verification contract/i);
     expect(content).toMatch(/human.*implement/i);
@@ -428,8 +432,8 @@ describe("human-mode feature pipeline", () => {
     expect(content).toMatch(/present.*findings|findings.*present/i);
     expect(content).toMatch(/explicit.*approval.*landing|approval.*before.*landing/i);
     expect(content).toContain("land-worker");
-    expect(content).toMatch(/next slice.*approval|approval.*next slice/i);
-    expect(content).toMatch(/whole-task.*refactor|collaborative.*refactor/i);
+    expect(content).toMatch(/next ticket.*approval|approval.*next ticket/i);
+    expect(content).toMatch(/whole-effort.*refactor|collaborative.*refactor/i);
     expect(content).toMatch(/consent.*refactor|approval.*refactor/i);
   });
 });
@@ -520,15 +524,15 @@ describe("human-mode integration coverage", () => {
     expect(human).toMatch(/fast[- ]fail/i);
     expect(human).toMatch(/failure.*return|return.*failure/i);
     expect(human).toMatch(/rejected|declined|not approved/i);
-    expect(human).toMatch(/next slice|task completion|declaring task completion/i);
+    expect(human).toMatch(/next ticket|ticket completion|declaring ticket completion/i);
   });
 
   test("feature human protocol preserves collaborative post-handoff assistance boundary", () => {
     const human = readFile("skills/engineering/implement-task/resources/feature/human.md");
-    expect(human).toMatch(/after the per[- ]slice handoff|after.*handoff/i);
+    expect(human).toMatch(/after the per[- ]ticket handoff|after.*handoff/i);
     expect(human).toMatch(/explicit request.*code assistance|code assistance.*explicit/i);
-    expect(human).toMatch(/multiple slices|each slice|every slice/i);
-    expect(human).toMatch(/whole-task.*refactor|collaborative.*refactor/i);
+    expect(human).toMatch(/multiple tickets|each ticket|every ticket/i);
+    expect(human).toMatch(/whole-effort.*refactor|collaborative.*refactor/i);
   });
 });
 
@@ -1674,5 +1678,179 @@ describe("mode: human refusal (overhaul-execution-skills)", () => {
     expect(content).toMatch(/mode: human/);
     expect(content).toMatch(/hard-refus|refuse/i);
     expect(content).toContain("/skill:implement-task");
+  });
+});
+
+// ─── Per-ticket chains v4 (overhaul-execution-skills) ────────────────
+
+describe("feature chain v4 (overhaul-execution-skills)", () => {
+  const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
+
+  test("step 0 reads the ticket (subtype, mode, size) and works the effort frontier", () => {
+    expect(content).toContain("tw_frontier <effort-slug>");
+    expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<ticket-slug>\/ticket\.md/);
+    expect(content).toMatch(/subtype, mode, size/i);
+  });
+
+  test("the architecture spec lives at the effort root, user-approved, frontmattered", () => {
+    expect(content).toMatch(/docs\/tasks\/<effort>\/arch-spec\.md/);
+    expect(content).toMatch(/user-approved|user approves/i);
+    // Committed on the starting branch before the first chain dispatch, so
+    // every ticket branch includes it.
+    expect(content).toMatch(/committed on the starting branch before the first chain dispatch/i);
+  });
+
+  test("the arch-spec frontmatter template conforms", () => {
+    const templates = extractFrontmatterTemplates(content);
+    const arch = templates.find((t) => /^type: arch spec$/m.test(t));
+    expect(arch).toBeDefined();
+    const keys = frontmatterKeys(arch!);
+    expect(keys).toContain("type");
+    expect(keys).toContain("title");
+    expect(keys).toContain("status");
+    for (const killed of KILLED_KEYS) expect(keys).not.toContain(killed);
+    assertTemplateConforms(arch!);
+  });
+
+  test("budgets key off the ticket's size with the m default, expressed as timeoutMs", () => {
+    expect(content).toMatch(/\|\|\s*"m"/);
+    expect(content).toMatch(/s:\s*15/);
+    expect(content).toMatch(/m:\s*30/);
+    expect(content).toMatch(/l:\s*45/);
+    expect(content).toMatch(/xl:\s*60/);
+    expect(content).toMatch(/\+50 percent|by 50 percent/i);
+    // The retired chain API's turnBudget has no current equivalent; the
+    // timeout is the honest lever.
+    expect(content).not.toMatch(/turnBudget/);
+    expect(content).toMatch(/timeoutMs/);
+  });
+
+  test("chains run per ticket per dependency level, sequential within a level", () => {
+    expect(content).toContain("tw_dependency_levels <effort-slug>");
+    expect(content).toMatch(/sequentially/i);
+    expect(content).toMatch(/strict barriers/i);
+  });
+
+  test("the chain dispatches tdd, then verify plus deviation gated, then land", () => {
+    expect(content).toContain("tdd-worker");
+    expect(content).toContain("slice-verifier");
+    expect(content).toContain("deviation-reporter");
+    expect(content).toContain("land-worker");
+    expect(content).toMatch(/workflowScript/);
+    expect(content).toMatch(/runs\.run/);
+    expect(content).toMatch(/runs\.all/);
+    expect(content).toMatch(/ok-gate|ok gate/i);
+  });
+
+  test("the chain never marks the ticket done; finalize owns the marking", () => {
+    const beforeToolbelt = content.split("## Failure toolbelt")[0];
+    // No chain step sets the field: the marking has one owner, finalize.
+    expect(beforeToolbelt).not.toMatch(/tw_set[^)]*workflow_state/);
+    expect(beforeToolbelt).not.toMatch(/workflow_state.{0,20}done/);
+    expect(content).toMatch(/\/skill:finalize-task/);
+  });
+
+  test("dispatch points the state file at the ticket", () => {
+    expect(content).toContain("tw_state_set task <ticket-slug>");
+  });
+
+  test("uncertainty lives in the ticket directory", () => {
+    expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<ticket-slug>\/\.work\/uncertainty\.md/);
+  });
+
+  test("no slice machinery, no ui-noter, no guidelines tool remains", () => {
+    expect(content).not.toContain("tw_slices");
+    expect(content).not.toMatch(/slices\//);
+    expect(content).not.toContain("get_guidelines");
+    expect(content).not.toMatch(/ui-noter/);
+    expect(content).not.toMatch(/impeccable/i);
+  });
+
+  test("references only surviving tools", () => {
+    expectOnlySurvivingTools(content);
+  });
+});
+
+describe("bug chain v4 (overhaul-execution-skills)", () => {
+  const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
+
+  test("the lean per-ticket chain: tdd, verify, land, gated; no deviation-reporter", () => {
+    expect(content).toContain("tdd-worker");
+    expect(content).toContain("slice-verifier");
+    expect(content).toContain("land-worker");
+    expect(content).not.toContain("deviation-reporter");
+    expect(content).toMatch(/workflowScript/);
+  });
+
+  test("the bug doc and reproduction are referenced from the ticket body", () => {
+    expect(content).toMatch(/ticket body/);
+    expect(content).toMatch(/docs\/bugs/);
+    // The bug frontmatter field is dead: no tool reads it, no prose reads it.
+    expect(content).not.toMatch(/tw_get\([^)]*,\s*"bug"\)/);
+    expect(content).not.toMatch(/bug: <slug>/);
+  });
+
+  test("budgets key off the ticket's size with the m default", () => {
+    expect(content).toMatch(/\|\|\s*"m"/);
+    expect(content).toMatch(/s:\s*15/);
+    expect(content).toMatch(/m:\s*30/);
+    expect(content).toMatch(/l:\s*45/);
+    expect(content).toMatch(/xl:\s*60/);
+    expect(content).not.toMatch(/turnBudget/);
+  });
+
+  test("keeps the red-first regression rule and the diagnosing-bugs discipline", () => {
+    expect(content).toMatch(/red.{0,40}test|test.{0,40}red/i);
+    expect(content).toContain("diagnosing-bugs");
+  });
+
+  test("no slice machinery, no ui-noter, no guidelines tool remains", () => {
+    expect(content).not.toContain("tw_slices");
+    expect(content).not.toMatch(/slices\//);
+    expect(content).not.toMatch(/ui-noter/);
+    expect(content).not.toContain("get_guidelines");
+    expectOnlySurvivingTools(content);
+  });
+});
+
+describe("chain agents v4 (overhaul-execution-skills)", () => {
+  test("tdd-worker implements one ticket on a ticket/<slug> working branch", () => {
+    const content = readFile("agents/tdd-worker.md");
+    expect(content).toMatch(/ticket\/<slug>/);
+    expect(content).not.toMatch(/slice\//);
+    expect(content).toMatch(/docs\/tasks\/<effort>\/arch-spec\.md/);
+    expect(content).toMatch(/ticket doc/i);
+    expect(content).toMatch(/tickets\/<ticket-slug>\/\.work\/uncertainty\.md/);
+  });
+
+  test("slice-verifier verifies the ticket from its test plan or the arch-spec seams", () => {
+    const content = readFile("agents/slice-verifier.md");
+    expect(content).toMatch(/ticket doc/i);
+    expect(content).toMatch(/arch-spec seams|test plan/i);
+    expect(content).not.toMatch(/slice doc/i);
+  });
+
+  test("land-worker merges the working branch into the landing branch, no archive duty", () => {
+    const content = readFile("agents/land-worker.md");
+    expect(content).toMatch(/ticket\/<ticket-slug>|ticket\/<slug>/);
+    expect(content).toMatch(/task\/<ticket-slug>|task\/<slug>/);
+    expect(content).not.toMatch(/slices\/archive|archive the slice/i);
+    expect(content).not.toMatch(/state\.yaml/);
+    expect(content).toMatch(/finalize/i);
+  });
+
+  test("deviation-reporter writes frontmattered reports to the ticket directory", () => {
+    const content = readFile("agents/deviation-reporter.md");
+    expect(content).toMatch(/deviation-reports/);
+    expect(content).toMatch(/task\/<ticket-slug>\.\.ticket\/<ticket-slug>/);
+    const templates = extractFrontmatterTemplates(content);
+    const report = templates.find((t) => /^type: deviation report$/m.test(t));
+    expect(report).toBeDefined();
+    const keys = frontmatterKeys(report!);
+    expect(keys).toContain("type");
+    expect(keys).toContain("title");
+    expect(keys).toContain("status");
+    for (const killed of KILLED_KEYS) expect(keys).not.toContain(killed);
+    assertTemplateConforms(report!);
   });
 });
