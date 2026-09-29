@@ -47,6 +47,10 @@ tasks:
   - overhaul-planning-skills
   - overhaul-execution-skills
   done: false
+- slug: backfill-skill-docs-pages
+  blocked_by:
+  - overhaul-dead-surface
+  done: false
 ---
 
 ## Destination
