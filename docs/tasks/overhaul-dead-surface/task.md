@@ -4,11 +4,12 @@ type: feature
 slug: overhaul-dead-surface
 title: Delete the dead tool surface (zero references remain)
 map: task-tools-overhaul
-status: ready
+status: done
 blocked_by:
 - overhaul-planning-skills
 - overhaul-execution-skills
-slices: [overhaul-dead-surface]
+slices:
+- overhaul-dead-surface
 ---
 
 ## What to build
