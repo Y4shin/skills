@@ -58,3 +58,60 @@ new flow.
 ## Blocked by
 
 - overhaul-tw-rename (prose is written against final tool names).
+
+## Implementation notes
+
+### Slice - overhaul-planning-skills (landed)
+
+Landed on `slice/overhaul-planning-skills` (7 commits, merged into
+`task/overhaul-planning-skills`). All eight acceptance criteria landed
+test-first in the arch spec's two seams: structure tests in
+`tests/skills.test.ts` and tool tests against the v4 fixtures in
+`tests/plugin.test.ts`. Gates on the merged branch: 716/716 tests (15
+files), `tsc --noEmit` clean; no lint script is configured (typecheck is
+the designated gate). Verified independently before landing: same
+numbers on the slice branch.
+
+What landed: wayfinder rewritten to the v4 tree (map and decision-task
+templates, state pointers set on create and resume, root index step,
+the four planning resources moved to v4 templates, `feature.md` and
+`bug.md` deleted with feature/bug creation routed to
+`/skill:to-tickets`); to-spec writes a frontmattered `spec.md` at the
+effort root; to-tickets writes v4 `ticket.md` files with no `slices:`
+field and an honest by-hand contract; the doctor gained the OKF
+conformance symptom with `resources/okf-conformance-failure.md`
+(detection plus per-producer routing) and a v4-rewritten
+`missing-tasks-tree.md`; the router tells the v4 story. A
+template-conformance seam extracts every frontmatter template from the
+five skills' prose plus the four planning resources, substitutes them,
+and runs them through the repo's own `parse` + `fromFrontmatter` +
+`validateArtifact` + `findAnomalies` with zero anomalies, so prose and
+engine rules cannot drift silently.
+
+Carried forward, in priority order:
+
+1. **`tw_list` interface change.** The `map` param is replaced by
+   `effort`, `kind` is widened to map|task|ticket|spec, and a
+   `workflow_state` filter is added; the implementation is rebuilt on
+   the scan layer, excluding any `archive/` path. The v3 plugin test
+   "filters by map" flipped to "filters by effort". As a consequence,
+   listings on pre-migration v3 trees now include legacy
+   `slices/<n>-*.md` files as `(slice)` rows (the `kind` enum has no
+   `slice`, so they cannot be kind-filtered). overhaul-execution-skills
+   and overhaul-dead-surface should pick this up deliberately.
+2. **Docs pages deferred (arch spec approval decision 2).** The docs
+   pages for wayfinder, to-spec, to-tickets, task-workflow-doctor, and
+   task-workflow-overview are stale relative to their SKILL.md until a
+   follow-up docs backfill task runs. Not lost here: it must be
+   planned as its own follow-up.
+3. **To-spec approval flip needs the full spec path.**
+   `tw_set docs/tasks/<effort>/spec.md status stable`, because a bare
+   slug shared with `map.md` resolves to the map (resolver type
+   priority prefers map). The prose shows the path form.
+4. **The doctor's bash sweep is illustrative prose.** Quoted or exotic
+   YAML is not matched by it; the engine-level checks (`tw_frontier`
+   Anomalies, `findAnomalies`) are the real gate. The sweep also
+   includes `archive/` (a deliberate reading, documented in the
+   resource).
+5. **The repo's own `docs/tasks` tree stays v3 by design** until the
+   user runs `/skill:setup-workflow` (migrate branch of the overhaul).
