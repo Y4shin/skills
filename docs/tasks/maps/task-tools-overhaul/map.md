@@ -37,7 +37,7 @@ tasks:
 - slug: overhaul-planning-skills
   blocked_by:
   - overhaul-tw-rename
-  done: false
+  done: true
 - slug: overhaul-execution-skills
   blocked_by:
   - overhaul-tw-rename
@@ -46,6 +46,10 @@ tasks:
   blocked_by:
   - overhaul-planning-skills
   - overhaul-execution-skills
+  done: false
+- slug: backfill-skill-docs-pages
+  blocked_by:
+  - overhaul-dead-surface
   done: false
 ---
 

@@ -3,24 +3,25 @@
 Use this resource when a decision depends on facts from documentation, APIs,
 third-party systems, or the local repository.
 
-Create a direct task with `type: research` and no slices:
+Create the task at `docs/tasks/<effort>/tasks/<task-slug>/task.md` with
+`subtype: research` and no blockers:
 
 ```yaml
 ---
-kind: task
-type: research
-slug: <slug>
+type: task
+subtype: research
 title: <question>
-map: <map-slug>
-status: ready
+status: stable
+workflow_state: ready
 blocked_by: []
+mode: human   # optional; omit unless the human must implement it
 ---
 ```
 
 The task body must state:
 
 - the precise question;
-- the decision or task it unblocks;
+- the decision or ticket it unblocks;
 - trusted source boundaries;
 - the evidence required for completion;
 - likely dependent tasks.

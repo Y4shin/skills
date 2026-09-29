@@ -4,17 +4,18 @@ Use this resource when progress requires a human or environment prerequisite,
 such as obtaining access, provisioning a service, or inspecting data that is
 not yet available.
 
-Create a direct task with `type: manual` and no slices:
+Create the task at `docs/tasks/<effort>/tasks/<task-slug>/task.md` with
+`subtype: manual`:
 
 ```yaml
 ---
-kind: task
-type: manual
-slug: <slug>
+type: task
+subtype: manual
 title: <prerequisite>
-map: <map-slug>
-status: ready
+status: stable
+workflow_state: ready
 blocked_by: []
+mode: human   # omit unless the human must implement it; manual work usually does
 ---
 ```
 

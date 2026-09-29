@@ -6,8 +6,10 @@ description: Entry point. Ask which skill or flow fits your situation. A router 
 # Working with Tasks
 
 You don't remember every skill, so ask. This is the router that maps user
-intent to the right skill or flow. This repo uses the task-workflow: a
-dependency graph under `docs/tasks/` of maps and executable tasks. Bugs live
+intent to the right skill or flow. `docs/tasks/` is an OKF bundle: one
+directory per effort holding `map.md`, an optional `spec.md`, a `tasks/`
+subdirectory of decision tasks, and a `tickets/` subdirectory of
+implementation tickets. The `tw_*` tools make that graph queryable. Bugs live
 under `docs/bugs/`. No external issue tracker, everything in git.
 
 A **flow** is a path through the skills. Most paths run along one **main
@@ -32,9 +34,10 @@ The route most work travels. You have an idea and want it built.
    - **`/skill:handoff`** back what you learned.
 3. **Branch: is this a multi-session build?**
    - **Yes** to **`/skill:to-spec`** (turn the thread into a spec), then
-     **`/skill:to-tickets`** to split it into tracer-bullet feature/bug tickets,
-     each declaring its **blocking edges** under `docs/tasks/` using the
-     `tw_*` tools for the graph. Kick off **`/skill:implement-task`** per
+     **`/skill:to-tickets`** to split it into tracer-bullet feature/bug
+     tickets, each declaring its **blocking edges** under
+     `docs/tasks/<effort>/tickets/`, written by hand; the `tw_*` tools make
+     the resulting graph queryable. Kick off **`/skill:implement-task`** per
      ticket, clearing context between each one.
    - **No** to **`/skill:implement-task`** right here, in the same context
      window.
@@ -125,10 +128,10 @@ Off the main flow entirely.
 | Question | Tool |
 |---|---|
 | "Is this task ready?" | `tw_finalizable <slug>` |
-| "What's left on task X?" | `tw_slices <slug>` for legacy tasks; `tw_frontier <map>` for Wayfinder maps |
-| "List tasks / maps" | `tw_list` |
+| "What's left on effort X?" | `tw_dependency_levels <effort>` / `tw_frontier <effort>` |
+| "List efforts / tasks / tickets" | `tw_list` |
 | "Show artifact X" | `tw_show <slug>` |
-| "Where am I?" | `tw_state` |
+| "Where am I?" | `tw_state` (both pointers) |
 | "What's in the bug triage queue?" | `grep -l "status: reported" docs/bugs/*.md` |
 
 ## Actions
@@ -144,6 +147,7 @@ Off the main flow entirely.
 | Finalize / archive | `/skill:finalize-task` |
 | Initialize repo | `/skill:setup-workflow` |
 | Triage incoming issues | `/skill:triage` |
+| Diagnose a broken workflow | `/skill:task-workflow-doctor` |
 | Diagnose a hard bug | `/skill:diagnosing-bugs` |
 
 > **Feedback:** any of these skills can hit a snag. When that happens, call

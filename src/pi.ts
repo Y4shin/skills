@@ -26,6 +26,7 @@ import {
   effortFrontier,
   effortLevels,
   effortFinalizable,
+  effortGroupOf,
   liveFrontier,
   itemFinalizable,
   type EffortGraph,
@@ -664,40 +665,47 @@ export function createTools(): Record<string, Tool> {
     ),
 
     tw_list: def(
-      "List artifacts. Excludes archived by default.",
+      "List artifacts (maps, specs, tasks, tickets). Excludes archived by default.",
       {
-        kind: { type: "string" as const, optional: true, enum: ["map", "task"] },
+        kind: { type: "string" as const, optional: true, enum: ["map", "task", "ticket", "spec"] },
         status: OptStr("Status filter"),
-        map: OptStr("Map slug filter"),
+        workflow_state: OptStr("Workflow state filter"),
+        effort: OptStr("Effort slug filter"),
         json: OptBool,
       },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         if (!isInitialized(root)) return "(no docs/tasks directory)";
-        const base = taskRoot(root);
-        const arts: { slug: string; kind: string; status: string | null; map?: string }[] = [];
+        // The scan layer reads both shapes; the archived subtree is the only
+        // location tw_list hides.
+        let hits = scanMemo(root)().hits.filter(
+          (h) => !h.path.split(/[\\/]/).includes("archive"),
+        );
+        if (p.kind) hits = hits.filter((h) => h.art.type === p.kind);
+        if (p.status) hits = hits.filter((h) => h.art.status === p.status);
+        if (p.workflow_state) hits = hits.filter((h) => h.art.workflow_state === p.workflow_state);
+        if (p.effort) hits = hits.filter((h) => effortGroupOf(h.art) === p.effort);
 
-        const scanDir = (dir: string, leaf: string, kind: string) => {
-          for (const sub of listSubdirs(dir)) {
-            const f = join(dir, sub, leaf);
-            if (!isFile(f)) continue;
-            try {
-              const { art } = parseArtifactFile(f);
-              const map = art.data.map as string | undefined;
-              arts.push({ slug: art.slug, kind: art.type, status: art.status, map });
-            } catch { /* skip */ }
-          }
-        };
-
-        if (p.kind !== "task") scanDir(join(base, "maps"), "map.md", "map");
-        if (p.kind !== "map") scanDir(base, "task.md", "task");
-
-        let filtered = arts;
-        if (p.status) filtered = filtered.filter((a) => a.status === p.status);
-        if (p.map) filtered = filtered.filter((a) => a.map === p.map);
-
-        if (p.json) return JSON.stringify(filtered, null, 2);
-        return filtered.map((a) => `${a.slug} (${a.kind})${a.status ? ` [${a.status}]` : ""}`).join("\n") || "(empty)";
+        if (p.json) {
+          return JSON.stringify(
+            hits.map((h) => ({
+              slug: h.art.slug,
+              type: h.art.type,
+              subtype: h.art.subtype,
+              status: h.art.status,
+              workflow_state: h.art.workflow_state,
+              effort: effortGroupOf(h.art),
+              path: h.path,
+            })),
+            null, 2,
+          );
+        }
+        const rows = hits.map((h) => {
+          const kind = h.art.subtype ? `${h.art.type}/${h.art.subtype}` : h.art.type;
+          const state = h.art.workflow_state ?? h.art.status;
+          return `${h.art.slug} (${kind})${state ? ` [${state}]` : ""}`;
+        });
+        return rows.join("\n") || "(empty)";
       },
     ),
 

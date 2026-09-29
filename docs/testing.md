@@ -125,6 +125,24 @@ suite normally; do not exclude this file.
   `tests/skills.test.ts` (e.g. "implement-task references
   tdd-worker"). When adding a skill: extend `SKILL_FILES` and bump the
   manifest count assertion.
+- **Producer prose is tested by running its templates through the engine.**
+  A skill that teaches agents to write artifacts is a producer, and its
+  prose templates are its real output contract: extract every fenced YAML
+  frontmatter block from the prose, substitute the placeholders, and run
+  each through the repo's own `parse` + `fromFrontmatter` +
+  `validateArtifact` + `findAnomalies` asserting zero anomalies and no
+  killed keys. Assemble fixture efforts from the extracted templates (a
+  fresh effort, a one-off with one ticket, a spec-only effort) and assert
+  zero anomalies; plant a nonconformant file (an invalid
+  status/workflow_state pair, a type-less file) and assert the engine
+  reports it. Prose and engine rules then cannot drift silently. See the
+  `conformance seam` blocks in `tests/skills.test.ts`
+  (overhaul-planning-skills).
+- **Tool allowlist assertion for rewritten prose.** When a skill rewrite
+  must not reference deleted tools, assert every `tw_*` name appearing in
+  the prose is in the surviving-tool set (`expectOnlySurvivingTools` in
+  `tests/skills.test.ts`), so a stale tool reference fails a structure test
+  instead of waiting for the dead-surface sweep.
 - **YAML gotcha:** an unquoted `: ` inside a frontmatter value (e.g. a
   title containing `type: bug`) makes the YAML invalid; the task tools
   then *silently skip* the file. Quote such values.

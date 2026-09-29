@@ -7,17 +7,18 @@ disable-model-invocation: true
 # Wayfinder
 
 > **Telemetry:** once you have created the map, call the `telemetry_skill_context`
-> tool with `{ skill_name: "wayfinder", map }` where `map` is the map slug (the
-> directory name under `docs/tasks/maps/`). When you are focused on a specific
-> task or slice, also pass `target` (the task slug) or `slice` (the slice slug).
-> This skill has no static invocation capture, so the tool is the only way to
-> record its target. Pass `skill_name` explicitly so the metadata correlates
-> to this invocation even when multiple skills run in one turn.
+> tool with `{ skill_name: "wayfinder", map }` where `map` is the effort slug
+> (the directory name under `docs/tasks/`). When you are focused on a specific
+> task, also pass `target` (the task slug). This skill has no static invocation
+> capture, so the tool is the only way to record its target. Pass `skill_name`
+> explicitly so the metadata correlates to this invocation even when multiple
+> skills run in one turn.
 
-Wayfinder is the planning and discovery phase of this workflow. It replaces
-`create-task`, `to-spec`, and `to-tickets`. Its output is a living map and a
-dependency graph of **decision tasks** consumed by `to-spec` and `to-tickets`,
-which then produce the implementation tasks that `implement-task` executes.
+Wayfinder is the planning and discovery phase of this workflow. It hands off to
+`to-spec` and `to-tickets` (the two-phase model): its output is a living map and
+a dependency graph of **decision tasks**; `to-spec` collapses those decisions
+into a buildable spec, and `to-tickets` breaks the spec into the implementation
+tickets `implement-task` executes.
 
 ## Plan, don't do
 
@@ -34,13 +35,16 @@ Wayfinder owns:
 
 - the destination and scope;
 - the map and its decision-task graph;
-- task creation (planning types only), dependencies, and the frontier;
+- task creation (planning subtypes only: research, prototype, grilling,
+  manual), dependencies, and the frontier;
 - resolving ambiguity into concrete task bodies;
 - adding newly discovered work and recording out-of-scope work.
 
 `to-spec` and `to-tickets` own collapsing the decisions into a buildable plan
-(spec + implementation tickets). `implement-task` owns completing tickets.
-There is no separate specification or ticket-generation step inside Wayfinder.
+(spec + implementation tickets). Feature and bug creation belongs to
+`to-tickets`, aligned with its Boundary. `implement-task` owns completing
+tickets. There is no separate specification or ticket-generation step inside
+Wayfinder.
 
 ## Entry
 
@@ -56,15 +60,15 @@ but it still gets the same initial alignment pass.
 
 ## The map
 
-Create the map at `docs/tasks/maps/<slug>/map.md`:
+Create the map at `docs/tasks/<effort>/map.md` (the effort slug is the
+directory name):
 
 ```yaml
 ---
-kind: map
-slug: <slug>
+type: map
 title: <title>
-status: active
-tasks: []
+status: stable
+blocked_by: []   # optional; effort-to-effort edges
 ---
 ```
 
@@ -92,9 +96,10 @@ The body is the canonical low-resolution map:
 - ...
 ```
 
-Tasks live at `docs/tasks/<task-slug>/task.md` and are listed in the map's
-`tasks` array. Each task has one planning type. Choose the type using this
-table, then follow the matching planning resource in
+Decision tasks live at `docs/tasks/<effort>/tasks/<task-slug>/task.md`. The
+directory is the registration: writing the file is all there is, there is no
+array to update. Each task has one planning subtype. Choose the subtype using
+this table, then follow the matching planning resource in
 `skills/engineering/wayfinder/resources/` before writing the task:
 
 - `research`: gather high-trust evidence;
@@ -102,15 +107,29 @@ table, then follow the matching planning resource in
 - `grilling`: resolve a human decision through conversation;
 - `manual`: complete a human or environment prerequisite.
 
-Feature and bug tasks are **not** created by Wayfinder. They are created by
-`to-tickets` after the decisions are clear. Wayfinder produces decisions, not
+```yaml
+---
+type: task
+subtype: research   # or prototype | grilling | manual
+title: <title>
+status: stable
+workflow_state: ready
+blocked_by: [<task-slug>, ...]
+mode: human   # optional; omit unless the human must implement it
+---
+```
+
+Feature and bug work is **not** created by Wayfinder. It is created by
+`/skill:to-tickets` after the decisions are clear. Feature and bug creation
+belongs to `to-tickets` by its Boundary. Wayfinder produces decisions, not
 deliverables.
 
 The planning resource defines the task body, acceptance/evidence criteria,
 and required artifacts. Execution is later routed by `implement-task` to its
 matching resource.
 
-Use `blocked_by` for ordering.
+Use `blocked_by` for ordering. Edges are kind-scoped and effort-scoped: a
+task's `blocked_by` names other tasks of the same effort.
 
 ## Chart the initial graph
 
@@ -118,21 +137,29 @@ Use `blocked_by` for ordering.
 2. Run one mandatory grilling session to establish and confirm the destination,
    constraints, scope boundary, and first task frontier.
 3. Create the map only after that grilling has produced shared understanding.
-4. Create only tasks whose question or outcome is precise enough to state now.
-5. Put the rest in `## Fog` rather than inventing speculative tasks.
-6. Wire dependencies after all initial task slugs exist.
-7. Show the user the destination, task graph, dependencies, and fog. Ask for
+4. Set the state pointers: `tw_state_set map <effort-slug>`, and clear a stale
+   task pointer with `tw_state_set task null`.
+5. Register the effort in the root index: add `<effort-slug>` to the `## Live`
+   list of `docs/tasks/index.md`, keeping the list sorted. When the index file
+   does not exist yet, create it with frontmatter `type: index`,
+   `okf_version: "0.2"`, `title: docs/tasks`, and body sections `# docs/tasks`,
+   `## Live` (the sorted live effort list), and `## Archived`.
+6. Create only tasks whose question or outcome is precise enough to state now.
+7. Put the rest in `## Fog` rather than inventing speculative tasks.
+8. Wire dependencies after all initial task slugs exist.
+9. Show the user the destination, task graph, dependencies, and fog. Ask for
    confirmation before beginning execution.
 
 A task is ready when every task in its `blocked_by` list is done. The frontier
-is the ready, unfinished task set.
+is the ready, unfinished task set. Read it with `tw_frontier <effort-slug>`;
+layer the whole effort with `tw_dependency_levels <effort-slug>`.
 
 ## Hand off, don't build
 
 When the current frontier is meaningful, hand off to:
 
 ```text
-/skill:to-spec <map-slug>
+/skill:to-spec <effort-slug>
 ```
 
 The map's decisions collapse into a spec (`to-spec`), which breaks into
@@ -155,13 +182,15 @@ criteria. Add a task instead.
 On a later Wayfinder session, or when called back after implementation:
 
 1. Load only the map first.
-2. Inspect the current frontier with `tw_frontier`.
-3. Read task details only as needed.
-4. Claim or select one planning question at a time when human input is needed.
-5. Update the map and dependencies, then hand back to `to-spec`.
+2. Set the state pointers: `tw_state_set map <effort-slug>`, then
+   `tw_state_set task <task-slug>` for the task you are focusing on.
+3. Inspect the current frontier with `tw_frontier <effort-slug>`.
+4. Read task details only as needed.
+5. Claim or select one planning question at a time when human input is needed.
+6. Update the map and dependencies, then hand back to `to-spec`.
 
-Never mark an implementation task complete from Wayfinder. Never resolve an
-unclear question by pretending it is a feature task.
+Never mark an implementation ticket complete from Wayfinder. Never resolve an
+unclear question by pretending it is a feature ticket.
 
 > **Feedback:** if planning hits a snag (a grilling loop that circled, a
 > dependency that wouldn't wire, a task type that didn't fit, a frontier that

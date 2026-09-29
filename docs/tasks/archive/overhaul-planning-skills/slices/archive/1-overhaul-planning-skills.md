@@ -4,7 +4,7 @@ slug: overhaul-planning-skills
 title: Planning-side skills to v4 (wayfinder, to-spec, to-tickets, doctor, router)
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: l
 blocked_by: []
 ---
