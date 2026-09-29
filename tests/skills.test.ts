@@ -682,40 +682,29 @@ describe("skill cross-references", () => {
     expect(content).toContain("tw_finalizable");
   });
 
-  test("finalize-task references tw_map_tick", () => {
+  test("finalize-task does not tick a map array (no array exists to tick)", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toContain("tw_map_tick");
+    expect(content).not.toContain("tw_map_tick");
   });
 
-  test("finalize-task Step 7 separates Pi tool calls from the shell archive block", () => {
+  test("finalize-task keeps Pi tool calls out of the set -e shell blocks", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    const step7Start = content.indexOf("## Step 7");
-    expect(step7Start).toBeGreaterThan(-1);
-    const step8Start = content.indexOf("## Step 8", step7Start);
-    const step7 = step8Start > -1 ? content.slice(step7Start, step8Start) : content.slice(step7Start);
-
-    // The git shell block (containing `git merge --no-ff`) must not interleave
-    // Pi tool calls (tw_state_set / tw_map_tick) as if they were shell
-    // binaries, under `set -e` that aborts the archive mid-sequence (see
-    // docs/bugs/finalize-task-set-e-tool-confusion.md).
     const fence = /```[^\n]*\n([\s\S]*?)```/g;
-    let shellBlock: string | null = null;
     let m: RegExpExecArray | null;
-    while ((m = fence.exec(step7)) !== null) {
+    let shellBlocks = 0;
+    while ((m = fence.exec(content)) !== null) {
       if (/git\s+merge\s+--no-ff/.test(m[1])) {
-        shellBlock = m[1];
-        break;
+        shellBlocks++;
+        // Wrapping a Pi tool call in a set -e shell block fails with
+        // command not found and aborts the archive mid-sequence (see
+        // docs/bugs/finalize-task-set-e-tool-confusion.md).
+        expect(m[1]).not.toMatch(/tw_state_set|tw_set|tw_finalizable|tw_map_finalizable/);
       }
     }
-    expect(shellBlock).not.toBeNull();
-    expect(shellBlock!).not.toMatch(/tw_state_set/);
-    expect(shellBlock!).not.toMatch(/tw_map_tick/);
-
-    // The Pi tool calls must still appear in Step 7, clearly marked as tool
-    // invocations rather than shell commands.
-    expect(step7).toContain("tw_state_set");
-    expect(step7).toContain("tw_map_tick");
-    expect(step7).toMatch(/Pi tool|tool call|tool invocation|invoke .*tool|not .*shell command/i);
+    expect(shellBlocks).toBeGreaterThan(0);
+    // The Pi tool calls must still appear, clearly marked as tool invocations
+    // rather than shell commands.
+    expect(content).toMatch(/Pi tool|tool call|tool invocation|not a shell command/i);
   });
 
   test("finalize-task references tw_map_finalizable", () => {
@@ -723,9 +712,9 @@ describe("skill cross-references", () => {
     expect(content).toContain("tw_map_finalizable");
   });
 
-  test("finalize-task has a type: bug branch", () => {
+  test("finalize-task has a subtype: bug branch", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toMatch(/type\s*:\s*bug/i);
+    expect(content).toMatch(/subtype:\s*bug/i);
   });
 
   test("finalize-task bug branch archives bug docs to docs/bugs/archive", () => {
@@ -739,14 +728,16 @@ describe("skill cross-references", () => {
     expect(content).toContain("fix_commit");
   });
 
-  test("finalize-task bug branch asks user when bug field is absent", () => {
+  test("finalize-task bug branch asks user when the body reference is absent", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toMatch(/ask.{0,80}bug/i);
+    expect(content).toMatch(/ask.{0,80}(which bug|bug doc)/i);
   });
 
-  test("finalize-task documents bug slug frontmatter convention", () => {
+  test("finalize-task takes the bug slug from the ticket body's reference", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toContain("bug: <slug>");
+    expect(content).toMatch(/ticket body/i);
+    // The bug frontmatter field is dead; the body reference is the convention.
+    expect(content).not.toContain("bug: <slug>");
   });
 
   test("setup-workflow creates docs/bugs/archive directory", () => {
@@ -1881,5 +1872,60 @@ describe("failure splits v4 (overhaul-execution-skills)", () => {
     expect(feature).toMatch(/status: deprecated/);
     expect(feature).toMatch(/workflow_state: done/);
     expect(feature).toMatch(/note naming its sub-tickets/i);
+  });
+});
+
+// ─── finalize-task v4 (overhaul-execution-skills) ────────────────────
+
+describe("finalize-task v4 (overhaul-execution-skills)", () => {
+  const content = readFile("skills/engineering/finalize-task/SKILL.md");
+
+  test("step 0 gates on the ticket resolving and implement-task having landed its chains", () => {
+    expect(content).toMatch(/the ticket resolves|resolves through the resolver/i);
+    expect(content).toMatch(/implement-task reported its chains landed|chains landed/i);
+  });
+
+  test("the per-ticket close-out marks workflow_state done via the set tool, then verifies", () => {
+    expect(content).toMatch(/tw_set[^`]*workflow_state done|tw_set <ticket-path> workflow_state done/);
+    expect(content).toContain("tw_finalizable <ticket-slug>");
+    // The finalizable check also surfaces the effort graph's anomalies.
+    expect(content).toMatch(/anomal/i);
+  });
+
+  test("the current item pointer is cleared; the slice pointer is not called", () => {
+    expect(content).toMatch(/tw_state_set task null/);
+    expect(content).not.toMatch(/tw_state_set slice/);
+  });
+
+  test("archiving is gated on the scan tools, not a tick", () => {
+    expect(content).toContain("tw_map_finalizable <effort-slug>");
+  });
+
+  test("no per-ticket git mv: the ticket stays in the live effort", () => {
+    const closeout = content.split(/## Step \d+.*close-out/i)[1]?.split("## Step")[0] ?? "";
+    expect(closeout).not.toContain("git mv");
+    expect(content).toMatch(/no per-ticket (git mv|move)|the ticket stays in the live effort/i);
+  });
+
+  test("the effort archives as a unit, deprecated-marked, with the index regenerated", () => {
+    expect(content).toMatch(/git mv docs\/tasks\/<effort>\/ docs\/tasks\/archive\/<effort>\//);
+    expect(content).toMatch(/status: deprecated/);
+    expect(content).toMatch(/docs\/tasks\/index\.md/);
+    expect(content).toMatch(/## Archived/);
+    expect(content).toMatch(/## Live/);
+    expect(content).toMatch(/sorted/i);
+  });
+
+  test("both pointers clear when the effort finalizes", () => {
+    expect(content).toMatch(/tw_state_set map null/);
+  });
+
+  test("the impeccable-note check is gone", () => {
+    expect(content).not.toMatch(/impeccable/i);
+    expect(content).not.toMatch(/ui-noter/i);
+  });
+
+  test("references only surviving tools", () => {
+    expectOnlySurvivingTools(content);
   });
 });
