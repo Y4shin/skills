@@ -1569,3 +1569,46 @@ describe("task-workflow-overview v4 (overhaul-planning-skills)", () => {
     }
   });
 });
+
+// ─── Structure facts: registration + full template conformance ───────
+
+describe("planning skills structure facts (overhaul-planning-skills)", () => {
+  const FIVE_SKILLS = [
+    "skills/engineering/wayfinder/SKILL.md",
+    "skills/engineering/to-spec/SKILL.md",
+    "skills/engineering/to-tickets/SKILL.md",
+    "skills/engineering/task-workflow-doctor/SKILL.md",
+    "skills/engineering/task-workflow-overview/SKILL.md",
+  ];
+
+  test("the five planning skills are registered in package.json", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    for (const dir of ["wayfinder", "to-spec", "to-tickets", "task-workflow-doctor", "task-workflow-overview"]) {
+      expect(pkg.pi.skills).toContain(`./skills/engineering/${dir}`);
+    }
+  });
+
+  test("every frontmatter template across the five skills' prose conforms, no killed keys", () => {
+    const files = [
+      ...FIVE_SKILLS,
+      "skills/engineering/wayfinder/resources/research.md",
+      "skills/engineering/wayfinder/resources/prototype.md",
+      "skills/engineering/wayfinder/resources/grilling.md",
+      "skills/engineering/wayfinder/resources/manual.md",
+    ];
+    let templateCount = 0;
+    for (const file of files) {
+      for (const template of extractFrontmatterTemplates(readFile(file))) {
+        templateCount++;
+        const keys = frontmatterKeys(template);
+        for (const killed of KILLED_KEYS) {
+          expect(keys, `${file} carries the killed key '${killed}'`).not.toContain(killed);
+        }
+        conform(template);
+      }
+    }
+    // The three producers still carry their templates; the doctor and the
+    // router produce no artifacts and carry none.
+    expect(templateCount).toBeGreaterThanOrEqual(6);
+  });
+});
