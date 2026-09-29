@@ -508,7 +508,7 @@ describe("human-mode integration coverage", () => {
   test("verification agent permissions are read-only while landing remains separate", () => {
     const verifier = parseFrontmatter(readFile("agents/slice-verifier.md"));
     const reviewer = parseFrontmatter(readFile("agents/code-reviewer.md"));
-    expect(verifier.tools).toBe("read, bash");
+    expect(verifier.tools).toBe("read, bash, submit_feedback");
     expect(reviewer.tools).not.toMatch(/edit|write|land-worker/);
 
     for (const kind of taskKinds) {
