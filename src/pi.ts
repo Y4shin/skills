@@ -2,14 +2,13 @@
  * task-workflow v2 — single extension entry point.
  *
  * Registers tw_* tools for artifact operations on the docs/tasks/ planning
- * tree, plus lifecycle hooks for coding guidelines and pi-subagents checks.
+ * tree, plus lifecycle hooks for pi-subagents and pi-telemetry checks.
  *
  * Principles:
  * - One file, one extension. No split entry points.
  * - Core modules are pure data (no file I/O).
  * - All file I/O is in this file.
  * - Algorithms belong in tools, not in skill prose.
- * - Slice resolution works (fixed from v1 FEEDBACK).
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
@@ -20,7 +19,7 @@ import { Type } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
-import { fromFrontmatter, findAnomalies, sliceInfoFrom, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, type Artifact, type SliceInfo, type WorkItemInfo, type Anomaly } from "./core/art.js";
+import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
 import {
   effortGraphs,
   effortFrontier,
@@ -179,8 +178,6 @@ async function stripSkills(
 }
 
 // ─── File system helpers ──────────────────────────────────────────────────────
-
-const SLICE_RE = /^(\d+)-(.+)\.md$/;
 
 function findRoot(start: string): string {
   let dir = resolvePath(start);
@@ -356,23 +353,6 @@ function resolveArt(root: string, selector: string, want?: string): ScanHit {
   }
 
   return [...candidates].sort((a, b) => typeRank(a.art.type) - typeRank(b.art.type))[0];
-}
-
-function activeSlices(root: string, taskSlug: string): { number: number; slug: string; path: string; status: string | null }[] {
-  const sd = join(taskRoot(root), taskSlug, "slices");
-  if (!isDir(sd)) return [];
-  const out: { number: number; slug: string; path: string; status: string | null }[] = [];
-  for (const name of readdirSync(sd).sort()) {
-    if (name === "archive" || name.startsWith(".")) continue;
-    const m = name.match(SLICE_RE);
-    if (!m) continue;
-    const path = join(sd, name);
-    try {
-      const { art } = parseArtifactFile(path);
-      out.push({ number: parseInt(m[1], 10), slug: m[2], path, status: art.status });
-    } catch { /* skip */ }
-  }
-  return out;
 }
 
 function taskInfoFromPath(path: string): WorkItemInfo | null {
@@ -629,41 +609,6 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    tw_set_slices: def(
-      "Set a task's `slices:` list to the given slice slugs.",
-      { selector: Str("Task slug or path"), slugs: { type: "array" as const, items: Str("Slice slug") } },
-      async (p, ctx) => {
-        const root = findRoot(ctx.directory);
-        const { path, doc } = resolveArt(root, p.selector, "task");
-        doc.data["slices"] = p.slugs as string[];
-        writeFileSync(path, dump(doc), "utf-8");
-        return `slices: [${(doc.data["slices"] as string[]).join(", ")}]`;
-      },
-    ),
-
-    tw_resolve: def(
-      "Resolve a slug or path to the artifact's file path.",
-      { selector: Str("Slug or path"), kind: OptStr("Wanted OKF type (map, ticket, task, spec, arch spec)") },
-      async (p, ctx) => {
-        const root = findRoot(ctx.directory);
-        return resolveArt(root, p.selector, p.kind as string | undefined).path;
-      },
-    ),
-
-    tw_assert_kind: def(
-      "Assert an artifact's type (map, ticket, task, spec, arch spec). Fails on mismatch.",
-      {
-        selector: Str("Slug or path"),
-        kind: { type: "string" as const, enum: ["map", "ticket", "task", "spec", "arch spec", "slice"] },
-      },
-      async (p, ctx) => {
-        const root = findRoot(ctx.directory);
-        const { art } = resolveArt(root, p.selector);
-        if (art.type !== p.kind) throw new Error(`'${p.selector}' has type '${art.type}', not '${p.kind}'.`);
-        return `type: ${p.kind} (OK)`;
-      },
-    ),
-
     tw_list: def(
       "List artifacts (maps, specs, tasks, tickets). Excludes archived by default.",
       {
@@ -709,33 +654,14 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    tw_slices: def(
-      "List a task's active (non-archived) slice docs.",
-      { selector: Str("Task slug or path"), json: OptBool },
-      async (p, ctx) => {
-        const root = findRoot(ctx.directory);
-        const { art } = resolveArt(root, p.selector, "task");
-        const slices = activeSlices(root, art.slug);
-        if (p.json) return JSON.stringify(slices, null, 2);
-        return slices.length === 0 ? "(no open slices)" : slices.map((s) => `${s.number} — ${s.slug}${s.status ? ` [${s.status}]` : ""}`).join("\n");
-      },
-    ),
-
     tw_finalizable: def(
-      "Check an artifact is ready to finalize (workflow_state done; legacy tasks also need no open slices).",
+      "Check an artifact is ready to finalize (workflow_state done).",
       { selector: Str("Task or ticket slug or path") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         const { art } = resolveArt(root, p.selector);
         const reason = itemFinalizable(art);
         if (reason !== null) throw new Error(reason);
-        // Secondary gate, v3-shape tasks only: a done task with open slice
-        // docs is a contradiction worth surfacing. v4 tasks have no slice
-        // files, so this is a no-op there.
-        const slices = activeSlices(root, art.slug);
-        if (slices.length > 0) {
-          throw new Error(`task '${art.slug}' has ${slices.length} open slice(s): ${slices.map((s) => `${s.number}`).join(", ")}`);
-        }
         const index = scanMemo(root)();
         const graph = graphForPath(effortGraphs(index), art.path ?? "");
         return withAnomalies("ready to finalize", graph?.anomalies ?? []);
@@ -743,40 +669,24 @@ export function createTools(): Record<string, Tool> {
     ),
 
     tw_dependency_levels: def(
-      "Compute BFS dependency levels from an effort map's scan or a legacy task's remaining slices.",
-      { selector: Str("Map or task slug") },
+      "Compute BFS dependency levels from an effort map's scan.",
+      { selector: Str("Map slug") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         const resolved = resolveArt(root, p.selector);
-        if (resolved.art.type === "map") {
-          const index = scanMemo(root)();
-          const graph = graphForPath(effortGraphs(index), resolved.path);
-          if (hasScanChildren(graph)) {
-            const levels = effortLevels(graph!);
-            const deprecated = graph!.deprecated.map((a) => ({ slug: a.slug, type: a.type }));
-            return JSON.stringify({ ...levels, deprecated, anomalies: graph!.anomalies }, null, 2);
-          }
-          // v3 fallback: the map's own array is the graph.
-          const children = mapChildInfos(root, resolved.path);
-          const remaining = children.filter((item) => item.status !== "done");
-          const levels = dependencyLevels(remaining);
-          return JSON.stringify({ levels, remaining_count: remaining.length, done_count: children.length - remaining.length }, null, 2);
+        if (resolved.art.type !== "map") throw new ResolutionError(`'${p.selector}' must resolve to a map`);
+        const index = scanMemo(root)();
+        const graph = graphForPath(effortGraphs(index), resolved.path);
+        if (hasScanChildren(graph)) {
+          const levels = effortLevels(graph!);
+          const deprecated = graph!.deprecated.map((a) => ({ slug: a.slug, type: a.type }));
+          return JSON.stringify({ ...levels, deprecated, anomalies: graph!.anomalies }, null, 2);
         }
-        if (resolved.art.type !== "task") throw new ResolutionError(`'${p.selector}' must resolve to a map or task`);
-        const rawSlices = activeSlices(root, resolved.art.slug);
-        const remaining = rawSlices.filter((s) => s.status !== "done");
-        const done = rawSlices.filter((s) => s.status === "done");
-        const slicesInfo: SliceInfo[] = remaining.map((s) => {
-          const sp = join(dirname(resolved.path), "slices", `${s.number}-${s.slug}.md`);
-          try {
-            const parsed = parse(readFileSync(sp, "utf-8"));
-            return sliceInfoFrom(`${s.number}-${s.slug}.md`, parsed.data);
-          } catch {
-            return { number: s.number, slug: s.slug, status: s.status, size: null, blocked_by: [] };
-          }
-        });
-        const levels = dependencyLevels(slicesInfo);
-        return JSON.stringify({ levels, remaining_count: remaining.length, done_count: done.length }, null, 2);
+        // v3 fallback: the map's own array is the graph.
+        const children = mapChildInfos(root, resolved.path);
+        const remaining = children.filter((item) => item.status !== "done");
+        const levels = dependencyLevels(remaining);
+        return JSON.stringify({ levels, remaining_count: remaining.length, done_count: children.length - remaining.length }, null, 2);
       },
     ),
 
@@ -832,38 +742,6 @@ export function createTools(): Record<string, Tool> {
         const frontier = children.filter((item) => item.status !== "done" && item.blocked_by.every((blocker) => done.has(blocker)));
         if (p.json) return JSON.stringify(frontier, null, 2);
         return frontier.length === 0 ? "(empty frontier)" : frontier.map((item) => `${item.slug}${item.type ? ` (${item.type})` : ""}`).join("\n");
-      },
-    ),
-
-    tw_map_tasks: def(
-      "List a map's planned child tasks with their done state.",
-      { selector: Str("Map slug or path"), json: OptBool },
-      async (p, ctx) => {
-        const root = findRoot(ctx.directory);
-        const { doc } = resolveArt(root, p.selector, "map");
-        const tasks = doc.data["tasks"];
-        if (!Array.isArray(tasks)) return "(no child tasks planned yet)";
-        const lines = tasks.map((t: any) => `${t.slug}${t.done ? " ✓" : ""}${t.blocked_by?.length ? ` blocked_by: ${t.blocked_by.join(", ")}` : ""}`);
-        return p.json ? JSON.stringify(tasks, null, 2) : lines.join("\n");
-      },
-    ),
-
-    tw_map_tick: def(
-      "Mark a map's child task as finalized (done: true).",
-      { selector: Str("Map slug or path"), task_slug: Str("Child task slug") },
-      async (p, ctx) => {
-        const root = findRoot(ctx.directory);
-        const { path, doc } = resolveArt(root, p.selector, "map");
-        const tasks = Array.isArray(doc.data["tasks"]) ? [...doc.data["tasks"]] : [];
-        for (const c of tasks) {
-          if ((c as any).slug === p.task_slug) {
-            (c as any).done = true;
-            doc.data["tasks"] = tasks;
-            writeFileSync(path, dump(doc), "utf-8");
-            return `${p.task_slug} → done`;
-          }
-        }
-        throw new Error(`no task '${p.task_slug}' in map`);
       },
     ),
 
@@ -1025,152 +903,7 @@ export default function (pi: ExtensionAPI) {
     });
   }
 
-  // ── Guidelines tools ──────────────────────────────────────────────────
-
-  // Track discovered guidelines in memory
-  type GuidelineEntry = { file: string; content: string; topics: string[]; source: "docs" | "root" };
-  let guidelinesCache = new Map<string, GuidelineEntry>();
-  let shouldInjectGuidelines = true;
-
-  const EXT_TO_LANG: Record<string, string> = {
-    ".ts": "typescript", ".tsx": "typescript", ".js": "javascript", ".py": "python",
-    ".rs": "rust", ".go": "go", ".rb": "ruby", ".java": "java", ".kt": "kotlin",
-    ".swift": "swift", ".c": "c", ".cpp": "cpp", ".nix": "nix", ".sh": "bash",
-    ".md": "markdown", ".json": "json", ".yaml": "yaml", ".yml": "yaml",
-  };
-
-  const SKIP_DIRS = new Set(["node_modules", ".git", ".venv", "dist", "build", "coverage", "__pycache__"]);
-
-  // Single source of truth for the 12 Fowler smells is skills/engineering/code-review/smells.md.
-  // This inlined copy is a fallback floor; keep it in sync with that file.
-  const SMELL_BASELINE = `# Smell baseline
-
-Twelve Fowler code smells from _Refactoring_, chapter 3. The Standards axis of \`/code-review\` carries this list as a floor when the repo documents no overriding standard. Each smell is a labelled heuristic — "possible Feature Envy" — never a hard violation.
-
-## Mysterious Name
-
-**What it is:** a function, variable, type, or module whose name does not reveal what it does or holds.
-
-**How to fix:** rename it so the intent is honest and obvious. If no honest name comes to mind, the underlying design is probably still murky — clarify the responsibility first.
-
-## Duplicated Code
-
-**What it is:** the same logical shape appears in more than one hunk or file in the change.
-
-**How to fix:** extract the shared shape into a single place and call it from both sites.
-
-## Feature Envy
-
-**What it is:** a function or method reaches into another object's data more than it uses its own.
-
-**How to fix:** move the behaviour onto the object whose data it envies.
-
-## Data Clumps
-
-**What it is:** the same few fields or parameters keep travelling together, as if they want to become one type.
-
-**How to fix:** bundle them into a single small type and pass that around instead of the loose fields.
-
-## Primitive Obsession
-
-**What it is:** a primitive or string is used to represent a domain concept that deserves its own type.
-
-**How to fix:** give the concept its own small value type or enum so the domain meaning is explicit.
-
-## Repeated Switches
-
-**What it is:** the same \`switch\` or \`if\`-cascade on the same type recurs across the change.
-
-**How to fix:** replace the repeated dispatch with polymorphism, or with one shared map/table both sites use.
-
-## Shotgun Surgery
-
-**What it is:** one logical change forces scattered edits across many files in the diff.
-
-**How to fix:** gather the pieces that change together into one module so the next change has a single home.
-
-## Divergent Change
-
-**What it is:** one file or module is edited for several unrelated reasons.
-
-**How to fix:** split responsibilities so each module changes for only one reason.
-
-## Speculative Generality
-
-**What it is:** abstractions, parameters, or hooks are added for needs the spec does not have.
-
-**How to fix:** delete the unused generality and inline back to the concrete case. Reintroduce abstraction only when a real need appears.
-
-## Message Chains
-
-**What it is:** a caller walks a long chain such as \`a.b().c().d()\`, coupling itself to the intermediate structure.
-
-**How to fix:** hide the walk behind a single method on the object the caller already knows.
-
-## Middle Man
-
-**What it is:** a class or function that mostly just delegates onward without adding value.
-
-**How to fix:** remove the middleman and call the real target directly.
-
-## Refused Bequest
-
-**What it is:** a subclass or implementer ignores or overrides most of what it inherits.
-
-**How to fix:** drop the inheritance and use composition instead.`;
-
-  function discoverGuidelines(cwd: string) {
-    const cache = new Map<string, GuidelineEntry>();
-    const docsDir = join(cwd, "docs");
-
-    if (existsSync(docsDir)) {
-      try {
-        for (const entry of readdirSync(docsDir)) {
-          const full = join(docsDir, entry);
-          try {
-            if (!statSync(full).isFile()) continue;
-            const lower = entry.toLowerCase();
-            const topics: string[] = [];
-            if (lower === "testing.md") topics.push("testing");
-            else if (lower.endsWith("-guidelines.md")) topics.push(lower.replace("-guidelines.md", ""));
-            else if (lower.endsWith("-conventions.md")) topics.push(lower.replace("-conventions.md", ""));
-            else if (lower.endsWith("-practices.md")) topics.push(lower.replace("-practices.md", ""));
-            else continue;
-            cache.set(entry, { file: entry, content: readFileSync(full, "utf-8"), topics, source: "docs" });
-          } catch { /* skip */ }
-        }
-      } catch { /* skip */ }
-    }
-
-    // Repo-root standards files + docs/standards.md. These are intentionally
-    // separate from the language/topic docs discovery above.
-    for (const file of ["AGENTS.md", "CLAUDE.md", "CONTEXT.md"]) {
-      const full = join(cwd, file);
-      try {
-        if (existsSync(full) && statSync(full).isFile()) {
-          cache.set(file, { file, content: readFileSync(full, "utf-8"), topics: ["standards"], source: "root" });
-        }
-      } catch { /* skip */ }
-    }
-
-    const docsStandards = join(docsDir, "standards.md");
-    try {
-      if (existsSync(docsStandards) && statSync(docsStandards).isFile()) {
-        cache.set("docs/standards.md", { file: "standards.md", content: readFileSync(docsStandards, "utf-8"), topics: ["standards"], source: "docs" });
-      }
-    } catch { /* skip */ }
-
-    return cache;
-  }
-
-  function guidelineDisplayPath(g: { file: string; source: "docs" | "root" }): string {
-    return g.source === "docs" ? `docs/${g.file}` : g.file;
-  }
-
-
   pi.on("session_start", async (_event, ctx) => {
-    guidelinesCache = discoverGuidelines(ctx.cwd);
-    shouldInjectGuidelines = true;
     for (const diagnostic of gate.diagnostics) {
       ctx.ui.notify(`task-workflow gate: ${diagnostic}`, "info");
     }
@@ -1191,88 +924,9 @@ Twelve Fowler code smells from _Refactoring_, chapter 3. The Standards axis of \
     }
   });
 
-  pi.on("session_compact", async () => { shouldInjectGuidelines = true; });
-
-  if (!gate.active) {
-    pi.on("before_agent_start", async (event, _ctx) => {
-      if (!shouldInjectGuidelines) return;
-      shouldInjectGuidelines = false;
-      if (guidelinesCache.size === 0) return;
-
-      const lines = ["## Project coding guidelines", ""];
-      lines.push("Available documentation:");
-      for (const [, g] of guidelinesCache) {
-        lines.push(`- \`${guidelineDisplayPath(g)}\` — topics: ${g.topics.join(", ")}`);
-      }
-      lines.push("", "Use `get_guidelines(language, topic?)` to fetch detailed guidelines.");
-      lines.push("Use `list_guidelines()` to see all available sources.");
-      lines.push("", "Abide by any conventions defined in these project files when writing code.");
-
-      return { systemPrompt: event.systemPrompt + "\n\n" + lines.join("\n") };
-    });
-  }
-
   if (gate.active) {
     pi.on("before_agent_start", stripSkills);
     pi.on("input", gateSkillInvocation);
   }
 
-  if (!gate.active) {
-    pi.registerTool({
-      name: "get_guidelines",
-      label: "Get Guidelines",
-      description: "Fetch coding guidelines for a language or topic.",
-      parameters: Type.Object({
-        language: Type.Optional(Type.String({ description: "Language filter (e.g. typescript)" })),
-        topic: Type.Optional(Type.String({ description: "Topic filter (e.g. mocking)" })),
-      }),
-      async execute(_id: string, params: any) {
-        const results: { file: string; content: string; topics: string[]; source: "docs" | "root" }[] = [];
-        for (const [, g] of guidelinesCache) {
-          if (params.language) {
-            const lang = params.language.toLowerCase();
-            if (!g.file.toLowerCase().includes(lang) && !g.topics.some((t) => t.toLowerCase() === lang)) continue;
-          }
-          if (params.topic) {
-            const topic = params.topic.toLowerCase();
-            if (!g.topics.some((t) => t.toLowerCase().includes(topic))) continue;
-          }
-          results.push(g);
-        }
-        if (results.length === 0) {
-          return {
-            content: [{
-              type: "text",
-              text: `# Smell baseline (floor — no repo standards found for this request)\n\n${SMELL_BASELINE}`,
-            }],
-            details: {},
-          };
-        }
-        return { content: [{ type: "text", text: results.map((r) => `### ${r.file}\n${r.content}`).join("\n\n---\n\n") }], details: {} };
-      },
-    });
-  }
-
-  if (!gate.active) {
-    pi.registerTool({
-      name: "list_guidelines",
-      label: "List Guidelines",
-      description: "List available coding guideline sources.",
-      parameters: Type.Object({}),
-      async execute() {
-        if (guidelinesCache.size === 0) {
-          const text = [
-            "Available coding guideline sources:",
-            "  - Smell baseline (Fowler 12) — served as the floor when no repo standards match",
-          ].join("\n");
-          return { content: [{ type: "text", text }], details: {} };
-        }
-        const lines = ["Available coding guideline sources:"];
-        for (const [, g] of guidelinesCache) {
-          lines.push(`  - ${guidelineDisplayPath(g)} (topics: ${g.topics.join(", ")})`);
-        }
-        return { content: [{ type: "text", text: lines.join("\n") }], details: {} };
-      },
-    });
-  }
 }

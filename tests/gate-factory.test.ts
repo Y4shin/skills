@@ -230,8 +230,6 @@ describe("factory gate", () => {
 
     const names = stub.tools.map((t) => t.name);
     expect(names).not.toContain("notify_user");
-    expect(names).not.toContain("get_guidelines");
-    expect(names).not.toContain("list_guidelines");
   });
 
   test("personal repo registers all gated tools", () => {
@@ -325,7 +323,7 @@ describe("factory gate", () => {
     }
   });
 
-  describe("before_agent_start guidelines injection", () => {
+  describe("before_agent_start", () => {
     test("work repo (gate active) registers the strip handler on before_agent_start", () => {
       setupWorkRepo();
 
@@ -334,93 +332,6 @@ describe("factory gate", () => {
 
       expect(stub.handlers["before_agent_start"]).toBeDefined();
       expect(stub.handlers["before_agent_start"].length).toBe(1);
-    });
-
-    test("personal repo appends guidelines preamble when a guideline file exists", async () => {
-      globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
-      process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
-      const repo = makeRepo("https://github.com/Y4shin/skills.git");
-      mkdirSync(join(repo, "docs"), { recursive: true });
-      writeFileSync(join(repo, "docs", "testing.md"), "# Testing guidelines\n");
-      process.chdir(repo);
-
-      const stub = createStub();
-      factory(stub);
-
-      const sessionStartHandlers = stub.handlers["session_start"];
-      await sessionStartHandlers[0]({ type: "session_start", reason: "startup" }, { cwd: repo, ui: stub.ui });
-
-      const beforeAgentStartHandlers = stub.handlers["before_agent_start"];
-      expect(beforeAgentStartHandlers).toBeDefined();
-      expect(beforeAgentStartHandlers.length).toBe(1);
-
-      const result = await beforeAgentStartHandlers[0]({ systemPrompt: "BASE" }, { cwd: repo });
-      expect(result).toBeDefined();
-      const tail = [
-        "## Project coding guidelines",
-        "",
-        "Available documentation:",
-        "- `docs/testing.md` — topics: testing",
-        "",
-        "Use `get_guidelines(language, topic?)` to fetch detailed guidelines.",
-        "Use `list_guidelines()` to see all available sources.",
-        "",
-        "Abide by any conventions defined in these project files when writing code.",
-      ].join("\n");
-      expect(result.systemPrompt).toBe("BASE\n\n" + tail);
-    });
-
-    test("personal repo returns undefined when no guideline files are discovered", async () => {
-      globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
-      process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
-      const repo = makeRepo("https://github.com/Y4shin/skills.git");
-      process.chdir(repo);
-
-      const stub = createStub();
-      factory(stub);
-
-      const sessionStartHandlers = stub.handlers["session_start"];
-      await sessionStartHandlers[0]({ type: "session_start", reason: "startup" }, { cwd: repo, ui: stub.ui });
-
-      const beforeAgentStartHandlers = stub.handlers["before_agent_start"];
-      expect(beforeAgentStartHandlers).toBeDefined();
-      expect(beforeAgentStartHandlers.length).toBe(1);
-
-      const result = await beforeAgentStartHandlers[0]({ systemPrompt: "BASE" }, { cwd: repo });
-      expect(result).toBeUndefined();
-    });
-
-    test("personal repo re-arms injection after session_compact", async () => {
-      globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
-      process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
-      const repo = makeRepo("https://github.com/Y4shin/skills.git");
-      mkdirSync(join(repo, "docs"), { recursive: true });
-      writeFileSync(join(repo, "docs", "testing.md"), "# Testing guidelines\n");
-      process.chdir(repo);
-
-      const stub = createStub();
-      factory(stub);
-
-      const sessionStartHandlers = stub.handlers["session_start"];
-      await sessionStartHandlers[0]({ type: "session_start", reason: "startup" }, { cwd: repo, ui: stub.ui });
-
-      const beforeAgentStartHandlers = stub.handlers["before_agent_start"];
-      const compactHandlers = stub.handlers["session_compact"];
-      expect(compactHandlers).toBeDefined();
-      expect(compactHandlers.length).toBe(1);
-
-      const first = await beforeAgentStartHandlers[0]({ systemPrompt: "BASE" }, { cwd: repo });
-      expect(first).toBeDefined();
-      expect(first.systemPrompt).toContain("## Project coding guidelines");
-
-      const second = await beforeAgentStartHandlers[0]({ systemPrompt: "BASE" }, { cwd: repo });
-      expect(second).toBeUndefined();
-
-      await compactHandlers[0]();
-
-      const third = await beforeAgentStartHandlers[0]({ systemPrompt: "BASE" }, { cwd: repo });
-      expect(third).toBeDefined();
-      expect(third.systemPrompt).toContain("## Project coding guidelines");
     });
   });
 
@@ -603,33 +514,15 @@ describe("factory gate", () => {
       expect(result.systemPrompt).toContain("<name>oracle</name>");
     });
 
-    test("personal repo does not register the strip handler", async () => {
+    test("personal repo does not register the strip handler", () => {
       const repo = setupPersonalRepo();
-      mkdirSync(join(repo, "docs"), { recursive: true });
-      writeFileSync(join(repo, "docs", "testing.md"), "# Testing guidelines\n");
 
       const stub = createStub();
       factory(stub);
 
-      const sessionStartHandlers = stub.handlers["session_start"];
-      expect(sessionStartHandlers).toBeDefined();
-      await sessionStartHandlers[0](
-        { type: "session_start", reason: "startup" },
-        { cwd: repo, ui: stub.ui },
-      );
-
-      const beforeAgentStartHandlers = stub.handlers["before_agent_start"];
-      expect(beforeAgentStartHandlers).toBeDefined();
-      expect(beforeAgentStartHandlers.length).toBe(1);
-
-      const fixture = buildSkillsXml([...GATED_SKILL_NAMES, "oracle"]);
-      const result = await beforeAgentStartHandlers[0](
-        { systemPrompt: fixture },
-        { cwd: repo },
-      );
-
-      expect(result.systemPrompt).toContain("<name>wayfinder</name>");
-      expect(result.systemPrompt).toContain("<name>oracle</name>");
+      // The guidelines injection hook is gone: a personal repo registers no
+      // before_agent_start handler at all, strip included.
+      expect(stub.handlers["before_agent_start"]).toBeUndefined();
     });
   });
 

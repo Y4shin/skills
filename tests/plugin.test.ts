@@ -296,75 +296,6 @@ describe("task-workflow tools", () => {
     });
   });
 
-  describe("tw_set_slices", () => {
-    test("sets the slices list", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_set_slices.execute({ selector: "login", slugs: ["a", "b", "c"] }, ctx(t));
-      expect(out).toContain("a, b, c");
-    });
-
-    test("replaces existing list", async () => {
-      const t = mkTmp(); seedTree(t);
-      await tools.tw_set_slices.execute({ selector: "login", slugs: ["x"] }, ctx(t));
-      const got = await tools.tw_get.execute({ selector: "login", field: "slices" }, ctx(t));
-      expect(got).toContain("x");
-      expect(got).not.toContain("do-thing");
-    });
-
-    test("accepts empty list", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_set_slices.execute({ selector: "login", slugs: [] }, ctx(t));
-      expect(out).toContain("slices:");  // the tool's return message
-      const got = await tools.tw_get.execute({ selector: "login", field: "slices" }, ctx(t));
-      // String([]) = "", so check the tool's return instead
-      expect(got).toBeDefined();
-    });
-  });
-
-  describe("tw_resolve", () => {
-    test("resolves task slug", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_resolve.execute({ selector: "login" }, ctx(t));
-      expect(out).toContain("login/task.md");
-    });
-
-    test("resolves map slug with kind filter", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_resolve.execute({ selector: "auth", kind: "map" }, ctx(t));
-      expect(out).toContain("maps/auth/map.md");
-    });
-
-    test("resolves slice slug", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_resolve.execute({ selector: "do-thing" }, ctx(t));
-      expect(out).toContain("do-thing.md");
-    });
-
-    test("throws for nonexistent slug", async () => {
-      const t = mkTmp(); seedTree(t);
-      await expect(tools.tw_resolve.execute({ selector: "nope" }, ctx(t))).rejects.toThrow();
-    });
-  });
-
-  describe("tw_assert_kind", () => {
-    test("passes on match", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_assert_kind.execute({ selector: "login", kind: "task" }, ctx(t));
-      expect(out).toContain("OK");
-    });
-
-    test("fails on mismatch", async () => {
-      const t = mkTmp(); seedTree(t);
-      await expect(tools.tw_assert_kind.execute({ selector: "login", kind: "map" }, ctx(t))).rejects.toThrow(/not/);
-    });
-
-    test("passes for slice kind", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_assert_kind.execute({ selector: "do-thing", kind: "slice" }, ctx(t));
-      expect(out).toContain("OK");
-    });
-  });
-
   describe("tw_list", () => {
     test("lists all non-archived artifacts", async () => {
       const t = mkTmp(); seedTree(t);
@@ -405,43 +336,7 @@ describe("task-workflow tools", () => {
     });
   });
 
-  describe("tw_slices", () => {
-    test("lists active slices", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_slices.execute({ selector: "login" }, ctx(t));
-      expect(out).toContain("do-thing");
-      expect(out).toContain("other-thing");
-    });
-
-    test("returns empty for done/finalized task", async () => {
-      const t = mkTmp(); seedTree(t);
-      // Create a task with no slices
-      mkdirSync(join(t, "docs/tasks/empty/slices"), { recursive: true });
-      writeFileSync(
-        join(t, "docs/tasks/empty/task.md"),
-        "---\nkind: task\ntitle: Empty\nslug: empty\nstatus: done\nslices: []\n---\n",
-      );
-      const out = await tools.tw_slices.execute({ selector: "empty" }, ctx(t));
-      expect(out).toContain("no open slices");
-    });
-
-    test("json flag returns structured data", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_slices.execute({ selector: "login", json: true }, ctx(t));
-      const parsed = JSON.parse(out);
-      expect(Array.isArray(parsed)).toBe(true);
-      expect(parsed.length).toBe(2);
-    });
-  });
-
   describe("tw_finalizable", () => {
-    test("rejects when slices are open", async () => {
-      const t = mkTmp(); seedTree(t);
-      // The v3 fixture carries workflow_state: done, so the primary status
-      // check passes and the secondary slice-count gate is what fires.
-      await expect(tools.tw_finalizable.execute({ selector: "login" }, ctx(t))).rejects.toThrow(/open slice/);
-    });
-
     test("passes when no slices remain", async () => {
       const t = mkTmp(); seedTree(t);
       // Archive all slices
@@ -453,28 +348,16 @@ describe("task-workflow tools", () => {
   });
 
   describe("tw_dependency_levels", () => {
-    test("returns levels for a task with dependencies", async () => {
+    test("v3 fallback: computes levels from a map's child array", async () => {
       const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_dependency_levels.execute({ selector: "login" }, ctx(t));
+      // sso exists only as a map-array entry; a task file makes it resolvable
+      // so the fallback computes a real two-level chain.
+      writeMd(join(t, "docs/tasks/sso/task.md"), "kind: task\ntitle: SSO\nslug: sso\nstatus: todo\nslices: []\nmap: auth\n");
+      const out = await tools.tw_dependency_levels.execute({ selector: "auth" }, ctx(t));
       const parsed = JSON.parse(out);
-      expect(parsed).toHaveProperty("levels");
-      expect(parsed).toHaveProperty("remaining_count");
-      expect(parsed).toHaveProperty("done_count");
-    });
-
-    test("first level has independent slices", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_dependency_levels.execute({ selector: "login" }, ctx(t));
-      const parsed = JSON.parse(out);
-      expect(parsed.levels[0]).toContain("do-thing");
-    });
-
-    test("last level has dependent slices", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_dependency_levels.execute({ selector: "login" }, ctx(t));
-      const parsed = JSON.parse(out);
-      const last = parsed.levels[parsed.levels.length - 1];
-      expect(last).toContain("other-thing");
+      expect(parsed.levels).toEqual([["login"], ["sso"]]);
+      expect(parsed.remaining_count).toBe(2);
+      expect(parsed.done_count).toBe(0);
     });
   });
 
@@ -494,36 +377,6 @@ describe("task-workflow tools", () => {
     });
   });
 
-  describe("tw_map_tasks", () => {
-    test("lists children", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_map_tasks.execute({ selector: "auth" }, ctx(t));
-      expect(out).toContain("login");
-      expect(out).toContain("sso");
-    });
-
-    test("json flag returns structured", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_map_tasks.execute({ selector: "auth", json: true }, ctx(t));
-      const parsed = JSON.parse(out);
-      expect(Array.isArray(parsed)).toBe(true);
-      expect(parsed.length).toBe(2);
-    });
-  });
-
-  describe("tw_map_tick", () => {
-    test("marks a child done", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_map_tick.execute({ selector: "auth", task_slug: "login" }, ctx(t));
-      expect(out).toContain("done");
-    });
-
-    test("throws for nonexistent child", async () => {
-      const t = mkTmp(); seedTree(t);
-      await expect(tools.tw_map_tick.execute({ selector: "auth", task_slug: "nope" }, ctx(t))).rejects.toThrow();
-    });
-  });
-
   describe("tw_map_finalizable", () => {
     test("rejects when children remain", async () => {
       const t = mkTmp(); seedTree(t);
@@ -532,8 +385,10 @@ describe("task-workflow tools", () => {
 
     test("passes when all children done", async () => {
       const t = mkTmp(); seedTree(t);
-      await tools.tw_map_tick.execute({ selector: "auth", task_slug: "login" }, ctx(t));
-      await tools.tw_map_tick.execute({ selector: "auth", task_slug: "sso" }, ctx(t));
+      // The map's array is edited directly: the tick tool died with the v4
+      // layout, the array fallback is what still serves this v3 map.
+      const mapPath = join(t, "docs/tasks/maps/auth/map.md");
+      writeFileSync(mapPath, readFileSync(mapPath, "utf-8").replace(/done: false/g, "done: true"), "utf-8");
       const out = await tools.tw_map_finalizable.execute({ selector: "auth" }, ctx(t));
       expect(out).toContain("ready to finalize");
     });
@@ -892,11 +747,6 @@ describe("task-workflow tools: scan-based graph tools", () => {
       ).rejects.toThrow(/todo/);
     });
 
-    test("still surfaces the v3 slice contradiction", async () => {
-      const t = mkTmp(); seedTree(t);
-      await expect(tools.tw_finalizable.execute({ selector: "login" }, ctx(t))).rejects.toThrow(/open slice/);
-    });
-
     test("falls back to status: done on the live v3 shape (no workflow_state)", async () => {
       const t = mkTmp();
       // The live v3 tree carries status only, never workflow_state. The
@@ -1140,56 +990,6 @@ describe("task-workflow tools: v4 effort-grouped tree", () => {
         ctx(t),
       );
       expect(out).toBe("findings");
-    });
-  });
-
-  describe("kind confusion regression", () => {
-    test("a wanted map against a ticket slug errors naming the actual type", async () => {
-      const t = mkTmp(); seedV4Tree(t);
-      await expect(
-        tools.tw_resolve.execute({ selector: "login-form", kind: "map" }, ctx(t)),
-      ).rejects.toThrow(/ticket.*map|map.*ticket/s);
-    });
-
-    test("a wanted task against a ticket slug errors naming the actual type", async () => {
-      const t = mkTmp(); seedV4Tree(t);
-      await expect(
-        tools.tw_resolve.execute({ selector: "login-form", kind: "task" }, ctx(t)),
-      ).rejects.toThrow(/ticket/);
-    });
-
-    test("a wanted map against a task slug errors naming the actual type", async () => {
-      const t = mkTmp(); seedV4Tree(t);
-      await expect(
-        tools.tw_resolve.execute({ selector: "research-cache", kind: "map" }, ctx(t)),
-      ).rejects.toThrow(/task/);
-    });
-
-    test("a wanted map against a task slug does not silently return the task", async () => {
-      const t = mkTmp(); seedV4Tree(t);
-      const out = await tools.tw_resolve.execute({ selector: "research-cache", kind: "task" }, ctx(t));
-      expect(out).toContain("tasks/research-cache/task.md");
-    });
-
-    test("resolves each type when the wanted type matches", async () => {
-      const t = mkTmp(); seedV4Tree(t);
-      expect(await tools.tw_resolve.execute({ selector: "billing", kind: "map" }, ctx(t))).toContain("map.md");
-      expect(await tools.tw_resolve.execute({ selector: "login-form", kind: "ticket" }, ctx(t))).toContain("ticket.md");
-      expect(await tools.tw_resolve.execute({ selector: "research-cache", kind: "task" }, ctx(t))).toContain("task.md");
-    });
-
-    test("an unresolvable slug names the wanted type", async () => {
-      const t = mkTmp(); seedV4Tree(t);
-      await expect(
-        tools.tw_resolve.execute({ selector: "ghost", kind: "ticket" }, ctx(t)),
-      ).rejects.toThrow(/no ticket matches 'ghost'/);
-    });
-
-    test("an unresolvable slug with no wanted type stays generic", async () => {
-      const t = mkTmp(); seedV4Tree(t);
-      await expect(
-        tools.tw_resolve.execute({ selector: "ghost" }, ctx(t)),
-      ).rejects.toThrow(/no artifact matches 'ghost'/);
     });
   });
 

@@ -11,10 +11,10 @@ override them locally.
 
 ## What gets gated in a work repo
 
-- **No tools register:** none of the `tw_*` tools, and none of `notify_user`,
-  `get_guidelines`, `list_guidelines`. The model never sees them.
-- **No `before_agent_start` injection:** the guidelines / "Use
-  `list_guidelines()`" preamble is not appended to the system prompt.
+- **No tools register:** none of the `tw_*` tools, and none of `notify_user`.
+  The model never sees them.
+- **No `before_agent_start` injection:** the guidelines preamble is not
+  appended to the system prompt.
 - **The six skills are stripped from the system prompt's `<available_skills>`**
   block, so the model doesn't auto-invoke them.
 - **Explicit `/skill:<name>` is blocked** for the six: an `input` event handler
