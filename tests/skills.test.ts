@@ -1926,6 +1926,33 @@ describe("standards direct reads (overhaul-execution-skills)", () => {
   });
 });
 
+// ─── Planning-type resources v4 touch (overhaul-execution-skills) ────
+
+describe("planning resources v4 touch (overhaul-execution-skills)", () => {
+  test.each(["research", "prototype", "grilling", "manual"])(
+    "%s marks the task done via the set tool, workflow_state done",
+    (subtype) => {
+      const content = readFile(`skills/engineering/implement-task/resources/${subtype}.md`);
+      expect(content).toMatch(/tw_set[^`]*workflow_state done/);
+      expectOnlySurvivingTools(content);
+    },
+  );
+
+  test("research captures findings in the task directory with frontmatter", () => {
+    const content = readFile("skills/engineering/implement-task/resources/research.md");
+    expect(content).toMatch(/docs\/tasks\/<effort>\/tasks\/<task-slug>\/findings\.md/);
+    const templates = extractFrontmatterTemplates(content);
+    const findings = templates.find((t) => /^type: findings$/m.test(t));
+    expect(findings).toBeDefined();
+    const keys = frontmatterKeys(findings!);
+    expect(keys).toContain("type");
+    expect(keys).toContain("title");
+    expect(keys).toContain("status");
+    for (const killed of KILLED_KEYS) expect(keys).not.toContain(killed);
+    assertTemplateConforms(findings!);
+  });
+});
+
 // ─── finalize-task v4 (overhaul-execution-skills) ────────────────────
 
 describe("finalize-task v4 (overhaul-execution-skills)", () => {
