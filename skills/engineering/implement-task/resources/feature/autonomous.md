@@ -275,11 +275,27 @@ finalize marks each ticket's `workflow_state`).
 Hard rule: on subagent failure the parent never implements. Its only moves are re-dispatch strategies, applied in this order:
 
 1. **Diagnose first** -- read worker outputs and any partial diff. Never blindly redo.
-2. **First failure -> split** -- split the ticket into sub-tickets registered
-   in the effort (the split rules below). Exception: if the ticket is already
-   atomic, skip to retry.
+2. **First failure -> split** -- split the ticket into sub-tickets registered in the effort, per the split rules below. Exception: if the ticket is
+   already atomic, skip to retry.
 3. **Second attempt -> retry +50%** -- re-run the chain with timeoutMs increased by 50 percent and the diagnosis/fix instructions in the prompt.
 4. **Backstop -> escalate** -- after two consecutive retries still fail, ask the user: "Two retries for ticket {ticket} failed. Should I increase budgets further, relax constraints, or skip this ticket?"
+
+**Split rules (sub-tickets, never ad-hoc files).** A split decomposes the
+failed ticket into sub-tickets that the effort's graph absorbs; no ad-hoc
+slice docs and no ad-hoc numbering convention exist anymore:
+
+- Write each sub-ticket to
+  `docs/tasks/<effort>/tickets/<sub-ticket-slug>/ticket.md` with v4
+  frontmatter: `type: ticket`, the original's inherited subtype, `status:
+  stable`, `workflow_state: ready`, a size from the diagnosis (how big
+  each remaining piece really is), and a `blocked_by` that inherits the
+  original's edges and chains between the subs (sub two blocked by sub one
+  when the work is sequential).
+- Supersede the original: set its frontmatter to `status: deprecated` plus
+  `workflow_state: done` (the deprecated-plus-done pair takes it out of the
+  graph), and add a body note naming its sub-tickets so the history reads.
+- Re-run the chain per sub-ticket; the frontier and dependency levels pick
+  the sub-tickets up like any other ticket.
 
 Hard rule: the parent context is large and expensive; routing through workers is always cheaper than pulling the fix into the parent. The parent never writes code or edits files as a fix.
 

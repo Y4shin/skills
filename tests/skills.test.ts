@@ -1854,3 +1854,32 @@ describe("chain agents v4 (overhaul-execution-skills)", () => {
     assertTemplateConforms(report!);
   });
 });
+
+describe("failure splits v4 (overhaul-execution-skills)", () => {
+  const feature = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
+  const bug = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
+
+  test.each([[feature, "feature"], [bug, "bug"]] as const)(
+    "the %s toolbelt splits into sub-tickets registered in the effort",
+    (content, kind) => {
+      expect(content).toMatch(/sub-tickets registered in the effort/i);
+      expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<sub-ticket-slug>\/ticket\.md/);
+      // No ad-hoc slice docs: the split never writes a slices/ file or a
+      // split status mark.
+      expect(content).not.toMatch(/slices\/\d|status: split/);
+    },
+  );
+
+  test("the split protocol specifies the sub-ticket frontmatter and wiring", () => {
+    expect(feature).toMatch(/inherited subtype|inherits the original's subtype/i);
+    expect(feature).toMatch(/size from the diagnosis/i);
+    expect(feature).toMatch(/blocked_by[^.]*inherit|inherit[^.]*blocked_by/i);
+    expect(feature).toMatch(/chain(s|ing)? between the subs|chained between the subs/i);
+  });
+
+  test("the superseded original leaves the graph as deprecated plus done", () => {
+    expect(feature).toMatch(/status: deprecated/);
+    expect(feature).toMatch(/workflow_state: done/);
+    expect(feature).toMatch(/note naming its sub-tickets/i);
+  });
+});

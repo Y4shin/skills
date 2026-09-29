@@ -135,9 +135,14 @@ marks the ticket's `workflow_state`).
 Hard rule: on subagent failure the parent never implements. Its only moves are re-dispatch strategies, applied in this order:
 
 1. **Diagnose first**  --  read worker outputs and any partial diff. A budget-exhausted tdd-worker attempt is the preferred diagnostic; its findings seed the sub-ticket breakdown. Never blindly redo.
-2. **First failure → split**  --  split the ticket into sub-tickets registered
-   in the effort (the split rules in the feature pipeline's failure toolbelt
-   apply here too). Exception: if the ticket is already atomic, skip to retry.
+2. **First failure → split**  --  split the ticket into sub-tickets registered in the effort: write each to
+   `docs/tasks/<effort>/tickets/<sub-ticket-slug>/ticket.md` with v4
+   frontmatter (inherited subtype, size from the diagnosis, `blocked_by`
+   inheriting the original's edges and chained between the subs), and
+   supersede the original as `status: deprecated` plus `workflow_state: done`
+   with a body note naming its sub-tickets. The split rules in the feature
+   pipeline's failure toolbelt apply here in full. Exception: if the ticket is
+   already atomic, skip to retry.
 3. **Second attempt → retry +50%**  --  re-run the chain with timeoutMs increased by 50% and the diagnosis/fix instructions in the prompt.
 4. **Backstop → escalate**  --  after two consecutive retries still fail, ask the user: "Two retries for ticket {ticket} failed. Should I increase budgets further, relax constraints, or skip this ticket?"
 
