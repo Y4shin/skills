@@ -541,9 +541,11 @@ describe("skill cross-references", () => {
     expect(content).toContain("setup-workflow");
   });
 
-  test("implement-task wrapper reads type and dispatches to resources", () => {
+  test("implement-task wrapper reads subtype (type fallback) and dispatches to resources", () => {
     const content = readFile("skills/engineering/implement-task/SKILL.md");
     expect(content).toContain("tw_get");
+    // v4 routing field: subtype, falling back to type for legacy artifacts.
+    expect(content).toMatch(/"subtype"/);
     expect(content).toContain("type");
     expect(content).toContain("resources/feature.md");
     expect(content).toContain("resources/bug.md");
@@ -587,9 +589,11 @@ describe("skill cross-references", () => {
     expect(existsSync(join(PROJECT, "skills/engineering/wayfinder/resources/bug.md"))).toBe(false);
   });
 
-  test("implement-task re-enters wayfinder after a map frontier", () => {
+  test("implement-task re-enters wayfinder after a frontier", () => {
     const content = readFile("skills/engineering/implement-task/SKILL.md");
-    expect(content).toContain("wayfinder <map-slug>");
+    // v4: the reassessment call keeps the effort slug (the map lives inside
+    // the effort directory; the effort slug is the invocation argument).
+    expect(content).toContain("wayfinder <effort-slug>");
     expect(content).toContain("reassess the map");
   });
 
@@ -1608,5 +1612,44 @@ describe("planning skills structure facts (overhaul-planning-skills)", () => {
     // The three producers still carry their templates; the doctor and the
     // router produce no artifacts and carry none.
     expect(templateCount).toBeGreaterThanOrEqual(6);
+  });
+});
+
+// ─── implement-task v4 (overhaul-execution-skills) ───────────────────
+
+describe("implement-task v4 (overhaul-execution-skills)", () => {
+  const content = readFile("skills/engineering/implement-task/SKILL.md");
+
+  test("the router reads subtype from frontmatter, falls back to type, defaults feature", () => {
+    // The v4 routing field is subtype; legacy artifacts (no subtype) keep
+    // today's behavior via the type fallback; absent both defaults feature.
+    expect(content).toMatch(/\"subtype\"/);
+    expect(content).toMatch(/subtype[^\n]*fallback|falls? back to `?type`?/i);
+    expect(content).toMatch(/\|\|\s*"feature"/);
+    expect(content).toMatch(/legacy artifacts keep today's behavior|absent subtype defaults/i);
+  });
+
+  test("dispatch names all six subtypes and routes each to its resource", () => {
+    for (const subtype of ["research", "prototype", "grilling", "manual", "feature", "bug"]) {
+      expect(content).toContain(`resources/${subtype}.md`);
+    }
+  });
+
+  test("resolves artifacts through the resolver, with no hardcoded task-path template", () => {
+    // Path-agnostic selectors: the resolver finds ticket.md and task.md in
+    // both shapes; the wrapper must not hardcode docs/tasks/<slug>/task.md.
+    expect(content).toMatch(/resolver/i);
+    expect(content).toMatch(/ticket\.md/);
+    expect(content).toMatch(/task\.md/);
+    expect(content).not.toMatch(/docs\/tasks\/\$\{taskSlug\}\/task\.md/);
+  });
+
+  test("frontier mode runs tw_frontier over the effort, routing each item by subtype", () => {
+    expect(content).toContain("tw_frontier <effort-slug>");
+    expect(content).toMatch(/routing each (item|ticket|task) by (its )?subtype/i);
+  });
+
+  test("references only surviving tools", () => {
+    expectOnlySurvivingTools(content);
   });
 });
