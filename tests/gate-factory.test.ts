@@ -47,23 +47,15 @@ const GATED_NAMES = [
   "tw_show",
   "tw_get",
   "tw_set",
-  "tw_set_slices",
-  "tw_resolve",
-  "tw_assert_kind",
   "tw_list",
-  "tw_slices",
   "tw_finalizable",
   "tw_dependency_levels",
   "tw_frontier",
-  "tw_map_tasks",
-  "tw_map_tick",
   "tw_map_finalizable",
   "tw_state",
   "tw_state_set",
   "tw_context",
   "notify_user",
-  "get_guidelines",
-  "list_guidelines",
 ];
 
 interface StubExtensionAPI extends ExtensionAPI {
@@ -252,9 +244,9 @@ describe("factory gate", () => {
     factory(stub);
 
     const names = stub.tools.map((t) => t.name);
-    for (const name of GATED_NAMES) {
-      expect(names).toContain(name);
-    }
+    // The shrunken registered surface, exactly: a deleted tool still
+    // registered fails here.
+    expect([...names].sort()).toEqual([...GATED_NAMES].sort());
   });
 
   test("work repo (gate active) skips session_start peer warnings", async () => {

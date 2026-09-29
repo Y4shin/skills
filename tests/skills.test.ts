@@ -1071,6 +1071,79 @@ describe("tool prefix rename", () => {
     expect(offenders).toEqual([]);
   });
 });
+// ─── Dead-surface deletion (corpus check) ────────────────────────────
+
+// The eight tools the overhaul deleted plus the guidelines machinery
+// identifiers. Unlike the rename sweep above, the names are written
+// literally: this sweep has no old-to-new mapping to collapse, and this
+// file is its own exemption (the sweep must not eat itself).
+const DELETED_SURFACE_NAMES = [
+  "tw_resolve",
+  "tw_assert_kind",
+  "tw_map_tasks",
+  "tw_map_tick",
+  "tw_slices",
+  "tw_set_slices",
+  "get_guidelines",
+  "list_guidelines",
+  "discoverGuidelines",
+  "guidelinesCache",
+  "shouldInjectGuidelines",
+  "guidelineDisplayPath",
+  "EXT_TO_LANG",
+  "SMELL_BASELINE",
+];
+const DELETED_SURFACE_PATTERN = new RegExp(`\\b(${DELETED_SURFACE_NAMES.join("|")})\\b`);
+
+// Historical-record exemptions (the arch spec's zero-references contract):
+// documents that record the deleted surface as it was keep the names that
+// were live when written. Archived task trees are already skipped wholesale
+// by the corpus walk's archive rule.
+const DEAD_SURFACE_EXEMPT_FILES = new Set([
+  "docs/tasks/CHANGELOG.md",
+  "docs/tasks/maps/task-tools-overhaul/map.md",
+  "docs/tasks/task-tools-overhaul/spec.md",
+  "docs/tasks/overhaul-synthesis-grilling/task.md",
+  "docs/migration-target.yaml",
+  "rewrite-plan.md",
+  "tests/skills.test.ts",
+]);
+const DEAD_SURFACE_EXEMPT_PREFIXES = [
+  "docs/ideas/",
+  "docs/tasks/overhaul-dead-surface/",
+  "docs/tasks/overhaul-execution-skills/",
+  "docs/tasks/tool-surface-inventory/",
+  "docs/tasks/workflow-tool-usage-audit/",
+];
+
+describe("dead surface deletion (corpus check)", () => {
+  test("no deleted tool or guidelines machinery identifier remains outside the historical exemptions", () => {
+    const offenders: string[] = [];
+    for (const file of corpusFiles(PROJECT)) {
+      const rel = file.slice(PROJECT.length + 1);
+      if (DEAD_SURFACE_EXEMPT_FILES.has(rel)) continue;
+      if (DEAD_SURFACE_EXEMPT_PREFIXES.some((p) => rel.startsWith(p))) continue;
+      if (DELETED_SURFACE_PATTERN.test(readFileSync(file, "utf-8"))) {
+        offenders.push(rel);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("the guidelines discovery skip-list identifier is gone from the extension source", () => {
+    // SKIP_DIRS is a generic identifier (vendored tooling carries its own);
+    // guidelines discovery was its sole user in src/, so the check is
+    // scoped to the extension source.
+    const offenders: string[] = [];
+    for (const file of corpusFiles(join(PROJECT, "src"))) {
+      if (/\bSKIP_DIRS\b/.test(readFileSync(file, "utf-8"))) {
+        offenders.push(file.slice(PROJECT.length + 1));
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
 // ─── Planning skills v4 (overhaul-planning-skills) ──────────────────
 
 // The tool names the new planning prose may reference: the surviving surface

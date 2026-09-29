@@ -184,9 +184,24 @@ describe("task-workflow tools", () => {
   beforeAll(() => { tools = createTools(); });
 
   describe("registration", () => {
-    test("all tools have descriptions and execute functions", () => {
+    test("registers exactly the shrunken surface after the dead-surface deletion", () => {
       const names = Object.keys(tools).sort();
-      expect(names.length).toBeGreaterThanOrEqual(14);
+      expect(names).toEqual([
+        "tw_context",
+        "tw_dependency_levels",
+        "tw_finalizable",
+        "tw_frontier",
+        "tw_get",
+        "tw_list",
+        "tw_map_finalizable",
+        "tw_set",
+        "tw_show",
+        "tw_state",
+        "tw_state_set",
+      ]);
+    });
+
+    test("all tools have descriptions and execute functions", () => {
       for (const t of Object.values(tools)) {
         expect(typeof t.description).toBe("string");
         expect(typeof t.execute).toBe("function");
