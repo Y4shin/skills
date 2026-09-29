@@ -970,12 +970,17 @@ const OLD_TOOL_PATTERN = new RegExp(`\\b${OLD_PREFIX}(${TOOL_SUFFIXES.join("|")}
 const OLD_WILDCARD_PATTERN = new RegExp(`${OLD_PREFIX}\\*`);
 
 // Mirrors the sweep verification: every file under the package root, minus
-// node_modules/.git and any archive directory (archived docs are historical
-// records and keep the names that were live when they ran).
+// node_modules/.git, any archive directory (archived docs are historical
+// records and keep the names that were live when they ran), and
+// prototype-bundle (gitignored vendored experiment trees whose third-party
+// build output, e.g. Python deps under smoke-py/build, is not package
+// surface and can coincidentally match old tool names like the anyio
+// `task` + `_state` variable).
+const CORPUS_SKIP_DIRS = new Set(["node_modules", ".git", "archive", "prototype-bundle"]);
 function corpusFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
-      if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "archive") continue;
+      if (CORPUS_SKIP_DIRS.has(entry.name)) continue;
       corpusFiles(join(dir, entry.name), out);
     } else if (entry.isFile()) {
       out.push(join(dir, entry.name));
