@@ -1,6 +1,6 @@
 ---
 name: to-spec
-description: "Turn the current conversation or map into a spec at docs/tasks/spec.md: no interview, just synthesis of what you've already discussed."
+description: "Turn the current conversation or map into a spec at docs/tasks/<effort>/spec.md: no interview, just synthesis of what you've already discussed."
 disable-model-invocation: true
 ---
 
@@ -24,9 +24,20 @@ already know.
 
    Check with the user that these seams match their expectations.
 
-3. Write the spec using the template below, then save it at
-   `docs/tasks/<slug>/spec.md`.
+3. Write the spec using the template below. The file carries frontmatter and
+   saves at `docs/tasks/<effort>/spec.md` (the effort root; the effort comes
+   from the invocation's map slug or the conversation):
 
+```yaml
+---
+type: spec
+title: <title>
+status: draft   # stable once the user approves the spec
+---
+```
+
+4. When the user approves the spec, flip its `status` to `stable` with
+   `tw_set docs/tasks/<effort>/spec.md status stable`.
 <spec-template>
 
 ## Problem Statement

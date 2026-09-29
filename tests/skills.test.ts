@@ -1350,3 +1350,52 @@ describe("conformance seam: fixture efforts from the prose templates", () => {
     }
   });
 });
+
+// ─── to-spec v4 (overhaul-planning-skills) ───────────────────────────
+
+describe("to-spec v4 (overhaul-planning-skills)", () => {
+  const content = readFile("skills/engineering/to-spec/SKILL.md");
+  const templates = extractFrontmatterTemplates(content);
+  const specTemplate = templates.find((t) => /^type: spec$/m.test(t))!;
+
+  test("spec template carries type, title, status and no killed keys", () => {
+    expect(specTemplate).toBeDefined();
+    const keys = frontmatterKeys(specTemplate);
+    expect(keys).toContain("type");
+    expect(keys).toContain("title");
+    expect(keys).toContain("status");
+    expect(keys).not.toContain("workflow_state");
+    for (const killed of KILLED_KEYS) expect(keys).not.toContain(killed);
+  });
+
+  test("saves at the effort root", () => {
+    expect(content).toMatch(/docs\/tasks\/<effort>\/spec\.md/);
+    // The bare pre-v4 path is gone from the prose and the description.
+    expect(content).not.toMatch(/docs\/tasks\/spec\.md/);
+  });
+
+  test("the description frontmatter names the effort-root path", () => {
+    const fm = parseFrontmatter(content);
+    expect(String(fm["description"])).toContain("docs/tasks/<effort>/spec.md");
+  });
+
+  test("draft while synthesizing, stable once the user approves", () => {
+    expect(specTemplate).toMatch(/# stable once the user approves the spec/);
+    expect(content).toMatch(/approves the spec|user approves/i);
+  });
+
+  test("every frontmatter template conforms by construction", () => {
+    for (const template of templates) conform(template);
+  });
+
+  test("a spec-only effort at planning time produces zero anomalies", () => {
+    const t = mkdtempSync(join(tmpdir(), "okf-spec-only-"));
+    try {
+      writeFm(t, "docs/tasks/spec-only/spec.md", substituteTemplate(specTemplate));
+      const anomalies = findAnomalies(fixtureArtifacts(t, ["docs/tasks/spec-only/spec.md"]));
+      expect(anomalies).toEqual([]);
+    } finally {
+      rmSync(t, { recursive: true, force: true });
+    }
+  });
+});
