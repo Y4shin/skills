@@ -1,7 +1,7 @@
 ---
 name: architecture-scout
 description: Read-only scout that finds high-leverage opportunities to deepen a codebase's architecture.
-tools: read, bash, get_guidelines
+tools: read, bash
 inheritProjectContext: true
 defaultContext: fresh
 ---

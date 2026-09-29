@@ -325,7 +325,9 @@ describe("codebase-design skill references", () => {
 describe("architecture scout structure", () => {
   test("uses the read-only tool allowlist and fresh context", () => {
     const fm = parseFrontmatter(readFile("agents/architecture-scout.md"));
-    expect(fm.tools).toBe("read, bash, get_guidelines");
+    // The guidelines tool is gone; the scout reads CONTEXT.md and docs/adr/
+    // directly.
+    expect(fm.tools).toBe("read, bash");
     expect(fm.defaultContext).toBe("fresh");
     expect(fm.inheritProjectContext).toBe("true");
   });
@@ -394,11 +396,15 @@ describe("human-mode feature pipeline", () => {
     expect(content).toMatch(/architecture[- ]spec/i);
     expect(content).toMatch(/collaborat(e|ively).*review|review.*architecture/i);
     expect(content).toMatch(/explicit (user|human) consent|consent.*before/i);
-    expect(content).toMatch(/no slice (code|implementation).*before.*handoff/i);
+    expect(content).toMatch(/no ticket (code|implementation).*before.*handoff/i);
+    // v4: the architecture spec lives at the effort root, shared by the
+    // effort's ticket chains; ordering reads the effort graph.
+    expect(content).toMatch(/docs\/tasks\/<effort>\/arch-spec\.md/);
+    expect(content).toContain("tw_dependency_levels <effort-slug>");
   });
 
-  test("defines per-slice handoff and human-owned implementation boundary", () => {
-    expect(content).toMatch(/per[- ]slice.*handoff/i);
+  test("defines per-ticket handoff and human-owned implementation boundary", () => {
+    expect(content).toMatch(/per[- ]ticket.*handoff/i);
     expect(content).toMatch(/non[- ]code context/i);
     expect(content).toMatch(/verification contract/i);
     expect(content).toMatch(/human.*implement/i);
@@ -428,8 +434,8 @@ describe("human-mode feature pipeline", () => {
     expect(content).toMatch(/present.*findings|findings.*present/i);
     expect(content).toMatch(/explicit.*approval.*landing|approval.*before.*landing/i);
     expect(content).toContain("land-worker");
-    expect(content).toMatch(/next slice.*approval|approval.*next slice/i);
-    expect(content).toMatch(/whole-task.*refactor|collaborative.*refactor/i);
+    expect(content).toMatch(/next ticket.*approval|approval.*next ticket/i);
+    expect(content).toMatch(/whole-effort.*refactor|collaborative.*refactor/i);
     expect(content).toMatch(/consent.*refactor|approval.*refactor/i);
   });
 });
@@ -520,15 +526,15 @@ describe("human-mode integration coverage", () => {
     expect(human).toMatch(/fast[- ]fail/i);
     expect(human).toMatch(/failure.*return|return.*failure/i);
     expect(human).toMatch(/rejected|declined|not approved/i);
-    expect(human).toMatch(/next slice|task completion|declaring task completion/i);
+    expect(human).toMatch(/next ticket|ticket completion|declaring ticket completion/i);
   });
 
   test("feature human protocol preserves collaborative post-handoff assistance boundary", () => {
     const human = readFile("skills/engineering/implement-task/resources/feature/human.md");
-    expect(human).toMatch(/after the per[- ]slice handoff|after.*handoff/i);
+    expect(human).toMatch(/after the per[- ]ticket handoff|after.*handoff/i);
     expect(human).toMatch(/explicit request.*code assistance|code assistance.*explicit/i);
-    expect(human).toMatch(/multiple slices|each slice|every slice/i);
-    expect(human).toMatch(/whole-task.*refactor|collaborative.*refactor/i);
+    expect(human).toMatch(/multiple tickets|each ticket|every ticket/i);
+    expect(human).toMatch(/whole-effort.*refactor|collaborative.*refactor/i);
   });
 });
 
@@ -541,9 +547,11 @@ describe("skill cross-references", () => {
     expect(content).toContain("setup-workflow");
   });
 
-  test("implement-task wrapper reads type and dispatches to resources", () => {
+  test("implement-task wrapper reads subtype (type fallback) and dispatches to resources", () => {
     const content = readFile("skills/engineering/implement-task/SKILL.md");
     expect(content).toContain("tw_get");
+    // v4 routing field: subtype, falling back to type for legacy artifacts.
+    expect(content).toMatch(/"subtype"/);
     expect(content).toContain("type");
     expect(content).toContain("resources/feature.md");
     expect(content).toContain("resources/bug.md");
@@ -587,9 +595,11 @@ describe("skill cross-references", () => {
     expect(existsSync(join(PROJECT, "skills/engineering/wayfinder/resources/bug.md"))).toBe(false);
   });
 
-  test("implement-task re-enters wayfinder after a map frontier", () => {
+  test("implement-task re-enters wayfinder after a frontier", () => {
     const content = readFile("skills/engineering/implement-task/SKILL.md");
-    expect(content).toContain("wayfinder <map-slug>");
+    // v4: the reassessment call keeps the effort slug (the map lives inside
+    // the effort directory; the effort slug is the invocation argument).
+    expect(content).toContain("wayfinder <effort-slug>");
     expect(content).toContain("reassess the map");
   });
 
@@ -674,40 +684,29 @@ describe("skill cross-references", () => {
     expect(content).toContain("tw_finalizable");
   });
 
-  test("finalize-task references tw_map_tick", () => {
+  test("finalize-task does not tick a map array (no array exists to tick)", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toContain("tw_map_tick");
+    expect(content).not.toContain("tw_map_tick");
   });
 
-  test("finalize-task Step 7 separates Pi tool calls from the shell archive block", () => {
+  test("finalize-task keeps Pi tool calls out of the set -e shell blocks", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    const step7Start = content.indexOf("## Step 7");
-    expect(step7Start).toBeGreaterThan(-1);
-    const step8Start = content.indexOf("## Step 8", step7Start);
-    const step7 = step8Start > -1 ? content.slice(step7Start, step8Start) : content.slice(step7Start);
-
-    // The git shell block (containing `git merge --no-ff`) must not interleave
-    // Pi tool calls (tw_state_set / tw_map_tick) as if they were shell
-    // binaries, under `set -e` that aborts the archive mid-sequence (see
-    // docs/bugs/finalize-task-set-e-tool-confusion.md).
     const fence = /```[^\n]*\n([\s\S]*?)```/g;
-    let shellBlock: string | null = null;
     let m: RegExpExecArray | null;
-    while ((m = fence.exec(step7)) !== null) {
+    let shellBlocks = 0;
+    while ((m = fence.exec(content)) !== null) {
       if (/git\s+merge\s+--no-ff/.test(m[1])) {
-        shellBlock = m[1];
-        break;
+        shellBlocks++;
+        // Wrapping a Pi tool call in a set -e shell block fails with
+        // command not found and aborts the archive mid-sequence (see
+        // docs/bugs/finalize-task-set-e-tool-confusion.md).
+        expect(m[1]).not.toMatch(/tw_state_set|tw_set|tw_finalizable|tw_map_finalizable/);
       }
     }
-    expect(shellBlock).not.toBeNull();
-    expect(shellBlock!).not.toMatch(/tw_state_set/);
-    expect(shellBlock!).not.toMatch(/tw_map_tick/);
-
-    // The Pi tool calls must still appear in Step 7, clearly marked as tool
-    // invocations rather than shell commands.
-    expect(step7).toContain("tw_state_set");
-    expect(step7).toContain("tw_map_tick");
-    expect(step7).toMatch(/Pi tool|tool call|tool invocation|invoke .*tool|not .*shell command/i);
+    expect(shellBlocks).toBeGreaterThan(0);
+    // The Pi tool calls must still appear, clearly marked as tool invocations
+    // rather than shell commands.
+    expect(content).toMatch(/Pi tool|tool call|tool invocation|not a shell command/i);
   });
 
   test("finalize-task references tw_map_finalizable", () => {
@@ -715,9 +714,9 @@ describe("skill cross-references", () => {
     expect(content).toContain("tw_map_finalizable");
   });
 
-  test("finalize-task has a type: bug branch", () => {
+  test("finalize-task has a subtype: bug branch", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toMatch(/type\s*:\s*bug/i);
+    expect(content).toMatch(/subtype:\s*bug/i);
   });
 
   test("finalize-task bug branch archives bug docs to docs/bugs/archive", () => {
@@ -731,14 +730,16 @@ describe("skill cross-references", () => {
     expect(content).toContain("fix_commit");
   });
 
-  test("finalize-task bug branch asks user when bug field is absent", () => {
+  test("finalize-task bug branch asks user when the body reference is absent", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toMatch(/ask.{0,80}bug/i);
+    expect(content).toMatch(/ask.{0,80}(which bug|bug doc)/i);
   });
 
-  test("finalize-task documents bug slug frontmatter convention", () => {
+  test("finalize-task takes the bug slug from the ticket body's reference", () => {
     const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toContain("bug: <slug>");
+    expect(content).toMatch(/ticket body/i);
+    // The bug frontmatter field is dead; the body reference is the convention.
+    expect(content).not.toContain("bug: <slug>");
   });
 
   test("setup-workflow creates docs/bugs/archive directory", () => {
@@ -1608,5 +1609,401 @@ describe("planning skills structure facts (overhaul-planning-skills)", () => {
     // The three producers still carry their templates; the doctor and the
     // router produce no artifacts and carry none.
     expect(templateCount).toBeGreaterThanOrEqual(6);
+  });
+});
+
+// ─── implement-task v4 (overhaul-execution-skills) ───────────────────
+
+describe("implement-task v4 (overhaul-execution-skills)", () => {
+  const content = readFile("skills/engineering/implement-task/SKILL.md");
+
+  test("the router reads subtype from frontmatter, falls back to type, defaults feature", () => {
+    // The v4 routing field is subtype; legacy artifacts (no subtype) keep
+    // today's behavior via the type fallback; absent both defaults feature.
+    expect(content).toMatch(/\"subtype\"/);
+    expect(content).toMatch(/subtype[^\n]*fallback|falls? back to `?type`?/i);
+    expect(content).toMatch(/\|\|\s*"feature"/);
+    expect(content).toMatch(/legacy artifacts keep today's behavior|absent subtype defaults/i);
+  });
+
+  test("dispatch names all six subtypes and routes each to its resource", () => {
+    for (const subtype of ["research", "prototype", "grilling", "manual", "feature", "bug"]) {
+      expect(content).toContain(`resources/${subtype}.md`);
+    }
+  });
+
+  test("resolves artifacts through the resolver, with no hardcoded task-path template", () => {
+    // Path-agnostic selectors: the resolver finds ticket.md and task.md in
+    // both shapes; the wrapper must not hardcode docs/tasks/<slug>/task.md.
+    expect(content).toMatch(/resolver/i);
+    expect(content).toMatch(/ticket\.md/);
+    expect(content).toMatch(/task\.md/);
+    expect(content).not.toMatch(/docs\/tasks\/\$\{taskSlug\}\/task\.md/);
+  });
+
+  test("frontier mode runs tw_frontier over the effort, routing each item by subtype", () => {
+    expect(content).toContain("tw_frontier <effort-slug>");
+    expect(content).toMatch(/routing each (item|ticket|task) by (its )?subtype/i);
+  });
+
+  test("references only surviving tools", () => {
+    expectOnlySurvivingTools(content);
+  });
+});
+
+describe("mode: human refusal (overhaul-execution-skills)", () => {
+  test("the wrapper hard-refuses autonomous dispatch for a mode: human artifact", () => {
+    const content = readFile("skills/engineering/implement-task/SKILL.md");
+    expect(content).toMatch(/mode: human/);
+    expect(content).toMatch(/hard-refuses autonomous dispatch/i);
+    // It never dispatches chains for a marked ticket, and it does not fall
+    // through to the subtype resource's autonomous pipeline.
+    expect(content).toMatch(/never launches subagent chains|never dispatches chains/i);
+    expect(content).toMatch(/does not fall through/i);
+    // The handoff names the skill invocation for the human to run.
+    expect(content).toContain("/skill:implement-task <slug>");
+    // The refusal is a router rule: it fires before any resource is selected.
+    expect(content).toMatch(/before any resource is selected/);
+  });
+
+  test.each(["feature", "bug"])("the %s router repeats the refusal rule", (kind) => {
+    const content = readFile(`skills/engineering/implement-task/resources/${kind}.md`);
+    expect(content).toMatch(/mode: human/);
+    expect(content).toMatch(/hard-refus|refuse/i);
+    expect(content).toContain("/skill:implement-task");
+  });
+});
+
+// ─── Per-ticket chains v4 (overhaul-execution-skills) ────────────────
+
+describe("feature chain v4 (overhaul-execution-skills)", () => {
+  const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
+
+  test("step 0 reads the ticket (subtype, mode, size) and works the effort frontier", () => {
+    expect(content).toContain("tw_frontier <effort-slug>");
+    expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<ticket-slug>\/ticket\.md/);
+    expect(content).toMatch(/subtype, mode, size/i);
+  });
+
+  test("the architecture spec lives at the effort root, user-approved, frontmattered", () => {
+    expect(content).toMatch(/docs\/tasks\/<effort>\/arch-spec\.md/);
+    expect(content).toMatch(/user-approved|user approves/i);
+    // Committed on the starting branch before the first chain dispatch, so
+    // every ticket branch includes it.
+    expect(content).toMatch(/committed on the starting branch before the first chain dispatch/i);
+  });
+
+  test("the arch-spec frontmatter template conforms", () => {
+    const templates = extractFrontmatterTemplates(content);
+    const arch = templates.find((t) => /^type: arch spec$/m.test(t));
+    expect(arch).toBeDefined();
+    const keys = frontmatterKeys(arch!);
+    expect(keys).toContain("type");
+    expect(keys).toContain("title");
+    expect(keys).toContain("status");
+    for (const killed of KILLED_KEYS) expect(keys).not.toContain(killed);
+    assertTemplateConforms(arch!);
+  });
+
+  test("budgets key off the ticket's size with the m default, expressed as timeoutMs", () => {
+    expect(content).toMatch(/\|\|\s*"m"/);
+    expect(content).toMatch(/s:\s*15/);
+    expect(content).toMatch(/m:\s*30/);
+    expect(content).toMatch(/l:\s*45/);
+    expect(content).toMatch(/xl:\s*60/);
+    expect(content).toMatch(/\+50 percent|by 50 percent/i);
+    // The retired chain API's turnBudget has no current equivalent; the
+    // timeout is the honest lever.
+    expect(content).not.toMatch(/turnBudget/);
+    expect(content).toMatch(/timeoutMs/);
+  });
+
+  test("chains run per ticket per dependency level, sequential within a level", () => {
+    expect(content).toContain("tw_dependency_levels <effort-slug>");
+    expect(content).toMatch(/sequentially/i);
+    expect(content).toMatch(/strict barriers/i);
+  });
+
+  test("the chain dispatches tdd, then verify plus deviation gated, then land", () => {
+    expect(content).toContain("tdd-worker");
+    expect(content).toContain("slice-verifier");
+    expect(content).toContain("deviation-reporter");
+    expect(content).toContain("land-worker");
+    expect(content).toMatch(/workflowScript/);
+    expect(content).toMatch(/runs\.run/);
+    expect(content).toMatch(/runs\.all/);
+    expect(content).toMatch(/ok-gate|ok gate/i);
+  });
+
+  test("the chain never marks the ticket done; finalize owns the marking", () => {
+    const beforeToolbelt = content.split("## Failure toolbelt")[0];
+    // No chain step sets the field: the marking has one owner, finalize.
+    expect(beforeToolbelt).not.toMatch(/tw_set[^)]*workflow_state/);
+    expect(beforeToolbelt).not.toMatch(/workflow_state.{0,20}done/);
+    expect(content).toMatch(/\/skill:finalize-task/);
+  });
+
+  test("dispatch points the state file at the ticket", () => {
+    expect(content).toContain("tw_state_set task <ticket-slug>");
+  });
+
+  test("uncertainty lives in the ticket directory", () => {
+    expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<ticket-slug>\/\.work\/uncertainty\.md/);
+  });
+
+  test("no slice machinery, no ui-noter, no guidelines tool remains", () => {
+    expect(content).not.toContain("tw_slices");
+    expect(content).not.toMatch(/slices\//);
+    expect(content).not.toContain("get_guidelines");
+    expect(content).not.toMatch(/ui-noter/);
+    expect(content).not.toMatch(/impeccable/i);
+  });
+
+  test("references only surviving tools", () => {
+    expectOnlySurvivingTools(content);
+  });
+});
+
+describe("bug chain v4 (overhaul-execution-skills)", () => {
+  const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
+
+  test("the lean per-ticket chain: tdd, verify, land, gated; no deviation-reporter", () => {
+    expect(content).toContain("tdd-worker");
+    expect(content).toContain("slice-verifier");
+    expect(content).toContain("land-worker");
+    expect(content).not.toContain("deviation-reporter");
+    expect(content).toMatch(/workflowScript/);
+  });
+
+  test("the bug doc and reproduction are referenced from the ticket body", () => {
+    expect(content).toMatch(/ticket body/);
+    expect(content).toMatch(/docs\/bugs/);
+    // The bug frontmatter field is dead: no tool reads it, no prose reads it.
+    expect(content).not.toMatch(/tw_get\([^)]*,\s*"bug"\)/);
+    expect(content).not.toMatch(/bug: <slug>/);
+  });
+
+  test("budgets key off the ticket's size with the m default", () => {
+    expect(content).toMatch(/\|\|\s*"m"/);
+    expect(content).toMatch(/s:\s*15/);
+    expect(content).toMatch(/m:\s*30/);
+    expect(content).toMatch(/l:\s*45/);
+    expect(content).toMatch(/xl:\s*60/);
+    expect(content).not.toMatch(/turnBudget/);
+  });
+
+  test("keeps the red-first regression rule and the diagnosing-bugs discipline", () => {
+    expect(content).toMatch(/red.{0,40}test|test.{0,40}red/i);
+    expect(content).toContain("diagnosing-bugs");
+  });
+
+  test("no slice machinery, no ui-noter, no guidelines tool remains", () => {
+    expect(content).not.toContain("tw_slices");
+    expect(content).not.toMatch(/slices\//);
+    expect(content).not.toMatch(/ui-noter/);
+    expect(content).not.toContain("get_guidelines");
+    expectOnlySurvivingTools(content);
+  });
+});
+
+describe("chain agents v4 (overhaul-execution-skills)", () => {
+  test("tdd-worker implements one ticket on a ticket/<slug> working branch", () => {
+    const content = readFile("agents/tdd-worker.md");
+    expect(content).toMatch(/ticket\/<slug>/);
+    expect(content).not.toMatch(/slice\//);
+    expect(content).toMatch(/docs\/tasks\/<effort>\/arch-spec\.md/);
+    expect(content).toMatch(/ticket doc/i);
+    expect(content).toMatch(/tickets\/<ticket-slug>\/\.work\/uncertainty\.md/);
+  });
+
+  test("slice-verifier verifies the ticket from its test plan or the arch-spec seams", () => {
+    const content = readFile("agents/slice-verifier.md");
+    expect(content).toMatch(/ticket doc/i);
+    expect(content).toMatch(/arch-spec seams|test plan/i);
+    expect(content).not.toMatch(/slice doc/i);
+  });
+
+  test("land-worker merges the working branch into the landing branch, no archive duty", () => {
+    const content = readFile("agents/land-worker.md");
+    expect(content).toMatch(/ticket\/<ticket-slug>|ticket\/<slug>/);
+    expect(content).toMatch(/task\/<ticket-slug>|task\/<slug>/);
+    expect(content).not.toMatch(/slices\/archive|archive the slice/i);
+    expect(content).not.toMatch(/state\.yaml/);
+    expect(content).toMatch(/finalize/i);
+  });
+
+  test("deviation-reporter writes frontmattered reports to the ticket directory", () => {
+    const content = readFile("agents/deviation-reporter.md");
+    expect(content).toMatch(/deviation-reports/);
+    expect(content).toMatch(/task\/<ticket-slug>\.\.ticket\/<ticket-slug>/);
+    const templates = extractFrontmatterTemplates(content);
+    const report = templates.find((t) => /^type: deviation report$/m.test(t));
+    expect(report).toBeDefined();
+    const keys = frontmatterKeys(report!);
+    expect(keys).toContain("type");
+    expect(keys).toContain("title");
+    expect(keys).toContain("status");
+    for (const killed of KILLED_KEYS) expect(keys).not.toContain(killed);
+    assertTemplateConforms(report!);
+  });
+});
+
+describe("failure splits v4 (overhaul-execution-skills)", () => {
+  const feature = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
+  const bug = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
+
+  test.each([[feature, "feature"], [bug, "bug"]] as const)(
+    "the %s toolbelt splits into sub-tickets registered in the effort",
+    (content, kind) => {
+      expect(content).toMatch(/sub-tickets registered in the effort/i);
+      expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<sub-ticket-slug>\/ticket\.md/);
+      // No ad-hoc slice docs: the split never writes a slices/ file or a
+      // split status mark.
+      expect(content).not.toMatch(/slices\/\d|status: split/);
+    },
+  );
+
+  test("the split protocol specifies the sub-ticket frontmatter and wiring", () => {
+    expect(feature).toMatch(/inherited subtype|inherits the original's subtype/i);
+    expect(feature).toMatch(/size from the diagnosis/i);
+    expect(feature).toMatch(/blocked_by[^.]*inherit|inherit[^.]*blocked_by/i);
+    expect(feature).toMatch(/chain(s|ing)? between the subs|chained between the subs/i);
+  });
+
+  test("the superseded original leaves the graph as deprecated plus done", () => {
+    expect(feature).toMatch(/status: deprecated/);
+    expect(feature).toMatch(/workflow_state: done/);
+    expect(feature).toMatch(/note naming its sub-tickets/i);
+  });
+});
+
+// ─── Standards direct reads (overhaul-execution-skills) ─────────────
+
+const STANDARDS_FILES = ["AGENTS.md", "CONTEXT.md", "docs/standards.md", "docs/testing.md"];
+
+describe("standards direct reads (overhaul-execution-skills)", () => {
+  test("the code-review skill reads standards files directly, no guidelines tool", () => {
+    const content = readFile("skills/engineering/code-review/SKILL.md");
+    expect(content).not.toContain("get_guidelines");
+    for (const file of STANDARDS_FILES) expect(content).toContain(file);
+    // The smell baseline stays, named for the sub-agent prompt.
+    expect(content).toMatch(/smells\.md/);
+  });
+
+  test("the code-review spec sources go v4", () => {
+    const content = readFile("skills/engineering/code-review/SKILL.md");
+    expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<ticket-slug>\/ticket\.md/);
+    expect(content).toMatch(/docs\/tasks\/<effort>\/arch-spec\.md/);
+    expect(content).toMatch(/bug doc/i);
+    // The old per-task paths are gone.
+    expect(content).not.toMatch(/docs\/tasks\/\$\{taskSlug\}|docs\/tasks\/<taskSlug>/);
+  });
+
+  test("the code-reviewer agent drops the guidelines tool and reads files directly", () => {
+    const content = readFile("agents/code-reviewer.md");
+    const fm = parseFrontmatter(content);
+    expect(String(fm.tools)).not.toContain("get_guidelines");
+    expect(content).not.toContain("get_guidelines");
+    for (const file of STANDARDS_FILES) expect(content).toContain(file);
+    // The standards reviewer's inner allowlist drops the tool too.
+    expect(content).not.toMatch(/tools:\s*read,\s*bash,\s*get_guidelines/);
+  });
+
+  test("the tdd-worker reads standards files directly", () => {
+    const content = readFile("agents/tdd-worker.md");
+    const fm = parseFrontmatter(content);
+    expect(String(fm.tools)).not.toContain("get_guidelines");
+    expect(content).not.toContain("get_guidelines");
+    for (const file of STANDARDS_FILES) expect(content).toContain(file);
+  });
+
+  test("the chain prompts name the direct standards reads", () => {
+    for (const kind of ["feature", "bug"]) {
+      const content = readFile(`skills/engineering/implement-task/resources/${kind}/autonomous.md`);
+      expect(content).toContain("AGENTS.md");
+      expect(content).not.toContain("get_guidelines");
+    }
+  });
+});
+
+// ─── Planning-type resources v4 touch (overhaul-execution-skills) ────
+
+describe("planning resources v4 touch (overhaul-execution-skills)", () => {
+  test.each(["research", "prototype", "grilling", "manual"])(
+    "%s marks the task done via the set tool, workflow_state done",
+    (subtype) => {
+      const content = readFile(`skills/engineering/implement-task/resources/${subtype}.md`);
+      expect(content).toMatch(/tw_set[^`]*workflow_state done/);
+      expectOnlySurvivingTools(content);
+    },
+  );
+
+  test("research captures findings in the task directory with frontmatter", () => {
+    const content = readFile("skills/engineering/implement-task/resources/research.md");
+    expect(content).toMatch(/docs\/tasks\/<effort>\/tasks\/<task-slug>\/findings\.md/);
+    const templates = extractFrontmatterTemplates(content);
+    const findings = templates.find((t) => /^type: findings$/m.test(t));
+    expect(findings).toBeDefined();
+    const keys = frontmatterKeys(findings!);
+    expect(keys).toContain("type");
+    expect(keys).toContain("title");
+    expect(keys).toContain("status");
+    for (const killed of KILLED_KEYS) expect(keys).not.toContain(killed);
+    assertTemplateConforms(findings!);
+  });
+});
+
+// ─── finalize-task v4 (overhaul-execution-skills) ────────────────────
+
+describe("finalize-task v4 (overhaul-execution-skills)", () => {
+  const content = readFile("skills/engineering/finalize-task/SKILL.md");
+
+  test("step 0 gates on the ticket resolving and implement-task having landed its chains", () => {
+    expect(content).toMatch(/the ticket resolves|resolves through the resolver/i);
+    expect(content).toMatch(/implement-task reported its chains landed|chains landed/i);
+  });
+
+  test("the per-ticket close-out marks workflow_state done via the set tool, then verifies", () => {
+    expect(content).toMatch(/tw_set[^`]*workflow_state done|tw_set <ticket-path> workflow_state done/);
+    expect(content).toContain("tw_finalizable <ticket-slug>");
+    // The finalizable check also surfaces the effort graph's anomalies.
+    expect(content).toMatch(/anomal/i);
+  });
+
+  test("the current item pointer is cleared; the slice pointer is not called", () => {
+    expect(content).toMatch(/tw_state_set task null/);
+    expect(content).not.toMatch(/tw_state_set slice/);
+  });
+
+  test("archiving is gated on the scan tools, not a tick", () => {
+    expect(content).toContain("tw_map_finalizable <effort-slug>");
+  });
+
+  test("no per-ticket git mv: the ticket stays in the live effort", () => {
+    const closeout = content.split(/## Step \d+.*close-out/i)[1]?.split("## Step")[0] ?? "";
+    expect(closeout).not.toContain("git mv");
+    expect(content).toMatch(/no per-ticket (git mv|move)|the ticket stays in the live effort/i);
+  });
+
+  test("the effort archives as a unit, deprecated-marked, with the index regenerated", () => {
+    expect(content).toMatch(/git mv docs\/tasks\/<effort>\/ docs\/tasks\/archive\/<effort>\//);
+    expect(content).toMatch(/status: deprecated/);
+    expect(content).toMatch(/docs\/tasks\/index\.md/);
+    expect(content).toMatch(/## Archived/);
+    expect(content).toMatch(/## Live/);
+    expect(content).toMatch(/sorted/i);
+  });
+
+  test("both pointers clear when the effort finalizes", () => {
+    expect(content).toMatch(/tw_state_set map null/);
+  });
+
+  test("the impeccable-note check is gone", () => {
+    expect(content).not.toMatch(/impeccable/i);
+    expect(content).not.toMatch(/ui-noter/i);
+  });
+
+  test("references only surviving tools", () => {
+    expectOnlySurvivingTools(content);
   });
 });

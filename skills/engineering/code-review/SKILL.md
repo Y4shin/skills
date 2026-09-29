@@ -43,18 +43,23 @@ A bad reference or empty diff stops here.
 
 ### 2. Identify the spec source
 
-The spec source depends on the task type:
+The spec source depends on what the diff delivers:
 
-- **Feature:** the task doc (`docs/tasks/<taskSlug>/task.md`) and the
-  architecture spec (`docs/tasks/<taskSlug>/arch-spec.md`).
-- **Bug:** the bug doc (`docs/bugs/<slug>.md`) and the repro steps it contains.
+- **Feature ticket:** the ticket doc
+  (`docs/tasks/<effort>/tickets/<ticket-slug>/ticket.md`) plus the effort-root
+  architecture spec (`docs/tasks/<effort>/arch-spec.md`).
+- **Bug ticket:** the bug doc (`docs/bugs/<slug>.md`) plus its reproduction,
+  as referenced from the ticket body.
+- **Whole-effort review:** the effort's ticket docs plus the effort-root
+  architecture spec.
 
 If no spec is available, say so. Do not invent requirements.
 
 ### 3. Identify the standards sources
 
-Discover repo standards through `get_guidelines`, plus any repo override files
-such as `AGENTS.md`, `CONTEXT.md`, or `docs/standards.md`.
+Read the repo's standards files directly: `AGENTS.md` and `CONTEXT.md` at the
+repo root, `docs/standards.md` when present, and `docs/testing.md`. There is
+no guidelines tool in the middle.
 
 On top of whatever the repo documents, the Standards axis always carries the
 **smell baseline** below: a fixed set of Fowler code smells (_Refactoring_,

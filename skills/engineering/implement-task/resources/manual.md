@@ -13,9 +13,10 @@ human or environment work.
    on the user's behalf.
 4. Record URLs, identifiers, configuration locations, row counts, or other
    facts needed by dependent tasks. Never record secrets.
-5. Mark the task `done` only when the evidence in its acceptance criteria is
-   present. If the prerequisite cannot be completed, leave it `blocked` with a
-   reason.
+5. Mark the task done with `tw_set <task-path> workflow_state done` only when
+   the evidence in its acceptance criteria is present. If the prerequisite
+   cannot be completed, leave it blocked with `tw_set <task-path>
+   workflow_state blocked` and a reason.
 
 ## Completion evidence
 

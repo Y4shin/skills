@@ -5,13 +5,13 @@ Resolves a `type: research` task. This is not a coding pipeline.
 ## Goal
 
 Answer the task's question using high-trust primary sources and local project
-artifacts where appropriate. Capture durable findings in a Markdown artifact
-under the map/task's documented location, or in the task body when the result
-is small.
+artifacts where appropriate. Capture durable findings at
+`docs/tasks/<effort>/tasks/<task-slug>/findings.md` with frontmatter, or in
+the task body when the result is small:
 
 ## Process
 
-1. Read the map, task body, project context, and dependencies.
+1. Read the effort's map, task body, project context, and dependencies.
 2. Identify the exact question and the decision it unblocks.
 3. Research primary sources first. Distinguish facts, assumptions, and open
    questions. Cite URLs or repository paths for every material claim.
@@ -20,10 +20,22 @@ is small.
 5. If research reveals a new precise requirement, record it as discovered work
    and ask Wayfinder to add the dependent task. Do not silently broaden this
    task.
-6. Mark the task `done` only when the evidence is sufficient for its stated
-   decision. Otherwise mark it `blocked` and explain what is missing.
+6. Mark the task done with `tw_set <task-path> workflow_state done` only when
+   the evidence is sufficient for its stated decision. Otherwise mark it
+   blocked with `tw_set <task-path> workflow_state blocked` and explain what
+   is missing.
 
 ## Completion evidence
+
+The findings artifact carries frontmatter:
+
+```yaml
+---
+type: findings
+title: <title>
+status: stable
+---
+```
 
 The result must contain:
 
