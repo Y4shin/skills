@@ -4,10 +4,11 @@ type: feature
 slug: overhaul-execution-skills
 title: Execution-side skills to v4 (implement-task, finalize-task, standards reads, ui-noter removal)
 map: task-tools-overhaul
-status: ready
+status: done
 blocked_by:
 - overhaul-tw-rename
-slices: [overhaul-execution-skills]
+slices:
+- overhaul-execution-skills
 ---
 
 ## What to build
