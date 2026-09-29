@@ -1473,3 +1473,56 @@ describe("to-tickets v4 (overhaul-planning-skills)", () => {
     }
   });
 });
+
+// ─── task-workflow-doctor v4 (overhaul-planning-skills) ──────────────
+
+describe("task-workflow-doctor v4 (overhaul-planning-skills)", () => {
+  const content = readFile("skills/engineering/task-workflow-doctor/SKILL.md");
+  const resourcePath = "skills/engineering/task-workflow-doctor/resources/okf-conformance-failure.md";
+
+  test("gains the OKF conformance symptom row", () => {
+    expect(content).toMatch(/OKF conformance/);
+    expect(content).toContain("okf-conformance-failure.md");
+  });
+
+  test("the conformance resource routes to the migration and the producers", () => {
+    const resource = readFile(resourcePath);
+    expect(resource).toContain("/skill:setup-workflow");
+    expect(resource).toMatch(/migrate/i);
+    expect(resource).toContain("/skill:wayfinder");
+    expect(resource).toContain("/skill:to-tickets");
+    expect(resource).toContain("/skill:to-spec");
+    expect(resource).toContain("/skill:finalize-task");
+    for (const file of ["map.md", "task.md", "ticket.md", "spec.md"]) {
+      expect(resource).toContain(file);
+    }
+  });
+
+  test("the conformance resource detects a pre-v4 tree, anomalies, and frontmatter gaps", () => {
+    const resource = readFile(resourcePath);
+    expect(resource).toMatch(/schema_version/);
+    expect(resource).toContain("tw_frontier");
+    expect(resource).toMatch(/Anomalies/);
+    expect(resource).toMatch(/index\.md/);
+    expect(resource).toMatch(/log\.md/);
+  });
+
+  test("doctor prose references only surviving tools", () => {
+    for (const text of [content, readFile(resourcePath)]) {
+      for (const name of toolNamesIn(text)) {
+        expect(SURVIVING_TOOLS.has(name), name).toBe(true);
+      }
+    }
+  });
+
+  test("missing-tasks-tree resource describes the v4 tree shape", () => {
+    const resource = readFile("skills/engineering/task-workflow-doctor/resources/missing-tasks-tree.md");
+    expect(resource).toMatch(/map\.md/);
+    expect(resource).toMatch(/tasks\//);
+    expect(resource).toMatch(/tickets\//);
+    expect(resource).toMatch(/state\.yaml/);
+    expect(resource).toMatch(/index\.md/);
+    // The maps/ subtree is gone from the target layout.
+    expect(resource).not.toMatch(/maps\//);
+  });
+});

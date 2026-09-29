@@ -29,6 +29,7 @@ When something feels wrong with the task workflow, tasks are not showing up, a r
 | Dev environment setup is undocumented | `docs/dev-env.md` | `/skill:setup-workflow` (see [resources/missing-dev-env.md](resources/missing-dev-env.md)) |
 | Testing conventions are undocumented | `docs/testing.md` | `/skill:setup-workflow` (see [resources/missing-testing-md.md](resources/missing-testing-md.md)) |
 | CONTEXT.md is missing | repo-root `CONTEXT.md` | Manual step until adopted (see [resources/missing-context-md.md](resources/missing-context-md.md)) |
+| Files under `docs/tasks/` fail OKF conformance (missing frontmatter, missing or empty `type`, invalid status/workflow_state pairs); the graph tools report anomalies | Frontmatter shape of the `docs/tasks/` tree | `/skill:setup-workflow` (migrate branch), or the responsible producer for v4 drift (see [resources/okf-conformance-failure.md](resources/okf-conformance-failure.md)) |
 | ADR directory is missing | `docs/adr/` | Manual step until adopted (see [resources/missing-adr-dir.md](resources/missing-adr-dir.md)) |
 | Skills or subagents are not registered | `package.json` `pi.skills` / `pi.subagents` | Manual fix (see [resources/manifest-misconfigured.md](resources/manifest-misconfigured.md)) |
 
