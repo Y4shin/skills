@@ -64,6 +64,17 @@ function isDone(art: Artifact): boolean {
   return art.workflow_state === "done" || isDeprecated(art);
 }
 
+/**
+ * The human-readable effort slug an artifact groups into.
+ *
+ * The same grouping the graph tools use (`effortGraphs`, `liveFrontier`):
+ * `groupKeyOf` decides the bucket and `slugFromKey` renders it, so a
+ * listing or filter cannot drift from graph semantics.
+ */
+export function effortGroupOf(art: Artifact): string {
+  return slugFromKey(groupKeyOf(art));
+}
+
 /** Group scanned hits into effort graphs, keyed by effort scope. */
 export function effortGraphs(index: ScanIndexLike): Map<string, EffortGraph> {
   const groups = new Map<string, Artifact[]>();

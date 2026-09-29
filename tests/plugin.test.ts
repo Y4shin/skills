@@ -374,9 +374,9 @@ describe("task-workflow tools", () => {
       expect(out).not.toContain("config");
     });
 
-    test("filters by map", async () => {
+    test("filters by effort", async () => {
       const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_list.execute({ map: "auth" }, ctx(t));
+      const out = await tools.tw_list.execute({ effort: "auth" }, ctx(t));
       expect(out).toContain("login");
       expect(out).not.toContain("config");
     });
@@ -690,6 +690,72 @@ describe("task-workflow tools", () => {
       const out = await tools.tw_show.execute({ selector: path }, ctx(t));
       expect(out).toContain("slug: do-thing");
     });
+  });
+});
+
+describe("task-workflow tools: tw_list on the v4 effort-grouped tree", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  test("lists tasks, tickets, maps, and specs, excluding archived", async () => {
+    const t = mkTmp(); seedV4Tree(t);
+    const out = await tools.tw_list.execute({}, ctx(t));
+    expect(out).toContain("research-cache");
+    expect(out).toContain("login-form");
+    expect(out).toContain("billing");
+    expect(out).not.toContain("old-effort");
+  });
+
+  test("filters by kind: ticket", async () => {
+    const t = mkTmp(); seedV4Tree(t);
+    const out = await tools.tw_list.execute({ kind: "ticket" }, ctx(t));
+    expect(out).toContain("login-form");
+    expect(out).toContain("api-fix");
+    expect(out).not.toContain("research-cache");
+  });
+
+  test("filters by effort", async () => {
+    const t = mkTmp(); seedV4Tree(t);
+    const out = await tools.tw_list.execute({ effort: "billing" }, ctx(t));
+    expect(out).toContain("login-form");
+    expect(out).toContain("research-cache");
+    expect(out).not.toContain("spec-only");
+  });
+
+  test("filters by workflow_state", async () => {
+    const t = mkTmp(); seedV4Tree(t);
+    const out = await tools.tw_list.execute({ workflow_state: "ready" }, ctx(t));
+    expect(out).toContain("prototype-api");
+    expect(out).toContain("login-form");
+    expect(out).not.toContain("api-fix");
+  });
+
+  test("rows show type/subtype and the workflow state", async () => {
+    const t = mkTmp(); seedV4Tree(t);
+    const out = await tools.tw_list.execute({}, ctx(t));
+    expect(out).toContain("login-form (ticket/feature)");
+    expect(out).toContain("research-cache (task/research)");
+    // Maps carry no workflow_state: the status is the fallback.
+    expect(out).toContain("billing (map)");
+  });
+
+  test("json rows carry slug, type, subtype, status, workflow_state, effort, path", async () => {
+    const t = mkTmp(); seedV4Tree(t);
+    const out = await tools.tw_list.execute({ json: true }, ctx(t));
+    const parsed = JSON.parse(out);
+    // The login-form directory also carries an aux findings file; select the
+    // ticket row.
+    const row = parsed.find((r: any) => r.slug === "login-form" && r.type === "ticket");
+    expect(row).toMatchObject({
+      slug: "login-form",
+      type: "ticket",
+      subtype: "feature",
+      status: "stable",
+      workflow_state: "ready",
+      effort: "billing",
+    });
+    expect(row.path).toMatch(/ticket\.md$/);
   });
 });
 

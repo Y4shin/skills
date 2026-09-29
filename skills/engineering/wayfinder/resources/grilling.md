@@ -3,17 +3,18 @@
 Use this resource when the next task is a human decision that cannot be
 answered from the repository or external sources.
 
-Create a direct task with `type: grilling` and no slices:
+Create the task at `docs/tasks/<effort>/tasks/<task-slug>/task.md` with
+`subtype: grilling` and no blockers:
 
 ```yaml
 ---
-kind: task
-type: grilling
-slug: <slug>
+type: task
+subtype: grilling
 title: <decision>
-map: <map-slug>
-status: ready
+status: stable
+workflow_state: ready
 blocked_by: []
+mode: human   # optional; omit unless the human must implement it
 ---
 ```
 
