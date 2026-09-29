@@ -65,8 +65,8 @@ the re-invocation for the human to run:
 > `/skill:implement-task <slug>` yourself, saying that you will implement it,
 > and the human-mode protocol will walk you through it."
 
-The refusal is a router rule, not a pipeline decision: it fires before any
-resource is selected, in this wrapper and again in the feature and bug
+The refusal is a router rule, not a pipeline decision: it fires
+before any resource is selected, here and again in the feature and bug
 routers.
 
 ## Skill delegation for planning subtypes

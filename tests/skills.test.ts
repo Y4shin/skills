@@ -1653,3 +1653,26 @@ describe("implement-task v4 (overhaul-execution-skills)", () => {
     expectOnlySurvivingTools(content);
   });
 });
+
+describe("mode: human refusal (overhaul-execution-skills)", () => {
+  test("the wrapper hard-refuses autonomous dispatch for a mode: human artifact", () => {
+    const content = readFile("skills/engineering/implement-task/SKILL.md");
+    expect(content).toMatch(/mode: human/);
+    expect(content).toMatch(/hard-refuses autonomous dispatch/i);
+    // It never dispatches chains for a marked ticket, and it does not fall
+    // through to the subtype resource's autonomous pipeline.
+    expect(content).toMatch(/never launches subagent chains|never dispatches chains/i);
+    expect(content).toMatch(/does not fall through/i);
+    // The handoff names the skill invocation for the human to run.
+    expect(content).toContain("/skill:implement-task <slug>");
+    // The refusal is a router rule: it fires before any resource is selected.
+    expect(content).toMatch(/before any resource is selected/);
+  });
+
+  test.each(["feature", "bug"])("the %s router repeats the refusal rule", (kind) => {
+    const content = readFile(`skills/engineering/implement-task/resources/${kind}.md`);
+    expect(content).toMatch(/mode: human/);
+    expect(content).toMatch(/hard-refus|refuse/i);
+    expect(content).toContain("/skill:implement-task");
+  });
+});
