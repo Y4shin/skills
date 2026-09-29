@@ -4,10 +4,11 @@ type: feature
 slug: overhaul-planning-skills
 title: Planning-side skills to v4 (wayfinder, to-spec, to-tickets, doctor, router)
 map: task-tools-overhaul
-status: ready
+status: done
 blocked_by:
 - overhaul-tw-rename
-slices: [overhaul-planning-skills]
+slices:
+- overhaul-planning-skills
 ---
 
 ## What to build
