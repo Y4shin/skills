@@ -325,7 +325,9 @@ describe("codebase-design skill references", () => {
 describe("architecture scout structure", () => {
   test("uses the read-only tool allowlist and fresh context", () => {
     const fm = parseFrontmatter(readFile("agents/architecture-scout.md"));
-    expect(fm.tools).toBe("read, bash, get_guidelines");
+    // The guidelines tool is gone; the scout reads CONTEXT.md and docs/adr/
+    // directly.
+    expect(fm.tools).toBe("read, bash");
     expect(fm.defaultContext).toBe("fresh");
     expect(fm.inheritProjectContext).toBe("true");
   });
@@ -1872,6 +1874,55 @@ describe("failure splits v4 (overhaul-execution-skills)", () => {
     expect(feature).toMatch(/status: deprecated/);
     expect(feature).toMatch(/workflow_state: done/);
     expect(feature).toMatch(/note naming its sub-tickets/i);
+  });
+});
+
+// ─── Standards direct reads (overhaul-execution-skills) ─────────────
+
+const STANDARDS_FILES = ["AGENTS.md", "CONTEXT.md", "docs/standards.md", "docs/testing.md"];
+
+describe("standards direct reads (overhaul-execution-skills)", () => {
+  test("the code-review skill reads standards files directly, no guidelines tool", () => {
+    const content = readFile("skills/engineering/code-review/SKILL.md");
+    expect(content).not.toContain("get_guidelines");
+    for (const file of STANDARDS_FILES) expect(content).toContain(file);
+    // The smell baseline stays, named for the sub-agent prompt.
+    expect(content).toMatch(/smells\.md/);
+  });
+
+  test("the code-review spec sources go v4", () => {
+    const content = readFile("skills/engineering/code-review/SKILL.md");
+    expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<ticket-slug>\/ticket\.md/);
+    expect(content).toMatch(/docs\/tasks\/<effort>\/arch-spec\.md/);
+    expect(content).toMatch(/bug doc/i);
+    // The old per-task paths are gone.
+    expect(content).not.toMatch(/docs\/tasks\/\$\{taskSlug\}|docs\/tasks\/<taskSlug>/);
+  });
+
+  test("the code-reviewer agent drops the guidelines tool and reads files directly", () => {
+    const content = readFile("agents/code-reviewer.md");
+    const fm = parseFrontmatter(content);
+    expect(String(fm.tools)).not.toContain("get_guidelines");
+    expect(content).not.toContain("get_guidelines");
+    for (const file of STANDARDS_FILES) expect(content).toContain(file);
+    // The standards reviewer's inner allowlist drops the tool too.
+    expect(content).not.toMatch(/tools:\s*read,\s*bash,\s*get_guidelines/);
+  });
+
+  test("the tdd-worker reads standards files directly", () => {
+    const content = readFile("agents/tdd-worker.md");
+    const fm = parseFrontmatter(content);
+    expect(String(fm.tools)).not.toContain("get_guidelines");
+    expect(content).not.toContain("get_guidelines");
+    for (const file of STANDARDS_FILES) expect(content).toContain(file);
+  });
+
+  test("the chain prompts name the direct standards reads", () => {
+    for (const kind of ["feature", "bug"]) {
+      const content = readFile(`skills/engineering/implement-task/resources/${kind}/autonomous.md`);
+      expect(content).toContain("AGENTS.md");
+      expect(content).not.toContain("get_guidelines");
+    }
   });
 });
 
