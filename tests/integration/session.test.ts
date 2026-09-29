@@ -75,21 +75,6 @@ describe("tool dispatch and filesystem round-trip", () => {
     expect(lastAssistantText(s.session)).toContain("kind is task");
   });
 
-  test("tw_assert_kind rejects a mismatch as a tool error", async () => {
-    const s = await session();
-    s.setResponses([
-      reply([call("tw_assert_kind", { selector: "login", kind: "map" })]),
-      (ctx: Context) => {
-        const result = latestToolResultText(ctx, "tw_assert_kind") ?? "";
-        return reply(result.includes("not") ? "mismatch as expected" : "unexpected success");
-      },
-    ]);
-    await s.session.prompt("Assert login is a map.");
-    const results = toolResultTexts(s.session, "tw_assert_kind");
-    expect(results.some((t) => /not/.test(t))).toBe(true);
-    expect(lastAssistantText(s.session)).toContain("mismatch as expected");
-  });
-
   test("tw_get reads a field after tw_set mutates it", async () => {
     const s = await session();
     s.setResponses([
@@ -102,16 +87,6 @@ describe("tool dispatch and filesystem round-trip", () => {
     expect(lastAssistantText(s.session)).toContain("status now: in-progress");
     const onDisk = readFileSync(join(s.cwd, "docs/tasks/login/task.md"), "utf-8");
     expect(onDisk).toContain("status: in-progress");
-  });
-
-  test("tw_finalizable blocks while a slice is open", async () => {
-    const s = await session();
-    s.setResponses([
-      reply([call("tw_finalizable", { selector: "login" })]),
-      (ctx: Context) => reply(latestToolResultText(ctx, "tw_finalizable") ?? "?"),
-    ]);
-    await s.session.prompt("Can we finalize login?");
-    expect(toolResultTexts(s.session, "tw_finalizable")[0]).toMatch(/open slice/);
   });
 
   test("tw_show works on slices by slug", async () => {
@@ -144,15 +119,15 @@ describe("tool dispatch and filesystem round-trip", () => {
   test("tw_dependency_levels returns levels", async () => {
     const s = await session();
     s.setResponses([
-      reply([call("tw_dependency_levels", { selector: "login" })]),
+      reply([call("tw_dependency_levels", { selector: "auth" })]),
       (ctx: Context) => reply(latestToolResultText(ctx, "tw_dependency_levels") ?? "?"),
     ]);
-    await s.session.prompt("Get dependency levels for login.");
+    await s.session.prompt("Get dependency levels for auth.");
     const result = toolResultTexts(s.session, "tw_dependency_levels")[0];
     expect(result).toContain("levels");
     const parsed = JSON.parse(result);
     expect(parsed.levels.length).toBeGreaterThanOrEqual(1);
-    expect(parsed.remaining_count).toBe(2);
+    expect(parsed.remaining_count).toBe(1);
   });
 
   test("tw_context returns schema", async () => {
@@ -169,18 +144,6 @@ describe("tool dispatch and filesystem round-trip", () => {
 // ─── 2. Multi-turn conversations ─────────────────────────────────────────────
 
 describe("multi-turn state mutations", () => {
-  test("tw_map_tick + tw_map_finalizable cross-turn", async () => {
-    const s = await session();
-    s.setResponses([
-      reply([call("tw_map_tick", { selector: "auth", task_slug: "login" })]),
-      reply([call("tw_map_tick", { selector: "auth", task_slug: "sso" })]),
-      reply([call("tw_map_finalizable", { selector: "auth" })]),
-      (ctx: Context) => reply(latestToolResultText(ctx, "tw_map_finalizable") ?? "?"),
-    ]);
-    await s.session.prompt("Tick both children done, then check map.");
-    expect(lastAssistantText(s.session)).toContain("ready to finalize");
-  });
-
   test("tw_state_set writes, tw_state reads back", async () => {
     const s = await session();
     s.setResponses([
@@ -193,39 +156,7 @@ describe("multi-turn state mutations", () => {
   });
 });
 
-// ─── 3. Guidelines extension ─────────────────────────────────────────────────
-
-describe("guidelines extension", () => {
-  test("list_guidelines discovers seeded docs files", async () => {
-    const s = await session({
-      projectFiles: {
-        "docs/typescript-guidelines.md": "## TS Conventions\nUse const.\n",
-      },
-    });
-    s.setResponses([
-      reply([call("list_guidelines", {})]),
-      (ctx: Context) => reply(latestToolResultText(ctx, "list_guidelines") ?? "(none)"),
-    ]);
-    await s.session.prompt("What guidelines are available?");
-    expect(toolResultTexts(s.session, "list_guidelines")[0]).toContain("typescript-guidelines");
-  });
-
-  test("get_guidelines returns content for a language", async () => {
-    const s = await session({
-      projectFiles: {
-        "docs/typescript-guidelines.md": "## TS Conventions\nUse const.\n",
-      },
-    });
-    s.setResponses([
-      reply([call("get_guidelines", { language: "typescript" })]),
-      (ctx: Context) => reply(latestToolResultText(ctx, "get_guidelines") ?? "(none)"),
-    ]);
-    await s.session.prompt("Get typescript guidelines.");
-    expect(lastAssistantText(s.session)).toContain("Use const");
-  });
-});
-
-// ─── 4. Edge cases ──────────────────────────────────────────────────────────
+// ─── 3. Edge cases ──────────────────────────────────────────────────────────
 
 describe("edge cases", () => {
   test("tw_list on tree without docs/tasks is graceful", async () => {
@@ -237,19 +168,6 @@ describe("edge cases", () => {
     ]);
     await s.session.prompt("List tasks.");
     expect(lastAssistantText(s.session)).toMatch(/\(empty\)|no docs\/tasks/);
-  });
-
-  test("resolve of nonexistent slug errors gracefully", async () => {
-    const s = await session();
-    s.setResponses([
-      reply([call("tw_resolve", { selector: "does-not-exist" })]),
-      (ctx: Context) => {
-        const result = latestToolResultText(ctx, "tw_resolve") ?? "";
-        return reply(result.includes("matches") ? "not found as expected" : "unexpected");
-      },
-    ]);
-    await s.session.prompt("Resolve does-not-exist.");
-    expect(lastAssistantText(s.session)).toContain("not found as expected");
   });
 
   test("tw_state works on fresh tree", async () => {

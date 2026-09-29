@@ -1,7 +1,7 @@
 ---
 name: tdd-worker
 description: Implement one ticket via strict TDD on a ticket working branch. RED → GREEN → REFACTOR per acceptance criterion. Commits after each GREEN. Writes uncertainty.md and stops if stuck.
-tools: read, write, edit, bash
+tools: read, write, edit, bash, submit_feedback
 inheritProjectContext: true
 defaultContext: fresh
 ---

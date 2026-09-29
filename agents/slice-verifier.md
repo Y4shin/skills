@@ -1,7 +1,7 @@
 ---
 name: slice-verifier
 description: Run lint and tests for a ticket. Reports pass or lists failures with full output. Blocks on failure.
-tools: read, bash
+tools: read, bash, submit_feedback
 inheritProjectContext: true
 defaultContext: fresh
 ---
