@@ -128,3 +128,27 @@ Carried forward, in priority order:
    lean tdd to slice-verifier to land chain with the bug doc and
    reproduction referenced from the ticket body (wherever they live),
    not pinned to a fixed repro path.
+
+### Finalize harvest
+
+Whole-effort code review (fresh-context, two-axis): merge verdict OK with
+notes; no P0s, spec axis complete. The P1s fixed in the landing commits
+(`b708f9b`): both pipelines' chain pseudocode rebased onto the real
+workflowScript API (keyed `runs.run`, awaited results, `outputReference`
+pointers; the retired `as:` labels and `{outputs.x}` interpolation gone),
+finalize's effort-finalization self-merge removed (the archive runs on
+main, nothing to merge), the CI-gate `tw_context` wording restored, the
+bucket-README one-liners re-synced, and the router's implement-task
+passage updated (the per-ticket chain and the advisory review).
+
+Transitional note: this ticket finalized against the live v3 tree, so the
+marking is doubled deliberately: the v3 `status: done` (which the migration
+converts) plus the v4 `workflow_state: done` per the new prose, and the
+v3 map array tick (the live tree's registration until the migration
+deletes it). The new prose's single-marking semantics apply to v4 trees
+post-migration.
+
+Durable testing pattern folded into `docs/testing.md` (Skill prose
+testing): pin pseudocode call shapes with regex assertions, plus a
+shape-guard test over both pipelines (no retired chain-API shapes, keyed
+and awaited calls, the feature file alone fans out with `runs.all`).

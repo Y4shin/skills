@@ -1806,6 +1806,29 @@ describe("bug chain v4 (overhaul-execution-skills)", () => {
   });
 });
 
+describe("chain pseudocode call shapes (overhaul-execution-skills)", () => {
+  const files = [
+    "skills/engineering/implement-task/resources/feature/autonomous.md",
+    "skills/engineering/implement-task/resources/bug/autonomous.md",
+  ];
+
+  test.each(files)("%s uses the real workflowScript call shapes, no retired chain API", (file) => {
+    const content = readFile(file);
+    // Pseudocode cannot be executed, so retired API shapes survive silently;
+    // pin the shape itself (the review caught a hybrid here once).
+    expect(content).not.toMatch(/\bas:\s*"/);      // retired chain-API labels
+    expect(content).not.toMatch(/\{outputs\./);     // retired interpolation
+    expect(content).not.toMatch(/\(runs\)\s*=>/);   // retired function-wrapper form
+    expect(content).toMatch(/runs\.run\("/);       // keyed call: runs.run(key, ...)
+    expect(content).toMatch(/await runs\.run/);      // results awaited before .ok reads
+  });
+
+  test("the feature chain fans out with runs.all; the bug chain stays sequential", () => {
+    expect(readFile(files[0])).toMatch(/await runs\.all/);
+    expect(readFile(files[1])).not.toMatch(/runs\.all/);
+  });
+});
+
 describe("chain agents v4 (overhaul-execution-skills)", () => {
   test("tdd-worker implements one ticket on a ticket/<slug> working branch", () => {
     const content = readFile("agents/tdd-worker.md");

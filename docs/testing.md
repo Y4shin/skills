@@ -143,6 +143,15 @@ suite normally; do not exclude this file.
   the prose is in the surviving-tool set (`expectOnlySurvivingTools` in
   `tests/skills.test.ts`), so a stale tool reference fails a structure test
   instead of waiting for the dead-surface sweep.
+- **Pin pseudocode call shapes with regex assertions.** When a slice's
+  deliverable is dispatch pseudocode (chain prose for a subagent API), no
+  test can execute it, so retired API shapes survive the rewrite silently
+  (overhaul-execution-skills shipped a chain/workflowScript hybrid: missing
+  `runs.run` keys, un-awaited `.ok` reads, `as:` labels, `{outputs.x}`
+  interpolation; only the fresh-context review caught it). Guard the shape
+  itself: assert the keyed-call form (`runs.run("`), the awaits, and the
+  absence of the retired shapes (`as: "`, `{outputs.`) over the prose, so
+  the class fails GREEN-time instead of review time.
 - **YAML gotcha:** an unquoted `: ` inside a frontmatter value (e.g. a
   title containing `type: bug`) makes the YAML invalid; the task tools
   then *silently skip* the file. Quote such values.
