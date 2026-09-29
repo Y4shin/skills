@@ -1526,3 +1526,46 @@ describe("task-workflow-doctor v4 (overhaul-planning-skills)", () => {
     expect(resource).not.toMatch(/maps\//);
   });
 });
+
+// ─── task-workflow-overview v4 (overhaul-planning-skills) ────────────
+
+describe("task-workflow-overview v4 (overhaul-planning-skills)", () => {
+  const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
+
+  test("describes the effort-grouped OKF bundle", () => {
+    expect(content).toMatch(/OKF bundle/i);
+    expect(content).toMatch(/map\.md/);
+    expect(content).toMatch(/spec\.md/);
+    expect(content).toMatch(/tasks\//);
+    expect(content).toMatch(/tickets\//);
+    expect(content).toMatch(/decision tasks/i);
+    expect(content).toMatch(/implementation tickets/i);
+  });
+
+  test("carries the wayfinder to to-spec to to-tickets handoff", () => {
+    expect(content).toContain("/skill:wayfinder");
+    expect(content).toContain("/skill:to-spec");
+    expect(content).toContain("/skill:to-tickets");
+  });
+
+  test("the tw_slices row is gone; effort-level queries use the graph tools", () => {
+    expect(content).not.toContain("tw_slices");
+    expect(content).toContain("tw_dependency_levels");
+    expect(content).toContain("tw_frontier");
+  });
+
+  test("tw_list lists efforts, tasks, and tickets", () => {
+    expect(content).toMatch(/List efforts \/ tasks \/ tickets/);
+  });
+
+  test("actions include the doctor row", () => {
+    expect(content).toMatch(/Diagnose a broken workflow/i);
+    expect(content).toContain("/skill:task-workflow-doctor");
+  });
+
+  test("references only surviving tools", () => {
+    for (const name of toolNamesIn(content)) {
+      expect(SURVIVING_TOOLS.has(name), name).toBe(true);
+    }
+  });
+});
