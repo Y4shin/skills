@@ -34,7 +34,7 @@ The route most work travels. You have an idea and want it built.
    - **Yes** to **`/skill:to-spec`** (turn the thread into a spec), then
      **`/skill:to-tickets`** to split it into tracer-bullet feature/bug tickets,
      each declaring its **blocking edges** under `docs/tasks/` using the
-     `task_*` tools for the graph. Kick off **`/skill:implement-task`** per
+     `tw_*` tools for the graph. Kick off **`/skill:implement-task`** per
      ticket, clearing context between each one.
    - **No** to **`/skill:implement-task`** right here, in the same context
      window.
@@ -124,11 +124,11 @@ Off the main flow entirely.
 
 | Question | Tool |
 |---|---|
-| "Is this task ready?" | `task_finalizable <slug>` |
-| "What's left on task X?" | `task_slices <slug>` for legacy tasks; `task_frontier <map>` for Wayfinder maps |
-| "List tasks / maps" | `task_list` |
-| "Show artifact X" | `task_show <slug>` |
-| "Where am I?" | `task_state` |
+| "Is this task ready?" | `tw_finalizable <slug>` |
+| "What's left on task X?" | `tw_slices <slug>` for legacy tasks; `tw_frontier <map>` for Wayfinder maps |
+| "List tasks / maps" | `tw_list` |
+| "Show artifact X" | `tw_show <slug>` |
+| "Where am I?" | `tw_state` |
 | "What's in the bug triage queue?" | `grep -l "status: reported" docs/bugs/*.md` |
 
 ## Actions

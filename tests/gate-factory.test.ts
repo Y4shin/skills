@@ -2,7 +2,7 @@
  * Factory-level gate tests for task-workflow.
  *
  * Drives the real extension factory with a stub ExtensionAPI to verify that
- * task_* tools, utility tools, and session_start peer warnings are skipped
+ * tw_* tools, utility tools, and session_start peer warnings are skipped
  * when the repo gate is active (work repo) and present when inactive (personal).
  */
 
@@ -44,23 +44,23 @@ const trackedRepos: string[] = [];
 let globalSettings: { dir: string; cleanup: () => void } | undefined;
 
 const GATED_NAMES = [
-  "task_show",
-  "task_get",
-  "task_set",
-  "task_set_slices",
-  "task_resolve",
-  "task_assert_kind",
-  "task_list",
-  "task_slices",
-  "task_finalizable",
-  "task_dependency_levels",
-  "task_frontier",
-  "task_map_tasks",
-  "task_map_tick",
-  "task_map_finalizable",
-  "task_state",
-  "task_state_set",
-  "task_context",
+  "tw_show",
+  "tw_get",
+  "tw_set",
+  "tw_set_slices",
+  "tw_resolve",
+  "tw_assert_kind",
+  "tw_list",
+  "tw_slices",
+  "tw_finalizable",
+  "tw_dependency_levels",
+  "tw_frontier",
+  "tw_map_tasks",
+  "tw_map_tick",
+  "tw_map_finalizable",
+  "tw_state",
+  "tw_state_set",
+  "tw_context",
   "notify_user",
   "get_guidelines",
   "list_guidelines",
@@ -210,7 +210,7 @@ describe("factory gate", () => {
     mockControl.mode = "passthrough";
   });
 
-  test("work repo (gate active) does not register task_* tools", () => {
+  test("work repo (gate active) does not register tw_* tools", () => {
     globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
     process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
     const repo = makeRepo("git@github.com:QNCGmbH/openai.git");
@@ -220,8 +220,9 @@ describe("factory gate", () => {
     factory(stub);
 
     const names = stub.tools.map((t) => t.name);
-    const taskNames = GATED_NAMES.filter((n) => n.startsWith("task_"));
-    for (const name of taskNames) {
+    const gatedToolNames = GATED_NAMES.filter((n) => n.startsWith("tw_"));
+    expect(gatedToolNames.length).toBeGreaterThan(0);
+    for (const name of gatedToolNames) {
       expect(names).not.toContain(name);
     }
   });
@@ -638,5 +639,18 @@ describe("factory gate", () => {
       expect(result.systemPrompt).toContain("<name>wayfinder</name>");
       expect(result.systemPrompt).toContain("<name>oracle</name>");
     });
+  });
+
+  test("registered tw_ tools derive their label from the tw_ prefix", () => {
+    setupPersonalRepo();
+    const stub = createStub();
+    factory(stub);
+
+    const labels = new Map(stub.tools.map((t: any) => [t.name, t.label]));
+    for (const name of GATED_NAMES) {
+      const suffix = name.replace(/^tw_/, "");
+      const expected = suffix.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      expect(labels.get(name)).toBe(expected);
+    }
   });
 });

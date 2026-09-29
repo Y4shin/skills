@@ -31,8 +31,8 @@ _Avoid_: step (too small), chunk (too vague)
 
 **Frontier**:
 The ready edge of the task graph: tasks (or slices) whose `blocked_by`
-dependencies are all done. `task_frontier <map>` computes it;
-`task_dependency_levels <map>` computes the BFS levels. implement-task
+dependencies are all done. `tw_frontier <map>` computes it;
+`tw_dependency_levels <map>` computes the BFS levels. implement-task
 works the frontier; wayfinder reassesses it after a frontier completes.
 _Avoid_: queue (implies FIFO only; the frontier is dependency-ordered, not
 strictly linear)
@@ -47,7 +47,7 @@ name)
 
 **Dependency level**:
 A BFS level in the task graph: level 0 is the unblocked frontier, level N
-is blocked by level N-1, etc. `task_dependency_levels` returns the levels;
+is blocked by level N-1, etc. `tw_dependency_levels` returns the levels;
 slices within a level run sequentially (shared repo cwd), levels are
 strict barriers.
 _Avoid_: rank, tier
@@ -151,7 +151,7 @@ artifact in the same effort provides). Graph tools surface them as a
 `## Anomalies` block in text output or an `anomalies` array under
 `--json`. A deprecated artifact is a separate visibility channel, not an
 anomaly kind: it counts as done, sits out of the graph, and stays visible
-through the `## Deprecated (out of the graph)` block on `task_frontier`.
+through the `## Deprecated (out of the graph)` block on `tw_frontier`.
 _Avoid_: error (an anomaly never fails the tool; it is reported alongside
 the answer)
 
@@ -214,7 +214,7 @@ _Avoid_: blacklist (too negative)
 
 - "Issue tracker" (Matt Pocock's skills use an issue tracker as the
   substrate for maps, tickets, specs, and triage). We do **not**: our
-  substrate is `docs/tasks/` files managed by the `task_*` tools. Resolved:
+  substrate is `docs/tasks/` files managed by the `tw_*` tools. Resolved:
   the term is not used as a domain term here; our skills that reference a
   tracker are adapted to read/write `docs/tasks/` + `docs/bugs/` instead.
   Where a skill still says "issue tracker", read it as "the `docs/tasks/`

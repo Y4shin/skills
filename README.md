@@ -10,11 +10,11 @@
 - **3 agents instead of 7**, tdd-worker, slice-verifier, land-worker, deviation-reporter
 - **6 skills instead of 10** (+ 9 archived removed)
 - **Parallel fan-out** with git worktrees instead of sequential loops
-- **`task_dependency_levels` and `task_frontier` tools**, BFS dependency resolution, not LLM pseudocode
+- **`tw_dependency_levels` and `tw_frontier` tools**, BFS dependency resolution, not LLM pseudocode
 - **Verifier retry path**, re-dispatches TDD worker with error output
 - **Checkpoint commits**, TDD worker commits after each GREEN
 - **Size-based turn budgets**, S/M/L/XL from task frontmatter
-- **Legacy slice resolution preserved**, existing task_* tools still accept slices
+- **Legacy slice resolution preserved**, existing tw_* tools still accept slices
 
 ## Install
 

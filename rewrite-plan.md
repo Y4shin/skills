@@ -63,7 +63,7 @@ original v1 codebase and from real pipeline runs (see `FEEDBACK.md`).
 ## Clean-Slate Design: Principles
 
 1. **Three layers, not five.**
-   - **One extension** (TypeScript) — registers `task_*` tools
+   - **One extension** (TypeScript): registers `tw_*` tools
    - **Agent definitions** (markdown) — subagent behavior
    - **N skills** (SKILL.md) — orchestration instructions for the parent
    No chain JSON files. No barrel exports. No `dist/` build output.
@@ -174,11 +174,11 @@ No chain JSON.
 
 ### Phase 2: Implement Task (autonomous, parallel, recovery-ready)
 
-The parent calls `task_dependency_levels <task-slug>` which returns a
+The parent calls `tw_dependency_levels <task-slug>` which returns a
 JSON array of dependency levels computed from `blocked_by` edges:
 
 ```json
-// task_dependency_levels repo-foundation
+// tw_dependency_levels repo-foundation
 [
   ["go-module-and-layout"],           // level 0: no deps
   ["env-loading", "migration-runner"], // level 1: depend on level 0
@@ -241,14 +241,14 @@ for each level in levels:
 
 ---
 
-## New Tool: `task_dependency_levels`
+## New Tool: `tw_dependency_levels`
 
 Registered by the extension. Takes a task slug, reads all remaining slices,
 computes the BFS dependency levels from `blocked_by` edges, and returns
 structured JSON.
 
 ```typescript
-task_dependency_levels(selector: "repo-foundation")
+tw_dependency_levels(selector: "repo-foundation")
 // Returns:
 // {
 //   "levels": [
@@ -355,7 +355,7 @@ defaultContext: fresh
 
 One file (`src/pi.ts`). Registers:
 
-### New tool: `task_dependency_levels`
+### New tool: `tw_dependency_levels`
 
 Reads task slug, computes BFS dependency levels from `blocked_by` edges,
 returns JSON. Pure algorithm — the LLM should not implement BFS in prose.
@@ -367,19 +367,19 @@ Dropped from v1:
 - `task_lint` — lives in slice-verifier, not a registered tool
 
 Renamed:
-- `task_reference` + `task_profile` → `task_context`
+- `task_reference` + `task_profile` → `tw_context`
 
 Fixed from v1 (feedback_01.md):
-- `task_set`, `task_show`, `task_get`, `task_resolve`, `task_assert_kind`
+- `tw_set`, `tw_show`, `tw_get`, `tw_resolve`, `tw_assert_kind`
   all accept slice artifacts resolved by slug (disambiguated via active task)
   or by full path under `docs/tasks/<slug>/slices/<n>-<slug>.md`
-- `task_assert_kind` accepts `kind: slice`
+- `tw_assert_kind` accepts `kind: slice`
 
-Kept: `task_show`, `task_get`, `task_set`, `task_set_slices`,
-`task_resolve`, `task_assert_kind`, `task_list`, `task_slices`,
-`task_finalizable`, `task_dependency_levels`, `task_map_tasks`,
-`task_map_tick`, `task_map_finalizable`, `task_state`,
-`task_state_set`, `task_context`.
+Kept: `tw_show`, `tw_get`, `tw_set`, `tw_set_slices`,
+`tw_resolve`, `tw_assert_kind`, `tw_list`, `tw_slices`,
+`tw_finalizable`, `tw_dependency_levels`, `tw_map_tasks`,
+`tw_map_tick`, `tw_map_finalizable`, `tw_state`,
+`tw_state_set`, `tw_context`.
 
 ### notify_user tool
 
@@ -434,7 +434,7 @@ Dropped from v1:
 | Subagents used | 7 (+2 deprecated) | 3 |
 | Skills | 10 active + 1 entry + 9 archived | 5 |
 | Implementation model | Sequential per-slice chains | Parallel fan-out with worktrees |
-| Dependency resolution | LLM-pseudocode BFS | `task_dependency_levels` tool |
+| Dependency resolution | LLM-pseudocode BFS | `tw_dependency_levels` tool |
 | Verifier failure | Chain stops, manual fix | Retry: re-dispatch TDD with errors |
 | Divergence check | Separate step, caught nothing | Deleted |
 | Land step scope | Drifted into writing code | `land-worker`: no write tools at all |
@@ -475,5 +475,5 @@ Size-based turn budgets.
 1. Publish v2 as `task-workflow@2.0.0`
 2. v1 remains installable for existing repos
 3. Existing `docs/tasks/` trees are structurally compatible with v2
-4. Old tasks are read-only in v2 (visible via `task_list`, `task_show`,
+4. Old tasks are read-only in v2 (visible via `tw_list`, `tw_show`,
    but not buildable via the new parallel flow)

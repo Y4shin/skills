@@ -33,7 +33,7 @@ tasks:
 - slug: overhaul-tw-rename
   blocked_by:
   - overhaul-graph-tools
-  done: false
+  done: true
 - slug: overhaul-planning-skills
   blocked_by:
   - overhaul-tw-rename
@@ -96,7 +96,7 @@ it designs the way out.
 
 - **Audit scope (grilling round 1, Q1).** Cover the extension's full
   registered surface in the inventory, because we do not know yet what the
-  workflow uses; depth is reserved for the workflow-facing slice (task_* at
+  workflow uses; depth is reserved for the workflow-facing slice (tw_* at
   depth, everything else shallow). R1 catalogues all of it; R2 audits at
   depth only what the flow from wayfinder to implement-task (and
   supporting skills) actually touches.
@@ -117,29 +117,29 @@ it designs the way out.
   of scope.
 - **Facts established before the map (session of 2026-09-12, to be folded
   into R1 as verified facts, not re-derived).**
-  - The extension registers 20 tools: 17 task_* tools, notify_user,
+  - The extension registers 20 tools: 17 tw_* tools, notify_user,
     get_guidelines, list_guidelines (plus the repo-gate and guidelines
     hooks). Current implementation: `src/pi.ts` (one file, ~1070 lines),
     core modules `src/core/{art,err,frontmatter,repo-gate,state}.ts`.
   - The v3 adoption arch-spec (adopt-mp-skills-way, slice
     changesets-prose-finalize) deliberately left src/pi.ts untouched
     ("foundational and untouched, keep-as-ours, Q11").
-  - Confirmed bug: `task_state_set` rewrites state.yaml through
+  - Confirmed bug: `tw_state_set` rewrites state.yaml through
     toObject/fromObject, silently dropping unknown keys including
     `schema_version`, which setup-workflow keys its fresh/migrate/no-op
     detection on. Demonstrated live 2026-09-12 (and restored).
-  - `task_context`'s schema text ends "there is no separate
+  - `tw_context`'s schema text ends "there is no separate
     ticket-generation phase", contradicting the v3 two-phase main flow.
-  - Slice machinery (task_slices, task_finalizable, task_state_set slice,
+  - Slice machinery (tw_slices, tw_finalizable, tw_state_set slice,
     activeSlices, SLICE_RE) sees only legacy slices/<n>-*.md files, never
-    the `slices:` frontmatter list; task_set_slices writes that list but
+    the `slices:` frontmatter list; tw_set_slices writes that list but
     nothing reads it.
 - **Naming (grilling round 1).** Map slug `task-tools-overhaul`.
 - **G1 round 1 (2026-09-15), slice machinery deleted; map pointer in;
   tool verdicts in.** (a) Legacy slice machinery is **deleted end to
-  end**: `task_slices`, `task_set_slices`, the state.yaml `slice` field,
-  and all `slices/<n>-*.md` support go; `task_finalizable` becomes a
-  status-based predicate; `task_dependency_levels` keeps its map
+  end**: `tw_slices`, `tw_set_slices`, the state.yaml `slice` field,
+  and all `slices/<n>-*.md` support go; `tw_finalizable` becomes a
+  status-based predicate; `tw_dependency_levels` keeps its map
   branch, drops the task branch; to-tickets stops emitting `slices:`;
   wayfinder's feature/bug planning resources are deleted (feature/bug
   creation is to-tickets' job); implement-task's feature/bug pipelines
@@ -150,10 +150,10 @@ it designs the way out.
   rebase onto the `slices:` list (second nested graph; bare-slug list
   unreadable without moving status/size/blocked_by into frontmatter).
   (b) state.yaml gains a first-class **`map`** pointer
-  (`task_state_set`/`task_state` support it; wayfinder sets on create
+  (`tw_state_set`/`tw_state` support it; wayfinder sets on create
   and resume, implement-task when invoked with a map, finalize-task
-  clears on map finalization). (c) Deleted tools: `task_resolve`,
-  `task_assert_kind`, `task_map_tasks` (zero callers; paths
+  clears on map finalization). (c) Deleted tools: `tw_resolve`,
+  `tw_assert_kind`, `tw_map_tasks` (zero callers; paths
   convention-derived; kind confusion is a resolver bug to fix in the
   rework, not an assert tool's job; raw-array view superseded by
   spec-visibility work). Kept: `notify_user` untouched,
@@ -165,7 +165,7 @@ it designs the way out.
   directly.
 - **G1 round 2 (2026-09-15).** (a) state.yaml v4 shape is
   `{schema_version: 4, map, task}`: `schema_version` stays in
-  state.yaml, `task_state_set` accepts exactly `map` and `task`,
+  state.yaml, `tw_state_set` accepts exactly `map` and `task`,
   toObject/fromObject become lossless round-trips preserving unknown
   keys (the key-wipe fix), and the string-`None` wart dies with the
   3→4 migration rewrite. (b) spec becomes a first-class artifact
@@ -173,12 +173,12 @@ it designs the way out.
   to-spec template updated), resolveArt resolves spec-only
   directories, mapChildInfos reports every listed child with
   best-known truth (task.md, else spec.md, else listed-but-missing as
-  unfinished), task_list also scans spec.md so unregistered spec-only
+  unfinished), tw_list also scans spec.md so unregistered spec-only
   efforts are visible, map-side done/blocked_by overrides apply to
   spec children unchanged. (c) Manual-mode marker named now:
   `mode: human` optional task frontmatter, enforced in
   implement-task's router prose (hard-refuse autonomous dispatch,
-  hand off with the `/skill:` name), documented in task_context's
+  hand off with the `/skill:` name), documented in tw_context's
 - **G1 round 3 (2026-09-15).** (a) Task frontmatter v4: keep `kind,
   slug, title, type, map, status, blocked_by`; add optional `mode:
   human` and `size` (moved from slice docs to the ticket, default `m`);
@@ -188,7 +188,7 @@ it designs the way out.
   `kind, slug, title, map, status`, same vocabulary as tasks plus
   `draft`; a spec-only child counts as unfinished until `done`, with
   equal blocking semantics, so the false-finalizable class dies by
-  design. (c) task_context kept, full schema-text rewrite to v4
+  design. (c) tw_context kept, full schema-text rewrite to v4
   (slice section and ticket-phase denial deleted, killed fields
   gone, profile.md stays an optional append, finalize-task's CI-gate
   prose repointed at repo tooling). (d) Migration: the user's
@@ -211,7 +211,7 @@ it designs the way out.
   `tasks:` registration array are deleted: every task carries its own
   `map:` and `blocked_by:` frontmatter, done-ness reads from each
   task's own status, the graph tools rebuild on directory scans, and
-  mapChildInfos' override semantics and task_map_tick die with the
+  mapChildInfos' override semantics and tw_map_tick die with the
   array (user principle: avoid metadata that concerns a file but is
   stored outside that file). OKF 0.2 compliance for the entire
   directory: `type` is the artifact kind (task, map, spec, findings,
@@ -239,7 +239,7 @@ it designs the way out.
   is the grouping; slug is the dir name). `blocked_by` is kind-scoped
   and feature-scoped; feature-to-feature deps live on the map's own
   `blocked_by`. Map frontmatter is type/title/status/blocked_by only,
-  derived done-ness, task_map_tick dead. Every effort goes through
+  derived done-ness, tw_map_tick dead. Every effort goes through
   wayfinder + to-spec/to-tickets: no map-less one-offs; a one-off is
   a feature with a single ticket (spec+zero-tickets features are not
   finalizable). Tool prefix renames task_* to tw_* (tw_show, tw_get,

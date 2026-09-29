@@ -155,7 +155,7 @@ criteria. Add a task instead.
 On a later Wayfinder session, or when called back after implementation:
 
 1. Load only the map first.
-2. Inspect the current frontier with `task_frontier`.
+2. Inspect the current frontier with `tw_frontier`.
 3. Read task details only as needed.
 4. Claim or select one planning question at a time when human input is needed.
 5. Update the map and dependencies, then hand back to `to-spec`.
