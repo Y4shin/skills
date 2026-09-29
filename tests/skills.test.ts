@@ -1399,3 +1399,77 @@ describe("to-spec v4 (overhaul-planning-skills)", () => {
     }
   });
 });
+
+// ─── to-tickets v4 (overhaul-planning-skills) ────────────────────────
+
+describe("to-tickets v4 (overhaul-planning-skills)", () => {
+  const content = readFile("skills/engineering/to-tickets/SKILL.md");
+  const templates = extractFrontmatterTemplates(content);
+  const ticketTemplate = templates.find((t) => /^type: ticket$/m.test(t))!;
+
+  test("ticket template carries the v4 fields and no killed keys", () => {
+    expect(ticketTemplate).toBeDefined();
+    const keys = frontmatterKeys(ticketTemplate);
+    for (const key of ["type", "subtype", "title", "status", "workflow_state", "blocked_by"]) {
+      expect(keys).toContain(key);
+    }
+    expect(keys).toContain("size");
+    expect(keys).toContain("mode");
+    for (const killed of KILLED_KEYS) expect(keys).not.toContain(killed);
+  });
+
+  test("no slice-list field anywhere in the prose", () => {
+    expect(content).not.toContain("slices:");
+  });
+
+  test("tickets live under the effort's tickets/ subtree", () => {
+    expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<ticket-slug>\/ticket\.md/);
+    expect(content).toMatch(/directory is the registration/i);
+  });
+
+  test("no map-array registration language", () => {
+    expect(content).not.toMatch(/tasks array/i);
+    expect(content).not.toMatch(/Register each ticket/i);
+    expect(content).not.toMatch(/entry to the map frontmatter/i);
+  });
+
+  test("the honest contract: files written by hand, the graph queryable", () => {
+    expect(content).toMatch(/written by hand/i);
+    expect(content).toMatch(/graph queryable/i);
+    // No claim of tool support for creation.
+    expect(content).not.toMatch(/tools? (write|create|generate) (the )?tickets/i);
+  });
+
+  test("queries the graph via the surviving tools", () => {
+    expect(content).toContain("tw_dependency_levels <effort-slug>");
+    expect(content).toContain("tw_frontier <effort-slug>");
+    for (const name of toolNamesIn(content)) {
+      expect(SURVIVING_TOOLS.has(name), name).toBe(true);
+    }
+  });
+
+  test("one-ticket efforts are fine", () => {
+    expect(content).toMatch(/one ticket/i);
+  });
+
+  test("every frontmatter template conforms by construction", () => {
+    for (const template of templates) conform(template);
+  });
+
+  test("a one-off effort (map with exactly one ticket, empty tasks/) produces zero anomalies", () => {
+    const t = mkdtempSync(join(tmpdir(), "okf-one-off-"));
+    try {
+      const mapTemplate = extractFrontmatterTemplates(readFile(join(WAYFINDER_DIR, "SKILL.md")))
+        .find((tpl) => /^type: map$/m.test(tpl))!;
+      writeFm(t, "docs/tasks/one-off/map.md", substituteTemplate(mapTemplate));
+      writeFm(t, "docs/tasks/one-off/tickets/the-thing/ticket.md", substituteTemplate(ticketTemplate));
+      const anomalies = findAnomalies(fixtureArtifacts(t, [
+        "docs/tasks/one-off/map.md",
+        "docs/tasks/one-off/tickets/the-thing/ticket.md",
+      ]));
+      expect(anomalies).toEqual([]);
+    } finally {
+      rmSync(t, { recursive: true, force: true });
+    }
+  });
+});

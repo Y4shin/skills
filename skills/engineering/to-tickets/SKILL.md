@@ -1,21 +1,21 @@
 ---
 name: to-tickets
-description: "Break a plan, spec, or the current conversation into tracer-bullet feature/bug tasks with blocked_by edges under docs/tasks/, using the tw_* tools for the graph."
+description: "Break a spec into tracer-bullet feature/bug tickets under docs/tasks/<effort>/tickets/, written by hand; the tw_* tools make the resulting graph queryable."
 disable-model-invocation: true
 ---
 
 # To Tickets
 
-Break a plan, spec, or conversation into a set of **tickets**: tracer-bullet
-vertical slices, each declaring the tickets that **block** it.
+Break a spec into a set of **tickets**: tracer-bullet vertical slices, each
+declaring the tickets that **block** it.
 
 ## Process
 
 ### 1. Gather context
 
 Work from whatever is already in the conversation context. If the user passes
-a reference (a spec path, a map slug) as an argument, fetch it and read its
-full body. If a spec exists at `docs/tasks/<slug>/spec.md`, read it.
+a reference (a spec path, an effort slug) as an argument, fetch it and read its
+full body. If a spec exists at `docs/tasks/<effort>/spec.md`, read it.
 
 ### 2. Explore the codebase (optional)
 
@@ -29,20 +29,20 @@ Look for opportunities to prefactor the code to make the implementation easier.
 
 ### 3. Draft vertical slices
 
-Break the work into **tracer bullet** tickets. Each ticket becomes a task
-document at `docs/tasks/<ticket-slug>/task.md` with our existing task
+Break the work into **tracer bullet** tickets. Each ticket becomes a ticket
+document at `docs/tasks/<effort>/tickets/<ticket-slug>/ticket.md` with this
 frontmatter:
 
 ```yaml
 ---
-kind: task
-type: feature  # or bug
-slug: <ticket-slug>
+type: ticket
+subtype: feature   # or bug
 title: <title>
-map: <map-slug>
-status: ready
-blocked_by: [<other-ticket-slug>, ...]
-slices: [<slice-slug>, ...]
+status: stable
+workflow_state: ready
+blocked_by: [<ticket-slug>, ...]
+size: m   # optional; s | m | l | xl; absent means m
+mode: human   # optional; omit unless the human must implement it
 ---
 ```
 
@@ -57,7 +57,8 @@ slices: [<slice-slug>, ...]
 </vertical-slice-rules>
 
 Give each ticket its **blocking edges** via the `blocked_by` field. A ticket
-with no blockers can start immediately.
+with no blockers can start immediately. Edges are kind-scoped and
+effort-scoped: a ticket's `blocked_by` names other tickets of the same effort.
 
 **Wide refactors are the exception to vertical slicing.** A **wide refactor**
 is one mechanical change (rename a column, retype a shared symbol) whose **blast
@@ -72,6 +73,9 @@ remains, in a ticket blocked by every migrate batch. When even the batches
 can't stay green alone, keep the sequence but let them share an integration
 branch that all block a final integrate-and-verify ticket; green is promised
 only there.
+
+One-ticket efforts are fine: a one-off is an effort whose tickets directory
+holds exactly one ticket.
 
 ### 4. Quiz the user
 
@@ -92,20 +96,24 @@ Iterate until the user approves the breakdown.
 
 ### 5. Publish the tickets under docs/tasks/
 
-Write each approved ticket as `docs/tasks/<ticket-slug>/task.md` with the
-task frontmatter above. Then:
+Write each approved ticket **by hand** as
+`docs/tasks/<effort>/tickets/<ticket-slug>/ticket.md` with the ticket
+frontmatter above. The `tickets/` directory is the registration: writing the
+file is the whole registration step, there is no array write and no
+tool-supported creation step. Wire `blocked_by` edges in a **second pass**
+(all slugs must exist before they can reference each other) by editing the
+frontmatter once every ticket file exists.
 
-1. Register each ticket in the map's `tasks` array (add a
-   `{ slug, blocked_by, done: false }` entry to the map frontmatter).
-2. Wire `blocked_by` edges in a **second pass** (all slugs must exist before
-   they can reference each other).
-3. The graph is now queryable via `tw_dependency_levels <map-slug>` (BFS
-   levels) and `tw_frontier <map-slug>` (ready, unfinished tasks).
+The ticket files are written by hand, and the tools make the resulting graph
+queryable: `tw_dependency_levels <effort-slug>` (BFS levels) and
+`tw_frontier <effort-slug>` (the ready, unfinished tickets). No tw_* tool
+writes tickets; they read what you wrote.
 
 Work the **frontier**: any ticket whose blockers are all done. For a purely
 linear chain that means top to bottom.
 
-Do NOT close or modify any parent map.
+Do NOT close or modify the effort's map: effort done-ness is derived by
+scanning the tree.
 
 <ticket-template>
 
