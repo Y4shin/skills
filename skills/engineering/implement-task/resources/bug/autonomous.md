@@ -87,7 +87,7 @@ reviewId = subagent({
   agent: "code-reviewer",
   skill: "code-review",
   output: "review/result.md",
-  task: `Review the bug-fix diff for ticket ${ticket}. Fixed point: the starting branch. Spec source: the bug doc plus its reproduction. Report Standards + Spec findings side by side.`
+  task: `Review the bug-fix diff for ticket ${ticket}. Fixed point: the starting branch. Spec source: the bug doc plus its reproduction.`
 })
 
 wait({ id: reviewId })

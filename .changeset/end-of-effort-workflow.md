@@ -1,0 +1,5 @@
+---
+"task-workflow": minor
+---
+
+implement-task: run the end-of-effort wrap-up as a second pre-canned workflow (`scripts/end-of-effort.js`) over three new restricted agents. `coherence-refactorer` (read, write, edit, bash, submit_feedback) fixes the caller-passed list of inconsistencies and stops at scope and API-surface boundaries instead of crossing them; `test-runner` (read, bash, submit_feedback) executes the repo's docs/testing.md protocol, always-run commands plus numbered "run if asked" commands selected per launch, and never fixes what it finds; `spec-reconciler` (read, edit, submit_feedback) updates the arch spec from deviation reports, mid-effort for pending tickets and as the workflow's final reconcile, editing only the arch spec. The feature resource no longer has the parent refactor, edit the spec, or run the suite itself: it composes the inconsistency list, launches the workflow, and handles the structured result, relaunching with `review: false` after a suite failure. docs/testing.md gains the Test protocol section the test-runner reads.

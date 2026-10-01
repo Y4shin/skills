@@ -2,7 +2,8 @@
 
 Implements every pending ticket of a feature effort. Steps are: architecture
 spec (user-approved, at the effort root) → per-ticket chain per dependency
-level → coherence refactor.
+level → end-of-effort workflow (review, spec reconcile, coherence refactor,
+suite gate).
 
 ## Step 0 -- Prerequisites
 
@@ -163,65 +164,74 @@ for each level in levels:
 
         // success path: ticket landed on its landing branch
 
-    // After each level: read deviation reports for tickets that flagged
-    // user-attention-needed. Update the arch spec for pending tickets if API
-    // surfaces changed. If a deviation reveals a workflow/planning problem
-    // (ambiguous spec, wrong interface contract), surface it to the user.
-    // Do NOT report the deviation itself -- that's a project finding.
+    // After each level: read the level's deviation reports (planning input,
+    // not implementation). Where actual API surfaces diverged, dispatch the
+    // spec-reconciler agent (read plus edit on the arch spec only) with
+    // pointers to the reports and the pending tickets; the parent never
+    // edits the spec itself. If a deviation reveals a workflow/planning
+    // problem (ambiguous spec, wrong interface contract), surface it to the
+    // user. Do NOT report the deviation itself -- that's a project finding.
 ```
 
 The ticket is NOT marked done here: finalize-task owns the marking, one
 owner. Landing leaves the ticket unfinished in the graph. The uncertainty
 path is `docs/tasks/<effort>/tickets/<ticket-slug>/.work/uncertainty.md`.
 
-## Whole-effort code review (advisory)
+## Step 3 -- End-of-effort workflow (review, spec reconcile, coherence, suite gate)
 
-After all tickets have landed, run a two-axis code review over the whole-effort diff before the coherence refactor. The review is advisory -- it does not gate landing (the tickets already landed) and does not gate finalize.
+After all tickets have landed, run the wrap-up as one pre-canned workflow
+script, `scripts/end-of-effort.js` in this skill's directory (resolve its
+path against this skill's directory). It runs, in order: the advisory
+whole-effort review (code-reviewer, two-axis), the final arch-spec
+reconcile (spec-reconciler), the coherence refactor (coherence-refactorer),
+and the suite gate (test-runner, reading the repo's docs/testing.md
+protocol). This stage owns refactoring; the tdd-worker loop is RED→GREEN
+only. The parent composes inputs and handles the result; it never
+refactors, never edits the spec, and never runs the suite itself.
 
-```js
-reviewId = subagent({
-  async: true,
-  agent: "code-reviewer",
-  skill: "code-review",
-  output: "review/result.md",
-  task: `Review the whole-effort diff for effort ${effortSlug}. Fixed point: the starting branch. Spec source: the ticket docs plus the effort-root arch spec. Report Standards + Spec findings side by side.`
+**Determine scale first** (dispatch criteria, from the deviation reports):
+- If TDD workers refactored out-of-scope code or altered API surfaces not
+  in the spec → **ask user** before launching
+- If coherence would need large-scale refactors of out-of-scope code →
+  **ask user** before launching
+- Otherwise → compose the inconsistency list and launch. The
+  coherence-refactorer enforces the same boundaries in flight and stops
+  rather than cross them.
+
+```
+// Compose the coherence input from the deviation reports: concrete
+// inconsistencies, one line each (API drift between tickets, duplicated
+// helpers, mismatched error handling or test setup, naming).
+inconsistencies = <from the deviation reports>
+
+runId = subagent({
+    async: true,
+    workflow: "<skill-dir>/scripts/end-of-effort.js",
+    args: {
+        effort: effortSlug,
+        startingBranch: <the effort's starting branch>,
+        inconsistencies: inconsistencies,
+        optionalTests: <integers naming docs/testing.md "run if asked" commands; usually []>
+    }
 })
 
-wait({ id: reviewId })
+wait({ id: runId })
+result = <the workflow's return: { ok, failed?, step?, reviewOk?, refs }>
+
+// The review is advisory: read result.refs.review and surface its findings
+// to the user. It does not gate landing or finalize.
+
+// On result.failed == "suite": emergent cross-ticket breakage. Add the
+// failures to the inconsistencies list and relaunch the workflow with
+// review: false (the review already ran). Large, ambiguous, or
+// API-surface failures go to the user instead of a relaunch.
+
+// On result.failed == "coherence": the refactorer stopped on a scope or
+// API-surface boundary. Take its reason to the user; do not relaunch the
+// same list.
+
+// On result.failed == "spec": relaunch once; a second failure goes to the user.
 ```
-
-Read `review/result.md` and surface the findings to the user. Step 3 (coherence refactor) uses these findings to drive refactoring priorities.
-
-## Step 3 -- Coherence refactor
-
-This stage owns refactoring; the tdd-worker loop is RED→GREEN only. Refactor here, not in the per-ticket worker.
-
-After all tickets landed and the advisory code review findings have been surfaced, review the combined diff and all deviation reports.
-
-Read:
-- `docs/tasks/${effortSlug}/tickets/*/deviation-reports/*.md`
-- `docs/tasks/${effortSlug}/arch-spec.md`
-- Combined diff: `git diff <starting-branch>...task/<last-landed-ticket>` (the landing branches chain, so the last contains every landed ticket)
-
-**Determine scale:**
-- If TDD workers refactored out-of-scope code or altered API surfaces not in the spec → **ask user**
-- If you'd need large-scale refactors of out-of-scope code to make things coherent → **ask user**
-- Otherwise → do small/medium refactors autonomously:
-  - Rename symbols for consistency
-  - Extract shared helpers duplicated across tickets
-  - Align error handling patterns
-  - Consolidate duplicate test setup
-  - Ensure naming conventions are consistent
-
-Do NOT change API surfaces that dependents call without user approval.
-Do NOT refactor outside the effort's scope.
-
-**Cost note:** these refactors are done directly by you (the parent), which
-means your full context is loaded. Keep them genuinely small -- if a refactor
-would require reading more than ~5 files or editing more than ~50 lines,
-consider routing it through a subagent instead.
-
-**Final suite gate:** Run the full project test suite. It must be green before Step 3 is complete. If red, this is emergent cross-ticket breakage -- breakage that only appears when all tickets combine and no single ticket owns the fix. Apply small/medium root-cause fixes within the effort's scope autonomously (same rules as above); escalate large, ambiguous, or API-surface-touching fixes to the user. For test failures: first try re-routing the fix through a subagent before doing it yourself.
 
 ## Step 4 -- Report
 

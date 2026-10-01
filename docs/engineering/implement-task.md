@@ -40,6 +40,17 @@ diagnosing-bugs skills. The gate is the read-only
 it refuses to launch any worker when the ticket doc does not exist, is
 human-owned, or does not match the dispatched subtype.
 
+After the frontier empties, the feature path runs a second shipped
+workflow, `scripts/end-of-effort.js`: the advisory whole-effort review, the
+arch-spec reconcile, the coherence refactor (driven by an explicit list of
+inconsistencies the model composes from the deviation reports), and the
+suite gate. The suite gate is a `test-runner` agent executing the repo's
+`docs/testing.md` protocol (always-run commands plus numbered "run if
+asked" commands selected per launch); the spec reconcile and coherence
+refactor go to restricted agents of their own. The model composes inputs
+and handles the structured result; it never refactors, edits the spec, or
+runs the suite itself.
+
 **Human-owned tickets (`mode: human`) are hard-refused:** the router never
 launches chains for a marked ticket and does not fall through to the
 subtype pipeline. It hands back the invocation:
@@ -83,6 +94,9 @@ the last one's conversation.
   level, and each one reads the ticket's subtype, mode, and size.
 - A missing, mismatched, or human-owned ticket doc is refused by the
   read-only preconditions gate before any worker launches.
+- The end-of-effort wrap-up (review, spec reconcile, coherence, suite gate)
+  runs as one workflow of delegated agents; the model never refactors or
+  edits the spec itself.
 - A `mode: human` ticket produces a refusal and a handback, never an
   autonomous chain.
 - Feature chains verify through read-only agents before anything lands, and

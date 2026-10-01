@@ -46,6 +46,9 @@ const AGENT_FILES = [
   "agents/architecture-scout.md",
   "agents/skill-reviewer.md",
   "agents/implement-preconditions.md",
+  "agents/coherence-refactorer.md",
+  "agents/test-runner.md",
+  "agents/spec-reconciler.md",
 ];
 
 describe("agent frontmatter", () => {
@@ -355,7 +358,10 @@ describe("all referenced agents exist", () => {
     expect(agentNames).toContain("land-worker");
     expect(agentNames).toContain("deviation-reporter");
     expect(agentNames).toContain("architecture-scout");
-    expect(agentNames).toContain("implement-preconditions");  });
+    expect(agentNames).toContain("implement-preconditions");
+    expect(agentNames).toContain("coherence-refactorer");
+    expect(agentNames).toContain("test-runner");
+    expect(agentNames).toContain("spec-reconciler");  });
 
   test("agent names are in package subagents path", () => {
     expect(pkg.pi.subagents.agents).toContain("./agents");
@@ -1830,6 +1836,16 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
     expect(content).toContain("tw_state_set task <ticket-slug>");
   });
 
+  test("the end-of-effort wrap-up is a shipped workflow, not parent work", () => {
+    expect(content).toMatch(/scripts\/end-of-effort\.js/);
+    expect(content).toMatch(/spec-reconciler/);
+    expect(content).toMatch(/coherence-refactorer/);
+    expect(content).toMatch(/test-runner/);
+    // The parent never refactors, never edits the spec, never runs the suite.
+    expect(content).not.toMatch(/done directly by you/i);
+    expect(content).toMatch(/never\s+refactors/);
+  });
+
   test("uncertainty lives in the ticket directory", () => {
     expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<ticket-slug>\/\.work\/uncertainty\.md/);
   });
@@ -1961,6 +1977,73 @@ describe("chain call shapes (shipped ticket-chain.js)", () => {
     expect(chain).toMatch(/if \(!verify\.ok\)/);
     expect(chain).toMatch(/failed: "args"/);
     expect(chain).toMatch(/landed: true/);
+  });
+});
+
+describe("end-of-effort agents", () => {
+  test("coherence-refactorer fixes the listed inconsistencies and stops at boundaries", () => {
+    const content = readFile("agents/coherence-refactorer.md");
+    const fm = parseFrontmatter(content);
+    expect(String(fm.tools)).toBe("read, write, edit, bash, submit_feedback");
+    expect(content).toMatch(/listed inconsistencies/i);
+    expect(content).toMatch(/Do NOT change API surfaces/i);
+    expect(content).toMatch(/stop and fail/i);
+    expect(content).toMatch(/refactor\(coherence\)/);
+  });
+
+  test("test-runner runs the docs/testing.md protocol and never fixes", () => {
+    const content = readFile("agents/test-runner.md");
+    const fm = parseFrontmatter(content);
+    expect(String(fm.tools)).toBe("read, bash, submit_feedback");
+    expect(content).toMatch(/run these always/i);
+    expect(content).toMatch(/run if asked/i);
+    expect(content).toMatch(/never invent or guess/i);
+    expect(content).toMatch(/never edit/i);
+  });
+
+  test("spec-reconciler edits exactly one file: the arch spec", () => {
+    const content = readFile("agents/spec-reconciler.md");
+    const fm = parseFrontmatter(content);
+    expect(String(fm.tools)).toBe("read, edit, submit_feedback");
+    expect(content).toMatch(/arch-spec\.md/);
+    expect(content).toMatch(/exactly one file/i);
+    expect(content).toMatch(/Pending update/i);
+    expect(content).toMatch(/Final reconcile/i);
+  });
+});
+
+describe("end-of-effort workflow (shipped end-of-effort.js)", () => {
+  const script = readFile("skills/engineering/implement-task/scripts/end-of-effort.js");
+
+  test("runs review, spec, coherence, and the suite gate with keyed awaited runs.run", () => {
+    expect(script).toMatch(/await runs\.run\("review"/);
+    expect(script).toMatch(/await runs\.run\("spec"/);
+    expect(script).toMatch(/await runs\.run\("coherence"/);
+    expect(script).toMatch(/await runs\.run\("suite"/);
+  });
+
+  test("steps are toggleable or input-driven; the suite gate runs last", () => {
+    expect(script).toMatch(/args\.review !== false/);
+    expect(script).toMatch(/args\.reconcile !== false/);
+    expect(script).toMatch(/inconsistencies\.length > 0/);
+    expect(script.indexOf('runs.run("suite"')).toBeGreaterThan(script.indexOf('runs.run("coherence"'));
+  });
+
+  test("optional tests pass to the test-runner task as numbers", () => {
+    expect(script).toMatch(/optionalTests/);
+    expect(script).toMatch(/Run if asked/);
+  });
+
+  test("the review stays advisory: a failed reviewer never fails the workflow", () => {
+    expect(script).toMatch(/reviewOk = review\.ok/);
+    expect(script).not.toMatch(/failed: "review"/);
+  });
+
+  test("docs/testing.md carries the test protocol the test-runner reads", () => {
+    const content = readFile("docs/testing.md");
+    expect(content).toMatch(/## Test protocol/);
+    expect(content).toMatch(/Run these always/);
+    expect(content).toMatch(/Run if asked/);
   });
 });
 

@@ -5,14 +5,23 @@
 - [Vitest](https://vitest.dev/) (`vitest run`), test files under `tests/`.
 - Type checking: `tsc --noEmit` (no emitted build; `type: module`).
 
-## Run commands
+## Test protocol
 
-| Command | Purpose |
-|---|---|
-| `npm test` | Run the full test suite |
-| `npm run typecheck` | Type-check without emitting |
-| `npx vitest run <file>` | Run a single test file |
-| `devenv shell -- npm test` | Run the full suite in the reproducible devenv shell |
+The task-workflow `test-runner` agent reads this section. "Run these always"
+commands run on every suite gate; a "run if asked" command runs only when
+the caller passes its number.
+
+Run these always:
+
+- `npm test` -- the full test suite
+- `npm run typecheck` -- type-check without emitting
+
+Run if asked (by number):
+
+1. `devenv shell -- npm test` -- the full suite in the reproducible devenv shell
+
+A single test file, for manual use only (not part of the gated protocol):
+`npx vitest run <file>`.
 
 ## Mock conventions
 
