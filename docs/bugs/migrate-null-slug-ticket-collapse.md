@@ -4,7 +4,7 @@ status: fixed
 severity: critical
 reported: 2026-10-01
 confirmed_by: reproduction (synthetic fixture with two tickets, 2026-10-01)
-fix_commit:
+fix_commit: 4a5c273
 promoted_to:
 skill: setup-workflow
 ---
