@@ -78,21 +78,36 @@ echo "Bumped ${current_version} -> ${new_version}"
 # changesets writes/appends to ./CHANGELOG.md (the default formatter). This
 # repo keeps its changelog at docs/tasks/CHANGELOG.md, so fold the generated
 # entry in and remove the root file to avoid a second source of truth.
+#
+# docs/tasks/CHANGELOG.md may carry OKF frontmatter (a leading `---` fence,
+# which this repo's own v4 migration backfills) above a `# <title>` heading
+# and the `# <package>` heading changesets emits. The generated entry is
+# inserted above the previous newest version section: its own package heading
+# is dropped, so the changelog carries exactly one.
 if [ -f CHANGELOG.md ]; then
-  # Prepend the changesets-generated content to docs/tasks/CHANGELOG.md,
-  # preserving the docs/tasks/CHANGELOG.md title and the new version heading.
-  tmp="$(mktemp)"
-  # Keep the docs/tasks/CHANGELOG.md title line if present, then the
-  # changesets content, then the rest of docs/tasks/CHANGELOG.md minus its
-  # duplicate title.
-  if [ -f docs/tasks/CHANGELOG.md ]; then
-    title_line="$(head -1 docs/tasks/CHANGELOG.md)"
-    printf '%s\n\n' "$title_line" >> "$tmp"
-    cat CHANGELOG.md >> "$tmp"
-    # Append the rest of docs/tasks/CHANGELOG.md, skipping its first title line
-    # and any leading blank line, to avoid restating the title.
-    tail -n +2 docs/tasks/CHANGELOG.md | sed -e '1{/^$/d;}' >> "$tmp"
-    mv "$tmp" docs/tasks/CHANGELOG.md
+  dst="docs/tasks/CHANGELOG.md"
+  if [ -f "$dst" ]; then
+    # The generated entry without its leading `# <package>` heading.
+    entry="$(sed -e '1{/^# /d;}' -e '/./,$!d' CHANGELOG.md)"
+    tmp="$(mktemp)"
+    # Insert above the previous newest version section when one exists.
+    at="$(awk '/^## [0-9]+\.[0-9]+\.[0-9]+[[:space:]]*$/ {print NR; exit}' "$dst")"
+    if [ -n "$at" ]; then
+      { sed -n "1,$((at - 1))p" "$dst"; printf '%s\n\n' "$entry"; tail -n "+$at" "$dst"; } > "$tmp"
+    else
+      # No version section yet: insert below the frontmatter block (when the
+      # changelog carries one) and its title heading.
+      head_end=0
+      if [ "$(head -1 "$dst")" = "---" ]; then
+        head_end="$(awk 'NR>1 && $0=="---" {print NR; exit}' "$dst")"
+      fi
+      title_at="$((head_end + 1))"
+      while [ "$(sed -n "${title_at}p" "$dst")" = "" ]; do
+        title_at="$((title_at + 1))"
+      done
+      { sed -n "1,${title_at}p" "$dst"; printf '\n%s\n\n' "$entry"; tail -n "+$((title_at + 1))" "$dst" | sed -e '/./,$!d'; } > "$tmp"
+    fi
+    mv "$tmp" "$dst"
   else
     mv CHANGELOG.md docs/tasks/CHANGELOG.md
   fi
