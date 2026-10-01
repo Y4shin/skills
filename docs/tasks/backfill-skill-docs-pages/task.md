@@ -43,3 +43,36 @@ tree, decision tasks, tickets, the surviving tw_* tools).
 
 - overhaul-dead-surface (the tool surface is final then; earlier
       pages would document deleted tools).
+
+## Implementation notes
+
+### Slice - backfill-skill-docs-pages (landed)
+
+Landed on `ticket/backfill-skill-docs-pages` (2 commits, merged into
+`task/backfill-skill-docs-pages` with --no-ff, 28 files, +1888).
+Strict TDD per the arch spec's five seams, all appended to
+`tests/skills.test.ts`: RED commit `80cfeb6` (presence seam listed
+exactly the 27 missing pages), GREEN commit `64a8ac1` (27 pages
+created, all five seams passing). The presence test derives page
+paths from `pkg.pi.skills`, never a hardcoded list; the surviving
+tools seam reuses `expectOnlySurvivingTools` and `SURVIVING_TOOLS`.
+Seams 3 (no non-promoted pages) and 4 (surviving tools only) are
+guard tests, green on arrival by design; they become load-bearing
+the moment a future page violates them.
+
+What landed: 27 human-facing pages (22 under `docs/engineering/`, 5
+under `docs/productivity/`), each with H1 = skill name and the four
+required sections in order, no em-dashes (character sweep clean).
+The seven overhaul-changed flow pages (wayfinder, to-spec,
+to-tickets, task-workflow-overview, task-workflow-doctor,
+implement-task, finalize-task) plus setup-workflow describe the v4
+effort-grouped tree and the surviving `tw_*` tools; the code-review
+and tdd pages cover the standards direct reads. The two pre-existing
+pages (`eval-review`, `handoff`) conformed already and needed no
+re-sync. A deviation report sits under `deviation-reports/` in this
+ticket's directory.
+
+Gates on the merged branch (verified independently before landing,
+re-run after merge): 372/372 in `tests/skills.test.ts`, full suite
+733/733 across 14 files, `tsc --noEmit` clean; no lint script is
+configured.
