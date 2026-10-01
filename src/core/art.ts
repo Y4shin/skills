@@ -57,14 +57,6 @@ export interface Artifact {
   data: FrontmatterData;
 }
 
-export interface SliceInfo {
-  number: number;
-  slug: string;
-  status: string | null;
-  size: string | null;
-  blocked_by: string[];
-}
-
 /** A dependency-graph node used by maps and the Wayfinder workflow. */
 export interface WorkItemInfo {
   slug: string;
@@ -383,35 +375,13 @@ export function findAnomalies(artifacts: Artifact[]): Anomaly[] {
   return anomalies;
 }
 
-/** Parse slice info from filename (<n>-<slug>.md) and frontmatter. */
-export function sliceInfoFrom(
-  filename: string,
-  data: FrontmatterData,
-): SliceInfo {
-  const m = filename.match(/^(\d+)-(.+)\.md$/);
-  if (!m) throw new Error(`invalid slice filename: ${filename}`);
-
-  const blockedRaw = data.blocked_by;
-  const blocked_by: string[] = Array.isArray(blockedRaw)
-    ? blockedRaw.map(String)
-    : [];
-
-  return {
-    number: parseInt(m[1], 10),
-    slug: m[2],
-    status: (data.status as string) ?? null,
-    size: (data.size as string) ?? null,
-    blocked_by,
-  };
-}
-
 /** Extract dependency levels from a list of graph nodes using BFS. */
-export function dependencyLevels(slices: Array<SliceInfo | WorkItemInfo>): string[][] {
-  const bySlug = new Map(slices.map((s) => [s.slug, s]));
-  const slugSet = new Set(slices.map((s) => s.slug));
+export function dependencyLevels(items: WorkItemInfo[]): string[][] {
+  const bySlug = new Map(items.map((s) => [s.slug, s]));
+  const slugSet = new Set(items.map((s) => s.slug));
 
-  // Remaining slices to assign
-  const remaining = new Set(slices.map((s) => s.slug));
+  // Remaining items to assign
+  const remaining = new Set(items.map((s) => s.slug));
   const levels: string[][] = [];
 
   while (remaining.size > 0) {
@@ -419,7 +389,7 @@ export function dependencyLevels(slices: Array<SliceInfo | WorkItemInfo>): strin
 
     for (const slug of remaining) {
       const s = bySlug.get(slug)!;
-      // A slice is ready if all its blockers are either not in the set
+      // An item is ready if all its blockers are either not in the set
       // (already assigned to a previous level) or don't exist
       const blockers = s.blocked_by.filter((b) => slugSet.has(b));
       const ready = blockers.every((b) => !remaining.has(b));

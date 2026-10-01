@@ -4,7 +4,7 @@ slug: overhaul-dead-surface
 title: Delete the dead tool surface (zero references remain)
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: m
 blocked_by: []
 ---

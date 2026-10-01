@@ -1,17 +1,16 @@
 /**
- * Tests for the artifact model — dependency levels, slice info parsing.
+ * Tests for the artifact model: dependency levels.
  */
 
 import { describe, expect, test } from "vitest";
 import {
   fromFrontmatter,
   findAnomalies,
-  sliceInfoFrom,
   dependencyLevels,
   validateArtifact,
   validateCombination,
   type Artifact,
-  type SliceInfo,
+  type WorkItemInfo,
 } from "../src/core/art.js";
 
 describe("fromFrontmatter v4 shape", () => {
@@ -323,78 +322,54 @@ describe("findAnomalies", () => {
   });
 });
 
-describe("sliceInfoFrom", () => {
-  test("parses filename and frontmatter", () => {
-    const info = sliceInfoFrom("3-do-thing.md", {
-      status: "todo",
-      size: "m",
-      blocked_by: ["env-loading"],
-    });
-    expect(info.number).toBe(3);
-    expect(info.slug).toBe("do-thing");
-    expect(info.status).toBe("todo");
-    expect(info.size).toBe("m");
-    expect(info.blocked_by).toEqual(["env-loading"]);
-  });
-
-  test("handles missing blocked_by", () => {
-    const info = sliceInfoFrom("1-first.md", { status: "todo" });
-    expect(info.blocked_by).toEqual([]);
-  });
-
-  test("throws on bad filename", () => {
-    expect(() => sliceInfoFrom("bad-file.md", {})).toThrow();
-  });
-});
-
 describe("dependencyLevels", () => {
-  test("single slice with no deps returns one level", () => {
-    const slices: SliceInfo[] = [
-      { number: 1, slug: "a", status: "todo", size: "m", blocked_by: [] },
+  test("single item with no deps returns one level", () => {
+    const items: WorkItemInfo[] = [
+      { slug: "a", status: "todo", type: null, size: "m", blocked_by: [] },
     ];
-    expect(dependencyLevels(slices)).toEqual([["a"]]);
+    expect(dependencyLevels(items)).toEqual([["a"]]);
   });
 
   test("chain dependency produces sequential levels", () => {
-    const slices: SliceInfo[] = [
-      { number: 1, slug: "a", status: "todo", size: "m", blocked_by: [] },
-      { number: 2, slug: "b", status: "todo", size: "m", blocked_by: ["a"] },
-      { number: 3, slug: "c", status: "todo", size: "m", blocked_by: ["b"] },
+    const items: WorkItemInfo[] = [
+      { slug: "a", status: "todo", type: null, size: "m", blocked_by: [] },
+      { slug: "b", status: "todo", type: null, size: "m", blocked_by: ["a"] },
+      { slug: "c", status: "todo", type: null, size: "m", blocked_by: ["b"] },
     ];
-    expect(dependencyLevels(slices)).toEqual([["a"], ["b"], ["c"]]);
+    expect(dependencyLevels(items)).toEqual([["a"], ["b"], ["c"]]);
   });
 
-  test("independent slices share a level", () => {
-    const slices: SliceInfo[] = [
-      { number: 1, slug: "a", status: "todo", size: "m", blocked_by: [] },
-      { number: 2, slug: "b", status: "todo", size: "m", blocked_by: [] },
-      { number: 3, slug: "c", status: "todo", size: "m", blocked_by: ["a", "b"] },
+  test("independent items share a level", () => {
+    const items: WorkItemInfo[] = [
+      { slug: "a", status: "todo", type: null, size: "m", blocked_by: [] },
+      { slug: "b", status: "todo", type: null, size: "m", blocked_by: [] },
+      { slug: "c", status: "todo", type: null, size: "m", blocked_by: ["a", "b"] },
     ];
-    const levels = dependencyLevels(slices);
+    const levels = dependencyLevels(items);
     expect(levels[0]).toEqual(expect.arrayContaining(["a", "b"]));
     expect(levels[1]).toEqual(["c"]);
   });
 
   test("diamond dependency resolves", () => {
-    const slices: SliceInfo[] = [
-      { number: 1, slug: "a", status: "todo", size: "m", blocked_by: [] },
-      { number: 2, slug: "b", status: "todo", size: "m", blocked_by: ["a"] },
-      { number: 3, slug: "c", status: "todo", size: "m", blocked_by: ["a"] },
-      { number: 4, slug: "d", status: "todo", size: "m", blocked_by: ["b", "c"] },
+    const items: WorkItemInfo[] = [
+      { slug: "a", status: "todo", type: null, size: "m", blocked_by: [] },
+      { slug: "b", status: "todo", type: null, size: "m", blocked_by: ["a"] },
+      { slug: "c", status: "todo", type: null, size: "m", blocked_by: ["a"] },
+      { slug: "d", status: "todo", type: null, size: "m", blocked_by: ["b", "c"] },
     ];
-    const levels = dependencyLevels(slices);
+    const levels = dependencyLevels(items);
     expect(levels[0]).toEqual(["a"]);
     expect(levels[1]).toEqual(expect.arrayContaining(["b", "c"]));
     expect(levels[2]).toEqual(["d"]);
   });
 
   test("handles circular deps gracefully", () => {
-    const slices: SliceInfo[] = [
-      { number: 1, slug: "a", status: "todo", size: "m", blocked_by: ["b"] },
-      { number: 2, slug: "b", status: "todo", size: "m", blocked_by: ["a"] },
+    const items: WorkItemInfo[] = [
+      { slug: "a", status: "todo", type: null, size: "m", blocked_by: ["b"] },
+      { slug: "b", status: "todo", type: null, size: "m", blocked_by: ["a"] },
     ];
     // Should not deadlock — puts remaining in one level
-    const levels = dependencyLevels(slices);
+    const levels = dependencyLevels(items);
     expect(levels.length).toBe(1);
     expect(levels[0]).toEqual(expect.arrayContaining(["a", "b"]));
   });

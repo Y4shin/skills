@@ -1,7 +1,7 @@
 ---
 name: land-worker
 description: Merge a completed ticket working branch into the ticket's landing branch, append an implementation note to the ticket doc, and commit. May NOT write or modify any source code, tests, or config files.
-tools: read, edit, bash
+tools: read, edit, bash, submit_feedback
 inheritProjectContext: true
 defaultContext: fresh
 ---
