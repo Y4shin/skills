@@ -86,10 +86,20 @@ level N+1 starts only after every ticket in level N has landed.
 
 Each ticket runs as a **sequential chain** that shares the repo working
 directory: `tdd-worker → (slice-verifier ∥ deviation-reporter) → land-worker`,
-with an ok-gate blocking landing on verify plus deviation. The chain rebases
-onto the workflow API: one `subagent({ async: true, workflowScript })` per
-ticket chain, `runs.run` for the tdd step, `runs.all` for verify plus
-deviation, and output paths bound per step.
+with an ok-gate blocking landing on verify plus deviation. The chain ships
+as a pre-canned workflow script, `scripts/ticket-chain.js` in this skill's
+directory (shared with the bug pipeline): resolve its path against this
+skill's directory, launch it once per ticket with `async: true` and the
+ticket's parameters as `args`, and it owns the preconditions gate, the step
+order, the ok-gates, and the per-step output bindings. Each child task is composed from identity
+and pointers only; procedure lives in the agent definitions and the tdd /
+diagnosing-bugs skills, and the caller never authors worker prompts. The gate
+is the
+read-only `implement-preconditions` agent: it refuses to launch any worker
+when the ticket doc does not exist, is human-owned, or does not match the
+dispatched subtype. It returns `{ ok, failed?, step?, refs }`:
+`step` is the failed step's receipt for diagnosis, `refs` the durable
+output references gathered before the failure.
 
 ```
 levels = JSON.parse(tw_dependency_levels(effortSlug)).levels
@@ -104,98 +114,33 @@ for each level in levels:
         // Point the state file at the ticket its chain is about to run.
         tw_state_set task <ticket-slug>
 
+        // Resolve the chain script's path against this skill's directory,
+        // then launch it once per ticket.
         runId = subagent({
             async: true,
             timeoutMs,
-            workflowScript: `
-                // Step 1: tdd-worker implements the ticket on ticket/<ticket-slug>.
-                const tdd = await runs.run("tdd", {
-                    agent: "tdd-worker",
-                    skill: "tdd",
-                    label: "Implement ${ticket}",
-                    output: "tdd-${ticket}/result.md",
-                    task: [
-                        'Implement ticket "${ticket}" for effort "${effortSlug}".',
-                        "",
-                        "Ticket doc: ${ticketPath}",
-                        "Arch spec: docs/tasks/${effortSlug}/arch-spec.md",
-                        "",
-                        "Before writing code:",
-                        "1. Read the arch spec for this ticket's interface contract and abstraction notes.",
-                        "2. Read the existing source files listed in the arch spec.",
-                        "3. Read the standards files directly (AGENTS.md, CONTEXT.md,",
-                        "   docs/standards.md, docs/testing.md).",
-                        "4. Commit after each GREEN (checkpoint).",
-                        "",
-                        "If uncertain, write docs/tasks/${effortSlug}/tickets/${ticket}/.work/uncertainty.md and stop."
-                    ].join("\n")
-                });
-                if (!tdd.ok) return { failed: "tdd", tdd };
-                const tddRef = tdd.outputReference || tdd.output;
-
-                // Step 2: verify plus deviation in parallel; both must pass.
-                const pair = await runs.all([
-                    {
-                        key: "verify",
-                        agent: "slice-verifier",
-                        label: "Verify ${ticket}",
-                        output: "verify-${ticket}/result.md",
-                        task: [
-                            'Verify ticket "${ticket}".',
-                            "Implementation: " + tddRef,
-                            "Run lint and tests. Block on failure."
-                        ].join("\n")
-                    },
-                    {
-                        key: "deviation",
-                        agent: "deviation-reporter",
-                        label: "Report ${ticket} deviations",
-                        output: "deviation-${ticket}/result.md",
-                        task: [
-                            'Check ticket "${ticket}" for deviations from the arch spec and ticket doc.',
-                            "",
-                            "Ticket doc: ${ticketPath}",
-                            "Arch spec: docs/tasks/${effortSlug}/arch-spec.md",
-                            "Implementation: " + tddRef,
-                            "",
-                            "Compare the implementation against the spec. Write a frontmattered deviation",
-                            "report to docs/tasks/${effortSlug}/tickets/${ticket}/deviation-reports/ covering:",
-                            "- API surface changes (planned vs actual)",
-                            "- Abstraction usage (used what was specified?)",
-                            "- Out-of-scope additions",
-                            "- Any divergence from the ticket doc's acceptance criteria",
-                            "",
-                            "If the ticket doc's ## Implementation notes needs updating, note it."
-                        ].join("\n")
-                    }
-                ]);
-                // Ok-gate: landing is blocked on verify plus deviation.
-                if (!pair[0].ok) return { failed: "verify", pair };
-                const verifyRef = pair[0].outputReference || pair[0].output;
-
-                // Step 3: land-worker merges and appends the implementation note.
-                return runs.run("land", {
-                    agent: "land-worker",
-                    label: "Land ${ticket}",
-                    output: "land-${ticket}/result.md",
-                    task: [
-                        'Land ticket "${ticket}" for effort "${effortSlug}".',
-                        "Ticket doc: ${ticketPath}",
-                        "TDD output: " + tddRef,
-                        "Verify output: " + verifyRef,
-                        "",
-                        "Merge ticket/${ticket} into task/${ticket} with --no-ff, delete the working",
-                        "branch, append the implementation note to the ticket doc, commit."
-                    ].join("\n")
-                });
-            `
+            workflow: "<skill-dir>/scripts/ticket-chain.js",
+            args: {
+                effort: effortSlug,
+                ticket: ticket,
+                ticketPath: ticketPath,
+                subtype: "feature"
+            }
         })
 
         // Tickets within a level run sequentially (shared repo cwd), so block
         // for this chain before dispatching the next. No parallel work meanwhile.
         wait({ id: runId })
+        result = <the chain's return: { ok, failed?, step?, refs }>
 
         // Process the chain result
+        if result.failed == "gate":
+            // The preconditions refused this dispatch: wrong effort/ticket/
+            // path, a human-owned ticket, or a subtype mismatch. Re-resolve
+            // the ticket, rebuild the args, and relaunch once; a second
+            // refusal goes to the user. The failure toolbelt (diagnose,
+            // split, retry, escalate) never applies to a gate refusal.
+
         if exists docs/tasks/${effortSlug}/tickets/${ticket}/.work/uncertainty.md:
             // tdd-worker hit uncertainty and stopped (the ok-gate aborted before land)
             // This is a designed-for escape hatch -- record that it fired.
@@ -204,10 +149,13 @@ for each level in levels:
                 header: "Uncertain",
                 question: `TDD worker hit uncertainty in ticket ${ticket}:\n{read docs/tasks/${effortSlug}/tickets/${ticket}/.work/uncertainty.md}`
             })
-            delete the uncertainty file
+            delete the uncertainty file after recording the resolution where
+            the ticket owns it, so the re-run passes a pointer, not
+            parent-authored prompt text:
+            write the resolution to docs/tasks/${effortSlug}/tickets/${ticket}/.work/resolution.md
             // Re-route to tdd-worker. Do NOT do the work yourself -- parent context is expensive.
-            re-run the chain for this ticket,
-            appending the user's resolution to the tdd task prompt
+            re-launch the chain for this ticket with the same args plus
+            extra: "docs/tasks/${effortSlug}/tickets/${ticket}/.work/resolution.md (the recorded resolution)"
             continue
 
         // On chain failure, apply the failure toolbelt below
@@ -289,7 +237,7 @@ Hard rule: on subagent failure the parent never implements. Its only moves are r
 1. **Diagnose first** -- read worker outputs and any partial diff. Never blindly redo.
 2. **First failure -> split** -- split the ticket into sub-tickets registered in the effort, per the split rules below. Exception: if the ticket is
    already atomic, skip to retry.
-3. **Second attempt -> retry +50%** -- re-run the chain with timeoutMs increased by 50 percent and the diagnosis/fix instructions in the prompt.
+3. **Second attempt -> retry +50%** -- re-run the chain with timeoutMs increased by 50 percent and args.extra pointing at the failed step's output reference (and any recorded resolution), so the worker re-reads its prior attempt. Never author prompt instructions for the worker; pass pointers.
 4. **Backstop -> escalate** -- after two consecutive retries still fail, ask the user: "Two retries for ticket {ticket} failed. Should I increase budgets further, relax constraints, or skip this ticket?"
 
 **Split rules (sub-tickets, never ad-hoc files).** A split decomposes the

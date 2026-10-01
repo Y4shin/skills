@@ -25,8 +25,21 @@ const reproPath = <from the ticket body>
 
 Run one sequential chain that shares the repo working directory:
 `tdd-worker → slice-verifier → land-worker`, with an ok-gate blocking landing
-on verify. Point the state file at the ticket before the chain runs:
-`tw_state_set task <ticket-slug>`.
+on verify. The chain ships as a pre-canned workflow script,
+`scripts/ticket-chain.js` in this skill's directory (shared with the feature
+pipeline): resolve its path against this skill's directory, launch it once
+with `async: true` and the ticket's parameters as `args`, and it returns
+`{ ok, failed?, step?, refs }` (`step` is the failed step's receipt for
+diagnosis, `refs` the durable output references). Each child task is
+composed from identity and pointers only; procedure lives in the agent
+definitions and the tdd / diagnosing-bugs skills, and the caller never
+authors worker prompts. It opens with the
+read-only `implement-preconditions` gate: the chain refuses to run when
+the ticket doc does not exist, is human-owned, or does not match the
+dispatched subtype; on a gate refusal, re-resolve the ticket, rebuild the
+args, and relaunch once (a second refusal goes to the user; the failure
+toolbelt never applies). Point the state file at the ticket before the
+chain runs: `tw_state_set task <ticket-slug>`.
 
 > **Async dispatch (hard rule):** launch this chain with `async: true`. Never
 > run a blocking/foreground subagent. After dispatching, call `wait({ id })` to
@@ -39,76 +52,26 @@ size = tw_get(ticketPath, "size") || "m"
 budgetMinutes = { s: 15, m: 30, l: 45, xl: 60 }
 const timeoutMs = (budgetMinutes[size] || budgetMinutes.m) * 60 * 1000
 
+// Resolve the chain script's path against this skill's directory,
+// then launch it once per ticket.
 runId = subagent({
     async: true,
     timeoutMs,
-    workflowScript: `
-        // Step 1: tdd-worker fixes the bug on ticket/<ticket-slug>.
-        const tdd = await runs.run("tdd", {
-            agent: "tdd-worker",
-            skill: "diagnosing-bugs",
-            label: "Fix ${ticket}",
-            output: "tdd-${ticket}/result.md",
-            task: [
-                'Implement ticket "${ticket}" for bug effort "${effortSlug}".',
-                "",
-                "You are on a subtype: bug ticket; consult the /diagnosing-bugs skill for the",
-                "6-phase debugging discipline (Phase 1 non-skippable; others skippable with a",
-                "recorded reason).",
-                "",
-                "Bug doc: ${bugPath}",
-                "Reproduction: ${reproPath}",
-                "Ticket doc: ${ticketPath}",
-                "",
-                "Before writing code:",
-                "1. Read the bug doc, the reproduction, and the ticket doc.",
-                "2. Read the existing source files referenced by the bug.",
-                "3. Read the standards files directly (AGENTS.md, CONTEXT.md,",
-                "   docs/standards.md, docs/testing.md).",
-                "4. Commit after each GREEN (checkpoint).",
-                "",
-                "First, convert the reproduction into a regression test that is RED against the",
-                "unfixed code (the test rule), then make it GREEN, then run the full suite."
-            ].join("\n")
-        });
-        if (!tdd.ok) return { failed: "tdd", tdd };
-        const tddRef = tdd.outputReference || tdd.output;
-
-        // Step 2: verify; the ok-gate blocks landing on it.
-        const verify = await runs.run("verify", {
-            agent: "slice-verifier",
-            label: "Verify ${ticket}",
-            output: "verify-${ticket}/result.md",
-            task: [
-                'Verify ticket "${ticket}".',
-                "Implementation: " + tddRef,
-                "Run lint and tests. Block on failure."
-            ].join("\n")
-        });
-        if (!verify.ok) return { failed: "verify", verify };
-        const verifyRef = verify.outputReference || verify.output;
-
-        // Step 3: land-worker merges and appends the implementation note.
-        return runs.run("land", {
-            agent: "land-worker",
-            label: "Land ${ticket}",
-            output: "land-${ticket}/result.md",
-            task: [
-                'Land ticket "${ticket}" for effort "${effortSlug}".',
-                "Ticket doc: ${ticketPath}",
-                "TDD output: " + tddRef,
-                "Verify output: " + verifyRef,
-                "",
-                "Merge ticket/${ticket} into task/${ticket} with --no-ff, delete the working",
-                "branch, append the implementation note to the ticket doc, commit."
-            ].join("\n")
-        });
-    `
+    workflow: "<skill-dir>/scripts/ticket-chain.js",
+    args: {
+        effort: effortSlug,
+        ticket: ticketSlug,
+        ticketPath: ticketPath,
+        subtype: "bug",
+        bugPath: bugPath,
+        reproPath: reproPath
+    }
 })
 
 // No independent work between dispatch and result  --  block for the chain.
 // wait() keeps the turn alive for notifications and keeps the run steerable.
 wait({ id: runId })
+result = <the chain's return: { ok, failed?, step?, refs }>
 ```
 
 The ticket's `workflow_state` is NOT marked here: finalize-task owns the
@@ -152,7 +115,7 @@ Hard rule: on subagent failure the parent never implements. Its only moves are r
    with a body note naming its sub-tickets. The split rules in the feature
    pipeline's failure toolbelt apply here in full. Exception: if the ticket is
    already atomic, skip to retry.
-3. **Second attempt → retry +50%**  --  re-run the chain with timeoutMs increased by 50% and the diagnosis/fix instructions in the prompt.
+3. **Second attempt → retry +50%**  --  re-run the chain with timeoutMs increased by 50% and args.extra pointing at the failed step's output reference (and any recorded resolution), so the worker re-reads its prior attempt. Never author prompt instructions for the worker; pass pointers.
 4. **Backstop → escalate**  --  after two consecutive retries still fail, ask the user: "Two retries for ticket {ticket} failed. Should I increase budgets further, relax constraints, or skip this ticket?"
 
 Hard rule: the parent context is large and expensive; routing through workers is always cheaper than pulling the fix into the parent. The parent never writes code or edits files as a fix.

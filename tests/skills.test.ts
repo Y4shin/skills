@@ -45,6 +45,7 @@ const AGENT_FILES = [
   "agents/code-reviewer.md",
   "agents/architecture-scout.md",
   "agents/skill-reviewer.md",
+  "agents/implement-preconditions.md",
 ];
 
 describe("agent frontmatter", () => {
@@ -353,7 +354,8 @@ describe("all referenced agents exist", () => {
     expect(agentNames).toContain("slice-verifier");
     expect(agentNames).toContain("land-worker");
     expect(agentNames).toContain("deviation-reporter");
-    expect(agentNames).toContain("architecture-scout");  });
+    expect(agentNames).toContain("architecture-scout");
+    expect(agentNames).toContain("implement-preconditions");  });
 
   test("agent names are in package subagents path", () => {
     expect(pkg.pi.subagents.agents).toContain("./agents");
@@ -661,9 +663,13 @@ describe("skill cross-references", () => {
     expect(content).toContain("code-reviewer");
   });
 
-  test("implement-task bug resource uses red-first regression test rule", () => {
-    const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
-    expect(content).toMatch(/red.{0,40}test|test.{0,40}red/i);
+  test("implement-task bug chain keeps the red-first regression test rule", () => {
+    // The rule lives in the diagnosing-bugs skill the worker receives; the
+    // task text never restates it.
+    const diagnosing = readFile("skills/engineering/diagnosing-bugs/SKILL.md");
+    expect(diagnosing).toMatch(/regression test .{0,40}before the fix/i);
+    const chain = readFile("skills/engineering/implement-task/scripts/ticket-chain.js");
+    expect(chain).not.toMatch(/regression test/i);
   });
 
   test("feature and bug resources include failure toolbelt in order", () => {
@@ -784,9 +790,10 @@ describe("skill cross-references", () => {
     expect(content).toContain("routes");
   });
 
-  test("implement-task bug resource references diagnosing-bugs skill", () => {
-    const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
-    expect(content).toContain("diagnosing-bugs");
+  test("implement-task bug chain references diagnosing-bugs skill", () => {
+    // The discipline routing moved into the shipped chain script.
+    const chain = readFile("skills/engineering/implement-task/scripts/ticket-chain.js");
+    expect(chain).toContain("diagnosing-bugs");
   });
 
   test("tdd-worker agent references diagnosing-bugs skill", () => {
@@ -1804,9 +1811,10 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
     expect(content).toContain("slice-verifier");
     expect(content).toContain("deviation-reporter");
     expect(content).toContain("land-worker");
-    expect(content).toMatch(/workflowScript/);
-    expect(content).toMatch(/runs\.run/);
-    expect(content).toMatch(/runs\.all/);
+    // The chain ships as a pre-canned workflow script; the step order,
+    // ok-gates, and keyed calls live there and are pinned by the
+    // chain call shapes tests below.
+    expect(content).toMatch(/scripts\/ticket-chain\.js/);
     expect(content).toMatch(/ok-gate|ok gate/i);
   });
 
@@ -1847,7 +1855,7 @@ describe("bug chain v4 (overhaul-execution-skills)", () => {
     expect(content).toContain("slice-verifier");
     expect(content).toContain("land-worker");
     expect(content).not.toContain("deviation-reporter");
-    expect(content).toMatch(/workflowScript/);
+    expect(content).toMatch(/scripts\/ticket-chain\.js/);
   });
 
   test("the bug doc and reproduction are referenced from the ticket body", () => {
@@ -1868,8 +1876,13 @@ describe("bug chain v4 (overhaul-execution-skills)", () => {
   });
 
   test("keeps the red-first regression rule and the diagnosing-bugs discipline", () => {
-    expect(content).toMatch(/red.{0,40}test|test.{0,40}red/i);
-    expect(content).toContain("diagnosing-bugs");
+    // The rule lives in the diagnosing-bugs skill; the script only routes the
+    // discipline via the skill field and never restates it.
+    const diagnosing = readFile("skills/engineering/diagnosing-bugs/SKILL.md");
+    expect(diagnosing).toMatch(/regression test .{0,40}before the fix/i);
+    const chain = readFile("skills/engineering/implement-task/scripts/ticket-chain.js");
+    expect(chain).toMatch(/skill: subtype === "bug" \? "diagnosing-bugs" : "tdd"/);
+    expect(chain).not.toMatch(/regression test/i);
   });
 
   test("no slice machinery, no ui-noter, no guidelines tool remains", () => {
@@ -1881,26 +1894,73 @@ describe("bug chain v4 (overhaul-execution-skills)", () => {
   });
 });
 
-describe("chain pseudocode call shapes (overhaul-execution-skills)", () => {
-  const files = [
+describe("chain call shapes (shipped ticket-chain.js)", () => {
+  const resources = [
     "skills/engineering/implement-task/resources/feature/autonomous.md",
     "skills/engineering/implement-task/resources/bug/autonomous.md",
   ];
+  const chain = readFile("skills/engineering/implement-task/scripts/ticket-chain.js");
 
-  test.each(files)("%s uses the real workflowScript call shapes, no retired chain API", (file) => {
+  test.each(resources)("%s launches the shipped chain script, no retired chain API", (file) => {
     const content = readFile(file);
-    // Pseudocode cannot be executed, so retired API shapes survive silently;
-    // pin the shape itself (the review caught a hybrid here once).
+    // The chain is real code now, not inline pseudocode: the resources must
+    // launch the shipped script with args instead of composing the chain.
+    expect(content).toMatch(/scripts\/ticket-chain\.js/);
+    expect(content).toMatch(/async: true/);
+    expect(content).toMatch(/args:/);
+    expect(content).not.toMatch(/workflowScript/);  // retired field name
     expect(content).not.toMatch(/\bas:\s*"/);      // retired chain-API labels
     expect(content).not.toMatch(/\{outputs\./);     // retired interpolation
     expect(content).not.toMatch(/\(runs\)\s*=>/);   // retired function-wrapper form
-    expect(content).toMatch(/runs\.run\("/);       // keyed call: runs.run(key, ...)
-    expect(content).toMatch(/await runs\.run/);      // results awaited before .ok reads
+    expect(content).toMatch(/implement-preconditions/);
+  });
+
+  test("the chain gates preconditions before any worker launches", () => {
+    expect(chain).toMatch(/await runs\.run\("gate"/);
+    expect(chain).toMatch(/agent: "implement-preconditions"/);
+    expect(chain).toMatch(/failed: "gate"/);
+    // The gate step precedes the tdd step in the script.
+    expect(chain.indexOf('runs.run("gate"')).toBeLessThan(chain.indexOf('runs.run("tdd"'));
+  });
+
+  test("re-runs pass pointers, never authored instructions", () => {
+    // extra is a labeled context-pointer slot, and the resources only ever
+    // fill it with paths: the recorded resolution, prior-attempt outputs.
+    expect(chain).toMatch(/Additional context, read before starting: /);
+    for (const file of resources) {
+      const content = readFile(file);
+      expect(content).toMatch(/args\.extra/);
+      expect(content).not.toMatch(/diagnosis\/fix instructions/);
+    }
+    // The uncertainty resolution is recorded in the ticket's .work/ and
+    // passed as a pointer.
+    expect(readFile(resources[0])).toMatch(/\.work\/resolution\.md/);
+  });
+
+  test("the chain script uses keyed awaited runs.run, no retired chain API", () => {
+    expect(chain).toMatch(/await runs\.run\("tdd"/);
+    expect(chain).toMatch(/await runs\.run\("verify"/);
+    expect(chain).toMatch(/await runs\.run\("land"/);
+    expect(chain).not.toMatch(/\bas:\s*"/);
+    expect(chain).not.toMatch(/\{outputs\./);
+    expect(chain).not.toMatch(/\(runs\)\s*=>/);
   });
 
   test("the feature chain fans out with runs.all; the bug chain stays sequential", () => {
-    expect(readFile(files[0])).toMatch(/await runs\.all/);
-    expect(readFile(files[1])).not.toMatch(/runs\.all/);
+    // One script, two shapes: the fan-out sits inside the feature branch,
+    // the bug branch verifies through a plain awaited runs.run.
+    const [beforeElse, afterElse] = chain.split("} else {");
+    expect(chain).toMatch(/subtype === "bug"/);
+    expect(beforeElse).toMatch(/runs\.all\(/);
+    expect(afterElse).not.toMatch(/runs\.all/);
+  });
+
+  test("the chain gates landing and reports failures structurally", () => {
+    expect(chain).toMatch(/if \(!pair\[0\]\.ok\)/);
+    expect(chain).toMatch(/if \(!pair\[1\]\.ok\)/);
+    expect(chain).toMatch(/if \(!verify\.ok\)/);
+    expect(chain).toMatch(/failed: "args"/);
+    expect(chain).toMatch(/landed: true/);
   });
 });
 
@@ -1928,6 +1988,21 @@ describe("chain agents v4 (overhaul-execution-skills)", () => {
     expect(content).not.toMatch(/slices\/archive|archive the slice/i);
     expect(content).not.toMatch(/state\.yaml/);
     expect(content).toMatch(/finalize/i);
+  });
+
+  test("implement-preconditions gates the chain read-only before any worker", () => {
+    const content = readFile("agents/implement-preconditions.md");
+    const fm = parseFrontmatter(content);
+    // Strict read-only ceiling: file reads plus workflow telemetry only.
+    expect(String(fm.tools)).toBe("read, submit_feedback");
+    expect(content).toMatch(/read-only/i);
+    expect(content).toMatch(/type: ticket/);
+    expect(content).toMatch(/mode: human/);
+    expect(content).toMatch(/subtype/);
+    expect(content).toMatch(/bug\s+doc\s+path and the reproduction\s+path/i);
+    // The refusal is the gate's job; submit_feedback is for workflow
+    // friction, not the refusal itself.
+    expect(content).toMatch(/not.*for the refusal itself|NOT use it for the refusal itself/i);
   });
 
   test("deviation-reporter writes frontmattered reports to the ticket directory", () => {
@@ -2015,10 +2090,21 @@ describe("standards direct reads (overhaul-execution-skills)", () => {
     for (const file of STANDARDS_FILES) expect(content).toContain(file);
   });
 
-  test("the chain prompts name the direct standards reads", () => {
+  test("the chain tasks carry pointers, not procedure", () => {
+    // Procedure lives in the agent definitions and skills (pinned by the
+    // agent tests); the composed tasks carry identity, pointers, and the
+    // tdd uncertainty anchor only.
+    const chain = readFile("skills/engineering/implement-task/scripts/ticket-chain.js");
+    expect(chain).toMatch(/Ticket doc: /);
+    expect(chain).toMatch(/Arch spec: docs\/tasks\//);
+    expect(chain).toMatch(/uncertainty\.md and stop/);
+    expect(chain).not.toMatch(/Before writing code/);
+    expect(chain).not.toMatch(/Commit after each GREEN/);
+    expect(chain).not.toMatch(/standards files/i);
+    expect(chain).not.toMatch(/Run lint and tests/);
+    expect(chain).not.toContain("get_guidelines");
     for (const kind of ["feature", "bug"]) {
       const content = readFile(`skills/engineering/implement-task/resources/${kind}/autonomous.md`);
-      expect(content).toContain("AGENTS.md");
       expect(content).not.toContain("get_guidelines");
     }
   });

@@ -27,6 +27,19 @@ differently:
 - **Bug tickets** run a lean red-first regression chain (tdd-worker,
   slice-verifier, land-worker) following the `diagnosing-bugs` discipline.
 
+Both implementation chains are one pre-canned workflow script,
+`scripts/ticket-chain.js` in the skill directory: the model resolves the
+ticket's parameters (effort, ticket, subtype, ticket and bug paths, plus
+runtime context pointers as `extra`: a recorded resolution, prior-attempt
+outputs) and launches it once with those `args`; the script owns the
+preconditions gate, step order, ok-gates, and output bindings, and returns a
+structured `{ ok, failed, step, refs }` result. Child tasks carry identity
+and pointers only; procedure lives in the agent definitions and the tdd /
+diagnosing-bugs skills. The gate is the read-only
+`implement-preconditions` agent (file reads plus workflow telemetry only):
+it refuses to launch any worker when the ticket doc does not exist, is
+human-owned, or does not match the dispatched subtype.
+
 **Human-owned tickets (`mode: human`) are hard-refused:** the router never
 launches chains for a marked ticket and does not fall through to the
 subtype pipeline. It hands back the invocation:
@@ -68,6 +81,8 @@ the last one's conversation.
 
 - Dispatches are per-ticket over the frontier, sequenced by dependency
   level, and each one reads the ticket's subtype, mode, and size.
+- A missing, mismatched, or human-owned ticket doc is refused by the
+  read-only preconditions gate before any worker launches.
 - A `mode: human` ticket produces a refusal and a handback, never an
   autonomous chain.
 - Feature chains verify through read-only agents before anything lands, and
