@@ -1,3 +1,8 @@
+---
+type: arch spec
+title: "Architecture spec: bug-workflow"
+status: stable
+---
 # Architecture spec: bug-workflow
 
 Approved by user. Stable across all slice chains.
