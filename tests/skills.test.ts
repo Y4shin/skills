@@ -2103,3 +2103,90 @@ describe("finalize-task v4 (overhaul-execution-skills)", () => {
     expectOnlySurvivingTools(content);
   });
 });
+
+// ─── Human-facing docs pages (backfill-skill-docs-pages) ────────────
+
+// The four H2 sections every finished page carries, in order (the AGENTS.md
+// docs-page mandate). The two pre-existing pages (eval-review, handoff)
+// already conform; the seam pins the whole promoted set.
+const DOC_PAGE_SECTIONS = [
+  "## What it does",
+  "## When to reach for it",
+  "## Common questions",
+  "## It's working if",
+];
+
+/** "./skills/<bucket>/<name>" -> { bucket, name }; pi.skills is the promoted-set single source of truth. */
+function promotedSkill(entry: string): { bucket: string; name: string } {
+  const parts = entry.split("/");
+  return { bucket: parts[2], name: parts[3] };
+}
+
+describe("human-facing docs pages (backfill-skill-docs-pages)", () => {
+  const pkg = JSON.parse(readFile("package.json"));
+  const promoted = (pkg.pi.skills as string[]).map(promotedSkill);
+
+  test("every promoted skill has a docs page", () => {
+    const missing: string[] = [];
+    for (const { bucket, name } of promoted) {
+      const rel = join("docs", bucket, `${name}.md`);
+      if (!existsSync(join(PROJECT, rel))) missing.push(rel);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  test("every docs page carries the four sections in order", () => {
+    for (const { bucket, name } of promoted) {
+      const content = readFile(join("docs", bucket, `${name}.md`));
+      const positions = DOC_PAGE_SECTIONS.map((s) => content.indexOf(s));
+      expect(
+        positions.every((p) => p >= 0),
+        `docs/${bucket}/${name}.md is missing one of: ${DOC_PAGE_SECTIONS.join(", ")}`,
+      ).toBe(true);
+      expect(positions, `docs/${bucket}/${name}.md sections out of order`).toEqual(
+        [...positions].sort((a, b) => a - b),
+      );
+    }
+  });
+
+  test("non-promoted buckets have no docs pages", () => {
+    // The docs tree mirrors only the two promoted buckets; misc/,
+    // in-progress/, and deprecated/ skills get no page.
+    for (const bucket of ["misc", "in-progress", "deprecated"]) {
+      const dir = join(PROJECT, "skills", bucket);
+      if (!existsSync(dir)) continue;
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const mirrored = join(PROJECT, "docs", bucket, `${entry.name}.md`);
+        expect(
+          existsSync(mirrored),
+          `docs page exists for non-promoted skill ${bucket}/${entry.name}`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  test("every tw_* tool named in a docs page is a surviving tool", () => {
+    for (const { bucket, name } of promoted) {
+      expectOnlySurvivingTools(readFile(join("docs", bucket, `${name}.md`)));
+    }
+  });
+
+  test("the seven flow pages describe the v4 effort-grouped tree", () => {
+    // The effort-grouped path is what distinguishes v4 prose from the v3
+    // maps/ subtree: each flow page must name the effort directory shape.
+    const flowPages = [
+      "wayfinder",
+      "to-spec",
+      "to-tickets",
+      "task-workflow-overview",
+      "task-workflow-doctor",
+      "implement-task",
+      "finalize-task",
+    ];
+    for (const name of flowPages) {
+      const content = readFile(join("docs", "engineering", `${name}.md`));
+      expect(content, `docs/engineering/${name}.md`).toMatch(/docs\/tasks\/<effort>\//);
+    }
+  });
+});
