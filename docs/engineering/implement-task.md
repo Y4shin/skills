@@ -40,6 +40,14 @@ diagnosing-bugs skills. The gate is the read-only
 it refuses to launch any worker when the ticket doc does not exist, is
 human-owned, or does not match the dispatched subtype.
 
+Both autonomous pipelines dispatch one read-only `implement-orchestrator`
+agent after their acceptance step: it works the frontier and dependency
+levels, launches the shipped chains, recovers gate refusals, records
+uncertainty resolutions through the scoped tool after asking the parent,
+and escalates splits and unresolved failures back as structured flags. The
+model composes the brief, answers the orchestrator's uncertainty questions,
+and handles its report; it never enters the execution loop.
+
 After the frontier empties, the feature path runs a second shipped
 workflow, `scripts/end-of-effort.js`: the advisory whole-effort review, the
 arch-spec reconcile, the coherence refactor (driven by an explicit list of
@@ -94,6 +102,9 @@ the last one's conversation.
   level, and each one reads the ticket's subtype, mode, and size.
 - A missing, mismatched, or human-owned ticket doc is refused by the
   read-only preconditions gate before any worker launches.
+- The autonomous path dispatches one read-only orchestrator and answers its
+  uncertainty questions; splits and exhausted retries come back as
+  structured flags, never as the model fixing code itself.
 - The end-of-effort wrap-up (review, spec reconcile, coherence, suite gate)
   runs as one workflow of delegated agents; the model never refactors or
   edits the spec itself.

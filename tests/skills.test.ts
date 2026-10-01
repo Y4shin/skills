@@ -46,6 +46,7 @@ const AGENT_FILES = [
   "agents/architecture-scout.md",
   "agents/skill-reviewer.md",
   "agents/implement-preconditions.md",
+  "agents/implement-orchestrator.md",
   "agents/coherence-refactorer.md",
   "agents/test-runner.md",
   "agents/spec-reconciler.md",
@@ -359,6 +360,7 @@ describe("all referenced agents exist", () => {
     expect(agentNames).toContain("deviation-reporter");
     expect(agentNames).toContain("architecture-scout");
     expect(agentNames).toContain("implement-preconditions");
+    expect(agentNames).toContain("implement-orchestrator");
     expect(agentNames).toContain("coherence-refactorer");
     expect(agentNames).toContain("test-runner");
     expect(agentNames).toContain("spec-reconciler");  });
@@ -1730,9 +1732,10 @@ describe("implement-task v4 (overhaul-execution-skills)", () => {
     expect(content).not.toMatch(/docs\/tasks\/\$\{taskSlug\}\/task\.md/);
   });
 
-  test("frontier mode runs tw_frontier over the effort, routing each item by subtype", () => {
+  test("frontier mode reads tw_frontier, planning inline, tickets via the orchestrator", () => {
     expect(content).toContain("tw_frontier <effort-slug>");
-    expect(content).toMatch(/routing each (item|ticket|task) by (its )?subtype/i);
+    expect(content).toMatch(/planning-subtype items on the ready\s+frontier/i);
+    expect(content).toMatch(/implement-orchestrator/);
   });
 
   test("references only surviving tools", () => {
@@ -1795,16 +1798,13 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
   });
 
   test("budgets key off the ticket's size with the m default, expressed as timeoutMs", () => {
-    expect(content).toMatch(/\|\|\s*"m"/);
-    expect(content).toMatch(/s:\s*15/);
-    expect(content).toMatch(/m:\s*30/);
-    expect(content).toMatch(/l:\s*45/);
-    expect(content).toMatch(/xl:\s*60/);
-    expect(content).toMatch(/\+50 percent|by 50 percent/i);
-    // The retired chain API's turnBudget has no current equivalent; the
-    // timeout is the honest lever.
-    expect(content).not.toMatch(/turnBudget/);
-    expect(content).toMatch(/timeoutMs/);
+    // The size-keyed budgets moved into the orchestrator's contract.
+    const orchestrator = readFile("agents/implement-orchestrator.md");
+    expect(orchestrator).toMatch(/absent means m/);
+    expect(orchestrator).toMatch(/s 15, m 30, l 45, xl 60/);
+    expect(orchestrator).toMatch(/timeoutMs/);
+    expect(orchestrator).toMatch(/50 percent/);
+    expect(orchestrator).not.toMatch(/turnBudget/);
   });
 
   test("chains run per ticket per dependency level, sequential within a level", () => {
@@ -1834,7 +1834,9 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
   });
 
   test("dispatch points the state file at the ticket", () => {
-    expect(content).toContain("tw_state_set task <ticket-slug>");
+    // The frontier loop and its state pointer moved into the orchestrator.
+    const orchestrator = readFile("agents/implement-orchestrator.md");
+    expect(orchestrator).toMatch(/tw_state_set task <slug>/);
   });
 
   test("the end-of-effort wrap-up is a shipped workflow, not parent work", () => {
@@ -1852,7 +1854,9 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
   });
 
   test("the uncertainty resolution goes through the scoped tool", () => {
-    expect(content).toMatch(/tw_resolve_uncertainty/);
+    // The uncertainty loop moved into the orchestrator's contract.
+    const orchestrator = readFile("agents/implement-orchestrator.md");
+    expect(orchestrator).toMatch(/tw_resolve_uncertainty/);
   });
 
   test("no slice machinery, no ui-noter, no guidelines tool remains", () => {
@@ -1888,12 +1892,11 @@ describe("bug chain v4 (overhaul-execution-skills)", () => {
   });
 
   test("budgets key off the ticket's size with the m default", () => {
-    expect(content).toMatch(/\|\|\s*"m"/);
-    expect(content).toMatch(/s:\s*15/);
-    expect(content).toMatch(/m:\s*30/);
-    expect(content).toMatch(/l:\s*45/);
-    expect(content).toMatch(/xl:\s*60/);
-    expect(content).not.toMatch(/turnBudget/);
+    // The size-keyed budgets moved into the orchestrator's contract.
+    const orchestrator = readFile("agents/implement-orchestrator.md");
+    expect(orchestrator).toMatch(/absent means m/);
+    expect(orchestrator).toMatch(/s 15, m 30, l 45, xl 60/);
+    expect(orchestrator).not.toMatch(/turnBudget/);
   });
 
   test("keeps the red-first regression rule and the diagnosing-bugs discipline", () => {
@@ -1928,7 +1931,7 @@ describe("chain call shapes (shipped ticket-chain.js)", () => {
     // launch the shipped script with args instead of composing the chain.
     expect(content).toMatch(/scripts\/ticket-chain\.js/);
     expect(content).toMatch(/async: true/);
-    expect(content).toMatch(/args:/);
+    expect(content).toMatch(/args/);
     expect(content).not.toMatch(/workflowScript/);  // retired field name
     expect(content).not.toMatch(/\bas:\s*"/);      // retired chain-API labels
     expect(content).not.toMatch(/\{outputs\./);     // retired interpolation
@@ -1967,9 +1970,19 @@ describe("chain call shapes (shipped ticket-chain.js)", () => {
       expect(content).toMatch(/args\.extra/);
       expect(content).not.toMatch(/diagnosis\/fix instructions/);
     }
-    // The uncertainty resolution is recorded in the ticket's .work/ and
-    // passed as a pointer.
-    expect(readFile(resources[0])).toMatch(/\.work\/resolution\.md/);
+    // The uncertainty resolution is recorded through the scoped tool and
+    // re-runs point at it.
+    const orchestrator = readFile("agents/implement-orchestrator.md");
+    expect(orchestrator).toMatch(/tw_resolve_uncertainty/);
+    expect(orchestrator).toMatch(/pointing at the recorded resolution/);
+  });
+
+  test("both pipelines dispatch the read-only orchestrator, never the loop themselves", () => {
+    for (const file of resources) {
+      const content = readFile(file);
+      expect(content).toMatch(/agent: "implement-orchestrator"/);
+      expect(content).not.toMatch(/tw_dependency_levels\(effortSlug\)/);
+    }
   });
 
   test("the chain script uses keyed awaited runs.run, no retired chain API", () => {
@@ -2103,6 +2116,17 @@ describe("chain agents v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/finalize/i);
   });
 
+  test("implement-orchestrator executes the frontier read-only", () => {
+    const content = readFile("agents/implement-orchestrator.md");
+    const fm = parseFrontmatter(content);
+    expect(String(fm.tools)).toBe("read, subagent, submit_feedback, tw_get, tw_frontier, tw_dependency_levels, tw_show, tw_state_set, tw_resolve_uncertainty, contact_supervisor");
+    expect(String(fm.allowedAgents)).toBe("implement-preconditions, tdd-worker, slice-verifier, deviation-reporter, land-worker, spec-reconciler");
+    expect(content).toMatch(/never edit code or files/i);
+    expect(content).toMatch(/needsSplit/);
+    expect(content).toMatch(/escalate/);
+    expect(content).toMatch(/spec-reconciler/);
+  });
+
   test("implement-preconditions gates the chain read-only before any worker", () => {
     const content = readFile("agents/implement-preconditions.md");
     const fm = parseFrontmatter(content);
@@ -2144,7 +2168,7 @@ describe("failure splits v4 (overhaul-execution-skills)", () => {
   test.each([[feature, "feature"], [bug, "bug"]] as const)(
     "the %s toolbelt splits into sub-tickets registered in the effort",
     (content, kind) => {
-      expect(content).toMatch(/sub-tickets registered in the effort/i);
+      expect(content).toMatch(/sub-tickets\s+registered in the effort/i);
       expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<sub-ticket-slug>\/ticket\.md/);
       // No ad-hoc slice docs: the split never writes a slices/ file or a
       // split status mark.

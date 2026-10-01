@@ -21,57 +21,50 @@ const bugPath = <from the ticket body>
 const reproPath = <from the ticket body>
 ```
 
-## Step 1  --  Single chain dispatch
+## Step 1  --  Orchestrator dispatch
 
-Run one sequential chain that shares the repo working directory:
-`tdd-worker → slice-verifier → land-worker`, with an ok-gate blocking landing
-on verify. The chain ships as a pre-canned workflow script,
-`scripts/ticket-chain.js` in this skill's directory (shared with the feature
-pipeline): resolve its path against this skill's directory, launch it once
-with `async: true` and the ticket's parameters as `args`, and it returns
-`{ ok, failed?, step?, refs }` (`step` is the failed step's receipt for
-diagnosis, `refs` the durable output references). Each child task is
-composed from identity and pointers only; procedure lives in the agent
-definitions and the tdd / diagnosing-bugs skills, and the caller never
-authors worker prompts. It opens with the
-read-only `implement-preconditions` gate: the chain refuses to run when
-the ticket doc does not exist, is human-owned, or does not match the
-dispatched subtype; on a gate refusal, re-resolve the ticket, rebuild the
-args, and relaunch once (a second refusal goes to the user; the failure
-toolbelt never applies). Point the state file at the ticket before the
-chain runs: `tw_state_set task <ticket-slug>`.
+Run the ticket through the read-only orchestrator: one `implement-orchestrator`
+child executes it end to end. The chain itself ships as a pre-canned workflow
+script, `scripts/ticket-chain.js` in this skill's directory (shared with the
+feature pipeline): `tdd-worker → slice-verifier → land-worker`, with an
+ok-gate blocking landing on verify and host-enforced deliverable gates. Each
+child task is composed from identity and pointers only; procedure lives in
+the agent definitions and the tdd / diagnosing-bugs skills, and no caller
+ever authors worker prompts. The chain opens with the read-only
+`implement-preconditions` gate: it refuses to run when the ticket doc does
+not exist, is human-owned, or does not match the dispatched subtype. The
+orchestrator owns the dispatch, the size-keyed budgets, the state pointer,
+the gate-refusal recovery, and the uncertainty loop; it returns a structured
+report (`landed[]`, `needsSplit?`, `escalate?`, planning problems).
 
-> **Async dispatch (hard rule):** launch this chain with `async: true`. Never
-> run a blocking/foreground subagent. After dispatching, call `wait({ id })` to
-> receive the result while keeping the turn alive; the run is then tracked,
-> interruptible, and steerable.
+> **Async dispatch (hard rule):** launch the orchestrator with `async: true`.
+> Never run a blocking/foreground subagent. After dispatching, return
+> control; Pi wakes this session on completion or attention, so no wait call
+> is needed. Supervisor questions from the orchestrator are uncertainty asks:
+> run `ask_user_question` and reply through the channel.
 
 ```
-// Budgets come from the ticket's size; absent means m, never an error.
-size = tw_get(ticketPath, "size") || "m"
-budgetMinutes = { s: 15, m: 30, l: 45, xl: 60 }
-const timeoutMs = (budgetMinutes[size] || budgetMinutes.m) * 60 * 1000
-
-// Resolve the chain script's path against this skill's directory,
-// then launch it once per ticket.
 runId = subagent({
     async: true,
-    timeoutMs,
-    workflow: "<skill-dir>/scripts/ticket-chain.js",
-    args: {
-        effort: effortSlug,
-        ticket: ticketSlug,
-        ticketPath: ticketPath,
-        subtype: "bug",
-        bugPath: bugPath,
-        reproPath: reproPath
-    }
+    agent: "implement-orchestrator",
+    task: [
+        'Execute the ticket frontier for bug effort "${effortSlug}" (subtype bug; the single ticket ${ticketSlug}).',
+        "",
+        "Ticket doc: ${ticketPath}",
+        "Bug doc: ${bugPath}",
+        "Reproduction: ${reproPath}",
+        "Chain workflow: <absolute path to scripts/ticket-chain.js, resolved against this skill's directory>",
+        "Follow your contract; return the structured report."
+    ].join("\n")
 })
 
-// No independent work between dispatch and result  --  block for the chain.
-// wait() keeps the turn alive for notifications and keeps the run steerable.
-wait({ id: runId })
-result = <the chain's return: { ok, failed?, step?, refs }>
+// Return control; Pi wakes this session when the orchestrator finishes or
+// asks. Answer its supervisor questions (uncertainty asks) with
+// ask_user_question and reply through the channel.
+result = <the orchestrator's report: landed[], needsSplit?, escalate?, planning problems>
+
+// On result.needsSplit: register the split per the failure toolbelt below,
+// then re-dispatch the orchestrator. On result.escalate: ask the user.
 ```
 
 The ticket's `workflow_state` is NOT marked here: finalize-task owns the
@@ -104,19 +97,24 @@ marks the ticket's `workflow_state`).
 
 ## Failure toolbelt (parent never implements)
 
-Hard rule: on subagent failure the parent never implements. Its only moves are re-dispatch strategies, applied in this order:
+Hard rule: the parent never implements. In-flight recovery belongs to the
+orchestrator: it diagnoses from the failed step's output, re-runs an atomic
+ticket once with `timeoutMs` increased by 50% and `args.extra` pointing at
+the prior attempt, and stops at boundaries. What returns to the parent is
+an escalation, and the parent's only moves are:
 
-1. **Diagnose first**  --  read worker outputs and any partial diff. A budget-exhausted tdd-worker attempt is the preferred diagnostic; its findings seed the sub-ticket breakdown. Never blindly redo.
-2. **First failure → split**  --  split the ticket into sub-tickets registered in the effort: write each to
+1. **needsSplit -- register the split** -- split the ticket into sub-tickets
+   registered in the effort: write each to
    `docs/tasks/<effort>/tickets/<sub-ticket-slug>/ticket.md` with v4
    frontmatter (inherited subtype, size from the diagnosis, `blocked_by`
    inheriting the original's edges and chained between the subs), and
    supersede the original as `status: deprecated` plus `workflow_state: done`
    with a body note naming its sub-tickets. The split rules in the feature
-   pipeline's failure toolbelt apply here in full. Exception: if the ticket is
-   already atomic, skip to retry.
-3. **Second attempt → retry +50%**  --  re-run the chain with timeoutMs increased by 50% and args.extra pointing at the failed step's output reference (and any recorded resolution), so the worker re-reads its prior attempt. Never author prompt instructions for the worker; pass pointers.
-4. **Backstop → escalate**  --  after two consecutive retries still fail, ask the user: "Two retries for ticket {ticket} failed. Should I increase budgets further, relax constraints, or skip this ticket?"
+   pipeline's failure toolbelt apply here in full. Then re-dispatch the
+   orchestrator.
+2. **escalate -- ask the user** -- "Two retries for ticket {ticket} failed.
+   Should I increase budgets further, relax constraints, or skip this
+   ticket?"
 
 Hard rule: the parent context is large and expensive; routing through workers is always cheaper than pulling the fix into the parent. The parent never writes code or edits files as a fix.
 
