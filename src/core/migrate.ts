@@ -9,6 +9,10 @@
  * All I/O goes through the port, which is what makes failure injection and
  * in-memory fixture tests possible.
  *
+ * Every destination is claimed by exactly one source: a second source
+ * mapping to a claimed destination is reported for human eyes instead of
+ * silently overwriting the earlier write.
+ *
  * The real v4 model is imported (fromFrontmatter, validateCombination,
  * TYPE_LEAVES, TYPE_LEAF from core/art.ts; fromObject / toObject /
  * freshState from core/state.ts), so the layout and type tables stay in one
@@ -72,7 +76,9 @@ export interface HumanItem {
     | "unresolvable-ref"
     | "dead-pointer"
     | "unparseable"
-    | "normalized-combination";
+    | "normalized-combination"
+    | "no-slug"
+    | "destination-collision";
   path: string;
   detail: string;
 }
@@ -513,12 +519,25 @@ function vintageLocation(
   if (i === -1) return { archived: false, effort: null, slug: null };
   const rest = parts.slice(i + 1);
 
-  // `maps/archive/<map>/...`: an archived map subtree.
+  // `maps/archive/<map>/...`: an archived map subtree. A map carries its
+  // tickets and tasks in `(tickets|tasks)/<slug>/` containers, so the slug
+  // is the directory after the container, mirroring the archive branch
+  // below.
   if (rest[0] === "maps" && rest[1] === "archive") {
+    if ((rest[3] === "tickets" || rest[3] === "tasks") && rest[4] !== undefined) {
+      return { archived: true, effort: rest[2] ?? null, slug: rest[4] };
+    }
     return { archived: true, effort: rest[2] ?? null, slug: null };
   }
-  // `maps/<map>/...`: the live map subtree.
+  // `maps/<map>/...`: the live map subtree. A live map holds its tickets
+  // and tasks in `(tickets|tasks)/<slug>/` containers the same way, so the
+  // slug is the directory after the container. Without it every ticket of
+  // the subtree collapsed onto one `tickets/null/` destination and only the
+  // last write survived.
   if (rest[0] === "maps") {
+    if ((rest[2] === "tickets" || rest[2] === "tasks") && rest[3] !== undefined) {
+      return { archived: false, effort: rest[1] ?? null, slug: rest[3] };
+    }
     return { archived: false, effort: rest[1] ?? null, slug: null };
   }
   // `archive/<dir>/...`: the v3 archive. For a map the dir is the effort;
@@ -556,6 +575,10 @@ interface Plan {
   moves: Array<{ from: string; to: string }>;
   /** Destination path -> new content, for rewrites and adds. */
   writes: Map<string, string>;
+  /** Destination path -> the source path that claimed it. Two different
+   * sources claiming one destination is a collision: the first claim stands
+   * and the rest are reported, so no write is silently overwritten. */
+  claims: Map<string, string>;
   /** Paths to remove. */
   deletes: string[];
   /** Paths reported but left in place. */
@@ -581,6 +604,7 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
   const plan: Plan = {
     moves: [],
     writes: new Map(),
+    claims: new Map(),
     deletes: [],
     needsHuman: [],
     changes: [],
@@ -806,22 +830,24 @@ function reorganize(
           const dest = inContainer
             ? `${base}/${anchor.effort}/${(anchor as { container: string }).container}/${loc.slug ?? ""}/${basenameOf(path)}`
             : `${base}/${anchor.effort}/${basenameOf(path)}`;
-          stageMoveIfNeeded(path, dest, plan);
-          plan.writes.set(
-            dest,
-            dumpVerified(dest, {
-              type: "out-of-scope note",
-              title:
-                titleFromBody(doc0(tree, path).body) ?? basenameOf(path).replace(/\.md$/, ""),
-              status: "stable",
-            }, doc0(tree, path).body),
-          );
-          plan.changes.push({
-            action: "move",
-            path: dest,
-            from: path,
-            detail: `moved '${path}' beside its effort at '${dest}' with conformant frontmatter`,
-          });
+          if (claimDest(plan, dest, path)) {
+            stageMoveIfNeeded(path, dest, plan);
+            plan.writes.set(
+              dest,
+              dumpVerified(dest, {
+                type: "out-of-scope note",
+                title:
+                  titleFromBody(doc0(tree, path).body) ?? basenameOf(path).replace(/\.md$/, ""),
+                status: "stable",
+              }, doc0(tree, path).body),
+            );
+            plan.changes.push({
+              action: "move",
+              path: dest,
+              from: path,
+              detail: `moved '${path}' beside its effort at '${dest}' with conformant frontmatter`,
+            });
+          }
         }
         continue;
       }
@@ -831,22 +857,25 @@ function reorganize(
         title: titleFromBody(doc0(tree, path).body) ?? basenameOf(path).replace(/\.md$/, ""),
         status: "stable",
       };
-      stageMoveIfNeeded(path, dest, plan);
-      plan.writes.set(dest, dumpVerified(dest, data, doc0(tree, path).body));
-      plan.changes.push({
-        action: dest === path ? "rewrite" : "move",
-        path: dest,
-        from: dest === path ? undefined : path,
-        detail: `backfilled frontmatter on '${dest}'`,
-      });
+      if (claimDest(plan, dest, path)) {
+        stageMoveIfNeeded(path, dest, plan);
+        plan.writes.set(dest, dumpVerified(dest, data, doc0(tree, path).body));
+        plan.changes.push({
+          action: dest === path ? "rewrite" : "move",
+          path: dest,
+          from: dest === path ? undefined : path,
+          detail: `backfilled frontmatter on '${dest}'`,
+        });
+      }
       continue;
     }
 
     const type = effectiveType(doc.data);
     if (type === null) continue;
 
-    const dest = v4Home(path, type, doc.data, loc, placement, archSpecCount);
+    const dest = v4Home(path, type, doc.data, loc, placement, archSpecCount, plan.needsHuman);
     if (dest === null) continue;
+    if (!claimDest(plan, dest, path)) continue;
 
     const shaped = shapeFrontmatter(doc.data, type, plan.needsHuman, dest);
     const content = dumpVerified(dest, shaped, doc.body);
@@ -974,6 +1003,7 @@ function v4Home(
   loc: { archived: boolean; effort: string | null; slug: string | null },
   placement: Map<string, { effort: string; container: string; archived: boolean }>,
   archSpecCount: Map<string, number>,
+  needsHuman: HumanItem[],
 ): string | null {
   const base = loc.archived ? ARCHIVE : TASK_ROOT;
   const slug = loc.slug;
@@ -1003,6 +1033,18 @@ function v4Home(
   if (type === "task" || type === "ticket") {
     const effort = loc.effort ?? effortFromFrontmatter(data) ?? (slug ?? "");
     if (effort === "") return null;
+    if (slug === null) {
+      // Never interpolate: a null slug in the template below becomes the
+      // literal text `null`, and every slugless artifact of an effort would
+      // collapse onto one `tickets/null/` destination. Report and skip, the
+      // same bail-out the empty-effort guard above performs.
+      needsHuman.push({
+        kind: "no-slug",
+        path,
+        detail: `'${path}' is a ${type} whose slug cannot be derived from its path; it is left in place`,
+      });
+      return null;
+    }
     const container = type === "task" ? "tasks" : "tickets";
     const leaf = TYPE_LEAF[type] ?? `${type}.md`;
     return `${base}/${effort}/${container}/${slug}/${leaf}`;
@@ -1017,6 +1059,29 @@ function v4Home(
 function stageMoveIfNeeded(from: string, to: string, plan: Plan): void {
   if (from === to) return;
   plan.moves.push({ from, to });
+}
+
+/**
+ * Claim a destination for a source.
+ *
+ * The first claim stands. A later, different source is reported for human
+ * eyes and stages nothing: a would-be silent overwrite (the collapse that
+ * loses every earlier file) becomes a needs-human item instead. This is the
+ * backstop for any future destination bug: it can surface as a report, but
+ * never again as silent data loss.
+ */
+function claimDest(plan: Plan, dest: string, source: string): boolean {
+  const claimed = plan.claims.get(dest);
+  if (claimed === undefined || claimed === source) {
+    plan.claims.set(dest, source);
+    return true;
+  }
+  plan.needsHuman.push({
+    kind: "destination-collision",
+    path: dest,
+    detail: `'${source}' would also land at '${dest}', already claimed by '${claimed}'; '${source}' is left in place`,
+  });
+  return false;
 }
 
 // ─── Step 2: rebuild state.yaml ───────────────────────────────────────────────
@@ -1044,12 +1109,14 @@ function rebuildState(tree: TreePort, paths: string[], plan: Plan, from: number)
   const obj: Record<string, unknown> = { schema_version: 4, ...toObject(state) };
   const content = stringifyYaml(obj);
   if (safeRead(tree, STATE_PATH) !== content) {
-    plan.writes.set(STATE_PATH, content);
-    plan.changes.push({
-      action: "rewrite",
-      path: STATE_PATH,
-      detail: `rebuilt state.yaml at schema_version 4 (from vintage ${from})`,
-    });
+    if (claimDest(plan, STATE_PATH, STATE_PATH)) {
+      plan.writes.set(STATE_PATH, content);
+      plan.changes.push({
+        action: "rewrite",
+        path: STATE_PATH,
+        detail: `rebuilt state.yaml at schema_version 4 (from vintage ${from})`,
+      });
+    }
   }
 }
 
@@ -1196,23 +1263,25 @@ function reportRest(tree: TreePort, paths: string[], plan: Plan, vendoredRoots: 
       });
     }
     const pointer = `${dirnameOf(root)}/${basenameOf(root)}.pointer.md`;
-    plan.writes.set(
-      pointer,
-      dumpVerified(
+    if (claimDest(plan, pointer, root)) {
+      plan.writes.set(
         pointer,
-        {
-          type: "out-of-scope note",
-          title: `Vendored tree moved: ${basenameOf(root)}`,
-          status: "stable",
-        },
-        `\nThe vendored tree formerly at \`${root}\` now lives at \`${dest}\`.\n`,
-      ),
-    );
-    plan.changes.push({
-      action: "add",
-      path: pointer,
-      detail: `left a pointer at '${pointer}' naming the vendored tree's new home`,
-    });
+        dumpVerified(
+          pointer,
+          {
+            type: "out-of-scope note",
+            title: `Vendored tree moved: ${basenameOf(root)}`,
+            status: "stable",
+          },
+          `\nThe vendored tree formerly at \`${root}\` now lives at \`${dest}\`.\n`,
+        ),
+      );
+      plan.changes.push({
+        action: "add",
+        path: pointer,
+        detail: `left a pointer at '${pointer}' naming the vendored tree's new home`,
+      });
+    }
   }
 
   // Unresolvable blocked_by references: reported, never dropped silently.
@@ -1331,12 +1400,14 @@ function writeIndex(tree: TreePort, plan: Plan, paths: string[]): void {
   };
   const content = dumpVerified(INDEX_PATH, data, body);
   if (safeRead(tree, INDEX_PATH) === content) return;
-  plan.writes.set(INDEX_PATH, content);
-  plan.changes.push({
-    action: "add",
-    path: INDEX_PATH,
-    detail: `wrote '${INDEX_PATH}' with okf_version "${OKF_VERSION}" and the tree listing`,
-  });
+  if (claimDest(plan, INDEX_PATH, INDEX_PATH)) {
+    plan.writes.set(INDEX_PATH, content);
+    plan.changes.push({
+      action: "add",
+      path: INDEX_PATH,
+      detail: `wrote '${INDEX_PATH}' with okf_version "${OKF_VERSION}" and the tree listing`,
+    });
+  }
 }
 
 // ─── Step 5: bundle files ─────────────────────────────────────────────────────
@@ -1348,21 +1419,25 @@ function backfillBundleFiles(tree: TreePort, paths: string[], plan: Plan): void 
     const data: FrontmatterData = { type: "changelog", title: "Task Changelog" };
     const content = dumpVerified(CHANGELOG_PATH, data, body);
     if (safeRead(tree, CHANGELOG_PATH) !== content) {
-      plan.writes.set(CHANGELOG_PATH, content);
-      plan.changes.push({
-        action: "rewrite",
-        path: CHANGELOG_PATH,
-        detail: `backfilled frontmatter on '${CHANGELOG_PATH}'`,
-      });
+      if (claimDest(plan, CHANGELOG_PATH, CHANGELOG_PATH)) {
+        plan.writes.set(CHANGELOG_PATH, content);
+        plan.changes.push({
+          action: "rewrite",
+          path: CHANGELOG_PATH,
+          detail: `backfilled frontmatter on '${CHANGELOG_PATH}'`,
+        });
+      }
     }
   } else {
     const data: FrontmatterData = { type: "changelog", title: "Task Changelog" };
-    plan.writes.set(CHANGELOG_PATH, dumpVerified(CHANGELOG_PATH, data, "\n# Task Changelog\n"));
-    plan.changes.push({
-      action: "add",
-      path: CHANGELOG_PATH,
-      detail: `created '${CHANGELOG_PATH}' with conformant frontmatter`,
-    });
+    if (claimDest(plan, CHANGELOG_PATH, CHANGELOG_PATH)) {
+      plan.writes.set(CHANGELOG_PATH, dumpVerified(CHANGELOG_PATH, data, "\n# Task Changelog\n"));
+      plan.changes.push({
+        action: "add",
+        path: CHANGELOG_PATH,
+        detail: `created '${CHANGELOG_PATH}' with conformant frontmatter`,
+      });
+    }
   }
 
   const oosReadme = `${TASK_ROOT}/out-of-scope/README.md`;
@@ -1374,14 +1449,16 @@ function backfillBundleFiles(tree: TreePort, paths: string[], plan: Plan): void 
       title: "out-of-scope",
       status: "stable",
     };
-    plan.moves.push({ from: oosReadme, to: oosIndex });
-    plan.writes.set(oosIndex, dumpVerified(oosIndex, data, body));
-    plan.changes.push({
-      action: "move",
-      path: oosIndex,
-      from: oosReadme,
-      detail: `moved '${oosReadme}' to '${oosIndex}' with conformant frontmatter`,
-    });
+    if (claimDest(plan, oosIndex, oosReadme)) {
+      plan.moves.push({ from: oosReadme, to: oosIndex });
+      plan.writes.set(oosIndex, dumpVerified(oosIndex, data, body));
+      plan.changes.push({
+        action: "move",
+        path: oosIndex,
+        from: oosReadme,
+        detail: `moved '${oosReadme}' to '${oosIndex}' with conformant frontmatter`,
+      });
+    }
   }
 }
 

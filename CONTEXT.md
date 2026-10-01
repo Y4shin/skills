@@ -59,8 +59,9 @@ v4 effort-grouped OKF bundle. It is a tested unit (`src/core/migrate.ts`),
 invoked through a CLI by `setup-workflow`'s migrate branch, not a tool in the
 registered surface. Its non-negotiables: every rewrite is YAML-verified
 before it lands, a failure leaves the tree untouched (files and directories),
-a second run is a no-op, and an interrupted run resumes. It is the only
-writer of `schema_version: 4`.
+a second run is a no-op, an interrupted run resumes, and a destination is
+claimed by one source only (a collision is reported for human eyes, never
+silently overwritten). It is the only writer of `schema_version: 4`.
 _Avoid_: upgrade (that is the per-version resource file; the migration is the
 whole transformation)
 

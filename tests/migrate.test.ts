@@ -881,6 +881,159 @@ describe("migrate: no two files collapse to one destination", () => {
     const destinations = report.changes.map((c) => c.path);
     expect(new Set(destinations).size).toBe(destinations.length);
   });
+
+  test("a destination claimed by two different sources is reported, never overwritten", () => {
+    // With slugs derived for map-subtree artifacts, a flat task and a
+    // map-subtree task of the same effort and slug compute one destination.
+    // The second write used to silently replace the first (data loss); the
+    // collision must surface as a needs-human item instead, with both
+    // sources preserved.
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: effort\ntask: null\n",
+      "docs/tasks/maps/effort/map.md":
+        "---\nkind: map\nslug: effort\ntitle: Effort\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/alpha/task.md":
+        "---\nkind: task\ntype: feature\nslug: alpha\ntitle: Alpha flat\nmap: effort\n" +
+        "status: done\nblocked_by: []\n---\n\nflat body\n",
+      "docs/tasks/maps/effort/tasks/alpha/task.md":
+        "---\nkind: task\ntype: feature\nslug: alpha\ntitle: Alpha map\nmap: effort\n" +
+        "status: done\nblocked_by: []\n---\n\nmap body\n",
+    });
+    const report = migrate(tree);
+    const files = tree.snapshot();
+
+    // The first claimant lands; the later one is left in place, not lost.
+    expect(files["docs/tasks/effort/tickets/alpha/ticket.md"]).toContain("flat body");
+    expect(files["docs/tasks/maps/effort/tasks/alpha/task.md"]).toContain("map body");
+    expect(files["docs/tasks/alpha/task.md"]).toBeUndefined();
+
+    const collision = report.needsHuman.find((h) => h.kind === "destination-collision");
+    expect(collision).toBeDefined();
+    expect(collision?.path).toBe("docs/tasks/effort/tickets/alpha/ticket.md");
+    expect(collision?.detail).toContain("docs/tasks/maps/effort/tasks/alpha/task.md");
+    expect(collision?.detail).toContain("docs/tasks/alpha/task.md");
+
+    // A re-run stages nothing and re-reports the unresolved collision.
+    const second = migrate(tree);
+    const after = tree.snapshot();
+    expect(second.noop).toBe(true);
+    expect(second.changes).toEqual([]);
+    expect(after["docs/tasks/effort/tickets/alpha/ticket.md"]).toContain("flat body");
+    expect(after["docs/tasks/maps/effort/tasks/alpha/task.md"]).toContain("map body");
+    expect(second.needsHuman.some((h) => h.kind === "destination-collision")).toBe(true);
+  });
+});
+
+describe("migrate: map subtrees with tickets", () => {
+  test("every ticket of a live map keeps its own directory", () => {
+    // The regression: a live `maps/<map>/tickets/<slug>/` subtree yielded a
+    // null slug, so every ticket interpolated into `tickets/null/` and only
+    // the last write survived. Reported from a downstream repo where 12
+    // tickets collapsed to one file.
+    const tree = port({
+      "docs/tasks/state.yaml": "slice: null\nschema_version: 3\nmap: phase1\ntask: null\n",
+      "docs/tasks/maps/phase1/map.md":
+        "---\nkind: map\nslug: phase1\ntitle: Phase one\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/maps/phase1/tickets/a/ticket.md":
+        "---\nkind: ticket\ntype: feature\nslug: a\ntitle: Ticket A\nmap: phase1\n" +
+        "status: ready\nblocked_by: []\n---\n\nbody of ticket a\n",
+      "docs/tasks/maps/phase1/tickets/b/ticket.md":
+        "---\nkind: ticket\ntype: bug\nslug: b\ntitle: Ticket B\nmap: phase1\n" +
+        "status: done\nblocked_by: []\n---\n\nbody of ticket b\n",
+    });
+    const report = migrate(tree);
+    const files = tree.snapshot();
+
+    expect(files["docs/tasks/phase1/tickets/a/ticket.md"]).toContain("body of ticket a");
+    expect(files["docs/tasks/phase1/tickets/b/ticket.md"]).toContain("body of ticket b");
+    expect(files["docs/tasks/phase1/tickets/null/ticket.md"]).toBeUndefined();
+    expect(files["docs/tasks/maps/phase1/tickets/a/ticket.md"]).toBeUndefined();
+    expect(files["docs/tasks/maps/phase1/tickets/b/ticket.md"]).toBeUndefined();
+
+    // The collapse's report symptom: one destination line per ticket.
+    const destinations = report.changes.filter((c) => c.action === "move").map((c) => c.path);
+    expect(new Set(destinations).size).toBe(destinations.length);
+  });
+
+  test("an aux file beside a map-subtree ticket moves with it", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: phase1\ntask: null\n",
+      "docs/tasks/maps/phase1/map.md":
+        "---\nkind: map\nslug: phase1\ntitle: Phase one\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/maps/phase1/tickets/a/ticket.md":
+        "---\nkind: ticket\ntype: feature\nslug: a\ntitle: Ticket A\nmap: phase1\n" +
+        "status: ready\nblocked_by: []\n---\n\nbody of ticket a\n",
+      "docs/tasks/maps/phase1/tickets/a/findings.md":
+        "---\nkind: finding\ntask: a\nmap: phase1\ntitle: Findings A\n---\n\nfindings of a\n",
+    });
+    migrate(tree);
+    const files = tree.snapshot();
+
+    expect(files["docs/tasks/phase1/tickets/a/ticket.md"]).toContain("body of ticket a");
+    expect(files["docs/tasks/phase1/tickets/a/findings.md"]).toContain("findings of a");
+  });
+
+  test("every ticket of an archived map keeps its own directory", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
+      "docs/tasks/maps/archive/phase1/map.md":
+        "---\nkind: map\nslug: phase1\ntitle: Phase one\nstatus: done\ntasks: []\n---\n",
+      "docs/tasks/maps/archive/phase1/tickets/a/ticket.md":
+        "---\nkind: ticket\ntype: feature\nslug: a\ntitle: Ticket A\nmap: phase1\n" +
+        "status: done\nblocked_by: []\n---\n\nbody of ticket a\n",
+    });
+    migrate(tree);
+    const files = tree.snapshot();
+
+    expect(files["docs/tasks/archive/phase1/tickets/a/ticket.md"]).toContain("body of ticket a");
+    expect(files["docs/tasks/archive/phase1/tickets/null/ticket.md"]).toBeUndefined();
+  });
+
+  test("a ticket whose slug cannot be derived is reported and left in place", () => {
+    // A ticket sitting directly under a live map (no tickets/<slug>/
+    // container) has no derivable slug. It must be reported for human eyes,
+    // never interpolated into a `null` path segment.
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: phase1\ntask: null\n",
+      "docs/tasks/maps/phase1/map.md":
+        "---\nkind: map\nslug: phase1\ntitle: Phase one\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/maps/phase1/ticket.md":
+        "---\nkind: ticket\ntype: feature\nslug: stray\ntitle: Stray\nmap: phase1\n" +
+        "status: ready\nblocked_by: []\n---\n\nstray body\n",
+    });
+    const report = migrate(tree);
+    const files = tree.snapshot();
+
+    expect(files["docs/tasks/maps/phase1/ticket.md"]).toContain("stray body");
+    expect(
+      Object.keys(files).filter((p) => p.split("/").includes("null")),
+    ).toEqual([]);
+    const item = report.needsHuman.find(
+      (h) => h.kind === "no-slug" && h.path === "docs/tasks/maps/phase1/ticket.md",
+    );
+    expect(item).toBeDefined();
+  });
+
+  test("a second run over the migrated tree is a no-op", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 3\nmap: phase1\ntask: null\n",
+      "docs/tasks/maps/phase1/map.md":
+        "---\nkind: map\nslug: phase1\ntitle: Phase one\nstatus: active\ntasks: []\n---\n",
+      "docs/tasks/maps/phase1/tickets/a/ticket.md":
+        "---\nkind: ticket\ntype: feature\nslug: a\ntitle: Ticket A\nmap: phase1\n" +
+        "status: ready\nblocked_by: []\n---\n\nbody of ticket a\n",
+      "docs/tasks/maps/phase1/tickets/b/ticket.md":
+        "---\nkind: ticket\ntype: bug\nslug: b\ntitle: Ticket B\nmap: phase1\n" +
+        "status: done\nblocked_by: []\n---\n\nbody of ticket b\n",
+    });
+    const first = migrate(tree);
+    expect(first.noop).toBe(false);
+    const before = tree.snapshot();
+    const second = migrate(tree);
+    expect(second.noop).toBe(true);
+    expect(second.changes).toEqual([]);
+    expect(tree.snapshot()).toEqual(before);
+  });
 });
 
 describe("migrate: scope", () => {
