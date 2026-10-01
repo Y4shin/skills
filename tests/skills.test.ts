@@ -1098,7 +1098,8 @@ const DELETED_SURFACE_PATTERN = new RegExp(`\\b(${DELETED_SURFACE_NAMES.join("|"
 // Historical-record exemptions (the arch spec's zero-references contract):
 // documents that record the deleted surface as it was keep the names that
 // were live when written. Archived task trees are already skipped wholesale
-// by the corpus walk's archive rule.
+// by the corpus walk's archive rule; pending changeset entries are release
+// notes for the removal and name the removed tools by necessity.
 const DEAD_SURFACE_EXEMPT_FILES = new Set([
   "docs/tasks/CHANGELOG.md",
   "docs/tasks/maps/task-tools-overhaul/map.md",
@@ -1110,6 +1111,7 @@ const DEAD_SURFACE_EXEMPT_FILES = new Set([
 ]);
 const DEAD_SURFACE_EXEMPT_PREFIXES = [
   "docs/ideas/",
+  ".changeset/",
   "docs/tasks/overhaul-dead-surface/",
   "docs/tasks/overhaul-execution-skills/",
   "docs/tasks/tool-surface-inventory/",
