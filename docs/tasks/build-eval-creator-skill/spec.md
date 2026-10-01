@@ -1,3 +1,9 @@
+---
+type: spec
+title: Eval-creator skill
+status: draft
+---
+
 # Spec: eval-creator skill
 
 > Map `pi-harness-evals`. Synthesizes the map's settled decisions, the
