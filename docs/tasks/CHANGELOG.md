@@ -6,6 +6,39 @@ title: Task Changelog
 
 # task-workflow
 
+## 4.0.0
+
+### Major Changes
+
+- 5816b6b: The v4 tool-surface overhaul: the tool family is renamed to the `tw_` prefix
+  (`tw_show`, `tw_get`, `tw_set`, `tw_list`, `tw_frontier`,
+  `tw_dependency_levels`, `tw_finalizable`, `tw_map_finalizable`, `tw_state`,
+  `tw_state_set`, `tw_context`) and the registered surface shrinks to exactly
+  those 11 tools plus `notify_user`. Removed: `tw_resolve`, `tw_assert_kind`,
+  `tw_map_tasks`, `tw_map_tick`, `tw_slices`, `tw_set_slices`, the guidelines
+  feature (`get_guidelines`/`list_guidelines` and the system-prompt injection;
+  standards are read directly from repo files), and the slice machinery (skills
+  read standards files directly; chains are per-ticket over the effort
+  frontier). The schema reference (`tw_context`) now tells the v4 truth: the
+  effort-grouped `docs/tasks/` tree with decision tasks and implementation
+  tickets, OKF frontmatter, `workflow_state` alongside `status`, and the
+  state file with lossless round-trips. `setup-workflow` migrates any vintage
+  to `schema_version: 4` in one idempotent, resumable hop. All 29 promoted
+  skills now have human-facing docs pages under `docs/<bucket>/`.
+
+### Minor Changes
+
+- 7b55637: New `eval-review` skill: multi-criterion review of Inspect-based eval suites
+  for the pi harness (contract validity, outcome grading, isolation and
+  baseline-vs-treatment soundness, scorer integrity, with optional
+  simulated-user integrity and trial/saturation axes), plus a single-pass
+  run-triage mode classifying failures as scorer bug, skill defect, or spec
+  mismatch. Companion to the planned `eval-creator`.
+
+### Patch Changes
+
+- f00215d: Migration fix: the schema 3 to 4 migration collapsed every ticket of a live `maps/<map>/tickets/<slug>/` subtree onto one `tickets/null/ticket.md` destination (a downstream repo lost 11 of 12 tickets, recovered from git). Map-subtree slugs are now derived from the directory after the `tickets/`/`tasks/` container (live and archived map subtrees alike), a slugless task or ticket is reported as a `no-slug` needs-human item and left in place instead of interpolated, and every staging site claims its destination first so a second source becomes a `destination-collision` needs-human item rather than a silent overwrite. Red-first regressions cover the two-ticket fixture, aux anchoring, the archived-map subtree, the slugless ticket, the deliberate two-source collision, and re-run idempotence.
+
 ## 3.0.0
 
 ### Major Changes
