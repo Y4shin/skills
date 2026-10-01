@@ -110,7 +110,7 @@
 
 ### The harness runs green on the installed pi (0.80.10)
 
-`tests/integration/session.test.ts` (16 tests) **passes** on the installed
+`tests/integration/session.test.ts` (10 tests) **passes** on the installed
 `@earendil-works/pi-coding-agent` 0.80.10. An earlier revision of this doc
 recorded a `TypeError: Cannot read properties of undefined (reading
 'inMemory')` at `harness.ts:138` (`AuthStorage.inMemory()`); that was a

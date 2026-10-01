@@ -76,3 +76,16 @@ Gates on the merged branch (verified independently before landing,
 re-run after merge): 372/372 in `tests/skills.test.ts`, full suite
 733/733 across 14 files, `tsc --noEmit` clean; no lint script is
 configured.
+
+### Coherence pass (post-review)
+
+The advisory two-axis review (Standards plus Spec) flagged two page
+inaccuracies, both fixed: the implement-task page now states the real
+feature chain (slice-verifier and deviation-reporter run in parallel
+behind an ok-gate, not a failure-triggered deviation report), and the
+tdd page gained the standards direct reads the arch spec requires.
+`docs/testing.md`'s session.test.ts count was corrected from 16 to 10
+(the guidelines describe removed by overhaul-dead-surface). The
+review's remaining judgement calls (stale v3 map flags, the unused
+`Bool` helper deferred by the dead-surface deviation report, the
+pending changeset) are recorded there and left to finalize/release.

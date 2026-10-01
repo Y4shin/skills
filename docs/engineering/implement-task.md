@@ -21,8 +21,9 @@ differently:
   architecture spec at `docs/tasks/<effort>/arch-spec.md` (written with you,
   user-approved, committed before the first chain dispatch), then
   `tw_dependency_levels <effort-slug>` orders per-ticket chains that
-  dispatch a tdd-worker (red-green loop), a read-only slice-verifier, a
-  deviation-reporter when verification fails, and a land-worker per ticket.
+  dispatch a tdd-worker (red-green loop), then a read-only slice-verifier
+  and a deviation-reporter in parallel behind an ok-gate on both, then a
+  land-worker per ticket.
 - **Bug tickets** run a lean red-first regression chain (tdd-worker,
   slice-verifier, land-worker) following the `diagnosing-bugs` discipline.
 

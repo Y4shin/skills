@@ -27,7 +27,10 @@ The core claims:
   loop (it belongs to review).
 
 When exploring the codebase it reads `CONTEXT.md` for domain vocabulary and
-respects ADRs, so test names speak the project's language.
+respects ADRs, so test names speak the project's language. It also reads
+the **standards files directly** for project conventions: `AGENTS.md` and
+`CONTEXT.md` at the repo root, `docs/standards.md` when present, and
+`docs/testing.md`. There is no guidelines tool in the middle.
 
 ## When to reach for it
 
