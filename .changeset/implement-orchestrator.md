@@ -1,5 +1,0 @@
----
-"task-workflow": minor
----
-
-implement-task: dispatch a read-only `implement-orchestrator` agent for the autonomous execution phase. After the arch-spec conversation (features) or ticket resolution (bugs), the skill launches one orchestrator child (tools: read, subagent, submit_feedback, tw_get, tw_frontier, tw_dependency_levels, tw_show, tw_state_set, tw_resolve_uncertainty, contact_supervisor; allowedAgents restricted to the chain agents plus spec-reconciler) that works the frontier and dependency levels, launches the shipped per-ticket chains, recovers gate refusals, records uncertainty resolutions through the scoped tool after asking the parent over the supervisor channel, re-runs atomic failures once at +50%, and returns a structured report. Splits and exhausted retries come back as needsSplit/escalate flags; the parent owns sub-ticket registration, the end-of-effort workflow, graph updates, and Wayfinder. The dispatch prose now matches the runtime: async dispatch returns control and Pi wakes the session (no wait call), and supervisor questions are answered with ask_user_question.

@@ -18,12 +18,11 @@ metadata:
 > one turn.
 
 > **Async dispatch (hard rule):** every `subagent(...)` call in this skill's
-> resources -- orchestrator, chains, and any fan-out -- MUST be launched
-> with `async: true`. Never run a blocking/foreground subagent. After
-> dispatching, return control; Pi wakes this session on completion or
-> attention, so no wait call is needed to receive the result. When a
-> running child asks a question through the supervisor channel, answer it:
-> run `ask_user_question` and reply through the channel.
+> resources -- ticket chains and any fan-out -- MUST be launched with
+> `async: true`. Never run a blocking/foreground subagent. After dispatching,
+> call `wait({ id })` (or `wait()` / `wait({ all: true })`) to receive the
+> result while keeping the turn alive; async runs are tracked, interruptible,
+> and steerable.
 
 ## Routing
 
@@ -99,23 +98,15 @@ are met.
 
 ## Effort frontier mode
 
-When invoked with an effort: run any planning-subtype items on the ready
-frontier (`tw_frontier <effort-slug>`) inline per their own resources -- they
-are deliberately non-coding and often need you or the user -- then dispatch
-ONE `implement-orchestrator` child (`async: true`) to execute the effort's
-tickets. The orchestrator is read-only: it works the frontier and dependency
-levels, launches the shipped per-ticket chains, and escalates back. The
-frontier is the effort graph's ready edge: tickets whose `blocked_by`
-dependencies are all done. Everything after its return is yours: split
-registration per the resource's split rules, the end-of-effort workflow,
-graph updates, and Wayfinder. Planning and discovery tasks may add new
-tickets or reveal fog; update the graph and return to Wayfinder when a new
-decision must be made, after the orchestrator returns. Do not invent a
-separate specification or ticket phase.
+When invoked with an effort, work the ready frontier from
+`tw_frontier <effort-slug>`, routing each item by its subtype. The frontier is
+the effort graph's ready edge: tickets whose `blocked_by` dependencies are all
+done. Planning and discovery tasks may add new tickets or reveal fog; update
+the graph and return to Wayfinder when a new decision must be made. Do not
+invent a separate specification or ticket phase.
 
-The `feature` and `bug` resources are the implementation pipelines; both
-dispatch the orchestrator after their acceptance step. The other resources
-are deliberately non-coding pipelines.
+The `feature` and `bug` resources are the implementation pipelines. The other
+resources are deliberately non-coding pipelines.
 
 If no subtype is present, `subtype` defaults to `feature` (after the `type`
 fallback).

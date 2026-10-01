@@ -53,13 +53,13 @@ Present the complete spec to the user. One conversation. Iterate if needed.
 Once approved, write it to `docs/tasks/<effort>/arch-spec.md` with
 `status: stable`, and commit it on the starting branch.
 
-## Step 2 -- Orchestrator dispatch
+## Step 2 -- Per-ticket chain dispatch
 
-> **Async dispatch (hard rule):** launch the orchestrator with `async: true`.
-> Never run a blocking/foreground subagent. After dispatching, return
-> control; Pi wakes this session on completion or attention, so no wait call
-> is needed. Supervisor questions from the orchestrator are uncertainty asks:
-> run `ask_user_question` and reply through the channel.
+> **Async dispatch (hard rule):** launch every chain with `async: true`. Never
+> block on a foreground subagent. After dispatching a ticket's chain, call
+> `wait({ id })` to receive its result before moving on -- tickets within a
+> level run sequentially on a shared repo cwd, so there is no parallel work
+> meanwhile. The run stays tracked, interruptible, and steerable.
 
 The effort's tickets form a **ticket graph** with blocking relationships: each
 ticket declares its `blocked_by` dependencies, and the **frontier** is the set
@@ -89,52 +89,91 @@ Each ticket runs as a **sequential chain** that shares the repo working
 directory: `tdd-worker → (slice-verifier ∥ deviation-reporter) → land-worker`,
 with an ok-gate blocking landing on verify plus deviation. The chain ships
 as a pre-canned workflow script, `scripts/ticket-chain.js` in this skill's
-directory (shared with the bug pipeline): you pass its resolved absolute
-path in the orchestrator's brief, and the read-only `implement-orchestrator`
-agent launches it once per ticket with the ticket's parameters as `args`.
-The script owns the preconditions gate, the step order, the ok-gates, the
-host-enforced deliverable gates, and the per-step output bindings; each
-child task is composed from identity and pointers only, and procedure
-lives in the agent definitions and the tdd / diagnosing-bugs skills, so no
-caller ever authors worker prompts. The gate is the read-only
-`implement-preconditions` agent: it refuses to launch any worker when the
-ticket doc does not exist, is human-owned, or does not match the dispatched
-subtype. The chain returns `{ ok, failed?, step?, refs }`: `step` is the
-failed step's receipt for the orchestrator's diagnosis, `refs` the durable
+directory (shared with the bug pipeline): resolve its path against this
+skill's directory, launch it once per ticket with `async: true` and the
+ticket's parameters as `args`, and it owns the preconditions gate, the step
+order, the ok-gates, and the per-step output bindings. Each child task is composed from identity
+and pointers only; procedure lives in the agent definitions and the tdd /
+diagnosing-bugs skills, and the caller never authors worker prompts. The gate
+is the
+read-only `implement-preconditions` agent: it refuses to launch any worker
+when the ticket doc does not exist, is human-owned, or does not match the
+dispatched subtype. It returns `{ ok, failed?, step?, refs }`:
+`step` is the failed step's receipt for diagnosis, `refs` the durable
 output references gathered before the failure.
 
 ```
-// Planning-subtype items on the frontier already ran inline. One dispatch
-// executes the effort's tickets; the parent never enters the loop itself:
-runId = subagent({
-    async: true,
-    agent: "implement-orchestrator",
-    task: [
-        'Execute the ticket frontier for effort "${effortSlug}" (subtype feature).',
-        "",
-        "Arch spec: docs/tasks/${effortSlug}/arch-spec.md (user-approved, stable)",
-        "Chain workflow: <absolute path to scripts/ticket-chain.js, resolved against this skill's directory>",
-        "Follow your contract; return the structured report."
-    ].join("\n")
-})
+levels = JSON.parse(tw_dependency_levels(effortSlug)).levels
 
-// Return control; Pi wakes this session when the orchestrator finishes or
-// asks. Answer its supervisor questions (uncertainty asks) with
-// ask_user_question and reply through the channel.
-result = <the orchestrator's report: landed[], needsSplit?, escalate?, planning problems>
+for each level in levels:
+    for each ticket in level:   // sequential: chains share the repo cwd
+        // Budgets come from the ticket's size; absent means m, never an error.
+        size = tw_get(ticketPath, "size") || "m"
+        budgetMinutes = { s: 15, m: 30, l: 45, xl: 60 }
+        const timeoutMs = (budgetMinutes[size] || budgetMinutes.m) * 60 * 1000
 
-if result.needsSplit:
-    // The orchestrator diagnosed a ticket that must split. You own the
-    // registration: apply the split rules below, then re-dispatch the
-    // orchestrator for the remaining frontier.
-if result.escalate:
-    // The ticket exhausted its re-run. Ask the user: increase budgets
-    // further, relax constraints, or skip the ticket?
-if result.planning problems:
-    // Surface them to the user; graph updates and Wayfinder run after the
-    // orchestrator returns, per the skill's frontier mode.
+        // Point the state file at the ticket its chain is about to run.
+        tw_state_set task <ticket-slug>
 
-// success path: every frontier ticket landed on its landing branch
+        // Resolve the chain script's path against this skill's directory,
+        // then launch it once per ticket.
+        runId = subagent({
+            async: true,
+            timeoutMs,
+            workflow: "<skill-dir>/scripts/ticket-chain.js",
+            args: {
+                effort: effortSlug,
+                ticket: ticket,
+                ticketPath: ticketPath,
+                subtype: "feature"
+            }
+        })
+
+        // Tickets within a level run sequentially (shared repo cwd), so block
+        // for this chain before dispatching the next. No parallel work meanwhile.
+        wait({ id: runId })
+        result = <the chain's return: { ok, failed?, step?, refs }>
+
+        // Process the chain result
+        if result.failed == "gate":
+            // The preconditions refused this dispatch: wrong effort/ticket/
+            // path, a human-owned ticket, or a subtype mismatch. Re-resolve
+            // the ticket, rebuild the args, and relaunch once; a second
+            // refusal goes to the user. The failure toolbelt (diagnose,
+            // split, retry, escalate) never applies to a gate refusal.
+
+        if exists docs/tasks/${effortSlug}/tickets/${ticket}/.work/uncertainty.md:
+            // tdd-worker hit uncertainty and stopped (the ok-gate aborted before land)
+            // This is a designed-for escape hatch -- record that it fired.
+            submit_feedback({ kind: "expected", data: `feature: tdd-worker uncertainty stop on ticket ${ticket}` })
+            resolution = ask_user_question({
+                header: "Uncertain",
+                question: `TDD worker hit uncertainty in ticket ${ticket}:\n{read docs/tasks/${effortSlug}/tickets/${ticket}/.work/uncertainty.md}`
+            })
+            // Record the resolution through the scoped tool: it writes
+            // docs/tasks/<effort>/tickets/<ticket>/.work/resolution.md,
+            // deletes the uncertainty file, and can do nothing else.
+            resolutionPath = tw_resolve_uncertainty({
+                selector: ticketPath,
+                resolution: <the user's resolution>
+            })
+            // Re-route to tdd-worker. Do NOT do the work yourself -- parent context is expensive.
+            re-launch the chain for this ticket with the same args plus
+            extra: "<resolutionPath> (the recorded resolution)"
+            continue
+
+        // On chain failure, apply the failure toolbelt below
+        // (diagnose → split → retry +50% → escalate). Never fix code yourself.
+
+        // success path: ticket landed on its landing branch
+
+    // After each level: read the level's deviation reports (planning input,
+    // not implementation). Where actual API surfaces diverged, dispatch the
+    // spec-reconciler agent (read plus edit on the arch spec only) with
+    // pointers to the reports and the pending tickets; the parent never
+    // edits the spec itself. If a deviation reveals a workflow/planning
+    // problem (ambiguous spec, wrong interface contract), surface it to the
+    // user. Do NOT report the deviation itself -- that's a project finding.
 ```
 
 The ticket is NOT marked done here: finalize-task owns the marking, one
@@ -206,18 +245,13 @@ finalize marks each ticket's `workflow_state`).
 
 ## Failure toolbelt (parent never implements)
 
-Hard rule: the parent never implements. In-flight recovery belongs to the
-orchestrator: it diagnoses from the failed step's output, re-runs an atomic
-ticket once with `timeoutMs` increased by 50 percent and `args.extra`
-pointing at the prior attempt, and stops at boundaries. What returns to the
-parent is an escalation, and the parent's only moves are:
+Hard rule: on subagent failure the parent never implements. Its only moves are re-dispatch strategies, applied in this order:
 
-1. **needsSplit -- register the split** -- split the ticket into sub-tickets
-   registered in the effort, per the split rules below, then re-dispatch the
-   orchestrator for the remaining frontier.
-2. **escalate -- ask the user** -- "Two retries for ticket {ticket} failed.
-   Should I increase budgets further, relax constraints, or skip this
-   ticket?"
+1. **Diagnose first** -- read worker outputs and any partial diff. Never blindly redo.
+2. **First failure -> split** -- split the ticket into sub-tickets registered in the effort, per the split rules below. Exception: if the ticket is
+   already atomic, skip to retry.
+3. **Second attempt -> retry +50%** -- re-run the chain with timeoutMs increased by 50 percent and args.extra pointing at the failed step's output reference (and any recorded resolution), so the worker re-reads its prior attempt. Never author prompt instructions for the worker; pass pointers.
+4. **Backstop -> escalate** -- after two consecutive retries still fail, ask the user: "Two retries for ticket {ticket} failed. Should I increase budgets further, relax constraints, or skip this ticket?"
 
 **Split rules (sub-tickets, never ad-hoc files).** A split decomposes the
 failed ticket into sub-tickets that the effort's graph absorbs; no ad-hoc
