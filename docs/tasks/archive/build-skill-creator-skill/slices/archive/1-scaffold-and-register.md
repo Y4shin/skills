@@ -6,7 +6,7 @@ task: ../task.md
 mode: afk
 status: done
 size: s
-blocked_by: []
+legacy_blocked_by: []
 ---
 
 # Slice 1: Scaffold + frontmatter + trigger description + register

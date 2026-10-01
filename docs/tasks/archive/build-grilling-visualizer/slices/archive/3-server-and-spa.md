@@ -6,7 +6,7 @@ task: ../task.md
 mode: afk
 status: done
 size: l
-blocked_by:
+legacy_blocked_by:
 - cli-core-and-state
 ---
 

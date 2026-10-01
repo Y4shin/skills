@@ -6,7 +6,7 @@ task: ../task.md
 mode: hitl
 status: todo
 size: l
-blocked_by:
+legacy_blocked_by:
   - human-mode-resource-routing
 ---
 

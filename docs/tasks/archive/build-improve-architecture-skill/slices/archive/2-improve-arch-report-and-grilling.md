@@ -6,7 +6,7 @@ task: ../task.md
 mode: afk
 status: done
 size: m
-blocked_by: [improve-arch-skill-and-scout]
+legacy_blocked_by: [improve-arch-skill-and-scout]
 ---
 
 # Slice 2: Wire the report generation, grilling/no-grill, and wayfinder handoff

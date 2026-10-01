@@ -6,7 +6,7 @@ task: ../task.md
 mode: hitl
 status: done
 size: m
-blocked_by: []
+legacy_blocked_by: []
 ---
 
 Implement the compatible three-resource layout for feature and bug execution. Keep `resources/feature.md` and `resources/bug.md` as slim routers, move the current autonomous behavior into `resources/feature/autonomous.md` and `resources/bug/autonomous.md`, and add routing for clear human/manual invocation prose with confirmation for ambiguous intent.

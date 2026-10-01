@@ -6,7 +6,7 @@ task: ../task.md
 mode: afk
 status: done
 size: l
-blocked_by: []
+legacy_blocked_by: []
 ---
 
 # Slice 1: Author the skill + scout agent + vendor the CDN deps

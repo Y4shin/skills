@@ -6,7 +6,7 @@ task: ../task.md
 mode: afk
 status: done
 size: l
-blocked_by: [code-review-skill-content]
+legacy_blocked_by: [code-review-skill-content]
 ---
 
 # Slice 2: Create the code-reviewer agent + wire it into implement-task

@@ -6,7 +6,7 @@ task: ../task.md
 mode: hitl
 status: done
 size: m
-blocked_by: []
+legacy_blocked_by: []
 ---
 
 Update the integration harness's in-memory authentication/model-registry setup to match the installed Pi coding-agent API, preserving the faux provider and existing session tests.

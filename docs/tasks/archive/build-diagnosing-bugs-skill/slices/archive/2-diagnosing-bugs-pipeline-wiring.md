@@ -6,7 +6,7 @@ task: ../task.md
 mode: afk
 status: todo
 size: m
-blocked_by: [diagnosing-bugs-skill-content]
+legacy_blocked_by: [diagnosing-bugs-skill-content]
 ---
 
 # Slice 2: Wire /diagnosing-bugs into the bug pipeline + the tdd-worker line

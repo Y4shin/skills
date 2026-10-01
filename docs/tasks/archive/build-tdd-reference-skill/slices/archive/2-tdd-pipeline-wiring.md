@@ -6,7 +6,7 @@ task: ../task.md
 mode: afk
 status: done
 size: m
-blocked_by: [tdd-skill-content]
+legacy_blocked_by: [tdd-skill-content]
 ---
 
 # Slice 2: Wire /tdd into the pipeline and relocate the refactor step

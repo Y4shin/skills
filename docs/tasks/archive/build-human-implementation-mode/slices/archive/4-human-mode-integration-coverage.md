@@ -5,7 +5,7 @@ title: Integrate and regression-test human implementation mode
 task: ../task.md
 mode: hitl
 status: done
-blocked_by:
+legacy_blocked_by:
   - human-mode-feature-pipeline
   - human-mode-bug-pipeline
 ---

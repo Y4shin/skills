@@ -6,7 +6,7 @@ task: ../task.md
 mode: afk
 status: done
 size: m
-blocked_by: []
+legacy_blocked_by: []
 ---
 
 # Slice 1: Author the /diagnosing-bugs skill and register it

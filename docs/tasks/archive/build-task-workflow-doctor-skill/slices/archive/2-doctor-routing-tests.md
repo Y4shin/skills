@@ -6,7 +6,7 @@ task: ../task.md
 mode: afk
 status: todo
 size: s
-blocked_by: [doctor-skill-and-resources]
+legacy_blocked_by: [doctor-skill-and-resources]
 ---
 
 # Slice 2: Add routing xref assertions

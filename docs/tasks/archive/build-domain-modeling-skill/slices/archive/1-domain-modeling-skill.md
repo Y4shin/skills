@@ -6,7 +6,7 @@ task: ../task.md
 mode: hitl
 status: todo
 size: m
-blocked_by: []
+legacy_blocked_by: []
 ---
 
 Add the model-invoked `/domain-modeling` skill, register it in the package manifest, and add structure/cross-reference coverage.

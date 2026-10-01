@@ -6,7 +6,7 @@ task: ../task.md
 mode: afk
 status: done
 size: m
-blocked_by: []
+legacy_blocked_by: []
 started_at:
 completed_at: 2026-07-30T17:10:00Z
 ---

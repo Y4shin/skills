@@ -6,7 +6,7 @@ task: ../task.md
 mode: afk
 status: todo
 size: m
-blocked_by: []
+legacy_blocked_by: []
 ---
 
 # Slice 1: Author the task-workflow-doctor skill + resources and register it
