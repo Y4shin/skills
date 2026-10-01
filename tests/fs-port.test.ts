@@ -21,6 +21,7 @@ import {
   readdirSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { join, relative } from "node:path";
@@ -200,6 +201,36 @@ describe("FsPort: corruption safety on real disk", () => {
       expect(() => port.commit({ failAfterWrites: 1 })).toThrow();
       expect(existsSync(join(root, "docs/tasks/created.md"))).toBe(false);
       expect(snapshot(root)).toEqual(before);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("FsPort: the tree walk tolerates symlink hazards", () => {
+  test("a dangling symlink outside the bundle is skipped, not fatal", () => {
+    // The reproduction from the live 3-to-4 run: a gitignored experiment
+    // tree carries .devenv pointers to ephemeral runtime dirs, and statSync
+    // (which follows links) threw ENOENT, killing the whole migration
+    // before anything was staged.
+    const root = mkTmp();
+    try {
+      seedV3(root);
+      mkdirSync(join(root, "prototype-bundle/.devenv"), { recursive: true });
+      symlinkSync(
+        "/run/user/1000/nowhere-devenv",
+        join(root, "prototype-bundle/.devenv/run"),
+      );
+      const port = new FsPort(root);
+      const paths = port.list();
+      expect(paths).toContain("docs/tasks/state.yaml");
+      expect(paths).not.toContain("prototype-bundle/.devenv/run");
+      // The full migration over the same tree still runs to completion.
+      const report = migrate(port);
+      expect(report.noop).toBe(false);
+      expect(
+        readFileSync(join(root, "docs/tasks/state.yaml"), "utf-8"),
+      ).toContain("schema_version: 4");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
