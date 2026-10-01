@@ -2,7 +2,7 @@
 kind: map
 slug: task-tools-overhaul
 title: Research the task-workflow end to end and overhaul its extension tools
-status: active
+status: deprecated
 tasks:
 - slug: tool-surface-inventory
   blocked_by: []

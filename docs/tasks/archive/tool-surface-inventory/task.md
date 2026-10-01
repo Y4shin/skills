@@ -4,8 +4,9 @@ type: research
 slug: tool-surface-inventory
 title: Catalog every tool and hook the extension registers, at contract level
 map: task-tools-overhaul
-status: done
+status: deprecated
 blocked_by: []
+workflow_state: done
 ---
 
 ## The precise question

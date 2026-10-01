@@ -4,10 +4,11 @@ type: grilling
 slug: overhaul-synthesis-grilling
 title: Fold R1 + R2 into overhaul decisions (gap matrix, keep/rework/delete, schema v4) via grilling
 map: task-tools-overhaul
-status: done
+status: deprecated
 blocked_by:
 - tool-surface-inventory
 - workflow-tool-usage-audit
+workflow_state: done
 ---
 
 ## The decision to settle

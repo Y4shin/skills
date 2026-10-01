@@ -4,12 +4,13 @@ type: feature
 slug: overhaul-dead-surface
 title: Delete the dead tool surface (zero references remain)
 map: task-tools-overhaul
-status: done
+status: deprecated
 blocked_by:
 - overhaul-planning-skills
 - overhaul-execution-skills
 slices:
 - overhaul-dead-surface
+workflow_state: done
 ---
 
 ## What to build

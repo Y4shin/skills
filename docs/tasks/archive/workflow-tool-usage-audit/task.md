@@ -4,8 +4,9 @@ type: research
 slug: workflow-tool-usage-audit
 title: Map how every step of the workflow (wayfinder to implement-task and supporting skills) actually uses the tools
 map: task-tools-overhaul
-status: done
+status: deprecated
 blocked_by: []
+workflow_state: done
 ---
 
 ## The precise question

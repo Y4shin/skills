@@ -4,7 +4,7 @@ type: feature
 slug: backfill-skill-docs-pages
 title: Backfill human-facing docs pages for promoted skills
 map: task-tools-overhaul
-status: done
+status: deprecated
 blocked_by:
 - overhaul-dead-surface
 slices:
