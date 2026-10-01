@@ -4,8 +4,9 @@ type: prototype
 slug: pi-headless-isolation-spike
 title: Spike - prove hermetic headless pi runs for evals
 map: pi-harness-evals
-status: done
+status: deprecated
 blocked_by: []
+workflow_state: done
 ---
 
 ## Decision to settle

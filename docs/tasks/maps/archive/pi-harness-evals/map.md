@@ -2,7 +2,7 @@
 kind: map
 slug: pi-harness-evals
 title: Eval-creator skill, Inspect-based eval suites for pi skills and extensions
-status: active
+status: deprecated
 tasks:
 - slug: eval-stack-research
   blocked_by: []

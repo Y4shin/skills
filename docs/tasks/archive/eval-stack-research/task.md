@@ -4,8 +4,9 @@ type: research
 slug: eval-stack-research
 title: Capture the eval-stack facts into a durable findings file
 map: pi-harness-evals
-status: done
+status: deprecated
 blocked_by: []
+workflow_state: done
 ---
 
 ## Decision to settle
