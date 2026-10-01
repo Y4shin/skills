@@ -20,9 +20,9 @@ metadata:
 > **Async dispatch (hard rule):** every `subagent(...)` call in this skill's
 > resources -- ticket chains and any fan-out -- MUST be launched with
 > `async: true`. Never run a blocking/foreground subagent. After dispatching,
-> call `wait({ id })` (or `wait()` / `wait({ all: true })`) to receive the
-> result while keeping the turn alive; async runs are tracked, interruptible,
-> and steerable.
+> return control; Pi wakes this session on completion or attention, so no
+> wait call is needed to receive the result. Async runs stay tracked,
+> interruptible, and steerable either way.
 
 ## Routing
 

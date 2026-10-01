@@ -42,9 +42,9 @@ toolbelt never applies). Point the state file at the ticket before the
 chain runs: `tw_state_set task <ticket-slug>`.
 
 > **Async dispatch (hard rule):** launch this chain with `async: true`. Never
-> run a blocking/foreground subagent. After dispatching, call `wait({ id })` to
-> receive the result while keeping the turn alive; the run is then tracked,
-> interruptible, and steerable.
+> run a blocking/foreground subagent. After dispatching, return control; Pi
+> wakes this session on completion or attention, so no wait call is needed;
+> the run stays tracked, interruptible, and steerable.
 
 ```
 // Budgets come from the ticket's size; absent means m, never an error.
@@ -68,9 +68,8 @@ runId = subagent({
     }
 })
 
-// No independent work between dispatch and result  --  block for the chain.
-// wait() keeps the turn alive for notifications and keeps the run steerable.
-wait({ id: runId })
+// Return control after dispatching; Pi wakes this session with the chain's
+// result, tracked, interruptible, and steerable.
 result = <the chain's return: { ok, failed?, step?, refs }>
 ```
 
@@ -90,7 +89,8 @@ reviewId = subagent({
   task: `Review the bug-fix diff for ticket ${ticket}. Fixed point: the starting branch. Spec source: the bug doc plus its reproduction.`
 })
 
-wait({ id: reviewId })
+// Return control after dispatching; Pi wakes this session with the review
+// result. Then read it and surface the findings to the user.
 ```
 
 Read `review/result.md` and surface the findings to the user.

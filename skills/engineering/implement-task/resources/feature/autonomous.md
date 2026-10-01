@@ -56,10 +56,11 @@ Once approved, write it to `docs/tasks/<effort>/arch-spec.md` with
 ## Step 2 -- Per-ticket chain dispatch
 
 > **Async dispatch (hard rule):** launch every chain with `async: true`. Never
-> block on a foreground subagent. After dispatching a ticket's chain, call
-> `wait({ id })` to receive its result before moving on -- tickets within a
-> level run sequentially on a shared repo cwd, so there is no parallel work
-> meanwhile. The run stays tracked, interruptible, and steerable.
+> block on a foreground subagent. After dispatching a ticket's chain, return
+> control; Pi wakes this session when it completes, so no wait call is needed
+> -- tickets within a level run sequentially on a shared repo cwd, so there
+> is no parallel work meanwhile. The run stays tracked, interruptible, and
+> steerable.
 
 The effort's tickets form a **ticket graph** with blocking relationships: each
 ticket declares its `blocked_by` dependencies, and the **frontier** is the set
@@ -129,9 +130,10 @@ for each level in levels:
             }
         })
 
-        // Tickets within a level run sequentially (shared repo cwd), so block
-        // for this chain before dispatching the next. No parallel work meanwhile.
-        wait({ id: runId })
+        // Tickets within a level run sequentially (shared repo cwd), so
+        // receive this chain's result before dispatching the next; there is
+        // no parallel work meanwhile. Return control after dispatching: Pi
+        // wakes this session with the chain's result.
         result = <the chain's return: { ok, failed?, step?, refs }>
 
         // Process the chain result
@@ -218,7 +220,8 @@ runId = subagent({
     }
 })
 
-wait({ id: runId })
+// Return control after dispatching; Pi wakes this session with the
+// workflow's result.
 result = <the workflow's return: { ok, failed?, step?, reviewOk?, refs }>
 
 // The review is advisory: read result.refs.review and surface its findings
