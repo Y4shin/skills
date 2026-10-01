@@ -4,7 +4,7 @@ slug: backfill-skill-docs-pages
 title: Backfill human-facing docs pages for promoted skills
 task: ../task.md
 mode: afk
-status: todo
+status: done
 size: l
 blocked_by: []
 ---

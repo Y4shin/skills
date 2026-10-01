@@ -4,10 +4,12 @@ type: feature
 slug: backfill-skill-docs-pages
 title: Backfill human-facing docs pages for promoted skills
 map: task-tools-overhaul
-status: ready
+status: done
 blocked_by:
 - overhaul-dead-surface
-slices: [backfill-skill-docs-pages]
+slices:
+- backfill-skill-docs-pages
+workflow_state: done
 ---
 
 ## What to build
