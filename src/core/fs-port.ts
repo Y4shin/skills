@@ -50,7 +50,17 @@ export class FsPort implements TreePort {
       for (const name of readdirSync(dir).sort()) {
         if (name === ".git" || name === "node_modules") continue;
         const p = join(dir, name);
-        if (statSync(p).isDirectory()) walk(p);
+        let isDir: boolean;
+        try {
+          isDir = statSync(p).isDirectory();
+        } catch {
+          // A dangling or cyclic symlink (e.g. a gitignored experiment
+          // tree's .devenv pointers to ephemeral runtime dirs): stat follows
+          // links and throws. Not walkable content; skip it rather than
+          // killing the whole migration.
+          continue;
+        }
+        if (isDir) walk(p);
         else out.push(relative(this.root, p).split("\\").join("/"));
       }
     };
