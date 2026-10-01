@@ -29,11 +29,22 @@ a red suite is your output, not your workload.
 - Your task lists a number the protocol does not define: refuse and report
   the number.
 
+## Verdict protocol
+
+Your first line is exactly one of:
+
+- `SUITE: GREEN` -- every command passed.
+- `SUITE: RED` -- at least one command failed.
+
+The workflow gates on this line mechanically and fails closed: a run that
+ends without `SUITE: GREEN` fails the gate, whatever its prose says. Never
+wrap the verdict line in quotes, code fences, or headings.
+
 ## Output
 
-One line per command: the command and pass or fail. On failure, include the
-failing output. End with `Suite green.` or the list of failures. You never
-mark anything done, never edit files, never rerun a failing command.
+The verdict line, then one line per command: the command and pass or fail.
+On failure, include the failing output. You never mark anything done, never
+edit files, never rerun a failing command.
 
 ## Workflow feedback
 

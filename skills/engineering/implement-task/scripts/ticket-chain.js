@@ -53,6 +53,15 @@
 // uncertainty check, the failure toolbelt (diagnose, split, retry,
 // escalate), and the advisory reviews.
 
+// Task composition follows the pointer discipline: identity and pointers
+// only; procedure lives in the agent definitions and skills. Gating is
+// enforced, not trusted: every step that gates carries a host-run gate
+// command (a nonzero exit fails the run), and verdict-gated children must
+// open their final output with an exact first-line marker, checked
+// fail-closed by the script (anything but the success marker refuses).
+// A child that merely ends its turn reporting a refusal is a successful
+// run completion, so ok alone can never express refusal.
+
 const subtype = args.subtype === "bug" ? "bug" : "feature";
 
 const missing = [];
@@ -79,6 +88,10 @@ function gateTask() {
     lines.push("Bug doc: " + args.bugPath, "Reproduction: " + args.reproPath);
   }
   return lines.join("\n");
+}
+
+function verdict(receipt, marker) {
+  return receipt.ok && typeof receipt.output === "string" && receipt.output.trimStart().startsWith(marker);
 }
 
 function featureTddTask() {
@@ -134,28 +147,36 @@ function landTask(tddRef, verifyRef) {
 }
 
 // Step 0: preconditions gate. implement-preconditions is read-only
-// (tools: read, submit_feedback); it fails when the ticket doc does not
-// exist or does not match these args, so no worker launches on bad input.
-// A gate refusal is not a worker failure: the caller re-resolves the ticket
-// and rebuilds the args; the failure toolbelt never applies.
+// (tools: read, submit_feedback); it refuses when the ticket doc does not
+// exist or does not match these args. Enforcement is layered: the child's
+// first line must be VERDICT: PASS (anything else, including a run
+// failure, refuses), and a host-run test -f fails the run outright when
+// the ticket doc is missing. A gate refusal is not a worker failure: the
+// caller re-resolves the ticket and rebuilds the args; the failure
+// toolbelt never applies.
 const gate = await runs.run("gate", {
   agent: "implement-preconditions",
   label: "Check " + args.ticket + " preconditions",
-  output: "gate-" + args.ticket + "/result.md",
+  gate: "test -f " + args.ticketPath,
   task: gateTask()
 });
-if (!gate.ok) {
+if (!verdict(gate, "VERDICT: PASS")) {
   return { ok: false, ticket: args.ticket, subtype, failed: "gate", step: gate, refs: {} };
 }
 
 // Step 1: tdd-worker implements the ticket on the working branch
 // ticket/<ticket-slug>. The discipline differs by subtype: tdd for features,
-// diagnosing-bugs for bugs.
+// diagnosing-bugs for bugs. The host gate enforces the contract's two
+// stop conditions: an uncertainty stop leaves .work/uncertainty.md
+// behind (the designed escape now fails the run, aborting the chain
+// before verify), and real work leaves the ticket/<slug> working branch
+// behind (no branch means nothing happened).
 const tdd = await runs.run("tdd", {
   agent: "tdd-worker",
   skill: subtype === "bug" ? "diagnosing-bugs" : "tdd",
   label: subtype === "bug" ? "Fix " + args.ticket : "Implement " + args.ticket,
   output: "tdd-" + args.ticket + "/result.md",
+  gate: "test ! -f " + args.ticketPath.replace(/ticket\.md$/, "") + ".work/uncertainty.md && git rev-parse --verify refs/heads/ticket/" + args.ticket,
   task: subtype === "bug" ? bugTddTask() : featureTddTask()
 });
 const refs = { tdd: tdd.outputReference || tdd.output };
@@ -179,6 +200,7 @@ if (subtype === "feature") {
       agent: "deviation-reporter",
       label: "Report " + args.ticket + " deviations",
       output: "deviation-" + args.ticket + "/result.md",
+      gate: "test -f " + args.ticketPath.replace(/ticket\.md$/, "") + "deviation-reports/" + args.ticket + ".md",
       task: deviationTask(refs.tdd)
     }
   ]);
@@ -204,12 +226,14 @@ if (subtype === "feature") {
 }
 
 // Step 3: land-worker merges the working branch into the landing branch and
-// appends the implementation note. The ticket is NOT marked done here:
-// finalize-task owns that marking, one owner.
+// appends the implementation note. The host gate enforces the deliverable:
+// task/<ticket-slug> must exist after landing. The ticket is NOT marked done
+// here: finalize-task owns that marking, one owner.
 const land = await runs.run("land", {
   agent: "land-worker",
   label: "Land " + args.ticket,
   output: "land-" + args.ticket + "/result.md",
+  gate: "git rev-parse --verify refs/heads/task/" + args.ticket,
   task: landTask(refs.tdd, refs.verify)
 });
 refs.land = land.outputReference || land.output;

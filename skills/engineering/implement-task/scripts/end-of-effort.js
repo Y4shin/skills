@@ -40,6 +40,13 @@
 // procedure lives in the agent definitions and skills. The caller composes
 // the inconsistency list from the deviation reports; it never refactors.
 
+// Task composition follows ticket-chain.js: identity and pointers only;
+// procedure lives in the agent definitions and skills. Gating is enforced,
+// not trusted: spec, coherence, and suite are verdict-gated (their final
+// output must open with an exact first-line marker, checked fail-closed),
+// because a child that merely ends its turn reporting a failure is a
+// successful run completion and ok alone can never express it.
+
 const missing = [];
 if (!args.effort) missing.push("effort");
 if (!args.startingBranch) missing.push("startingBranch");
@@ -53,6 +60,10 @@ if (missing.length > 0) {
 
 const inconsistencies = Array.isArray(args.inconsistencies) ? args.inconsistencies : [];
 const optionalTests = Array.isArray(args.optionalTests) ? args.optionalTests : [];
+
+function verdict(receipt, marker) {
+  return receipt.ok && typeof receipt.output === "string" && receipt.output.trimStart().startsWith(marker);
+}
 
 function reviewTask() {
   return [
@@ -115,49 +126,48 @@ if (args.review !== false) {
   reviewOk = review.ok;
 }
 
-// Step 2: final spec reconcile. Gated: a failed reconcile leaves the record
-// inaccurate, so the workflow fails and the caller relaunches.
+// Step 2: final spec reconcile. Gated: the reconciler must open with
+// RECONCILED; a FLAGGED verdict (planning problem) or any run failure
+// fails the workflow and the caller takes the reason to the user.
 if (args.reconcile !== false) {
   const spec = await runs.run("spec", {
     agent: "spec-reconciler",
     label: "Reconcile " + args.effort + " arch spec",
-    output: "spec-" + args.effort + "/result.md",
     task: specTask()
   });
   refs.spec = spec.outputReference || spec.output;
-  if (!spec.ok) {
+  if (!verdict(spec, "RECONCILED")) {
     return { ok: false, effort: args.effort, failed: "spec", step: spec, reviewOk, refs };
   }
 }
 
 // Step 3: coherence refactor, only when there are inconsistencies to fix.
-// The refactorer stops on scope or API-surface boundaries; that stop is an
-// ask-the-user path, never a silent skip.
+// The refactorer must open with REFACTORED; a STOPPED verdict (scope or
+// API-surface boundary) fails the workflow and the reason goes to the user.
 if (inconsistencies.length > 0) {
   const coherence = await runs.run("coherence", {
     agent: "coherence-refactorer",
     label: "Refactor " + args.effort + " coherence",
-    output: "coherence-" + args.effort + "/result.md",
     task: coherenceTask(refs.review)
   });
   refs.coherence = coherence.outputReference || coherence.output;
-  if (!coherence.ok) {
+  if (!verdict(coherence, "REFACTORED")) {
     return { ok: false, effort: args.effort, failed: "coherence", step: coherence, reviewOk, refs };
   }
 }
 
-// Step 4: suite gate. Always runs; the final ok-gate. A failure here is
-// emergent cross-ticket breakage: the caller adds the failures to the
+// Step 4: suite gate. Always runs; the final ok-gate. The runner must open
+// with SUITE: GREEN; anything else, including a completed run reporting
+// failures, fails the workflow. The caller then adds the failures to the
 // inconsistency list and relaunches with review: false, or takes large or
 // API-surface failures to the user.
 const suite = await runs.run("suite", {
   agent: "test-runner",
   label: "Run " + args.effort + " suite gate",
-  output: "suite-" + args.effort + "/result.md",
   task: suiteTask()
 });
 refs.suite = suite.outputReference || suite.output;
-if (!suite.ok) {
+if (!verdict(suite, "SUITE: GREEN")) {
   return { ok: false, effort: args.effort, failed: "suite", step: suite, reviewOk, refs };
 }
 

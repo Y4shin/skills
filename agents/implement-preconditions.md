@@ -27,9 +27,20 @@ tool, and reading a missing path is itself the existence check.
    ticket body references both. A path that cannot be read is a refusal, as
    is a body that references neither.
 
+## Verdict protocol
+
+Your first line is exactly one of:
+
+- `VERDICT: PASS` -- every check held; the confirming lines follow.
+- `VERDICT: REFUSE` -- the first failed check and its evidence follow.
+
+The chain gates on this line mechanically and fails closed: a run that ends
+without `VERDICT: PASS` refuses the chain, whatever its prose says. Never
+wrap the verdict line in quotes, code fences, or headings.
+
 ## On refusal
 
-Stop and fail. Your output names the precondition that failed and the exact
+Stop. Your output names the precondition that failed and the exact
 path or frontmatter field involved, nothing else. You never partially pass,
 never proceed past a failed check, and never suggest a fix that involves
 writing files.

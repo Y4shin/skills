@@ -1944,6 +1944,20 @@ describe("chain call shapes (shipped ticket-chain.js)", () => {
     expect(chain.indexOf('runs.run("gate"')).toBeLessThan(chain.indexOf('runs.run("tdd"'));
   });
 
+  test("refusals are enforced, not trusted: verdicts fail closed and deliverables are host-gated", () => {
+    // A child ending its turn with a refusal is a successful run completion,
+    // so ok alone can never express refusal (found by probe: the gate child
+    // refused a nonexistent ticket and the chain landed it anyway).
+    expect(chain).toMatch(/function verdict\(receipt, marker\)/);
+    expect(chain).toMatch(/verdict\(gate, "VERDICT: PASS"\)/);
+    // Host-run gates verify the deliverables model-independently.
+    expect(chain).toMatch(/gate: "test -f " \+ args\.ticketPath/);
+    expect(chain).toMatch(/test ! -f " \+ args\.ticketPath\.replace/);
+    expect(chain).toMatch(/git rev-parse --verify refs\/heads\/ticket\//);
+    expect(chain).toMatch(/git rev-parse --verify refs\/heads\/task\//);
+    expect(chain).toMatch(/deviation-reports\/" \+ args\.ticket/);
+  });
+
   test("re-runs pass pointers, never authored instructions", () => {
     // extra is a labeled context-pointer slot, and the resources only ever
     // fill it with paths: the recorded resolution, prior-attempt outputs.
@@ -1992,7 +2006,8 @@ describe("end-of-effort agents", () => {
     expect(String(fm.tools)).toBe("read, write, edit, bash, submit_feedback");
     expect(content).toMatch(/listed inconsistencies/i);
     expect(content).toMatch(/Do NOT change API surfaces/i);
-    expect(content).toMatch(/stop and fail/i);
+    expect(content).toMatch(/REFACTORED/);
+    expect(content).toMatch(/STOPPED/);
     expect(content).toMatch(/refactor\(coherence\)/);
   });
 
@@ -2002,6 +2017,8 @@ describe("end-of-effort agents", () => {
     expect(String(fm.tools)).toBe("read, bash, submit_feedback");
     expect(content).toMatch(/run these always/i);
     expect(content).toMatch(/run if asked/i);
+    expect(content).toMatch(/SUITE: GREEN/);
+    expect(content).toMatch(/SUITE: RED/);
     expect(content).toMatch(/never invent or guess/i);
     expect(content).toMatch(/never edit/i);
   });
@@ -2014,6 +2031,8 @@ describe("end-of-effort agents", () => {
     expect(content).toMatch(/exactly one file/i);
     expect(content).toMatch(/Pending update/i);
     expect(content).toMatch(/Final reconcile/i);
+    expect(content).toMatch(/RECONCILED/);
+    expect(content).toMatch(/FLAGGED/);
   });
 });
 
@@ -2042,6 +2061,12 @@ describe("end-of-effort workflow (shipped end-of-effort.js)", () => {
   test("the review stays advisory: a failed reviewer never fails the workflow", () => {
     expect(script).toMatch(/reviewOk = review\.ok/);
     expect(script).not.toMatch(/failed: "review"/);
+  });
+
+  test("the suite gate and its siblings gate on verdicts, not run completion", () => {
+    expect(script).toMatch(/verdict\(spec, "RECONCILED"\)/);
+    expect(script).toMatch(/verdict\(coherence, "REFACTORED"\)/);
+    expect(script).toMatch(/verdict\(suite, "SUITE: GREEN"\)/);
   });
 
   test("docs/testing.md carries the test protocol the test-runner reads", () => {
@@ -2084,6 +2109,9 @@ describe("chain agents v4 (overhaul-execution-skills)", () => {
     // Strict read-only ceiling: file reads plus workflow telemetry only.
     expect(String(fm.tools)).toBe("read, submit_feedback");
     expect(content).toMatch(/read-only/i);
+    expect(content).toMatch(/VERDICT: PASS/);
+    expect(content).toMatch(/VERDICT: REFUSE/);
+    expect(content).toMatch(/fails closed/i);
     expect(content).toMatch(/type: ticket/);
     expect(content).toMatch(/mode: human/);
     expect(content).toMatch(/subtype/);

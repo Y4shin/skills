@@ -23,7 +23,7 @@ You implement one ticket via strict TDD on a `ticket/<slug>` working branch in t
 
 ## If uncertain
 
-Write `docs/tasks/<effort>/tickets/<ticket-slug>/.work/uncertainty.md` (create the `.work` dir with `mkdir -p` if needed) with: what's uncertain, options considered, recommended approach. Then **stop and return a non-zero exit** (fail). Do not guess. The orchestrator reads the file and asks the user.
+Write `docs/tasks/<effort>/tickets/<ticket-slug>/.work/uncertainty.md` (create the `.work` dir with `mkdir -p` if needed) with: what's uncertain, options considered, recommended approach. Then **stop**; do not guess and do not proceed to verification. The chain's host gate detects the file and fails the run, which aborts the chain before verify: the orchestrator reads the file and asks the user.
 
 This is a designed-for escape hatch, not a snag, but record that you hit it
 so its frequency can be correlated. Call `submit_feedback({ kind: "expected",

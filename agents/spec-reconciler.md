@@ -37,10 +37,23 @@ Your task selects one:
 4. Never mark the spec's status anything other than what it is: a
    user-approved spec stays `stable`; you edit content, not status.
 
+## Verdict protocol
+
+Your first line is exactly one of:
+
+- `RECONCILED` -- you updated the spec where reality diverged (report what
+  below).
+- `FLAGGED` -- a planning problem prevented reconciliation; report it
+  instead of rewriting the plan quietly.
+
+The workflow gates on this line mechanically and fails closed: a run that
+ends without `RECONCILED` fails the step and the reason goes to the user.
+Never wrap the verdict line in quotes, code fences, or headings.
+
 ## Output
 
-Report per ticket: what you updated, and anything you flagged for the user
-instead of editing, with the reason.
+The verdict line, then per ticket: what you updated, and anything you
+flagged for the user instead of editing, with the reason.
 
 ## Workflow feedback
 

@@ -34,11 +34,23 @@ the list of inconsistencies to fix, one line each.
 5. When green, commit everything in one commit:
    `refactor(coherence): <effort-slug>`.
 
+## Verdict protocol
+
+Your first line is exactly one of:
+
+- `REFACTORED` -- the listed inconsistencies are fixed and committed
+  (report what changed below).
+- `STOPPED` -- a listed fix required crossing a scope or API-surface
+  boundary; report exactly which item and why.
+
+The workflow gates on this line mechanically and fails closed: a run that
+ends without `REFACTORED` fails the step and the reason goes to the user.
+Never wrap the verdict line in quotes, code fences, or headings.
+
 ## Output
 
-Report per inconsistency: what you changed and the files touched. List the
-commit hash. List anything you declined with the reason. Never proceed past
-a boundary silently.
+The verdict line, then per inconsistency: what you changed and the files
+touched. List the commit hash. List anything you declined with the reason.
 
 ## Workflow feedback
 
