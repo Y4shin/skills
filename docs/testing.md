@@ -143,6 +143,15 @@ suite normally; do not exclude this file.
   the prose is in the surviving-tool set (`expectOnlySurvivingTools` in
   `tests/skills.test.ts`), so a stale tool reference fails a structure test
   instead of waiting for the dead-surface sweep.
+- **Docs pages are structure-tested like skills** (backfill-skill-docs-pages).
+  Every promoted skill's human-facing page (`docs/<bucket>/<skill-name>.md`)
+  is pinned by the docs-page seams in `tests/skills.test.ts`: presence
+  derived from `package.json` `pi.skills` (never a hardcoded list), the four
+  H2 sections in order, no pages mirrored from non-promoted buckets, `tw_*`
+  names restricted to the surviving set, and the flow pages naming the v4
+  effort path. Guard invariants (no non-promoted pages, surviving tools
+  only) are green on arrival by design; they exist to catch future
+  violations, so do not force them RED by creating violations first.
 - **Pin pseudocode call shapes with regex assertions.** When a slice's
   deliverable is dispatch pseudocode (chain prose for a subagent API), no
   test can execute it, so retired API shapes survive the rewrite silently
