@@ -1172,6 +1172,7 @@ const SURVIVING_TOOLS = new Set([
   "tw_dependency_levels",
   "tw_finalizable",
   "tw_map_finalizable",
+  "tw_resolve_uncertainty",
   "tw_state",
   "tw_state_set",
   "tw_context",
@@ -1848,6 +1849,10 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
 
   test("uncertainty lives in the ticket directory", () => {
     expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<ticket-slug>\/\.work\/uncertainty\.md/);
+  });
+
+  test("the uncertainty resolution goes through the scoped tool", () => {
+    expect(content).toMatch(/tw_resolve_uncertainty/);
   });
 
   test("no slice machinery, no ui-noter, no guidelines tool remains", () => {

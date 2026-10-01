@@ -1,5 +1,5 @@
 /**
- * task-workflow v2 — single extension entry point.
+ * task-workflow v2 -- single extension entry point.
  *
  * Registers tw_* tools for artifact operations on the docs/tasks/ planning
  * tree, plus lifecycle hooks for pi-subagents and pi-telemetry checks.
@@ -11,8 +11,8 @@
  * - Algorithms belong in tools, not in skill prose.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, resolve as resolvePath } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext, InputEvent, InputEventResult } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -766,6 +766,25 @@ export function createTools(): Record<string, Tool> {
         const undone = tasks.filter((t: any) => !t.done).map((t: any) => t.slug || "?");
         if (undone.length === 0) return "ready to finalize: all children done";
         throw new Error(`unfinished children: ${undone.join(", ")}`);
+      },
+    ),
+
+    tw_resolve_uncertainty: def(
+      "Record a ticket's uncertainty resolution: writes the resolution next to the ticket's .work/uncertainty.md, deletes the uncertainty file, and returns the resolution path for the re-run pointer. Refuses when the ticket has no uncertainty file, so it can never serve as a generic writer.",
+      { selector: Str("Ticket slug or path"), resolution: Str("The resolution text to record") },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        if (!p.resolution.trim()) throw new Error("resolution text is empty");
+        const { path, art } = resolveArt(root, p.selector, "ticket");
+        const workDir = join(dirname(path), ".work");
+        const uncertaintyPath = join(workDir, "uncertainty.md");
+        if (!isFile(uncertaintyPath)) {
+          throw new Error(`no uncertainty to resolve for ticket '${art.slug}': ${relative(root, uncertaintyPath)} does not exist`);
+        }
+        const resolutionPath = join(workDir, "resolution.md");
+        writeFileSync(resolutionPath, `${p.resolution.trim()}\n`, "utf-8");
+        rmSync(uncertaintyPath);
+        return relative(root, resolutionPath);
       },
     ),
 

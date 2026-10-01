@@ -194,6 +194,7 @@ describe("task-workflow tools", () => {
         "tw_get",
         "tw_list",
         "tw_map_finalizable",
+        "tw_resolve_uncertainty",
         "tw_set",
         "tw_show",
         "tw_state",
@@ -391,6 +392,59 @@ describe("task-workflow tools", () => {
       writeFileSync(mapPath, readFileSync(mapPath, "utf-8").replace(/done: false/g, "done: true"), "utf-8");
       const out = await tools.tw_map_finalizable.execute({ selector: "auth" }, ctx(t));
       expect(out).toContain("ready to finalize");
+    });
+  });
+
+  describe("tw_resolve_uncertainty", () => {
+    test("records the resolution and deletes the uncertainty file", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const work = join(t, "docs/tasks/billing/tickets/login-form/.work");
+      mkdirSync(work, { recursive: true });
+      writeFileSync(join(work, "uncertainty.md"), "which seam?\n");
+      const out = await tools.tw_resolve_uncertainty.execute(
+        { selector: "docs/tasks/billing/tickets/login-form/ticket.md", resolution: "test at the public seam" },
+        ctx(t),
+      );
+      expect(out).toBe("docs/tasks/billing/tickets/login-form/.work/resolution.md");
+      expect(readFileSync(join(work, "resolution.md"), "utf-8")).toBe("test at the public seam\n");
+      expect(existsSync(join(work, "uncertainty.md"))).toBe(false);
+      rmSync(t, { recursive: true, force: true });
+    });
+
+    test("refuses without an uncertainty file, so it is not a generic writer", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      await expect(
+        tools.tw_resolve_uncertainty.execute(
+          { selector: "docs/tasks/billing/tickets/login-form/ticket.md", resolution: "no uncertainty here" },
+          ctx(t),
+        ),
+      ).rejects.toThrow(/no uncertainty to resolve/);
+      expect(existsSync(join(t, "docs/tasks/billing/tickets/login-form/.work"))).toBe(false);
+      rmSync(t, { recursive: true, force: true });
+    });
+
+    test("refuses an empty resolution", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      await expect(
+        tools.tw_resolve_uncertainty.execute({ selector: "login-form", resolution: "  " }, ctx(t)),
+      ).rejects.toThrow(/empty/);
+      rmSync(t, { recursive: true, force: true });
+    });
+
+    test("resolves by slug and rejects non-tickets", async () => {
+      const t = mkTmp(); seedV4Tree(t);
+      const work = join(t, "docs/tasks/billing/tickets/login-form/.work");
+      mkdirSync(work, { recursive: true });
+      writeFileSync(join(work, "uncertainty.md"), "x\n");
+      const out = await tools.tw_resolve_uncertainty.execute(
+        { selector: "login-form", resolution: "go" },
+        ctx(t),
+      );
+      expect(out).toContain(".work/resolution.md");
+      await expect(
+        tools.tw_resolve_uncertainty.execute({ selector: "research-cache", resolution: "go" }, ctx(t)),
+      ).rejects.toThrow(/not 'ticket'/);
+      rmSync(t, { recursive: true, force: true });
     });
   });
 

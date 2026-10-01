@@ -150,13 +150,16 @@ for each level in levels:
                 header: "Uncertain",
                 question: `TDD worker hit uncertainty in ticket ${ticket}:\n{read docs/tasks/${effortSlug}/tickets/${ticket}/.work/uncertainty.md}`
             })
-            delete the uncertainty file after recording the resolution where
-            the ticket owns it, so the re-run passes a pointer, not
-            parent-authored prompt text:
-            write the resolution to docs/tasks/${effortSlug}/tickets/${ticket}/.work/resolution.md
+            // Record the resolution through the scoped tool: it writes
+            // docs/tasks/<effort>/tickets/<ticket>/.work/resolution.md,
+            // deletes the uncertainty file, and can do nothing else.
+            resolutionPath = tw_resolve_uncertainty({
+                selector: ticketPath,
+                resolution: <the user's resolution>
+            })
             // Re-route to tdd-worker. Do NOT do the work yourself -- parent context is expensive.
             re-launch the chain for this ticket with the same args plus
-            extra: "docs/tasks/${effortSlug}/tickets/${ticket}/.work/resolution.md (the recorded resolution)"
+            extra: "<resolutionPath> (the recorded resolution)"
             continue
 
         // On chain failure, apply the failure toolbelt below
