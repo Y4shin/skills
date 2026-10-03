@@ -50,6 +50,14 @@ end-of-effort workflow, and the failure toolbelt. Effort-level machinery stays
 with `implement-ticket`, because levels and the arch-spec are ticket concepts.
 Each skill is disclosed through its own opener toolset.
 
+## Decisions already taken (inputs from the user)
+
+- `finalize-task` is retired and its per-ticket close-out is inlined into the
+  ticket-execution skill, so the split must place the closing phase (CI gate,
+  knowledge harvest, changelog, done-marking through the set tool,
+  per-ticket close-out, merge to main) on the ticket-execution side, in the
+  same run that lands the ticket. See `grill-skill-surface`.
+
 ## Downstream work it may create
 
 The skill surface, the disclosure openers, the gate model, and the prose each
