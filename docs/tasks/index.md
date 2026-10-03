@@ -9,6 +9,7 @@ title: docs/tasks
 ## Live
 
 - build-eval-creator-skill
+- enforced-workflow-v5
 
 ## Archived
 
