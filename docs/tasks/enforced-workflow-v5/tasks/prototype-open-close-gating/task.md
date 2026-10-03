@@ -3,8 +3,9 @@ type: task
 subtype: prototype
 title: Validate open/close disclosure and the write guard
 status: stable
-workflow_state: ready
-blocked_by: [research-pi-tool-disclosure]
+workflow_state: done
+blocked_by:
+- research-pi-tool-disclosure
 ---
 
 # Validate open/close disclosure and the write guard
@@ -69,15 +70,18 @@ returns `{ opened: false, reason, legal_next }` with a phase-correct
 legal-next-calls menu, and a legal target returns `{ opened: true, active }`.
 The harness is at 67 PASS, 0 FAIL, with the original 49 checks preserved.
 
-Not done yet, because the task question is human-in-the-loop and these stay
-unverified: `/tree`, resume, and fork persistence (source-verified only); the
-gate reads a fixture state table rather than the live effort scan, so wiring
-it to `src/core/graph.ts` is still open; bash command-string scanning as an
-inherently bypassable heuristic; keying the opener to a real skill invocation;
-a single model sample. The live reaction checklist is in `findings.md` under
-"What the user must do to react live", and it now includes an illegal target
-whose refusal should name the legal next calls. The throwaway extension stays
-until that reaction, then is deleted unless this task says otherwise.
+The task question is answered. The live reaction confirmed the transcript
+restore after `/tree` and resume (O9) and interactive parity for the
+disclosure flip and the guard (O8), so the design is verified by run and not
+only by source. What remains is not a blocker for this task: the gate reads a
+fixture state table rather than the live effort scan, so wiring it to
+`src/core/graph.ts` is still open (U6); bash command-string scanning is an
+inherently bypassable heuristic (U2); the opener was not keyed to a real skill
+invocation (U3); headless model behavior is a single sample (U4); and fork
+shares the resume restore path but was not exercised on its own. The throwaway
+extension in the gitignored `.work/prototype/` is deleted now that the
+reaction is in; `findings.md` keeps the evidence, the rejected alternatives,
+and the decision-rich snippets.
 
 Observed constraint for the effort: progressive disclosure needs
 `@earendil-works/pi-coding-agent` 1.0.0; this repo resolves 0.80.10, which has

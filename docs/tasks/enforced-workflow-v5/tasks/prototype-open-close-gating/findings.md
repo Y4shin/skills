@@ -141,13 +141,48 @@ A sample refusal text: `Refused: target 'nope' does not exist in effort
 `details.opened === true` and activates the toolset. The effort state comes
 from `fixtures/efforts.json`; the live `docs/tasks/` tree is not read.
 
-### U1. Open and close survive `/tree`, resume, and fork (unverified)
+### O7. A real effort name is refused interactively, because the gate reads the fixture (observed)
 
-The research shows this works by source (`setActiveTools()` changes are
-recorded in the transcript as `toolsAdded` and re-applied on load, `/tree`, and
-fork, F3). The prototype could not confirm it non-interactively. This is the
-live reaction step below. Treat the transcript-restore path as
-verified-by-source, not verified-by-run.
+Run: the interactive session from "What the user must do to react live", step 2,
+on 2026-10-03. `tw_open({ skill: "wayfinder", effort:
+"enforced-workflow-v5", target: "grill-skill-reports" })` returned `Refused:
+effort 'enforced-workflow-v5' is not known. Legal next calls: run intake.`,
+and the toolset stayed closed. This is the fixture boundary (U6) behaving as
+written, not a defect: only `prototype`, `empty`, and `finished` exist in the
+fixture. Two consequences: the unknown-effort refusal path works end to end in
+the interactive harness (the twin of the harness-observed refusals in O6), and
+the live reaction must pass the fixture's names, so `effort: "prototype"`.
+
+### O8. Interactive parity for the gate, the disclosure flip, and the guard (observed)
+
+Second interactive session, `effort: "prototype"`, `target: "proto-ticket"`, on
+2026-10-03. Reproduced the harness results interactively:
+
+- Before open, the model listed only `tw_open` and `tw_close` (O1).
+- `tw_open` returned `Opened wayfinder: now active tw_show, tw_get,
+  tw_frontier.` and the model then listed all five names (O2). The model did
+  not invoke a gated tool, so interactive callability is still harness-only;
+  the interactive evidence is the declared set.
+- `tw_close` returned `Closed: removed tw_show, tw_get, tw_frontier.` and the
+  gated names disappeared from the model's list (O3).
+- `write` to `docs/tasks/whatever.md` and `docs/bugs/whatever.md` was refused
+  with the lockdown reason both while the toolset was open and after
+  `tw_close`, and a `write` to `src/foo.ts` succeeded (O4, and the guard's
+  independence from the active set, now observed interactively rather than
+  only in the harness). The `src/foo.ts` file was removed afterwards; the
+  protected trees are unchanged.
+
+### O9. Open and close survive `/tree` and resume (observed)
+
+The user's live reaction, on 2026-10-03, in an interactive session with the
+extension loaded. The opened state produced by `tw_open` was still in effect
+after `/tree` navigation and after a full quit and resume (`pi -r`): branching
+to an entry before the `tw_open` call showed the closed set (`tw_open` and
+`tw_close` only), and the leaf where `tw_open` ran showed the opened set
+(`tw_show`, `tw_get`, `tw_frontier` also active). This confirms the
+transcript-restore path (F3) that the harness could only reach by source. The
+user also confirmed the state returned after resume. Fork uses the same restore
+path and stays verified-by-source only.
 
 ### U2. Bash command-string scanning is not sound (unverified, expected bypassable)
 
@@ -177,11 +212,13 @@ in its types; the running global `pi` is 1.0.0, which has all of them
 (`grep` over the two `dist` trees). The prototype ran against 1.0.0 via
 `PI_PACKAGE_DIR`. Progressive disclosure depends on the 1.0.0 API.
 
-### U6. The gate reads a fixture, not the live effort tree (unverified)
+### U6. The gate reads a fixture, not the live effort tree (fixture read observed, live wiring unverified)
 
 The prototype gate reads `fixtures/efforts.json` so the harness does not depend
-on the live effort having tickets. Reading and computing the same frontier from
-the real `docs/tasks/` scan (the `src/core/graph.ts` path) was not exercised.
+on the live effort having tickets. That the fixture is the state source is now
+also observed interactively (O7: a real effort name is refused as unknown).
+Reading and computing the same frontier from the real `docs/tasks/` scan (the
+`src/core/graph.ts` path) was not exercised.
 
 ## Chosen direction and rejected alternatives
 
@@ -315,12 +352,16 @@ pi -ne -ns -np -nc \
   -e docs/tasks/enforced-workflow-v5/tasks/prototype-open-close-gating/.work/prototype/index.ts
 ```
 
-Then react to the transcript-restore behavior (U1):
+Then react to the transcript-restore behavior (now observed in O9):
 
 1. Ask the model to list its `tw_*` tools. Expect only `tw_open` and
    `tw_close`.
-2. Call `tw_open`. Ask again. Expect `tw_show`, `tw_get`, `tw_frontier` now
-   listed.
+2. Call `tw_open` with `skill: "wayfinder", effort: "prototype", target:
+   "proto-ticket"`, exactly those arguments. The gate reads the fixture, not
+   the live repo, so `effort: "prototype"` is the identifier to use
+   (`enforced-workflow-v5` is refused as unknown; see O7). Ask again. Expect
+   `tw_show`, `tw_get`, `tw_frontier` now listed and an "Opened wayfinder"
+   result.
 3. Open `/tree`, navigate to an earlier entry, then back to the leaf. Ask for
    the `tw_*` list again. Expect the open state to match the branch's
    transcript (open on the branch where `tw_open` ran).
