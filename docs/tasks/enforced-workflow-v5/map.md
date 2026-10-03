@@ -120,6 +120,37 @@ legal next call.
   documentation (ADRs, `CONTEXT.md`), and a time-boxed reach into the code.
   There is no trigger question, and non-goals and the success test belong to
   Wayfinder, not intake. Settled in the front-door grilling (Q2, Q3).
+- The map carries the non-goals, the non-negotiable facts, and the effort-level
+  success test as body sections: `## Non-goals`, which absorbs the old `## Out
+  of scope`, and `## Non-negotiable facts`, whose first line is the success
+  test. Settled in the simple-map and spec-gate grilling (Q1); the map's
+  reference orientation and the gate's exact check are narrowed below.
+- The map is reference-oriented: the decisions stay in the task files and the
+  map carries short statements plus pointers to them, never an inlined
+  specification. Every planning task writes its own results back to the map at
+  the end of its run, and Wayfinder's final `reconcile` pass sets a
+  `ready_for_spec` frontmatter flag on the map through a dedicated checking
+  tool, which refuses to set the flag unless the planning frontier is empty and
+  the map's non-goals and non-negotiable facts (with the success test) are
+  present. `to-spec` gates on that one flag. The check lives in the `to-spec`
+  phase's opener tool, the same call that discloses that phase's tools, never
+  in the skill's prose, so finishing every task and skipping the reconciliation
+  is refused with a pointer back to Wayfinder, and a Wayfinder mistake is
+  reported by Wayfinder instead of by `to-spec`. Settled in the simple-map and
+  spec-gate grilling (Q2, Q3, Q4).
+- The canonical grilling method is the round-based frontier in the `grilling`
+  skill: ask the whole frontier at once, numbered, each with a recommended
+  answer, then wait for the answers before the next round. Four places still
+  teach the old one-at-a-time method or fail to route to the skill:
+  `implement-task/resources/grilling.md` (the resource actually executed for a
+  `subtype: grilling` planning task), `wayfinder/resources/grilling.md`,
+  `implement-task/SKILL.md` (which says grilling has "no standalone skill"),
+  and `improve-codebase-architecture/SKILL.md`. This is the same
+  overload-and-drift problem as the skill surface, so the fix is owned by
+  `grill-skill-surface`, not by the documentation re-sync ticket: every skill
+  that runs a grilling session delegates to the `grilling` skill and stops
+  restating the method, and the routers that deny the skill exists are
+  corrected. Found while grilling the simple-map and spec-gate task.
 
 ## Fog
 

@@ -64,3 +64,41 @@ re-sync ticket that closes the effort.
 - Downstream interaction: the planned split of `implement-task` into planning
   and ticket execution must place this closing phase on the ticket-execution
   side. See `grill-implement-task-split`.
+
+### Grilling execution drift (found in the simple-map and spec-gate grilling)
+
+- The `grilling` skill is the canonical, round-based discipline: ask the whole
+  frontier in one round, numbered, each question with a recommended answer,
+  then wait for the answers before the next round.
+- Four files still teach or imply the superseded one-question-at-a-time method,
+  and one of them fails to route to the skill at all:
+  - `implement-task/resources/grilling.md` step 2 ("Ask exactly one focused
+    question at a time"), which is the resource actually executed for a
+    `subtype: grilling` planning task;
+  - `wayfinder/resources/grilling.md` ("The execution resource will ask one
+    question at a time");
+  - `improve-codebase-architecture/SKILL.md` ("Grilling uses its established
+    one question at a time ...");
+  - `implement-task/SKILL.md`, which says `subtype: grilling` has "no standalone
+    skill" and to run the inline resource, even though the `grilling` skill
+    exists and is model-invoked.
+- This belongs to the skill-surface decision: a resource that duplicates a
+  skill which now exists should defer to the skill, not restate a stale method
+  that the skill has since replaced.
+- This drift made the earlier grilling sessions ask one question at a time even
+  though the skill says rounds. The user confirmed rounds are the intended
+  method.
+
+### Every grilling session delegates to the `grilling` skill
+
+- Every skill that runs a grilling session stops restating the method and
+  instead points at the `grilling` skill and instructs the agent to invoke it.
+- The per-subtype resources that restate the method
+  (`implement-task/resources/grilling.md`, `wayfinder/resources/grilling.md`)
+  become thin pointers or are removed, and the router that claims grilling has
+  no standalone skill is corrected (`implement-task/SKILL.md`).
+- `wayfinder/resources/grilling.md` keeps its job of creating the task document;
+  it stops describing how the questions are asked.
+  `improve-codebase-architecture` calls the skill after the candidate is picked.
+- The user's ruling: this is a real bug and v5 fixes it. A resource that
+  duplicates a skill which already exists is the overload this effort removes.
