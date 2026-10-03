@@ -162,6 +162,23 @@ legal next call.
   inlined in the skill; there is no shared report skill or file, enforcement is
   prose discipline only, and the chain and end-of-effort return shapes are
   unchanged. Settled in the skill-reports grilling (Q1 to Q8).
+- Progressive disclosure is a skill-scoped opener with nesting. Idle declares
+  `tw_open` and `tw_next`; opening a skill discloses `tw_close` plus that
+  skill's tools, so the declared set is the union of the open skills' toolsets.
+  `tw_open` refuses a duplicate of an already-open skill and refuses any skill
+  the symmetric mutual-exclusivity table marks as conflicting with an
+  already-open one; `tw_close` names the skill it closes and
+  leaves the other open skills alone. `tw_next` stays declared in every state
+  and answers in short prose, which inside a skill must not suggest abandoning
+  it. The gated tools are `exposure: "direct",
+  defaultActive: false`, since `hidden` cannot be activated and `deferred` is
+  reachable through `tool_search`. The opener's parameter contract is a
+  discriminated union on the skill, verified by run. Subagents never open and
+  rely on their `tools:` allowlists, and skills do not declare `allowed-tools`.
+  Settled in the disclosure grilling (Q1 to Q11): the discriminant is named
+  `skill`, the symmetric exclusivity table decides which openers may overlap,
+  and the nested capability is kept, justified by `skill-creator`, whose
+  bundled validation scripts should become tools.
 
 ## Fog
 
