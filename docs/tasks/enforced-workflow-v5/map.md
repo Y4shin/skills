@@ -151,6 +151,17 @@ legal next call.
   that runs a grilling session delegates to the `grilling` skill and stops
   restating the method, and the routers that deny the skill exists are
   corrected. Found while grilling the simple-map and spec-gate task.
+- Every workflow skill ends its run with one shared completion report: a small
+  fixed order (what is now true, what needs the human, what to run next, what is
+  broken or blocked, one pointer to the detail), in compact simplified technical
+  English written for someone who did not watch the run. Run ids, step receipts,
+  output references, harness counts, and raw chain JSON never appear inline; the
+  detail is behind the pointer, and the report offers to expand on request.
+  The rules are shared but each skill's report template is tuned to what that
+  skill actually produces and lives in a per-skill report resource file, never
+  inlined in the skill; there is no shared report skill or file, enforcement is
+  prose discipline only, and the chain and end-of-effort return shapes are
+  unchanged. Settled in the skill-reports grilling (Q1 to Q8).
 
 ## Fog
 

@@ -3,7 +3,7 @@ type: task
 subtype: grilling
 title: What a skill reports when it finishes
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 ---
 
@@ -76,3 +76,136 @@ workflow skills; a review criterion in `code-review` or `skill-review`; the
 effort's final documentation re-sync ticket; possibly a change to how the
 per-ticket chain and end-of-effort workflows return their results to the
 parent, if the parent's report currently can only mirror the chain's internals.
+
+## Settled decisions
+
+### Q1 - One shared contract for every workflow skill's completion report (settled)
+
+- "Shared contract" means the fixed shape of the final report a workflow skill
+  produces for the human when it finishes. The user confirmed that reading.
+- One contract, applied by every workflow skill that ends a run with the human
+  waiting: intake, wayfinder, each planning task, to-spec, to-tickets, ticket
+  execution, and finalize-effort.
+- Fixed order: (1) what is now true, (2) what needs the human, (3) what to run
+  next, (4) what is broken or blocked, (5) one pointer to the detail. A skill
+  may add at most one skill-specific line inside that order; it may not reorder
+  or add sections.
+- Language requirements (the user's addition): simplified technical English;
+  compact, no yapping; never assume the reader knows what happened during the
+  run. The report is written for someone who did not watch execution.
+- Rejected: per-skill shapes. They would spread the same rules across nine files
+  and drift again, exactly as the grilling resources did.
+
+### Q2 - What must appear, and what must never appear inline (settled)
+
+- Must appear: the state change in plain terms, the artifacts that exist now,
+  anything the human must decide or approve (or the explicit word "nothing"),
+  the exact next commands, and a cause for anything broken or blocked.
+- Amendment: the cause is not limited to one line. One or two more sentences
+  are allowed to explain what went wrong. The limit is on volume: no paragraphs,
+  no tables of internals, no long enumerations.
+- Never inline: subagent run ids, per-step receipts, output references, harness
+  counts, tool-call detail, raw chain JSON, and workflow-internal terms the
+  human did not introduce. All of it is reachable only through the single
+  pointer.
+- Applies to completion, refusal, failure, and escalation reports alike. In a
+  failure, part 1 becomes "the ticket did not land and the tree is unchanged",
+  and the escalation question is part 2.
+- The concrete fields to keep out are the chain's `step` receipt and its `refs`,
+  which is what leaks today.
+
+### Q3 - The detail lives behind a pointer to existing artifacts (settled)
+
+- The message points at durable artifacts that already exist: for a landed
+  ticket, the ticket doc, the changelog entry, and the commit; for a planning
+  task, its task file; for an effort, the map and the review artifact.
+- No new per-run report artifact.
+- Amendment: the report offers to expand. It states the compact cause and then
+  offers more context on request, for example "requirement X failed: <one-line
+  summary>. Say the word and I will detail it." The offer is an offer, never a
+  dump.
+- When a run produced no durable artifact (a refusal, or a failed chain that
+  changed nothing), the message carries the cause and points at the failed
+  run's output only if the human asks.
+
+## Frontier for round 2
+
+Q4 (where the shared contract physically lives), Q5 (enforcement), and Q6
+(does the vocabulary qualifier rule apply to reports). All depend only on Q1
+and Q3, so all three are in the next round.
+
+### Q4 - No shared skill or shared file; shared rules, per-skill templates (settled)
+
+- The user's ruling: no `reporting` skill and no single shared contract file.
+  The report template is tuned individually for each skill that produces a
+  report. The shared instructions (the order, the language rules, the noise
+  rules) are kept inline in each skill or in a per-skill resource file.
+- This amends Q1's "one shared contract": what is shared is the set of rules,
+  not one canonical text or one canonical template. Each skill's report is tuned
+  to the state that skill actually produces (a new effort, a landed ticket, a
+  refusal, an effort finalize).
+- Rejected: a model-invoked `reporting` skill (one more skill in the inventory,
+  and a single template cannot be tuned per skill); a canonical section in
+  `task-workflow-overview`; a shared reference file.
+- Accepted consequence and risk: because the shared rules are duplicated in
+  per-skill text with no canonical home, they can drift, and the compactness and
+  noise rules have to be repeated in each place. The user accepted this in
+  exchange for per-skill tuning and simplicity. Recorded as remaining fog, not
+  re-litigated.
+
+### Q5 - Enforcement is prose discipline only (settled)
+
+- The report shape is stated in each skill's prose. No review criterion is added
+  to `skill-review`, and there is no runtime gate. The user's ruling: adding a
+  report review would overcomplicate the workflow and make it unnecessarily
+  long.
+- Consequence: nothing mechanically prevents a skill from emitting a wall of
+  text. The only pressure is the prose and the human's correction. This is the
+  accepted cost; the enforcement pillar does not reach a final chat message.
+
+### Q6 - The vocabulary qualifiers apply to reports (settled)
+
+- Reports are not exempt. Use the qualified nouns ("implementation ticket",
+  "planning task", "the specification", "the architecture"). Compactness limits
+  sentence count, not terminology.
+
+## Frontier for round 3
+
+Q7 (do the chain and end-of-effort return shapes change so the parent cannot
+mirror internals) and Q8 (inlined in each skill, or a per-skill resource file).
+
+### Q7 - The chain and end-of-effort return shapes do not change (settled)
+
+- Leave `ticket-chain.js` and `end-of-effort.js` return shapes as they are. The
+  chain keeps returning `ok`, `failed`, `error`, `step`, and `refs`.
+- Reason: the failure toolbelt needs `step` and `refs` for diagnosis and for
+  the retry's `args.extra` pointer, so they must stay in the machine contract. A
+  pre-written `summary` field would give the parent a generic sentence to echo,
+  which is the same wall of text with extra indirection.
+- The report contract is what keeps `step` and `refs` out of the human-facing
+  message, not a change to the machine contract.
+
+### Q8 - Every report step is a per-skill resource file (settled)
+
+- Every skill that produces a completion report gets its own report resource
+  file (a per-skill `resources/report.md`), never an inlined block in the
+  `SKILL.md`.
+- Reason (the user's): progressive disclosure. Step-level detail that only
+  becomes relevant at the end of the run would junk up the `SKILL.md` context
+  window, and a `skill-review` pass over the rebuilt skills would flag the
+  inlined block as a progressive-disclosure violation.
+- Consequence: each reporting skill points at its own resource, so the skill
+  surface gains one small file per reporting skill. This is an input to
+  `grill-skill-surface`.
+
+## Frontier empty
+
+Q1 to Q8 are settled. No decision in this task remains open.
+
+## Human confirmation
+
+- The user confirmed the Q1 to Q8 summary as the shared understanding, including
+  the reconciliation that the report rules are shared while the template is
+  tuned per skill, and that every report step lives in a per-skill report
+  resource file for progressive disclosure. The planning task is done on that
+  basis.
