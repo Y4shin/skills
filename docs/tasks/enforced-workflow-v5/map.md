@@ -3,6 +3,7 @@ type: map
 title: Enforced workflow v5
 status: stable
 blocked_by: []
+ready_for_spec: true
 ---
 
 # Enforced workflow v5
@@ -47,6 +48,23 @@ legal next call.
   repo resolves 0.80.10, which has no `exposure`, `defaultActive`, or
   `tool_search` API, so the dependency bump is part of the effort. Verified by
   the open/close gating prototype.
+- Pi-native: no Claude Code plugin manifest, no skills.sh.
+- No em-dashes in repo prose.
+
+## Non-negotiable facts
+
+**Success test:** a fresh effort taken through `intake`, `wayfinder`,
+`to-spec`, `to-tickets`, `implement-ticket`, and `finalize-effort` reaches
+archive with every phase transition performed by a gated tool, and an attempt
+to skip a phase is refused by that tool with the legal next call, not by prose
+alone.
+
+- Enforcement over remodeling: the schema and the fundamental flow stay; the
+  v5 delta is small and additive.
+- Progressive disclosure requires `@earendil-works/pi-coding-agent` 1.0.0.
+  This repo resolves 0.80.10, so the dependency bump is part of the effort.
+- Schema 5 ships with one idempotent migration; v3 and v4 stay readable during
+  the transition.
 - Pi-native: no Claude Code plugin manifest, no skills.sh.
 - No em-dashes in repo prose.
 
@@ -268,7 +286,7 @@ legal next call.
 
 Nothing open.
 
-## Out of scope
+## Non-goals
 
 - Rewriting the chain internals and the verdict and host-gate mechanics.
 - Changing the 11 agent definitions.
