@@ -5,8 +5,8 @@ title: Schema 5 shape and migration
 status: stable
 workflow_state: done
 blocked_by:
-- grill-front-door-and-triage
-- grill-simple-map-and-spec-gate
+- grill-front-door
+- grill-non-negotiables-and-spec-gate
 - grill-finalize-effort
 - grill-gate-model-and-write-lockdown
 - grill-workflow-vocabulary

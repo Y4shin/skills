@@ -259,4 +259,4 @@ final documentation re-sync ticket, which writes the agreed glossary into
   effort whose map carries exactly one planning task, a grilling task that
   determines the effort's non-goals and its non-negotiable facts, and
   `to-spec` gates on those being present. See
-  `grill-simple-map-and-spec-gate`.
+  `grill-non-negotiables-and-spec-gate`.

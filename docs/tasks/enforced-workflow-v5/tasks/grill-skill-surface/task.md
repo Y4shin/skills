@@ -5,13 +5,14 @@ title: Skill surface after the tool layer owns the rules
 status: stable
 workflow_state: done
 blocked_by:
-- grill-front-door-and-triage
-- grill-simple-map-and-spec-gate
+- grill-front-door
+- grill-non-negotiables-and-spec-gate
 - grill-disclosure-mechanics
 - grill-gate-model-and-write-lockdown
 - grill-finalize-effort
 - grill-workflow-vocabulary
 - grill-implement-task-split
+- grill-skill-reports
 ---
 
 # Skill surface after the tool layer owns the rules

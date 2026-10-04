@@ -35,8 +35,9 @@ legal next call.
   facts.
 - Out of scope: the per-ticket chain internals (`ticket-chain.js`,
   `end-of-effort.js`, the verdict and host-gate mechanics), the 11 agent
-  definitions, repo gating, the telemetry and feedback layer, and the
-  two-phase planning model itself.
+  definitions, repo gating, the telemetry and feedback backend, and the
+  two-phase planning model itself. Absorbing the existing skill-context
+  telemetry calls into the opener is in scope.
 - The effort's final ticket is a documentation re-sync ticket: audit
   `CONTEXT.md`, the top-level `README.md`, and the bucket READMEs against the
   implemented v5 and fix what drifted. It is blocked by every other ticket.
@@ -111,7 +112,7 @@ legal next call.
   bundled scripts and is the one nestable tool-owning discipline.
 - Shared vocabulary is a first-class decision. A dedicated grilling task
   settles the ubiquitous language (effort, map, task, ticket, and the rest)
-  before the front door, simple-map, schema 5, and skill-surface decisions
+  before the front door, non-negotiables, schema 5, and skill-surface decisions
   are taken, and the effort's final documentation ticket writes the agreed
   glossary into `CONTEXT.md`.
 - An effort is the whole arc: wayfinder map, decision tasks, spec, tickets,
@@ -157,7 +158,8 @@ legal next call.
   the effort's non-goals and its non-negotiable facts (including the
   effort-level success test), and Wayfinder must establish those before it may
   hand off to `to-spec`. Intake no longer decides simple versus full. Decided
-  by the user, recorded in the simple-map task; the vocabulary's `simple map`
+  by the user, recorded in the non-negotiables and spec-gate task; the
+  vocabulary's `simple map`
   term is superseded.
 - The intake round is deliberately minimal: the raw request, a one-line
   destination, the actor, feature or bug, and three to five user stories (or a
@@ -169,7 +171,7 @@ legal next call.
 - The map carries the non-goals, the non-negotiable facts, and the effort-level
   success test as body sections: `## Non-goals`, which absorbs the old `## Out
   of scope`, and `## Non-negotiable facts`, whose first line is the success
-  test. Settled in the simple-map and spec-gate grilling (Q1); the map's
+  test. Settled in the non-negotiables and spec-gate grilling (Q1); the map's
   reference orientation and the gate's exact check are narrowed below.
 - The map is reference-oriented: the decisions stay in the task files and the
   map carries short statements plus pointers to them, never an inlined
@@ -182,8 +184,8 @@ legal next call.
   phase's opener tool, the same call that discloses that phase's tools, never
   in the skill's prose, so finishing every task and skipping the reconciliation
   is refused with a pointer back to Wayfinder, and a Wayfinder mistake is
-  reported by Wayfinder instead of by `to-spec`. Settled in the simple-map and
-  spec-gate grilling (Q2, Q3, Q4).
+  reported by Wayfinder instead of by `to-spec`. Settled in the non-negotiables
+  and spec-gate grilling (Q2, Q3, Q4).
 - The canonical grilling method is the round-based frontier in the `grilling`
   skill: ask the whole frontier at once, numbered, each with a recommended
   answer, then wait for the answers before the next round. Four places still
@@ -196,7 +198,7 @@ legal next call.
   `grill-skill-surface`, not by the documentation re-sync ticket: every skill
   that runs a grilling session delegates to the `grilling` skill and stops
   restating the method, and the routers that deny the skill exists are
-  corrected. Found while grilling the simple-map and spec-gate task.
+  corrected. Found while grilling the non-negotiables and spec-gate task.
 - Every workflow skill ends its run with one shared completion report: a small
   fixed order (what is now true, what needs the human, what to run next, what is
   broken or blocked, one pointer to the detail), in compact simplified technical
@@ -235,27 +237,44 @@ legal next call.
   tool-mediated: `tw_resolve_uncertainty`, `tw_split_ticket`, and
   `tw_record_out_of_scope`, which writes the global out-of-scope KB. Settled in
   the gate-model grilling (Q1 to Q6).
+- Telemetry is emitted, but not by the model. The opener absorbs the explicit
+  `telemetry_skill_context` calls and records the skill, effort, and target
+  automatically, so the per-skill telemetry prose is removed from the skills
+  and the model no longer calls that tool. `submit_feedback` stays available to
+  the model for anomalies. The telemetry backend (storage, schema, dashboards)
+  stays out of scope. Settled in the wayfinder fog reconciliation (F2).
+- The write guard covers the built-in `write` and `edit` on `docs/tasks/**`
+  only. A file-writing MCP tool or a shell command can still mutate the tree;
+  the residual risk is accepted and documented. Settled in the wayfinder fog
+  reconciliation (F3).
+- The nested-open path is proven by one integration test in the opener tooling:
+  open a phase, nest `skill-creator`, assert the declared set is the union of
+  both toolsets, close `skill-creator`, assert the phase is still open with its
+  own tools intact. This is an acceptance criterion for the
+  progressive-disclosure tickets. Settled in the wayfinder fog reconciliation
+  (F4).
+- The report rules have no canonical home; each skill's report template lives in
+  its own report resource, enforcement is prose discipline only, and the drift
+  risk is accepted. Settled in the wayfinder fog reconciliation (F5).
+- A living-architecture change that contradicts a settled planning decision is
+  recorded in full in `architecture.md`, with a note naming the superseded
+  decision. The map's `Decisions so far` gets a one-line pointer so the index
+  does not advertise a decision that is now wrong, and an ADR is written when
+  the decision is ADR-worthy under `domain-modeling`'s rules. There is no
+  automatic ADR mechanism, so nothing is generated for a change that is not
+  ADR-worthy. Settled in the wayfinder fog reconciliation (F1).
 
 ## Fog
 
-- Whether a living-architecture change that contradicts a settled planning
-  decision is also recorded as an ADR or a map decision, since the
-  specification's architecture content becomes archival.
-- Whether telemetry should record tool activation and deactivation as
-  workflow events.
-- Whether the write guard needs coverage for a file-writing tool beyond the
-  built-in `write` and `edit`, since an MCP file server would bypass it.
-- How the nested-open path is exercised and tested: `skill-creator` gains its
-  toolset in this effort, but the nested path still needs a deliberate nested
-  invocation to be proven.
-- The report rules have no canonical home and can drift, which the user accepted
-  in exchange for per-skill report templates (`grill-skill-reports`, Q4).
+Nothing open.
 
 ## Out of scope
 
 - Rewriting the chain internals and the verdict and host-gate mechanics.
 - Changing the 11 agent definitions.
-- Repo gating and the telemetry or feedback layer.
+- Repo gating. The telemetry or feedback backend (storage, schema,
+  dashboards) is out of scope, but absorbing the existing
+  `telemetry_skill_context` calls into the opener is in scope.
 - Running the schema migration on a downstream repo, which stays a
   human-driven `setup-workflow` action after v5 lands. Updating
   `setup-workflow`'s templates and `docs/migration-target.yaml` to schema 5 is

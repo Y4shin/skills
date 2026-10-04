@@ -1,14 +1,14 @@
 ---
 type: task
 subtype: grilling
-title: Simple-map semantics and the to-spec gate
+title: Map non-negotiables and the `to-spec` gate
 status: stable
 workflow_state: done
 blocked_by:
 - grill-workflow-vocabulary
 ---
 
-# Simple-map semantics and the to-spec gate
+# Map non-negotiables and the `to-spec` gate
 
 ## Decision to settle
 

@@ -1,14 +1,14 @@
 ---
 type: task
 subtype: grilling
-title: Front door and its relationship to triage
+title: The front door and `intake`
 status: stable
 workflow_state: done
 blocked_by:
 - grill-workflow-vocabulary
 ---
 
-# Front door and its relationship to triage
+# The front door and `intake`
 
 ## Decision to settle
 
@@ -99,7 +99,7 @@ for an effort, and `setup-workflow`'s onboarding templates.
   time-boxed reach into the code when a targeted check is genuinely useful.
 - Removed from intake because they belong to Wayfinder: explicit non-goals and
   the effort-level success test. Those become required map outputs before the
-  `to-spec` handoff. See `grill-simple-map-and-spec-gate`.
+  `to-spec` handoff. See `grill-non-negotiables-and-spec-gate`.
 - Removed from intake with the abandonment of the simple map: the clear-way
   check and the appetite question. Intake no longer decides simple versus full;
   every effort gets the non-negotiables grilling task.
