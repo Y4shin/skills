@@ -55,14 +55,60 @@ legal next call.
   two-phase model.
 - Documentation re-sync is in scope, as the effort's final ticket.
 - Schema 5 with migration; small additive changes only, because the change is
-  enforcement rather than a schema redesign.
+  enforcement rather than a schema redesign. Settled in the schema-5 grilling
+  (Q1 to Q5): map frontmatter gains `ready_for_spec` (boolean, absent reads as
+  false) and optional `origin_effort`; no `simple` field. `type: arch spec` and
+  `arch-spec.md` become `architecture` and `architecture.md` at the effort
+  root, a new `type: review` covers `review.md` at the effort root, and the map
+  body gains `## Non-goals` (absorbing `## Out of scope`) and
+  `## Non-negotiable facts`. `schema_version` 5 ships through
+  `src/migrate-cli.ts` and `src/core/migrate.ts` in one idempotent hop from any
+  vintage, v3 and v4 stay readable during the transition, and the renames cover
+  archives while `docs/bugs/` is left in place as a static archive. The same
+  grilling (Q6) settles that this effort also updates `docs/migration-target.yaml`
+  and adds `setup-workflow`'s `upgrade-4-to-5` resource, while running the
+  migration on a downstream repo stays a human `setup-workflow` action.
 - The open decisions are grouped into themed grilling tasks, plus a research
   task and a prototype task ahead of the disclosure grilling. A later
   grilling task, added when the reporting defect surfaced, covers what a skill
   reports to the human when it finishes.
-- The overloaded `implement-task` skill is split into planning and ticket
-  execution, decided by its own grilling task rather than folded into the
-  skill-surface decision.
+- The overloaded `implement-task` skill is split, decided by its own grilling
+  task rather than folded into the skill-surface decision. Settled in the
+  implement-task-split grilling (Q1 to Q7): the ticket half is
+  `implement-ticket`, a mutually exclusive phase skill that owns the ticket
+  frontier, the level loop, the chain dispatch, the end-of-effort pass, the
+  failure toolbelt, and the inlined per-ticket close-out. The planning half is
+  absorbed into `wayfinder`: there is no `plan-task`. `wayfinder` creates the
+  map and the planning tasks, works the planning frontier (delegating
+  `research` and `prototype`, running `grilling` and `manual` itself), writes
+  results back, and reconciles. Planning work is serialized per kind: never
+  more than one grilling at a time, while research and prototype may run
+  concurrently; tickets may run concurrently within one dependency level and
+  serialize across levels. A `wayfinder` invocation is bounded to one frontier
+  snapshot and then relinquishes control; it never rolls into the next
+  frontier, so each frontier is a visible break point. A pass works the
+  non-grilling ready tasks and at most one grilling, so each grilling is its
+  own break point. When the ready frontier is empty, the invocation runs the
+  reconcile pass and releases. `wayfinder` stays user-invoked:
+  `disable-model-invocation: true`, with the human typing `/skill:wayfinder`
+  for every pass.
+- The skill surface is settled in the skill-surface grilling (Q1 to Q6): add
+  `intake` (replacing `triage`), `finalize-effort`, and `implement-ticket`;
+  retire `triage`, `finalize-task`, and `implement-task`; re-scope `wayfinder`,
+  `to-spec`, `to-tickets`, `task-workflow-overview`, and the prose of every
+  workflow skill. `intake`, `wayfinder`, `to-spec`, `to-tickets`, and
+  `setup-workflow` stay user-invoked; `implement-ticket`, `finalize-effort`,
+  `task-workflow-overview`, and `task-workflow-doctor` are model-invoked.
+  `task-workflow-overview` stays a layered explainer of the workflow with
+  progressive disclosure plus a fast track to `tw_next`, and
+  `task-workflow-doctor` narrows to legacy trees, missing scaffolding, failed
+  migrations, and opener-refusal routing. Ticket resources and the chain
+  scripts move under `implement-ticket`; planning resources consolidate under
+  `wayfinder/resources`; the duplicated planning resources are deleted. The
+  phase skills are `intake`, `setup-workflow`, `wayfinder`, `to-spec`,
+  `to-tickets`, `implement-ticket`, and `finalize-effort`, all pairwise
+  mutually exclusive; `skill-creator` gains a disclosed toolset from its
+  bundled scripts and is the one nestable tool-owning discipline.
 - Shared vocabulary is a first-class decision. A dedicated grilling task
   settles the ubiquitous language (effort, map, task, ticket, and the rest)
   before the front door, simple-map, schema 5, and skill-surface decisions
@@ -195,17 +241,13 @@ legal next call.
 - Whether a living-architecture change that contradicts a settled planning
   decision is also recorded as an ADR or a map decision, since the
   specification's architecture content becomes archival.
-- Whether v5 ripples into `setup-workflow`'s onboarding templates and
-  `docs/migration-target.yaml`.
 - Whether telemetry should record tool activation and deactivation as
   workflow events.
 - Whether the write guard needs coverage for a file-writing tool beyond the
   built-in `write` and `edit`, since an MCP file server would bypass it.
-- How the nested-open path is exercised and tested, since today only
-  `skill-creator` would use it, and only after its bundled scripts become tools.
-- Whether `wayfinder` becomes model-invoked so a phase skill can call it
-  directly, or stays user-invoked with the human typing the command. Not yet put
-  to the user.
+- How the nested-open path is exercised and tested: `skill-creator` gains its
+  toolset in this effort, but the nested path still needs a deliberate nested
+  invocation to be proven.
 - The report rules have no canonical home and can drift, which the user accepted
   in exchange for per-skill report templates (`grill-skill-reports`, Q4).
 
@@ -214,6 +256,8 @@ legal next call.
 - Rewriting the chain internals and the verdict and host-gate mechanics.
 - Changing the 11 agent definitions.
 - Repo gating and the telemetry or feedback layer.
-- Migrating downstream repos, which is `setup-workflow`'s job once schema 5
-  lands.
+- Running the schema migration on a downstream repo, which stays a
+  human-driven `setup-workflow` action after v5 lands. Updating
+  `setup-workflow`'s templates and `docs/migration-target.yaml` to schema 5 is
+  in scope for this effort.
 - Any change to the shape of the two-phase planning model.
