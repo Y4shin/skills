@@ -179,20 +179,35 @@ legal next call.
   `skill`, the symmetric exclusivity table decides which openers may overlap,
   and the nested capability is kept, justified by `skill-creator`, whose
   bundled validation scripts should become tools.
+- Gate preconditions live in the extension tools as the single source of truth,
+  and host gate commands stay at real execution boundaries only. Free `tw_set`
+  is removed; named transition tools carry the state machine's preconditions and
+  become the only writers of `docs/tasks/**`. The built-in `write` and `edit` are
+  blocked on `docs/tasks/**`, and the `bash` command scan is dropped as
+  bypassable, so every step that needed `bash` moves into a tool. The escape
+  hatches stay
+  tool-mediated: `tw_resolve_uncertainty`, `tw_split_ticket`, and
+  `tw_record_out_of_scope`, which writes the global out-of-scope KB. Settled in
+  the gate-model grilling (Q1 to Q6).
 
 ## Fog
 
 - Whether a living-architecture change that contradicts a settled planning
   decision is also recorded as an ADR or a map decision, since the
   specification's architecture content becomes archival.
-- Whether skills should also declare `allowed-tools` to line up with
-  disclosure, or whether activation alone is enough.
-- How `task-workflow-overview` answers read queries when workflow tools are
-  hidden outside skills.
 - Whether v5 ripples into `setup-workflow`'s onboarding templates and
   `docs/migration-target.yaml`.
 - Whether telemetry should record tool activation and deactivation as
   workflow events.
+- Whether the write guard needs coverage for a file-writing tool beyond the
+  built-in `write` and `edit`, since an MCP file server would bypass it.
+- How the nested-open path is exercised and tested, since today only
+  `skill-creator` would use it, and only after its bundled scripts become tools.
+- Whether `wayfinder` becomes model-invoked so a phase skill can call it
+  directly, or stays user-invoked with the human typing the command. Not yet put
+  to the user.
+- The report rules have no canonical home and can drift, which the user accepted
+  in exchange for per-skill report templates (`grill-skill-reports`, Q4).
 
 ## Out of scope
 
