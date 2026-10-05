@@ -63,6 +63,9 @@ interface StubExtensionAPI extends ExtensionAPI {
   tools: Array<{ name: string }>;
   handlers: Record<string, Array<(...args: any[]) => any>>;
   notifications: Array<{ message: string; level: string }>;
+  activeTools: string[];
+  setActiveTools(toolNames: string[]): void;
+  getActiveTools(): string[];
 }
 
 const GATED_SKILL_NAMES = [
@@ -125,6 +128,7 @@ function createStub(): StubExtensionAPI {
   const tools: Array<{ name: string }> = [];
   const handlers: Record<string, Array<(...args: any[]) => any>> = {};
   const notifications: Array<{ message: string; level: string }> = [];
+  const activeTools: string[] = [];
 
   return {
     tools,
@@ -139,6 +143,12 @@ function createStub(): StubExtensionAPI {
     },
     getAllTools() {
       return tools;
+    },
+    setActiveTools(toolNames: string[]) {
+      activeTools.splice(0, activeTools.length, ...toolNames);
+    },
+    getActiveTools() {
+      return [...activeTools];
     },
     ui: {
       notify(message: string, level: string) {
@@ -538,5 +548,137 @@ describe("factory gate", () => {
       const expected = suffix.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       expect(labels.get(name)).toBe(expected);
     }
+  });
+
+  describe("write lockdown guard", () => {
+    /** Fire the registered tool_call guard and fail loudly if it is absent. */
+    function fireGuard(
+      stub: StubExtensionAPI,
+      cwd: string,
+      toolName: string,
+      input: Record<string, unknown>,
+    ): Promise<any> {
+      const handlers = stub.handlers["tool_call"];
+      expect(handlers, "the guard must register a tool_call handler").toBeDefined();
+      expect(handlers.length).toBe(1);
+      return handlers[0](
+        { type: "tool_call", toolCallId: "guard-1", toolName, input },
+        { cwd, ui: stub.ui },
+      );
+    }
+
+    test("refuses write and edit under docs/tasks for relative and absolute paths", async () => {
+      const repo = setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const blockedPaths = [
+        "docs/tasks/effort-one/map.md",
+        "docs/tasks/effort-one/tasks/research/task.md",
+        // Normalized before the containment check: traversal cannot slip past.
+        "docs/../docs/tasks/effort-one/map.md",
+        join(repo, "docs/tasks/effort-one/map.md"),
+      ];
+      for (const path of blockedPaths) {
+        const result = await fireGuard(stub, repo, "write", { path, content: "x" });
+        expect(result, `write '${path}' must be blocked`).toMatchObject({ block: true });
+        expect(result.reason, `write '${path}' must carry the lockdown reason`).toContain("write lockdown");
+      }
+
+      const editPaths = [
+        "docs/tasks/effort-one/tickets/one/ticket.md",
+        join(repo, "docs/tasks/effort-one/tickets/one/ticket.md"),
+      ];
+      for (const path of editPaths) {
+        const result = await fireGuard(stub, repo, "edit", { path, edits: [] });
+        expect(result, `edit '${path}' must be blocked`).toMatchObject({ block: true });
+        expect(result.reason, `edit '${path}' must carry the lockdown reason`).toContain("write lockdown");
+      }
+    });
+
+    test("registers exactly one tool_call handler in a personal repo and none in a work repo", () => {
+      setupPersonalRepo();
+      const personalStub = createStub();
+      factory(personalStub);
+      expect(personalStub.handlers["tool_call"]).toBeDefined();
+      expect(personalStub.handlers["tool_call"].length).toBe(1);
+
+      setupWorkRepo();
+      const workStub = createStub();
+      factory(workStub);
+      expect(workStub.handlers["tool_call"]).toBeUndefined();
+    });
+
+    test("blocks while a toolset is open, independent of the active tool set", async () => {
+      const repo = setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      // Simulate an open phase toolset: the declared active set now carries
+      // the built-in write tool plus a phase toolset, the shape setActiveTools
+      // leaves behind while a skill is open.
+      stub.setActiveTools(["write", "edit", "tw_open", "tw_next", "tw_show"]);
+      expect(stub.getActiveTools()).toContain("write");
+
+      const result = await fireGuard(stub, repo, "write", {
+        path: "docs/tasks/effort-one/map.md",
+        content: "x",
+      });
+      expect(result).toMatchObject({ block: true });
+      expect(result.reason).toContain("write lockdown");
+    });
+
+    test("adds no bash command-string scan: bash and read pass the guard unblocked", async () => {
+      const repo = setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      // A shell command string cannot be gated soundly, so the guard does not
+      // scan one: even a mutation-shaped command naming the tree passes. The
+      // residual risk is accepted and documented in docs/repo-gating.md.
+      const passThrough = [
+        { toolName: "bash", input: { command: "rm -rf docs/tasks/effort-one" } },
+        { toolName: "bash", input: { command: "echo hello > docs/tasks/effort-one/map.md" } },
+        // Reading the tree stays allowed.
+        { toolName: "read", input: { path: "docs/tasks/effort-one/map.md" } },
+      ];
+      for (const { toolName, input } of passThrough) {
+        const result = await fireGuard(stub, repo, toolName, input);
+        expect(result, `${toolName} ${JSON.stringify(input)} must pass unblocked`).toBeUndefined();
+      }
+    });
+
+    test("the boundary documentation records the accepted bash residual risk", () => {
+      const doc = readFileSync(join(process.cwd(), "docs", "repo-gating.md"), "utf-8");
+      expect(doc).toContain("Residual risk");
+      expect(doc).toContain("cannot be gated soundly");
+      expect(doc).toContain("bash");
+    });
+
+    test("allows write and edit outside docs/tasks, including docs/bugs", async () => {
+      const repo = setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const allowedCases: Array<{ toolName: string; path: string }> = [
+        // docs/bugs is out of the guard scope: the bug substrate retires.
+        { toolName: "write", path: "docs/bugs/login-loop.md" },
+        { toolName: "write", path: join(repo, "docs/bugs/login-loop.md") },
+        { toolName: "write", path: "README.md" },
+        { toolName: "write", path: join(tmpdir(), "write-lockdown-elsewhere", "notes.md") },
+        { toolName: "edit", path: "src/index.ts" },
+        // A sibling directory is not the tree: the match is not a prefix test.
+        { toolName: "edit", path: "docs/tasks-archive/notes.md" },
+      ];
+      for (const { toolName, path } of allowedCases) {
+        const input = toolName === "write" ? { path, content: "x" } : { path, edits: [] };
+        const result = await fireGuard(stub, repo, toolName, input);
+        expect(result, `${toolName} '${path}' must pass the guard unblocked`).toBeUndefined();
+      }
+    });
   });
 });
