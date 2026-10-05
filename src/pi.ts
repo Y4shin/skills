@@ -599,6 +599,29 @@ function activeAfterClose(active: string[], closing: SkillEntry, remaining: Set<
   return active.filter((tool) => !removed.has(tool));
 }
 
+/**
+ * Record the skill invocation telemetry the per-skill prose used to ask the
+ * model for: the opener absorbs the explicit telemetry_skill_context call, so
+ * the model never makes one. Best-effort and fail-open: when the telemetry
+ * extension is absent (unknown tool) or errors, the open still succeeds.
+ */
+async function recordSkillTelemetry(
+  ctx: ToolContext,
+  skill: string,
+  effort: string,
+  target: string | undefined,
+): Promise<void> {
+  if (!ctx.executeTool) return;
+  try {
+    await ctx.executeTool("telemetry_skill_context", {
+      skill_name: skill,
+      target: target ?? effort,
+    });
+  } catch {
+    // Telemetry is never load-bearing for the open.
+  }
+}
+
 // ─── Tool factory ──────────────────────────────────────────────────────────────
 
 interface Tool {
@@ -944,6 +967,7 @@ export function createTools(): Record<string, Tool> {
         const next = [...new Set([...active, ...entry.toolset, CLOSER])].sort();
         activeSet.set(next);
         const disclosed = next.filter((tool) => !active.includes(tool));
+        await recordSkillTelemetry(ctx, entry.name, p.effort as string, p.target as string | undefined);
         return outcome(
           `Opened ${entry.name}: now active ${disclosed.join(", ")}.`,
           { opened: true, skill: entry.name, effort: p.effort, target: p.target, disclosed, active: next },
