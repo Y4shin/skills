@@ -68,3 +68,44 @@ model-available. Skills do not declare `allowed-tools`.
 
 - bump-dependencies (the `exposure`, `defaultActive`, `setActiveTools`, and
   `tool_search` APIs exist only after the bump).
+
+## Implementation notes
+
+- Landed on `ticket/disclosure-open-close-core` (13 commits from landing
+  point `736082f`), re-verified after a prior attempt hit its script timeout
+  mid-implementation with the suite already green.
+- The engine lives in the new pure module `src/disclosure.ts`: the skill
+  registry with the symmetric `conflicts` table (adding a skill is a table
+  entry; the check is order-independent), the discriminated-union parameter
+  builder, `validateOpenArgs` (the runtime backstop for a provider that
+  flattens the union), and the open-set derivation `openSkillsIn`, which
+  reads the open skills out of the active tool set via per-skill private
+  signature tools, so the declared set and the open state can never disagree
+  and transcript persistence is inherited for free.
+- `src/pi.ts` gains the three structured tools: `tw_open` (single dispatcher
+  on the union; refuses exactly a duplicate or a conflicting skill; discloses
+  the skill's toolset plus `tw_close`; records telemetry through a nested
+  `telemetry_skill_context` call, fail-open when the tool is absent),
+  `tw_close` (names its skill; removes only the tools no remaining open
+  skill still needs; drops itself when the last skill closes), and `tw_next`
+  (always declared, never errors, prose in both states, never a structured
+  frontier, never suggests closing). Registration is the bypass-free
+  combination: every workflow tool `exposure: "direct"`, `defaultActive:
+  false`, with only the dispatcher pair declared idle. The declared set is
+  re-asserted from the transcript on resume and fork.
+- The registry's toolsets are provisional: `opener-gate-and-toolsets` (real
+  per-phase preconditions and toolsets, plus `legal_next` on refusals) and
+  `skill-creator-nested-toolset` (the real nested toolset) replace them as
+  data-table edits.
+- Tests: `tests/disclosure.test.ts` (tool-level open/close/next contracts,
+  refusals in both orders, union backstop), `tests/integration/
+disclosure.test.ts` (three-way flip including unsearchability before open
+  and after close, the nested skill-creator union test, /tree and resume
+  persistence, telemetry absorption x3), a registration pin in
+  `tests/gate-factory.test.ts`, persistence options on the integration
+  harness, and session tests that open a skill before gated tool use.
+  Full suite 836/836; typecheck clean.
+- Unpinned judgment calls: telemetry args (`skill_name` plus `target`, the
+  effort as the phase-open target; old `sliceCount`/`map` attributes not
+  forwarded), and the provisional registry contents, both documented in the
+  deviation report and reversible.
