@@ -49,11 +49,22 @@ async function session(extra?: Parameters<typeof createTaskSession>[0]): Promise
   return s;
 }
 
+/**
+ * Open a workflow skill before its tools run: the declared set is two-state,
+ * so a gated workflow tool is callable only inside an open skill.
+ */
+async function openSkill(s: TaskSession, skill: string): Promise<void> {
+  s.setResponses([reply([call("tw_open", { skill, effort: "test-effort" })])]);
+  await s.session.prompt(`Open ${skill}.`);
+  s.setResponses([]);
+}
+
 // ─── 1. Tool dispatch + filesystem round-trip ────────────────────────────────
 
 describe("tool dispatch and filesystem round-trip", () => {
   test("tw_list sees the on-disk tree", async () => {
     const s = await session();
+    await openSkill(s, "wayfinder");
     s.setResponses([
       reply([call("tw_list", {})]),
       (ctx: Context) => reply(`Tasks: ${latestToolResultText(ctx, "tw_list") ?? "(none)"}`),
@@ -66,6 +77,7 @@ describe("tool dispatch and filesystem round-trip", () => {
 
   test("tw_show returns frontmatter", async () => {
     const s = await session();
+    await openSkill(s, "skill-creator");
     s.setResponses([
       reply([call("tw_show", { selector: "login" })]),
       (ctx: Context) => reply(`kind is ${(/kind: (\w+)/.exec(latestToolResultText(ctx, "tw_show") ?? "")?.[1]) ?? "?"}`),
@@ -77,13 +89,15 @@ describe("tool dispatch and filesystem round-trip", () => {
 
   test("tw_get reads a field after tw_set mutates it", async () => {
     const s = await session();
+    await openSkill(s, "to-spec");
     s.setResponses([
       reply([call("tw_set", { selector: "login", field: "status", value: "in-progress" })]),
       reply([call("tw_get", { selector: "login", field: "status" })]),
       (ctx: Context) => reply(`status now: ${latestToolResultText(ctx, "tw_get") ?? "?"}`),
     ]);
     await s.session.prompt("Set login to in-progress, then read it back.");
-    expect(toolCallNames(s.events)).toEqual(["tw_set", "tw_get"]);
+    // The open (and its nested telemetry call) precede the two workflow calls.
+    expect(toolCallNames(s.events).slice(-2)).toEqual(["tw_set", "tw_get"]);
     expect(lastAssistantText(s.session)).toContain("status now: in-progress");
     const onDisk = readFileSync(join(s.cwd, "docs/tasks/login/task.md"), "utf-8");
     expect(onDisk).toContain("status: in-progress");
@@ -91,6 +105,7 @@ describe("tool dispatch and filesystem round-trip", () => {
 
   test("tw_show works on slices by slug", async () => {
     const s = await session();
+    await openSkill(s, "skill-creator");
     s.setResponses([
       reply([call("tw_show", { selector: "do-thing" })]),
       (ctx: Context) => reply(latestToolResultText(ctx, "tw_show") ?? "?"),
@@ -103,6 +118,7 @@ describe("tool dispatch and filesystem round-trip", () => {
 
   test("tw_set works on slices by slug", async () => {
     const s = await session();
+    await openSkill(s, "to-spec");
     s.setResponses([
       reply([call("tw_set", { selector: "do-thing", field: "status", value: "in-progress" })]),
       (ctx: Context) => {
@@ -118,6 +134,7 @@ describe("tool dispatch and filesystem round-trip", () => {
 
   test("tw_dependency_levels returns levels", async () => {
     const s = await session();
+    await openSkill(s, "wayfinder");
     s.setResponses([
       reply([call("tw_dependency_levels", { selector: "auth" })]),
       (ctx: Context) => reply(latestToolResultText(ctx, "tw_dependency_levels") ?? "?"),
@@ -132,6 +149,7 @@ describe("tool dispatch and filesystem round-trip", () => {
 
   test("tw_context returns schema", async () => {
     const s = await session();
+    await openSkill(s, "setup-workflow");
     s.setResponses([
       reply([call("tw_context", {})]),
       (ctx: Context) => reply(latestToolResultText(ctx, "tw_context") ?? "?"),
@@ -146,6 +164,7 @@ describe("tool dispatch and filesystem round-trip", () => {
 describe("multi-turn state mutations", () => {
   test("tw_state_set writes, tw_state reads back", async () => {
     const s = await session();
+    await openSkill(s, "intake");
     s.setResponses([
       reply([call("tw_state_set", { field: "task", value: "login" })]),
       reply([call("tw_state", {})]),
@@ -162,6 +181,7 @@ describe("edge cases", () => {
   test("tw_list on tree without docs/tasks is graceful", async () => {
     const s = await createTaskSession({ extensions: ALL_EXTENSIONS, projectFiles: {} });
     sessions.push(s);
+    await openSkill(s, "wayfinder");
     s.setResponses([
       reply([call("tw_list", {})]),
       (ctx: Context) => reply(latestToolResultText(ctx, "tw_list") ?? "?"),
@@ -173,6 +193,7 @@ describe("edge cases", () => {
   test("tw_state works on fresh tree", async () => {
     const s = await createTaskSession({ extensions: ALL_EXTENSIONS, projectFiles: {} });
     sessions.push(s);
+    await openSkill(s, "intake");
     s.setResponses([
       reply([call("tw_state", {})]),
       (ctx: Context) => reply(latestToolResultText(ctx, "tw_state") ?? "?"),

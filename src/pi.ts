@@ -22,16 +22,11 @@ import YAML from "yaml";
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
 import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
 import {
-  ALWAYS_DECLARED,
   CLOSER,
-  OPEN_CLOSE_TOOLS,
-  SKILL_REGISTRY,
   buildOpenParameters,
   conflictReason,
-  declaredSetFor,
   duplicateReason,
   openSkillsIn,
-  signatureToolOf,
   skillEntry,
   validateOpenArgs,
   type SkillEntry,
