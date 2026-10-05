@@ -63,6 +63,9 @@ interface StubExtensionAPI extends ExtensionAPI {
   tools: Array<{ name: string }>;
   handlers: Record<string, Array<(...args: any[]) => any>>;
   notifications: Array<{ message: string; level: string }>;
+  activeTools: string[];
+  setActiveTools(toolNames: string[]): void;
+  getActiveTools(): string[];
 }
 
 const GATED_SKILL_NAMES = [
@@ -125,6 +128,7 @@ function createStub(): StubExtensionAPI {
   const tools: Array<{ name: string }> = [];
   const handlers: Record<string, Array<(...args: any[]) => any>> = {};
   const notifications: Array<{ message: string; level: string }> = [];
+  const activeTools: string[] = [];
 
   return {
     tools,
@@ -139,6 +143,12 @@ function createStub(): StubExtensionAPI {
     },
     getAllTools() {
       return tools;
+    },
+    setActiveTools(toolNames: string[]) {
+      activeTools.splice(0, activeTools.length, ...toolNames);
+    },
+    getActiveTools() {
+      return [...activeTools];
     },
     ui: {
       notify(message: string, level: string) {
@@ -598,6 +608,26 @@ describe("factory gate", () => {
       const workStub = createStub();
       factory(workStub);
       expect(workStub.handlers["tool_call"]).toBeUndefined();
+    });
+
+    test("blocks while a toolset is open, independent of the active tool set", async () => {
+      const repo = setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      // Simulate an open phase toolset: the declared active set now carries
+      // the built-in write tool plus a phase toolset, the shape setActiveTools
+      // leaves behind while a skill is open.
+      stub.setActiveTools(["write", "edit", "tw_open", "tw_next", "tw_show"]);
+      expect(stub.getActiveTools()).toContain("write");
+
+      const result = await fireGuard(stub, repo, "write", {
+        path: "docs/tasks/effort-one/map.md",
+        content: "x",
+      });
+      expect(result).toMatchObject({ block: true });
+      expect(result.reason).toContain("write lockdown");
     });
 
     test("allows write and edit outside docs/tasks, including docs/bugs", async () => {
