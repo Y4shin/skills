@@ -154,3 +154,42 @@ describe("disclosure core: tw_open", () => {
     expect(active).toEqual(before);
   });
 });
+
+describe("disclosure core: tw_next", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  test("outside a skill it answers in short prose and points at the opener", async () => {
+    const ctx = disclosureCtx([...IDLE]);
+    const result = (await tools.tw_next.execute({}, ctx)) as ToolResult;
+    expect(typeof result.text).toBe("string");
+    expect(result.text.length).toBeGreaterThan(0);
+    expect(result.text).toContain("tw_open");
+    // It never returns a structured frontier.
+    expect(() => JSON.parse(result.text)).toThrow();
+  });
+
+  test("inside a skill it says to finish the current work first and never suggests closing", async () => {
+    const active = [...IDLE];
+    const ctx = disclosureCtx(active);
+    await tools.tw_open.execute({ skill: "wayfinder", effort: "e" }, ctx);
+
+    const result = (await tools.tw_next.execute({}, ctx)) as ToolResult;
+    expect(result.text).toContain("wayfinder");
+    expect(result.text).toMatch(/finish/i);
+    // The in-skill prose must not suggest abandoning the skill.
+    expect(result.text).not.toMatch(/close/i);
+  });
+
+  test("it never errors, whatever the arguments", async () => {
+    const idleCtx = disclosureCtx([...IDLE]);
+    await expect(tools.tw_next.execute({}, idleCtx)).resolves.toBeTruthy();
+    await expect(tools.tw_next.execute({ stray: "junk" }, idleCtx)).resolves.toBeTruthy();
+
+    const active = [...IDLE];
+    const workingCtx = disclosureCtx(active);
+    await tools.tw_open.execute({ skill: "to-spec", effort: "e" }, workingCtx);
+    await expect(tools.tw_next.execute({}, workingCtx)).resolves.toBeTruthy();
+  });
+});

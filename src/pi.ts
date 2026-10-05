@@ -983,6 +983,28 @@ export function createTools(): Record<string, Tool> {
         );
       },
     ),
+
+    tw_next: defStructured(
+      "Ask what to do next in the task workflow. Always declared, never errors: outside a skill it " +
+        "answers in short prose; inside a skill it says to finish the current work first.",
+      Type.Object({}),
+      async (_p, ctx) => {
+        const open = currentOpenSkills(ctx);
+        if (open.size === 0) {
+          return outcome(
+            "No workflow skill is open. Start the next phase by calling tw_open with the skill to run, " +
+              "for example the wayfinder planning phase, or ask the task-workflow-overview skill for the story.",
+            { open: [] },
+          );
+        }
+        const names = [...open].sort().join(", ");
+        return outcome(
+          `You are inside ${names}. Finish the current work first, then call tw_next again from outside the skill.`,
+          { open: [...open] },
+        );
+      },
+      { activeByDefault: true },
+    ),
   };
 }
 
