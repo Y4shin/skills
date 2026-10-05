@@ -6,6 +6,11 @@
  * Two frontmatter shapes are read:
  * - v4: OKF `type` (the artifact kind) plus `subtype` (the workflow category).
  * - v3: `kind` (the artifact kind) plus `type` (the workflow category).
+ * Schema 5 is an additive delta on top: the `architecture` and `review`
+ * effort-root types, the `ready_for_spec` and `origin_effort` map fields, and
+ * the `## Non-goals` / `## Non-negotiable facts` map section names. No
+ * producer writes v5 yet (the migration ticket owns the reshape), and the
+ * legacy `arch spec` / `arch-spec.md` pair stays readable as a v4 shape.
  * New producers write v4 only; v3 is recognized and mapped, never written.
  */
 
