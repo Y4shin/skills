@@ -110,6 +110,27 @@ describe("disclosure core: tw_open", () => {
     expect(active).toContain("tw_show");
   });
 
+  test("runtime validation backs the discriminated union up", async () => {
+    const ctx = disclosureCtx([...IDLE]);
+    // A ticket open carries the effort and the target: omitting the target throws.
+    await expect(
+      tools.tw_open.execute({ skill: "implement-ticket", effort: "e" }, ctx),
+    ).rejects.toThrow(/target/);
+    // An effort-only open carries no target: a provider that flattens the
+    // union and always sends one is refused with the reason.
+    await expect(
+      tools.tw_open.execute({ skill: "wayfinder", effort: "e", target: "stray" }, ctx),
+    ).rejects.toThrow(/takes no target/);
+    await expect(tools.tw_open.execute({ skill: "no-such-skill", effort: "e" }, ctx)).rejects.toThrow(
+      /unknown skill/,
+    );
+    await expect(tools.tw_open.execute({ skill: "wayfinder", effort: "  " }, ctx)).rejects.toThrow(
+      /non-empty effort/,
+    );
+    // None of the failed validations disclosed anything.
+    expect(ctx.getActiveTools()).toEqual([...IDLE]);
+  });
+
   test("tw_close removes only the closed skill's unneeded tools", async () => {
     const active = [...IDLE];
     const ctx = disclosureCtx(active);
