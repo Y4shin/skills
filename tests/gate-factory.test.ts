@@ -630,6 +630,27 @@ describe("factory gate", () => {
       expect(result.reason).toContain("write lockdown");
     });
 
+    test("adds no bash command-string scan: bash and read pass the guard unblocked", async () => {
+      const repo = setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      // A shell command string cannot be gated soundly, so the guard does not
+      // scan one: even a mutation-shaped command naming the tree passes. The
+      // residual risk is accepted and documented in docs/repo-gating.md.
+      const passThrough = [
+        { toolName: "bash", input: { command: "rm -rf docs/tasks/effort-one" } },
+        { toolName: "bash", input: { command: "echo hello > docs/tasks/effort-one/map.md" } },
+        // Reading the tree stays allowed.
+        { toolName: "read", input: { path: "docs/tasks/effort-one/map.md" } },
+      ];
+      for (const { toolName, input } of passThrough) {
+        const result = await fireGuard(stub, repo, toolName, input);
+        expect(result, `${toolName} ${JSON.stringify(input)} must pass unblocked`).toBeUndefined();
+      }
+    });
+
     test("allows write and edit outside docs/tasks, including docs/bugs", async () => {
       const repo = setupPersonalRepo();
 
