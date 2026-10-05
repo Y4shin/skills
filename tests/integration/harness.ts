@@ -21,7 +21,7 @@ import {
   fauxText,
   fauxToolCall,
   registerFauxProvider,
-} from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/compat.js";
+} from "@earendil-works/pi-ai/compat";
 
 import {
   type AgentSession,
@@ -35,7 +35,7 @@ import {
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import { InMemoryCredentialStore } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/index.js";
+import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 
 export type { AssistantMessage, Context, FauxContentBlock };
 
