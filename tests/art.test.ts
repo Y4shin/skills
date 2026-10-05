@@ -11,6 +11,9 @@ import {
   validateCombination,
   KNOWN_TYPES,
   TYPE_LEAF,
+  MAP_SECTION_NON_GOALS,
+  MAP_SECTION_NON_NEGOTIABLE_FACTS,
+  readMapSection,
   type Artifact,
   type WorkItemInfo,
 } from "../src/core/art.js";
@@ -192,6 +195,78 @@ describe("map frontmatter, schema 5", () => {
     const art = fromFrontmatter(doc.data);
     expect(art.ready_for_spec).toBe(true);
     expect(art.origin_effort).toBe("auth");
+  });
+});
+
+describe("map sections", () => {
+  const body = [
+    "# Effort",
+    "",
+    "## Destination",
+    "Ship it.",
+    "",
+    "## Non-goals",
+    "- Nothing about billing.",
+    "",
+    "## Non-negotiable facts",
+    "**Success test:** the fresh effort reaches archive.",
+    "- The schema delta stays additive.",
+    "",
+    "### A sub-heading stays inside",
+    "still facts",
+    "",
+    "## Decisions so far",
+    "- Settled.",
+  ].join("\n");
+
+  test("the section names are exported as the vocabulary", () => {
+    expect(MAP_SECTION_NON_GOALS).toBe("Non-goals");
+    expect(MAP_SECTION_NON_NEGOTIABLE_FACTS).toBe("Non-negotiable facts");
+  });
+
+  test("reads ## Non-goals and ## Non-negotiable facts", () => {
+    expect(readMapSection(body, MAP_SECTION_NON_GOALS)).toEqual(["- Nothing about billing."]);
+    expect(readMapSection(body, MAP_SECTION_NON_NEGOTIABLE_FACTS)).toEqual([
+      "**Success test:** the fresh effort reaches archive.",
+      "- The schema delta stays additive.",
+      "",
+      "### A sub-heading stays inside",
+      "still facts",
+    ]);
+  });
+
+  test("## Out of scope is tolerated as Non-goals", () => {
+    // The v4 name stays readable until the migration rewrites it.
+    const legacy = ["# Effort", "", "## Out of scope", "- Nothing about billing."].join("\n");
+    expect(readMapSection(legacy, MAP_SECTION_NON_GOALS)).toEqual(["- Nothing about billing."]);
+    expect(readMapSection(legacy, "Out of scope")).toEqual(["- Nothing about billing."]);
+  });
+
+  test("an absent section reads as null and an empty placeholder as empty", () => {
+    // Intake seeds the sections as empty placeholders, so a gate refusal
+    // names missing content, not a missing section.
+    expect(readMapSection(body, "Fog")).toBeNull();
+    const placeholder = ["# Effort", "", "## Non-goals", "", "## Fog", ""].join("\n");
+    expect(readMapSection(placeholder, MAP_SECTION_NON_GOALS)).toEqual([]);
+  });
+
+  test("a section ends at the next ## heading, not at # or ###", () => {
+    expect(readMapSection(body, "Destination")).toEqual(["Ship it."]);
+    expect(readMapSection(body, "Decisions so far")).toEqual(["- Settled."]);
+  });
+
+  test("the effort-level success test is the first line of ## Non-negotiable facts", () => {
+    const lines = readMapSection(body, MAP_SECTION_NON_NEGOTIABLE_FACTS)!;
+    expect(lines[0]).toMatch(/^\*\*Success test:\*\*/);
+  });
+
+  test("when both names appear, the first section wins", () => {
+    const both = [
+      "# Effort", "",
+      "## Out of scope", "- Legacy list.", "",
+      "## Non-goals", "- Modern list.",
+    ].join("\n");
+    expect(readMapSection(both, MAP_SECTION_NON_GOALS)).toEqual(["- Legacy list."]);
   });
 });
 

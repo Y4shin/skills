@@ -323,6 +323,59 @@ export function effortKeyOf(art: Artifact): string {
   return effort === null ? "" : `dir:${effort}`;
 }
 
+// ─── Map body sections ─────────────────────────────────────────────────────
+
+/**
+ * The map body sections schema 5 knows, by their canonical heading names:
+ * the non-goals (which absorbs the v4 `## Out of scope`) and the
+ * non-negotiable facts, whose first line is the bolded effort-level success
+ * test. Body sections, never frontmatter.
+ */
+export const MAP_SECTION_NON_GOALS = "Non-goals";
+export const MAP_SECTION_NON_NEGOTIABLE_FACTS = "Non-negotiable facts";
+
+/** The legacy heading each canonical section name answers to. */
+const MAP_SECTION_ALIASES: Record<string, string> = {
+  "Out of scope": MAP_SECTION_NON_GOALS,
+};
+
+function canonicalSectionName(name: string): string {
+  const trimmed = name.trim();
+  return MAP_SECTION_ALIASES[trimmed] ?? trimmed;
+}
+
+/**
+ * Read one `##` section out of a map body.
+ *
+ * Returns the section's content lines, with blank margins trimmed so an
+ * empty placeholder reads as `[]` and a non-empty check is a length check;
+ * `null` when the section is absent. A section runs to the next `##`
+ * heading, so `###` sub-headings stay inside it. Heading names resolve
+ * through the legacy aliases in both directions, so `## Out of scope` reads
+ * as Non-goals and either name finds either heading; when both headings
+ * appear, the first wins.
+ */
+export function readMapSection(body: string, name: string): string[] | null {
+  const wanted = canonicalSectionName(name);
+  let collecting = false;
+  const lines: string[] = [];
+  for (const line of body.split("\n")) {
+    const heading = /^##\s+(.+?)\s*$/.exec(line);
+    if (heading !== null) {
+      if (collecting) break;
+      if (canonicalSectionName(heading[1]) === wanted) collecting = true;
+      continue;
+    }
+    if (collecting) lines.push(line);
+  }
+  if (!collecting) return null;
+  while (lines.length > 0 && lines[0].trim() === "") lines.shift();
+  while (lines.length > 0 && lines[lines.length - 1].trim() === "") lines.pop();
+  return lines;
+}
+
+// ─── Whole-set checks ─────────────────────────────────────────────────────
+
 /**
  * Compute the anomalies that need the whole scanned set: orphaned artifacts
  * (type disagrees with location) and blocked_by targets no artifact provides.
