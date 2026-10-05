@@ -15,11 +15,26 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, wri
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext, InputEvent, InputEventResult, ToolCallEvent, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import { Type, type TSchema } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
 import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
+import {
+  ALWAYS_DECLARED,
+  CLOSER,
+  OPEN_CLOSE_TOOLS,
+  SKILL_REGISTRY,
+  buildOpenParameters,
+  conflictReason,
+  declaredSetFor,
+  duplicateReason,
+  openSkillsIn,
+  signatureToolOf,
+  skillEntry,
+  validateOpenArgs,
+  type SkillEntry,
+} from "./disclosure.js";
 import {
   effortGraphs,
   effortFrontier,
@@ -547,16 +562,66 @@ function artifactSchemaRef(): string {
   ].join("\n");
 }
 
+// ─── Open, close, next ────────────────────────────────────────────────────
+
+/**
+ * The open skills implied by the session's active tool set, or an empty set
+ * when no active tool set is reachable (a tool execute without a bound
+ * session). The derivation is the open/close engine's only state source.
+ */
+function currentOpenSkills(ctx: ToolContext): Set<string> {
+  return openSkillsIn(ctx.getActiveTools?.() ?? []);
+}
+
+function requireActiveSet(ctx: ToolContext): { get: () => string[]; set: (names: string[]) => void } {
+  if (!ctx.getActiveTools || !ctx.setActiveTools) {
+    throw new Error("tw_open and tw_close need a session-bound active tool set");
+  }
+  return { get: () => ctx.getActiveTools!(), set: (names) => ctx.setActiveTools!(names) };
+}
+
+function outcome(text: string, details: Record<string, unknown>): ToolOutcome {
+  return { text, details };
+}
+
 // ─── Tool factory ──────────────────────────────────────────────────────────────
 
 interface Tool {
   description: string;
   args: Record<string, unknown>;
-  execute(args: Record<string, any>, ctx: { directory: string }): Promise<string>;
+  /** Explicit TypeBox parameter schema; replaces the args-record conversion when present. */
+  parameters?: TSchema;
+  /** Whether registration activates the tool. Only the dispatcher pair is always declared. */
+  activeByDefault?: boolean;
+  execute(args: Record<string, any>, ctx: ToolContext): Promise<string> | Promise<ToolOutcome>;
+}
+
+/** A tool result: text for the model plus structured details. */
+interface ToolOutcome {
+  text: string;
+  details: Record<string, unknown>;
+}
+
+/** What a tool execute gets: the directory plus, when a session is bound, the active tool set. */
+interface ToolContext {
+  directory: string;
+  getActiveTools?(): string[];
+  setActiveTools?(toolNames: string[]): void;
+  executeTool?(name: string, args: unknown): Promise<unknown>;
 }
 
 function def(description: string, args: Record<string, unknown>, exec: (args: any, ctx: any) => Promise<string>): Tool {
   return { description, args, execute: exec };
+}
+
+/** Like def, for tools with an explicit TypeBox parameter schema and structured results. */
+function defStructured(
+  description: string,
+  parameters: TSchema,
+  exec: (args: any, ctx: ToolContext) => Promise<ToolOutcome>,
+  options: { activeByDefault?: boolean } = {},
+): Tool {
+  return { description, args: {}, parameters, activeByDefault: options.activeByDefault, execute: exec };
 }
 
 const Str = (d: string) => ({ type: "string" as const, description: d });
@@ -833,6 +898,44 @@ export function createTools(): Record<string, Tool> {
         return profile ? `${schema}\n\n---\n\n## Project profile\n\n${profile}` : schema;
       },
     ),
+
+    // ── disclosure core: the opener, the closer, and the router ──
+
+    tw_open: defStructured(
+      "Open a workflow skill: discloses the skill's toolset plus tw_close to the model. " +
+        "A wayfinder open carries only the effort; a ticket open carries the effort and the target. " +
+        "Refuses a skill that is already open or conflicts with an open skill; a refused open discloses nothing.",
+      buildOpenParameters(),
+      async (p, ctx) => {
+        validateOpenArgs(p);
+        const entry = skillEntry(p.skill as string)!;
+        const activeSet = requireActiveSet(ctx);
+        const active = activeSet.get();
+        const open = currentOpenSkills(ctx);
+        if (open.has(entry.name)) {
+          const reason = duplicateReason(entry.name);
+          return outcome(`Refused: ${reason}.`, { opened: false, reason });
+        }
+        // Exclusivity is a symmetric data table, so the check is
+        // order-independent; both directions are consulted for safety.
+        const conflicting = [...open].find(
+          (name) =>
+            entry.conflicts.includes(name) || (skillEntry(name)?.conflicts.includes(entry.name) ?? false),
+        );
+        if (conflicting !== undefined) {
+          const reason = conflictReason(entry.name, conflicting);
+          return outcome(`Refused: ${reason}.`, { opened: false, reason, open: [...open] });
+        }
+        const next = [...new Set([...active, ...entry.toolset, CLOSER])].sort();
+        activeSet.set(next);
+        const disclosed = next.filter((tool) => !active.includes(tool));
+        return outcome(
+          `Opened ${entry.name}: now active ${disclosed.join(", ")}.`,
+          { opened: true, skill: entry.name, effort: p.effort, target: p.target, disclosed, active: next },
+        );
+      },
+      { activeByDefault: true },
+    ),
   };
 }
 
@@ -921,10 +1024,23 @@ export default function (pi: ExtensionAPI) {
         name,
         label: name.replace(/^tw_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
         description: def.description,
-        parameters: Type.Object(params),
+        parameters: def.parameters ?? Type.Object(params),
+        // The bypass-free gate: every workflow tool is direct and inactive
+        // by default, activated only by the opener, except the dispatcher
+        // pair (tw_open, tw_next), which is declared in every state.
+        exposure: "direct",
+        defaultActive: def.activeByDefault ?? false,
         async execute(_id: string, args: any, _sig: any, _upd: any, ctx: any) {
-          const result = await def.execute(args, { directory: ctx.cwd });
-          return { content: [{ type: "text", text: result }], details: {} };
+          const result = await def.execute(args, {
+            directory: ctx.cwd,
+            getActiveTools: () => pi.getActiveTools(),
+            setActiveTools: (toolNames: string[]) => pi.setActiveTools(toolNames),
+            ...(ctx.executeTool ? { executeTool: (n: string, a: unknown) => ctx.executeTool(n, a) } : {}),
+          });
+          if (typeof result === "string") {
+            return { content: [{ type: "text", text: result }], details: {} };
+          }
+          return { content: [{ type: "text", text: result.text }], details: result.details };
         },
       });
     }
