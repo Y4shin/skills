@@ -6,6 +6,11 @@
  * Two frontmatter shapes are read:
  * - v4: OKF `type` (the artifact kind) plus `subtype` (the workflow category).
  * - v3: `kind` (the artifact kind) plus `type` (the workflow category).
+ * Schema 5 is an additive delta on top: the `architecture` and `review`
+ * effort-root types, the `ready_for_spec` and `origin_effort` map fields, and
+ * the `## Non-goals` / `## Non-negotiable facts` map section names. No
+ * producer writes v5 yet (the migration ticket owns the reshape), and the
+ * legacy `arch spec` / `arch-spec.md` pair stays readable as a v4 shape.
  * New producers write v4 only; v3 is recognized and mapped, never written.
  */
 
@@ -16,6 +21,7 @@ export const KNOWN_TYPES = [
   "task", "ticket", "map", "spec",
   "findings", "changelog", "out-of-scope note",
   "deviation report", "arch spec",
+  "architecture", "review",
 ] as const;
 export type KnownType = (typeof KNOWN_TYPES)[number];
 
@@ -46,6 +52,17 @@ export interface Artifact {
   size: string | null;
   /** Kind-scoped, effort-scoped. */
   blocked_by: string[];
+  /**
+   * Map only (schema 5): the spec gate flag Wayfinder's reconcile sets last.
+   * Absent reads as false, and an explicit false is allowed: the two are
+   * treated identically by every consumer. Only the boolean true reads true.
+   */
+  ready_for_spec: boolean;
+  /**
+   * Map only (schema 5): the effort this one spun out of, set on a follow-up
+   * effort's map. A field on the child, never a graph edge.
+   */
+  origin_effort: string | null;
   /** Which frontmatter shape was read. */
   shape: ArtifactShape;
   /**
@@ -112,6 +129,8 @@ export function fromFrontmatter(data: FrontmatterData, dirName?: string): Artifa
     mode: str(data.mode),
     size: str(data.size),
     blocked_by: strList(data.blocked_by),
+    ready_for_spec: data.ready_for_spec === true,
+    origin_effort: str(data.origin_effort),
     shape,
     data,
   };
@@ -229,6 +248,9 @@ export function effortDirOf(path: string): string | null {
  *
  * `task.md` is deliberately absent: it is both the v3 flat-task filename and
  * the v4 decision-task filename, so on its own it implies no type.
+ *
+ * `architecture.md` and `review.md` are the schema-5 effort-root documents;
+ * `arch-spec.md` stays as the legacy shape the reader keeps tolerating.
  */
 export const TYPE_LEAVES: readonly (readonly [type: string, file: string])[] = [
   ["map", "map.md"],
@@ -236,6 +258,8 @@ export const TYPE_LEAVES: readonly (readonly [type: string, file: string])[] = [
   ["task", "task.md"],
   ["spec", "spec.md"],
   ["arch spec", "arch-spec.md"],
+  ["architecture", "architecture.md"],
+  ["review", "review.md"],
 ];
 
 /** Type to filename, derived from TYPE_LEAVES. */
@@ -303,6 +327,59 @@ export function effortKeyOf(art: Artifact): string {
   const effort = art.path ? effortDirOf(art.path) : null;
   return effort === null ? "" : `dir:${effort}`;
 }
+
+// ─── Map body sections ─────────────────────────────────────────────────────
+
+/**
+ * The map body sections schema 5 knows, by their canonical heading names:
+ * the non-goals (which absorbs the v4 `## Out of scope`) and the
+ * non-negotiable facts, whose first line is the bolded effort-level success
+ * test. Body sections, never frontmatter.
+ */
+export const MAP_SECTION_NON_GOALS = "Non-goals";
+export const MAP_SECTION_NON_NEGOTIABLE_FACTS = "Non-negotiable facts";
+
+/** The legacy heading each canonical section name answers to. */
+const MAP_SECTION_ALIASES: Record<string, string> = {
+  "Out of scope": MAP_SECTION_NON_GOALS,
+};
+
+function canonicalSectionName(name: string): string {
+  const trimmed = name.trim();
+  return MAP_SECTION_ALIASES[trimmed] ?? trimmed;
+}
+
+/**
+ * Read one `##` section out of a map body.
+ *
+ * Returns the section's content lines, with blank margins trimmed so an
+ * empty placeholder reads as `[]` and a non-empty check is a length check;
+ * `null` when the section is absent. A section runs to the next `##`
+ * heading, so `###` sub-headings stay inside it. Heading names resolve
+ * through the legacy aliases in both directions, so `## Out of scope` reads
+ * as Non-goals and either name finds either heading; when both headings
+ * appear, the first wins.
+ */
+export function readMapSection(body: string, name: string): string[] | null {
+  const wanted = canonicalSectionName(name);
+  let collecting = false;
+  const lines: string[] = [];
+  for (const line of body.split("\n")) {
+    const heading = /^##\s+(.+?)\s*$/.exec(line);
+    if (heading !== null) {
+      if (collecting) break;
+      if (canonicalSectionName(heading[1]) === wanted) collecting = true;
+      continue;
+    }
+    if (collecting) lines.push(line);
+  }
+  if (!collecting) return null;
+  while (lines.length > 0 && lines[0].trim() === "") lines.shift();
+  while (lines.length > 0 && lines[lines.length - 1].trim() === "") lines.pop();
+  return lines;
+}
+
+// ─── Whole-set checks ─────────────────────────────────────────────────────
 
 /**
  * Compute the anomalies that need the whole scanned set: orphaned artifacts
