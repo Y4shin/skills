@@ -1,262 +1,33 @@
 ---
-type: spec
-title: Enforced workflow v5
+type: arch spec
+title: Enforced workflow v5 architecture
 status: stable
 ---
 
-# Spec: enforced workflow v5
+# Architecture: enforced workflow v5
 
-> Map `enforced-workflow-v5`. Synthesizes the map's settled decisions, ten
-> planning grillings, the Pi tool-disclosure research
-> (`tasks/research-pi-tool-disclosure/findings.md`), and the open/close
-> gating prototype (`tasks/prototype-open-close-gating/findings.md`). The
-> map's `## Decisions so far` index carries the pointers into every task
-> body; this spec is the implementation-facing distillation.
+> Effort `enforced-workflow-v5`. Produced at `to-tickets`. This is the
+> living architecture document; `spec.md` remains the decision record and
+> its architecture content is archival once this document exists (nothing
+> is deleted from `spec.md`).
 >
-> The architecture this spec hands off to now lives in
-> [`arch-spec.md`](./arch-spec.md) (renamed to `architecture.md` by the
-> schema-5 migration). The architecture content below is archival; the
-> architecture document is the living one.
+> This document is written in the v4 shape (`type: arch spec`,
+> `arch-spec.md`) so that the current tools and skills read it during
+> implementation. The schema-5 migration ticket renames it to
+> `type: architecture`, `architecture.md`; that rename is one of the
+> migration's obligations, not an implementation step for the tickets
+> below.
 
-## Problem Statement
+## Purpose
 
-The workflow this package ships states its rules in prose. `to-spec` is
-supposed to wait until the map's decisions are settled, `finalize-task` is
-supposed to run before a ticket is called done, and a phase is supposed to
-finish before the next one starts. Nothing enforces any of it. A model that
-skips a step, or a human who runs skills out of order, gets no refusal: the
-tools stay free to write any field on any artifact, and the only guard is
-whether the agent read the skill carefully. So the rules hold until the first
-inattentive run, and then the tree is wrong in a way that is hard to see.
+The specification settles what v5 is. This document settles how it is
+built: which existing abstractions to stand on, which seams the tickets
+share, what each ticket owns, and what the tickets promise each other so
+they can be implemented in dependency order without re-deriving the
+design. It inlines the specification's architecture content in full, then
+adds the implementation-facing material.
 
-Around that enforcement gap, v4 has accumulated overload and drift. One
-`implement-task` skill owns both planning-task execution and ticket
-implementation, whose artifacts, gates, and resources differ. `finalize-task`
-is a separate invocation that exists only because landing a ticket and
-closing it out were once different skills, which adds a seam where the agent
-waits for the human to type another command. `triage` and bug reports form a
-parallel substrate to `docs/tasks/`, so a bug can enter the workflow without
-ever becoming an effort. The specification still runs a seam and architecture
-interview that `to-tickets` then asks about a second time. Every workflow
-tool is declared to the model at all times, so the tool descriptions of a
-phase nobody is running consume context. And there is no holistic close: an
-effort can finish all its tickets and never get the one whole-effort pass
-that would catch what the tickets missed.
-
-The human cost is concrete. Completion reports arrive as a wall of run ids,
-step receipts, and chain internals, so the human cannot tell what changed,
-what needs a decision, or what to run next. And a repo owner has no way to
-know that the workflow their agent is running is the workflow they agreed
-to, rather than the path the model happened to improvise.
-
-## Solution
-
-A v5 of the package where every effort travels one visible path and the path
-is mechanically enforced.
-
-A single front door, `intake`, always creates an effort and a wayfinder map.
-Every phase transition (intake to wayfinder to spec to tickets to
-implementation to finalize to archive) is authorized by a tool precondition
-instead of prose, so a model that ignores the skill text still cannot perform
-the illegal action: the action's tool is either not available, or it refuses
-and names the legal next call. Workflow tools are disclosed only while the
-skill that needs them is open, so the declared tool set matches the phase in
-flight. An effort closes with one holistic `finalize-effort` pass and an
-archive. The rules the workflow already states become impossible to violate
-by accident.
-
-The schema and the fundamental two-phase flow stay. The changes are additive
-and the migration is one idempotent hop, so v3 and v4 trees remain readable
-while the transition completes.
-
-## User Stories
-
-1. As a repo owner, I want every new idea, bug, or request to enter through
-   one front door that always creates an effort and a map, so that no work
-   begins without a visible destination.
-2. As a repo owner, I want a workflow rule that is broken to be refused by
-   the tool I had to call anyway, so that correctness does not depend on the
-   agent having read the prose.
-3. As a repo owner, I want an effort to be impossible to archive while a
-   finding is undispositioned, so that review knowledge is never stranded in
-   an archive nobody reads again.
-4. As a repo owner, I want a model that skips the planning reconcile pass to
-   be told to run Wayfinder, rather than silently producing a spec, so that
-   the gate reports the real mistake at the phase that owns it.
-5. As a repo owner, I want `docs/tasks/**` to be writable only through the
-   named workflow tools, so that no run can reshape the tree outside the
-   state machine.
-6. As a repo owner, I want schema 5 to arrive through one idempotent,
-   resumable migration that leaves the tree untouched on failure, so that
-   upgrading is safe to re-run and safe to interrupt.
-7. As a repo owner, I want v3 and v4 trees to stay readable during the
-   transition, so that I can migrate my repos on my own schedule.
-8. As a repo owner, I want the workflow to keep working in the work-repo
-   gate exactly as it does in a personal repo, so that the enforcement
-   change does not disturb the existing gate behavior.
-9. As a human operator, I want to type `intake` and answer a short, fixed set
-   of questions, so that starting an effort is quick and low-ceremony.
-10. As a human operator, I want intake to record my raw request verbatim
-    plus a one-line destination, the actor, the classification, and three to
-    five stories, so that the effort keeps my own words.
-11. As a human operator, I want intake to check for duplicate and related
-    efforts with a bounded, time-boxed reach, so that it stays fast but still
-    catches an existing effort.
-12. As a human operator, I want every effort, including a one-line bug, to
-    carry a non-negotiables grilling task, so that no effort skips deciding
-    its non-goals and its success test.
-13. As a human operator, I want every bug report to become an effort with a
-    `subtype: bug` implementation ticket, so that bugs use the same graph as
-    features instead of a parallel substrate.
-14. As a human operator, I want to type `/skill:wayfinder` to work one
-    frontier pass, so that I decide when a pass runs and see every cut.
-15. As a human operator, I want a Wayfinder pass to work the current
-    frontier snapshot and one grilling at most, then release, so that each
-    grilling and each frontier is a visible stopping point.
-16. As a human operator, I want Wayfinder to never roll into the next
-    frontier, so that I can step away between passes without the run
-    continuing behind me.
-17. As a human operator, I want Wayfinder to run the reconcile pass only
-    when the planning frontier is empty, so that the map is verified against
-    every settled task before the spec handoff.
-18. As a human operator, I want the reconcile pass to set a
-    `ready_for_spec` flag through a checking tool, so that it is impossible
-    to flip the flag without the checks passing.
-19. As a human operator, I want `ready_for_spec` to auto-clear when the plan
-    or the map changes, so that a post-reconcile edit forces one more
-    Wayfinder pass rather than letting a stale flag through.
-20. As a human operator, I want `/skill:to-spec` to be refused when the map
-    is not reconciled, so that I am sent back to Wayfinder with a clear
-    reason.
-21. As a human operator, I want the specification to carry the problem, the
-    solution, the stories, the settled decisions, the testing decisions, and
-    out of scope, so that it is the handoff from planning to implementation.
-22. As a human operator, I want the specification to stop running a seam and
-    architecture interview, so that I am not asked the same question twice.
-23. As a human operator, I want `/skill:to-tickets` to produce the
-    architecture document plus the ticket graph, so that the interface and
-    seam contract has one producer and one owner.
-24. As a human operator, I want the architecture document to inline the
-    specification's architecture content and then become the living
-    document, so that an implementation-time change has one place to land.
-25. As a human operator, I want the implementation phase to read the
-    architecture rather than draft it, so that the double seam interview is
-    gone for good.
-26. As a human operator, I want `implement-ticket` to work the ticket
-    frontier in dependency levels, so that concurrent tickets inside a level
-    and serial barriers across levels are supervised by one owner.
-27. As a human operator, I want each landed ticket to be closed out in the
-    same autonomous run (CI gate, knowledge harvest, changelog, done mark,
-    merge to main), so that I never wait to type `/skill:finalize-task`.
-28. As a human operator, I want ticket concurrency inside a level and
-    serialization across levels by default, so that the shared repo working
-    directory is never corrupted by cross-level writes.
-29. As a human operator, I want the announcement of one settled grilling to
-    end a Wayfinder pass, so that two grillings can never blur together.
-30. As a human operator, I want to see only the tools the current phase
-    needs, so that the context window is spent on the work rather than on
-    descriptions of tools I cannot use yet.
-31. As a human operator, I want a phase to be disclosed by an opener that
-    gates the phase and activates its toolset in one call, so that the
-    refusal and the disclosure cannot disagree.
-32. As a human operator, I want the opener to refuse an illegal target and
-    name the legal next calls, so that a blocked run tells me exactly what to
-    do instead.
-33. As a human operator, I want phase skills to be pairwise exclusive and
-    duplicates refused, so that two phases can never run at once.
-34. As a human operator, I want a discipline (`skill-creator`) to nest inside
-    a phase, so that a skill with a real tooling surface can open its tools
-    without closing the phase.
-35. As a human operator, I want the object of an open or close named
-    explicitly, so that closing a nested discipline leaves the phase intact.
-36. As a human operator, I want `tw_next` declared in every state and
-    answering in short prose, so that the router always has a read path.
-37. As a human operator, I want `tw_next` called mid-skill to say "finish
-    what you are doing", never "close the skill now", so that a stray call
-    cannot make the agent abandon its run.
-38. As a human operator, I want `finalize-effort` to run a holistic review,
-    triage every finding, and engage me when it finds anything, so that an
-    in-scope finding becomes a ticket and a large one a proposed follow-up.
-39. As a human operator, I want a follow-up effort created only after I say
-    yes, so that the workflow does not spawn efforts on its own.
-40. As a human operator, I want the review artifact moved into the follow-up
-    effort, so that the findings live where the skills that act on them look.
-41. As a human operator, I want the follow-up effort linked by an
-    `origin_effort` field, so that the trail is readable without inventing a
-    cross-effort graph edge.
-42. As a human operator, I want a skill's completion report in a fixed,
-    short order (what is now true, what needs me, what to run next, what is
-    broken, one pointer), so that I can act without reading anything else.
-43. As a human operator, I want the report in simplified technical English
-    with no run ids, step receipts, or chain JSON inline, so that it reads
-    like a status update, not a machine dump.
-44. As a human operator, I want the report to offer more context on request,
-    so that the detail exists when I want it and never by default.
-45. As a human operator, I want a refusal, failure, or escalation report to
-    follow the same shape, so that the worst moments are the clearest.
-46. As a human operator, I want the workflow vocabulary settled once
-    (effort, map, planning task, implementation ticket, specification,
-    architecture) and written into `CONTEXT.md`, so that every skill and
-    report uses the same words.
-47. As a human operator, I want the qualified nouns used even when I speak
-    loosely, so that a planning task is never confused with an implemented
-    ticket.
-48. As a human operator, I want legacy words (`slice`, `docs/tasks/maps/`,
-    `mode: hitl/afk`, the broad `type:` set) retired from the live language
-    and kept only in the migration layer, so that the overloading does not
-    return.
-49. As a human operator, I want `task-workflow-overview` to stay a layered
-    explainer with a fast track to `tw_next`, so that I can ask what to do
-    next and get either the story or the live answer.
-50. As a human operator, I want `task-workflow-doctor` narrowed to legacy
-    trees, missing scaffolding, failed migrations, and opener-refusal
-    routing, so that it diagnoses what the tools cannot self-diagnose.
-51. As a human operator, I want every workflow skill to delegate a grilling
-    session to the `grilling` skill, so that the round-based method has one
-    home and cannot drift again.
-52. As a human operator, I want the effort to end with a documentation
-    re-sync ticket that audits `CONTEXT.md`, the READMEs, the package
-    manifest, and the docs pages, so that the shipped documentation matches
-    the shipped v5.
-53. As a skill author, I want the gated workflow tools registered with
-    `exposure: "direct"` and `defaultActive: false`, so that no path
-    (`tool_search` or codemode) can reach them without the opener.
-54. As a skill author, I want the opener's parameter contract to be a
-    discriminated union on the skill, so that a wayfinder open carries only
-    the effort and a ticket open carries the effort and the target.
-55. As a skill author, I want the built-in `write` and `edit` blocked on
-    `docs/tasks/**`, so that the named tools are the only writers.
-56. As a skill author, I want the `bash` mutation scan dropped and every
-    mutating step moved into a tool, so that no heuristic pretends to gate a
-    shell command.
-57. As a skill author, I want `tw_set` removed and every transition carried
-    by a named tool, so that a field write cannot perform an illegal
-    transition.
-58. As a skill author, I want the escape hatches (`tw_resolve_uncertainty`,
-    `tw_split_ticket`, `tw_record_out_of_scope`) to stay tool-mediated, so
-    that uncertainty, splitting, and deferral still work under the lockdown.
-59. As a skill author, I want the opener to absorb the explicit
-    `telemetry_skill_context` calls, so that telemetry is recorded without
-    the model remembering to call it.
-60. As a skill author, I want `submit_feedback` to stay model-available, so
-    that an anomaly can still be reported.
-61. As a skill author, I want each skill's report template in its own
-    `resources/report.md`, so that report detail is progressively disclosed
-    like any other step.
-62. As a skill author, I want the dependency bumped to
-    `@earendil-works/pi-coding-agent` 1.0.0, so that `exposure`,
-    `defaultActive`, `setActiveTools`, and `tool_search` exist.
-63. As a skill author, I want `skill-creator`'s bundled scripts turned into a
-    disclosed toolset, so that the nested-open capability has a real user and
-    the scripts stop being called through the shell.
-64. As a migration author, I want `src/migrate-cli.ts` and
-    `src/core/migrate.ts` to gain a version-5 branch and a v4-to-5 reshape, so
-    that the renames cover live and archived trees alike.
-65. As a migration author, I want `docs/migration-target.yaml` updated for
-    schema 5 and an `upgrade-4-to-5.md` resource added, so that
-    `setup-workflow` can carry a downstream repo forward.
-
-## Implementation Decisions
+## Settled architecture decisions (inlined from `spec.md`)
 
 The decisions below were settled during planning. They are grouped by
 pillar; each traces to a task body via the map's `## Decisions so far`.
@@ -607,93 +378,219 @@ pillar; each traces to a task body via the map's `## Decisions so far`.
 - **The vocabulary qualifiers apply to reports.** Compactness limits sentence
   count, not terminology.
 
-## Testing Decisions
+## Existing abstractions to use
 
-- **A good test here asserts external behavior**, not implementation detail.
-  For the tool layer that means: given a tree state, does the opener refuse
-  or open, does the guard block or allow, is a gated tool declared or not,
-  and does the migration produce byte-stable output on a second run. It does
-  not mean asserting the internal shape of a helper.
-- **The nested-open integration test is the acceptance criterion** for the
-  progressive-disclosure work: open a phase, nest `skill-creator`, assert the
-  declared set is the union of both toolsets, close `skill-creator`, assert
-  the phase is still open with its own tools intact. This follows the
-  prototype's harness pattern (an in-process `AgentSession` with no model
-  call, inspecting `getActiveToolNames()`).
-- **The disclosure flip gets the prototype's three-way assertion**: before
-  open the gated tools are absent and unsearchable, after open they are
-  declared and callable, after close they are absent and unsearchable again.
-  The prototype's `direct`-versus-`deferred` decoy is the prior art for the
-  unsearchability half.
-- **The opener-as-gate refusals are tested at the tool level**: missing
-  target, blocked target, done target, not-ready target, unknown effort,
-  effort with a spec and no tickets, and effort with every ticket done. Each
-  refusal must leave the toolset closed and name the legal next calls. The
-  prototype's observable refusal table is the model.
-- **The write guard is tested independently of the active set**, because the
-  prototype showed it is orthogonal to disclosure: `write` and `edit` under
-  `docs/tasks/**` blocked, absolute and relative paths both matched, and the
-  same calls outside the tree allowed. `docs/bugs/**` is no longer guarded.
-- **The migration is tested for the four non-negotiables** already covered by
-  the existing migration suite: every rewrite is YAML-verified before it
-  lands, a failure leaves the tree untouched, a second run is a no-op, and an
-  interrupted run resumes. The v4-to-5 reshape adds cases for the body
-  rename, the filename and type rename, and the archive coverage.
-- **The gate factory tests extend the existing pattern** in
-  `tests/gate-factory.test.ts`: drive the real extension factory with a stub
-  `ExtensionAPI` and assert that gated tools, the opener, the closer, and the
-  guard are registered and behave, in both the gated and ungated repo states.
-- **The structure tests in `tests/skills.test.ts` remain the seam for the
-  skill surface.** The skill-list assertions and the manifest assertions
-  update as the inventory changes; they are list-driven, so a renamed or
-  added skill is caught by the existing test rather than a new one.
-- **The skill-rewire tests are the seam for the grilling-drift fix**: the
-  resources that restate the one-question-at-a-time method are asserted to
-  point at the `grilling` skill instead.
-- **The integration harness is the seam for end-to-end phase behavior.** It
-  spins up a real `AgentSession` on the `faux` provider with no network, so a
-  phase flow (open, act, close) can be driven and asserted on tool calls and
-  filesystem state.
-- **The reflection test for the CLI is out of scope.** The migration CLI
-  keeps its existing direct tests; v5 does not add a CLI surface.
+The tickets build on what is already here. Do not invent parallel versions
+of any of these.
 
-## Out of Scope
+- **`src/core/art.ts`** is the artifact model: `Artifact`, `KNOWN_TYPES`,
+  `TYPE_LEAVES`/`TYPE_LEAF`, `fromFrontmatter`, `validateArtifact`,
+  `findAnomalies`, `effortKeyOf`, `effortDirOf`, `dependencyLevels`. Schema 5
+  extends this module; it does not fork it.
+- **`src/core/graph.ts`** is the pure graph layer: `effortGraphs`,
+  `effortFrontier`, `effortLevels`, `effortFinalizable`, `liveFrontier`,
+  `itemFinalizable`. The gate preconditions about frontiers, levels,
+  finalizability, and blockers are computed here.
+- **`src/core/frontmatter.ts`** is `parse`/`dump` plus `Document`; every
+  frontmatter write goes through it so a rewrite stays YAML-verified.
+- **`src/core/state.ts`** models `docs/tasks/state.yaml` (the two pointers,
+  unmodeled keys preserved). `tw_state_set` is the named writer that
+  survives.
+- **`src/core/migrate.ts`** is the tested migration unit: `detectVintage`,
+  `migrate()`, `TreePort`, the staging area, the undo journal, and the
+  legacy tables. Version 5 is a new vintage branch plus a new reshape step.
+- **`src/migrate-cli.ts`** is the CLI wrapper `setup-workflow` calls; the
+  version-5 work reuses it unchanged in shape.
+- **`src/core/fs-port.ts`** is the file-system port the migration and its
+  tests share; no direct `fs` in `core/`.
+- **`src/pi.ts`** is the single extension entry: `createTools()` builds the
+  `tw_*` surface, the default export registers tools and hooks. All file I/O
+  and all `pi.registerTool` calls live here. The new opener, closer, named
+  transition tools, guard, and pack/unpack helpers extend this file (or
+  modules it imports under `src/`), never a second extension entry.
+- **`tests/gate-factory.test.ts`** drives the real extension factory with a
+  stub `ExtensionAPI`; extend it, do not replace it.
+- **`tests/skills.test.ts`** is the list-driven skill-surface seam.
+- **`tests/skill-rewire.test.ts`** is the grep seam for skill prose drift.
+- **`tests/integration/harness.ts`** spins up a real `AgentSession` on the
+  `faux` provider; the nested-open integration test extends it.
+- **`tests/migrate.test.ts`** carries the migration non-negotiables.
+- **The `grilling` skill** is the one canonical grilling method. Every other
+  skill delegates to it.
+- **`docs/migration-target.yaml`** is the setup-workflow target-state source
+  the migration and its upgrade resources are versioned against.
 
-- Rewriting the chain internals (`ticket-chain.js`, `end-of-effort.js`, the
-  verdict and host-gate mechanics).
-- Changing the 11 agent definitions.
-- Repo gating.
-- The telemetry and feedback backend (storage, schema, dashboards). Absorbing
-  the existing `telemetry_skill_context` calls into the opener is in scope.
-- Running the schema migration on a downstream repo, which stays a
-  human-driven `setup-workflow` action after v5 lands.
-- Any change to the shape of the two-phase planning model.
-- Running tickets from different dependency levels at once.
-- Reaching the `bash` shell with a sound mutation gate. The scan is dropped
-  and the residual risk is accepted.
-- A shared report skill, a shared report file, or a runtime report gate.
+## Do not reimplement
 
-## Further Notes
+- **Frontier, level, and finalizability computation.** Use
+  `effortFrontier`, `effortLevels`, `effortFinalizable`, `itemFinalizable`.
+- **Artifact parsing and anomaly detection.** Use `fromFrontmatter`,
+  `validateArtifact`, `findAnomalies`.
+- **Frontmatter parse and dump.** Use `src/core/frontmatter.ts`.
+- **Migration machinery.** Reuse `detectVintage`, `migrate()`, `TreePort`,
+  the staging area, the undo journal, and the YAML-verify-before-lands rule.
+  Version 5 is a branch, not a second migration engine.
+- **State file modeling.** Use `toObject`/`fromObject` and the pointer
+  validation.
+- **The chain internals** (`ticket-chain.js`, `end-of-effort.js`, the verdict
+  and host-gate mechanics) and **the 11 agent definitions**. Out of scope.
+- **Telemetry storage, schema, and dashboards.** Only the `tw_open`
+  absorption of `telemetry_skill_context` is in scope.
+- **A second report artifact, a shared report skill, or a runtime report
+  gate.** Reports are prose discipline with per-skill templates.
+- **A cross-effort graph edge for follow-ups.** `origin_effort` is a field
+  on the child map, not an edge.
+- **A shell mutation gate.** The `bash` scan is dropped; no replacement.
 
-- **The success test.** A fresh effort taken through `intake`, `wayfinder`,
-  `to-spec`, `to-tickets`, `implement-ticket`, and `finalize-effort` reaches
-  archive with every phase transition performed by a gated tool, and an
-  attempt to skip a phase is refused by that tool with the legal next call,
-  not by prose alone.
-- **This effort's own spec runs in v4 mode.** The v5 gates and openers do not
-  exist until the v5 tickets land, so `to-spec`, `to-tickets`, and the ticket
-  pipeline run in v4 mode during this effort. The tool-side refusals are not
-  active yet and must not be assumed.
-- **The map is reference-oriented.** The full reasoning lives in the ten task
-  bodies and the two findings files; this spec distills the implementation
-  decisions and does not restate the rejected options.
-- **Factual grounding comes from the evidence artifacts**, not from
-  re-derivation: the exposure semantics, the transcript-restore path, and the
-  `tool_search` bypass come from the research findings; the `direct` plus
-  `defaultActive: false` gate, the opener-as-gate refusal shape, and the
-  guard's independence from the active set come from the prototype findings.
-- **The map retrofit is already applied** (rename to `## Non-goals`, add
-  `## Non-negotiable facts`), and `ready_for_spec` was set by hand as a
-  documented bridge, because the checking tool does not exist yet. The v5
-  migration will rewrite the tree properly.
-- **No em-dashes** in repo prose.
+## Seams
+
+- **Artifact tree seam.** Every tool reads the tree through `scanArtifacts`
+  plus `scanMemo` (one scan per invocation, no invalidation machinery) and
+  the pure `art.ts`/`graph.ts` layers. Gate preconditions read this seam.
+- **Frontmatter write seam.** Every mutating `tw_*` tool writes through
+  `parse`/`dump`; the only writer of `docs/tasks/**`.
+- **Opener seam.** `tw_open(skill, effort, target?)` is the single entry that
+  both checks the phase precondition and activates the phase toolset. The
+  gate and the disclosure cannot disagree because they are the same call.
+- **Active-tool seam.** The declared set is driven by `setActiveTools`; the
+  transcript is the persistence source. The write guard is a separate
+  `tool_call` handler, independent of the active set.
+- **Skill-surface seam.** `package.json` `pi.skills` plus `tests/skills.test.ts`
+  are list-driven; adding or renaming a skill is caught by editing the list.
+- **Prose seam.** `tests/skill-rewire.test.ts` and the docs pages assert
+  skill prose; they are updated with each skill rewrite.
+- **Migration seam.** `tests/migrate.test.ts` drives `migrate()` over
+  fixture trees; the version-5 cases extend it.
+- **Integration seam.** `tests/integration/harness.ts` on the `faux`
+  provider drives phase flows end to end.
+
+## Module and file map
+
+- `src/core/art.ts`: schema-5 types, legacy tolerance, map-section names.
+- `src/core/graph.ts`: `ready_for_spec` awareness (frontier, finalizability).
+- `src/core/migrate.ts`, `src/migrate-cli.ts`: v5 branch and reshape.
+- `src/pi.ts`: named transition tools; opener/closer/next; toolset registry;
+  guard; telemetry absorption; pack/unpack for archive and changelog.
+- `docs/migration-target.yaml`, `skills/engineering/setup-workflow/resources/upgrade-4-to-5.md`:
+  schema-5 target and upgrade guide.
+- `skills/engineering/intake/`: new front door.
+- `skills/engineering/implement-ticket/`: ticket phase and resources.
+- `skills/engineering/finalize-effort/`: effort close and archive.
+- `skills/engineering/wayfinder/`: absorbed planning frontier, passes,
+  reconcile, consolidated resources.
+- `skills/engineering/to-spec/`, `to-tickets/`: re-scoped.
+- `skills/engineering/task-workflow-overview/`, `task-workflow-doctor/`:
+  re-scoped.
+- `skills/engineering/skill-creator/`: disclosed nested toolset.
+- `skills/engineering/setup-workflow/`: version table plus `upgrade-4-to-5`.
+- `skills/deprecated/`: retired `triage`, `finalize-task`, `implement-task`
+  land here (content preserved, replacement named).
+- `package.json`, top-level `README.md`, bucket `README.md`s, `CONTEXT.md`,
+  `docs/<bucket>/*.md`: re-synced.
+
+## Per-ticket exports and interface contracts
+
+The tickets are ordered by dependency. Each entry names what the ticket
+exports to the tickets that depend on it.
+
+1. **`bump-dependencies`** exports a 1.0.0-capable toolchain and a smoke test
+   for `exposure`, `defaultActive`, `setActiveTools`, `tool_search`. No
+   downstream API of its own.
+2. **`schema5-artifact-model`** exports: `architecture` and `review` in
+   `KNOWN_TYPES`; `TYPE_LEAVES` entries for `architecture.md` and
+   `review.md`; `fromFrontmatter` reading `ready_for_spec` and
+   `origin_effort`; map-section-name helpers for `## Non-goals` and
+   `## Non-negotiable facts`; legacy `arch spec`/`arch-spec.md` tolerance.
+   Contract: v4 artifacts still parse; new producers write v5 only.
+3. **`planning-transition-tools`** exports `tw_write_section`,
+   `tw_finalize_map`, and planning `tw_mark_done`, and removes `tw_set`.
+   Contract: `tw_finalize_map` sets `ready_for_spec: true` only when the
+   planning frontier is empty and both map sections are present and
+   non-empty with a success test; it is the only setter; plan edits clear the
+   flag.
+4. **`write-lockdown-guard`** exports a `tool_call` guard for `write`/`edit`
+   under `docs/tasks/**`. Contract: independent of the active set; relative
+   and absolute paths matched; `docs/bugs/**` and everything else allowed.
+5. **`migrate-v4-to-v5`** exports the v5 `detectVintage` branch and the
+   v4-to-5 reshape. Contract: idempotent, YAML-verified, failure leaves the
+   tree untouched, interrupted run resumes, archives covered, `state.yaml`
+   stamped `schema_version: 5`.
+6. **`migration-target-and-upgrade-resource`** exports the schema-5
+   `docs/migration-target.yaml` and `upgrade-4-to-5.md`. Contract:
+   `setup-workflow` routes a v4 repo to the new guide.
+7. **`implementation-transition-tools`** exports `tw_write_spec`,
+   `tw_add_ticket`, `tw_split_ticket`, ticket `tw_mark_done`, the changelog
+   writer, `tw_record_out_of_scope`, and the archive move. Contract: every
+   remaining workflow write is covered; no legitimate step needs `bash` on
+   the tree.
+8. **`disclosure-open-close-core`** exports `tw_open`, `tw_close`, `tw_next`,
+   the gated registration (`exposure: "direct"`, `defaultActive: false`), the
+   discriminated union, the symmetric exclusivity table, the two-state
+   declared set, the nested-open integration test, and telemetry absorption.
+   Contract: `tw_open` refuses duplicates and conflicts; `tw_close` names its
+   skill and removes only unneeded tools; `tw_next` is always declared.
+9. **`opener-gate-and-toolsets`** exports the per-phase preconditions and
+   per-skill toolsets. Contract: a refused open activates nothing and returns
+   `legal_next`; the phase-to-toolset table is the single registry.
+10. **`wayfinder-reconcile-and-passes`** exports the absorbed planning phase.
+    Contract: one frontier snapshot, at most one grilling, reconcile through
+    `tw_finalize_map`, resources under `wayfinder/resources`.
+11. **`to-tickets-architecture`** exports the architecture-plus-tickets
+    phase. Contract: `arch-spec.md`/`architecture.md` is produced from the
+    spec's architecture content plus exports, seams, and contracts.
+12. **`grilling-delegation-fix`** exports the single grilling-method home.
+    Contract: every pointer resolves to the `grilling` skill; no resource
+    restates the method.
+13. **`skill-report-resources`** exports a per-skill `resources/report.md`.
+    Contract: fixed five-part order; no shared report artifact or runtime
+    gate.
+14. **`skill-creator-nested-toolset`** exports the disclosed nested toolset.
+    Contract: opens inside a phase without closing it.
+15. **`intake-skill`** exports the front door. Contract: always creates an
+    effort with a map and one non-negotiables grilling task through the named
+    tools; retires `triage`.
+16. **`to-spec-rescope`** exports the gated spec phase. Contract: checks only
+    `ready_for_spec`; no seam or architecture interview.
+17. **`implement-ticket-skill`** exports the implementation phase. Contract:
+    reads the architecture, owns the ticket frontier and levels, dispatches
+    chains, closes each ticket out inline; retires `implement-task` and
+    `finalize-task`.
+18. **`finalize-effort-skill`** exports the effort close. Contract: holistic
+    review, finding triage, follow-up only after a human yes, archive gate.
+19. **`overview-doctor-rescope`** exports the explainer and the narrowed
+    doctor. Contract: overview points at `tw_next`; doctor owns only what the
+    tools cannot self-diagnose.
+20. **`docs-resync`** exports the shipped documentation. Contract: shipped
+    prose matches shipped v5.
+
+## Testing seams
+
+- **Unit/model:** `tests/art.test.ts`, `tests/graph.test.ts`,
+  `tests/frontmatter.test.ts`, `tests/state.test.ts`.
+- **Tool contracts:** `tests/gate-factory.test.ts` (real factory, stub API),
+  `tests/plugin.test.ts` (registered-tool interface).
+- **Disclosure and gate:** the three-way flip test and the opener refusal
+  table, plus the nested-open integration test.
+- **Migration:** `tests/migrate.test.ts` with the four non-negotiables and
+  the new v5 cases.
+- **Skill surface:** `tests/skills.test.ts` (list-driven),
+  `tests/skill-rewire.test.ts` (prose drift).
+- **End to end:** `tests/integration/harness.ts` on the `faux` provider.
+
+A good test asserts external behavior: given a tree state, does the opener
+refuse or open, does the guard block or allow, is a gated tool declared or
+not, and does a second migration run produce byte-stable output. It does not
+assert the internal shape of a helper.
+
+## Open risks recorded here
+
+- **The disclosure work depends on 1.0.0.** If the bump exposes API drift
+  beyond `exposure`/`defaultActive`, that drift lands in ticket 1, not in
+  the disclosure ticket.
+- **The write guard is best-effort against a determined shell.** The residual
+  risk is accepted and documented; no ticket attempts a sound shell gate.
+- **`ready_for_spec` auto-clear must cover every plan writer.** The
+  transition-tool tickets own that list; a missed writer is a stale flag.
+- **This effort runs in v4 mode.** The v5 openers and gates do not exist
+  during implementation, so the ticket pipeline and the current skills run
+  against the v4 tree until the relevant tickets land.
