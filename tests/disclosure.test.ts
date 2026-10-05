@@ -92,4 +92,21 @@ describe("disclosure core: tw_open", () => {
     expect(refusedBack.details.reason).toContain("conflicts");
     expect(second).toEqual(afterToTickets);
   });
+
+  test("a nested open adds a second toolset without disturbing the first", async () => {
+    const active = [...IDLE];
+    const ctx = disclosureCtx(active);
+    await tools.tw_open.execute({ skill: "wayfinder", effort: "e" }, ctx);
+    const phaseSet = [...active];
+
+    // A discipline nests inside the open phase: no conflict, no close.
+    const nested = (await tools.tw_open.execute({ skill: "skill-creator", effort: "e" }, ctx)) as ToolResult;
+    expect(nested.details.opened).toBe(true);
+    // The phase's tools are all still declared.
+    for (const tool of phaseSet) {
+      expect(active, `${tool} must survive the nested open`).toContain(tool);
+    }
+    // The nested skill's own tools joined the declared set.
+    expect(active).toContain("tw_show");
+  });
 });
