@@ -49,3 +49,37 @@ No producer writes v5 yet; the migration ticket owns the reshape.
 ## Blocked by
 
 - None (can start immediately).
+
+## Implementation notes
+
+- Landed on `task/schema5-artifact-model` (6 commits from landing point
+  `29758fb`). Schema-5 additive model delta in `src/core/art.ts`:
+  `architecture`/`review` types with `architecture.md`/`review.md` filenames
+  at the effort root, `ready_for_spec` (strict-boolean, absent reads false)
+  and `origin_effort` map fields, `MAP_SECTION_NON_GOALS` /
+  `MAP_SECTION_NON_NEGOTIABLE_FACTS` constants and a `readMapSection` reader
+  with `## Out of scope` aliasing to Non-goals.
+- Divergence: `src/core/graph.ts` needed no code change. Both graph behaviors
+  the ticket prose names (spec-plus-zero-tickets refusal unchanged, no
+  missing-architecture anomaly for bug-only efforts) are already-guaranteed
+  invariants, pinned by new tests in `tests/graph.test.ts` instead of new
+  logic. `ready_for_spec` awareness in frontier/finalizability is deliberately
+  left to the `planning-transition-tools` and `to-spec-rescope` tickets; making
+  `effortFinalizable` require the flag would break every v4 map before the
+  migration runs.
+- Ripple: `KNOWN_TYPES` growth makes `architecture`/`review` recognized types
+  in `src/core/migrate.ts`'s structurally derived `AUX_TYPES` and
+  `auxTypeForFilename`. No v4 fixture carries them, so migration behavior is
+  unchanged, but the `migrate-v4-to-v5` ticket must place them deliberately as
+  effort-root primaries in the v5 reshape.
+- Untouched by design: `src/pi.ts`'s context text and skill prose still
+  describe the v4 type set; owned by later tickets in the chain.
+- Validation: `npm test` 809 passed across 15 files (785 baseline, +24);
+  `npx vitest run tests/art.test.ts` 64 passed, `tests/graph.test.ts` 30
+  passed; `npm run typecheck` clean. No lint tool is configured in this repo.
+- Residual: `readMapSection` matches heading names exactly after trim (no
+  case tolerance); producers must write canonical names until the migration
+  rewrites legacy ones.
+- Note: `docs/tasks/state.yaml` carried a pre-existing unstaged modification
+  (the orchestrator's `task:` pointer to `schema5-artifact-model`). Left
+  uncommitted and unstaged, exactly as found.
