@@ -14,7 +14,7 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { Type } from "typebox";
 
-import { createToolSearchExtension } from "@earendil-works/pi-coding-agent";
+import { SessionManager, createToolSearchExtension } from "@earendil-works/pi-coding-agent";
 
 import taskWorkflow from "../../src/pi.js";
 import {
@@ -173,6 +173,66 @@ describe("disclosure core: nested opens", () => {
     const conflictResult = latestToolResultText(s.session, "tw_open") ?? "";
     expect(conflictResult).toContain("conflicts");
     expect(s.session.getActiveToolNames()).toEqual(opened);
+  });
+});
+
+describe("disclosure core: transcript persistence", () => {
+  test("open state survives /tree navigation via the transcript restore path", async () => {
+    const s = await createTaskSession({ extensions: [taskWorkflow], persisted: true });
+    sessions.push(s);
+
+    s.setResponses([reply([call("tw_open", { skill: "wayfinder", effort: "some-effort" })])]);
+    await s.session.prompt("Open wayfinder.");
+    const working = new Set(s.session.getActiveToolNames());
+    expect(working.has("tw_close")).toBe(true);
+
+    // Branch to the leading system message, the last pre-open entry on the
+    // branch: the declared set reverts to what that message declared (idle).
+    const leaf = s.sessionManager.getLeafId();
+    const entries = s.sessionManager.getEntries();
+    const preOpen = entries.find(
+      (e) => e.type === "message" && (e as { message?: { role?: string } }).message?.role === "system",
+    );
+    expect(preOpen, "the transcript records a leading system message").toBeTruthy();
+    if (preOpen!.id !== leaf) await s.session.navigateTree(preOpen!.id);
+    const branched = s.session.getActiveToolNames();
+    expect(branched).not.toContain("tw_close");
+    expect(branched).not.toContain("tw_frontier");
+
+    // Back to the leaf where tw_open ran: the working set is restored.
+    if (leaf && leaf !== s.sessionManager.getLeafId()) await s.session.navigateTree(leaf);
+    const restored = s.session.getActiveToolNames();
+    for (const name of working) {
+      expect(restored, `${name} must be restored on the open branch`).toContain(name);
+    }
+  });
+
+  test("open state survives resume via the transcript restore path", async () => {
+    const s1 = await createTaskSession({ extensions: [taskWorkflow], persisted: true });
+    s1.setResponses([reply([call("tw_open", { skill: "wayfinder", effort: "some-effort" })])]);
+    await s1.session.prompt("Open wayfinder.");
+    const file = s1.session.sessionFile;
+    expect(file).toBeTruthy();
+    // Keep the directory; only drop the faux provider registration.
+    s1.faux.unregister();
+
+    // A fresh process state: a new session on the same session file, the way
+    // the CLI reopens it (session_start with reason "resume").
+    const s2 = await createTaskSession({
+      extensions: [taskWorkflow],
+      sessionManager: SessionManager.open(file!),
+      sessionStartReason: "resume",
+    });
+    sessions.push(s2);
+
+    const resumed = s2.session.getActiveToolNames();
+    for (const name of ["tw_close", "tw_frontier", "tw_list", "tw_dependency_levels", "tw_get"]) {
+      expect(resumed, `${name} must be restored from the transcript on resume`).toContain(name);
+    }
+    // And the restored set is live: a gated tool really executes.
+    s2.setResponses([reply([call("tw_frontier", { selector: "whatever-effort" })])]);
+    await s2.session.prompt("Show the frontier.");
+    expect(toolCallNames(s2.events)).toContain("tw_frontier");
   });
 });
 

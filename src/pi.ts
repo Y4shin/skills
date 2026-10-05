@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, wri
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext, InputEvent, InputEventResult, ToolCallEvent, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
+import { getCurrentTools } from "@earendil-works/pi-ai";
 import { Type, type TSchema } from "typebox";
 import YAML from "yaml";
 
@@ -1080,6 +1081,26 @@ async function guardTaskTreeWrites(
   return { block: true, reason: lockdownReason(event.toolName, path) };
 }
 
+/**
+ * Re-assert the declared tool set the session transcript records, so the open
+ * state survives resume and fork on the branch. The transcript is the
+ * persistence source: pi restores it on /tree navigation; on resume and fork
+ * the host rebuilds the loadout from registration defaults instead, so the
+ * extension replays the transcript's current declarations here, before any
+ * prompt can record a diff that would overwrite them.
+ */
+async function restoreDeclaredSetFromTranscript(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  reason: string,
+): Promise<void> {
+  if (reason !== "resume" && reason !== "fork") return;
+  const names = getCurrentTools(ctx.sessionManager.buildSessionProjection().messages).map((t) => t.name);
+  const live = new Set(pi.getActiveTools());
+  if (names.length === live.size && names.every((name) => live.has(name))) return;
+  pi.setActiveTools(names);
+}
+
 // ─── Pi extension entry point ──────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
@@ -1185,7 +1206,7 @@ export default function (pi: ExtensionAPI) {
     });
   }
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", async (event, ctx) => {
     for (const diagnostic of gate.diagnostics) {
       ctx.ui.notify(`task-workflow gate: ${diagnostic}`, "info");
     }
@@ -1196,6 +1217,9 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.notify(`task-workflow gate active: ${gate.reason}`, "info");
       return;
     }
+    // Persistence: replay the transcript's declared tool set on resume and
+    // fork, so the open state survives them.
+    await restoreDeclaredSetFromTranscript(pi, ctx, event.reason);
     // Check required peer extensions
     const tools = pi.getAllTools();
     if (!tools.some((t) => t.name === "subagent")) {
