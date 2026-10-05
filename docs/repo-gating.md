@@ -22,6 +22,33 @@ override them locally.
 
 In a personal repo, everything works exactly as today.
 
+## Write lockdown on docs/tasks (personal repos)
+
+In a personal repo (gate inactive), where the `tw_*` tools are the writers of
+the `docs/tasks/` tree, a `tool_call` event handler refuses the built-in
+`write` and `edit` on any path under `docs/tasks/**`. The named `tw_*` tools
+are the only writers of the tree.
+
+- **Relative and absolute paths both match.** Relative paths resolve against
+  the session cwd, absolute paths are taken as given; both are normalized
+  before the containment check, so `..` traversal cannot slip past and a
+  sibling directory such as `docs/tasks-archive` does not match.
+- **Independent of the active tool set.** The guard is a hook, not a declared
+  tool, so it blocks in every phase, including while a skill's toolset is open.
+- **`docs/bugs/**` is not guarded.** The bug substrate retires in schema 5;
+  the guard scope is `docs/tasks/**` only.
+- **Reading stays allowed.** `read` and `bash` can read the tree freely, and
+  the human's editor is unaffected.
+- **No `bash` command-string scan exists.** A command string cannot be gated
+  soundly, so the previous heuristic idea was dropped rather than kept; every
+  mutating operation that needs `bash` (the archive move, the `git mv`, the
+  changelog write) belongs in a `tw_*` tool instead.
+
+**Residual risk, accepted and documented:** a model that insists can still
+mutate the tree through `bash` (`rm`, `git`, `python -c`, and so on), because
+a command string cannot be gated soundly. The protection is that no
+legitimate path needs the shell on the tree, not that the shell is blocked.
+
 ## Known limitation
 
 pi 0.80.10 exposes **no** extension hook to suppress skills from the `/help` /

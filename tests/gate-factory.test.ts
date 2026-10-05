@@ -651,6 +651,13 @@ describe("factory gate", () => {
       }
     });
 
+    test("the boundary documentation records the accepted bash residual risk", () => {
+      const doc = readFileSync(join(process.cwd(), "docs", "repo-gating.md"), "utf-8");
+      expect(doc).toContain("Residual risk");
+      expect(doc).toContain("cannot be gated soundly");
+      expect(doc).toContain("bash");
+    });
+
     test("allows write and edit outside docs/tasks, including docs/bugs", async () => {
       const repo = setupPersonalRepo();
 
