@@ -16,6 +16,7 @@ export const KNOWN_TYPES = [
   "task", "ticket", "map", "spec",
   "findings", "changelog", "out-of-scope note",
   "deviation report", "arch spec",
+  "architecture", "review",
 ] as const;
 export type KnownType = (typeof KNOWN_TYPES)[number];
 
@@ -229,6 +230,9 @@ export function effortDirOf(path: string): string | null {
  *
  * `task.md` is deliberately absent: it is both the v3 flat-task filename and
  * the v4 decision-task filename, so on its own it implies no type.
+ *
+ * `architecture.md` and `review.md` are the schema-5 effort-root documents;
+ * `arch-spec.md` stays as the legacy shape the reader keeps tolerating.
  */
 export const TYPE_LEAVES: readonly (readonly [type: string, file: string])[] = [
   ["map", "map.md"],
@@ -236,6 +240,8 @@ export const TYPE_LEAVES: readonly (readonly [type: string, file: string])[] = [
   ["task", "task.md"],
   ["spec", "spec.md"],
   ["arch spec", "arch-spec.md"],
+  ["architecture", "architecture.md"],
+  ["review", "review.md"],
 ];
 
 /** Type to filename, derived from TYPE_LEAVES. */

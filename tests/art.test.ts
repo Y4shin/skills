@@ -9,6 +9,8 @@ import {
   dependencyLevels,
   validateArtifact,
   validateCombination,
+  KNOWN_TYPES,
+  TYPE_LEAF,
   type Artifact,
   type WorkItemInfo,
 } from "../src/core/art.js";
@@ -72,6 +74,51 @@ describe("fromFrontmatter v4 shape", () => {
     // In v4 `subtype` is its own key, so an equal value is real data, not the
     // v3 `kind`/`type` collision.
     expect(fromFrontmatter({ type: "task", subtype: "task" }).subtype).toBe("task");
+  });
+});
+
+describe("schema 5 types", () => {
+  test("architecture and review are known types with their effort-root filenames", () => {
+    expect(KNOWN_TYPES).toContain("architecture");
+    expect(KNOWN_TYPES).toContain("review");
+    expect(TYPE_LEAF["architecture"]).toBe("architecture.md");
+    expect(TYPE_LEAF["review"]).toBe("review.md");
+  });
+
+  test("an architecture.md at the effort root parses and is not an orphan", () => {
+    const map = fromFrontmatter({ type: "map", status: "stable" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    const arch = fromFrontmatter(
+      { type: "architecture", title: "Effort architecture", status: "stable" },
+      "eff",
+    );
+    arch.path = "/repo/docs/tasks/eff/architecture.md";
+    expect(arch.type).toBe("architecture");
+    expect(findAnomalies([map, arch])).toEqual([]);
+  });
+
+  test("a review.md at the effort root parses and is not an orphan", () => {
+    const map = fromFrontmatter({ type: "map", status: "stable" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    const review = fromFrontmatter(
+      { type: "review", title: "Effort review", status: "stable" },
+      "eff",
+    );
+    review.path = "/repo/docs/tasks/eff/review.md";
+    expect(review.type).toBe("review");
+    expect(findAnomalies([map, review])).toEqual([]);
+  });
+
+  test("a file in the new names claiming another type is still an orphan", () => {
+    // The filename implies the type, so a mismatch is caught exactly as for
+    // the older leaves.
+    const map = fromFrontmatter({ type: "map", status: "stable" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    const wrong = fromFrontmatter({ type: "spec", status: "stable" }, "eff");
+    wrong.path = "/repo/docs/tasks/eff/architecture.md";
+    const anomalies = findAnomalies([map, wrong]);
+    expect(anomalies.map((a) => a.kind)).toContain("orphan");
+    expect(anomalies.find((a) => a.kind === "orphan")!.detail).toMatch(/not 'architecture'/);
   });
 });
 
