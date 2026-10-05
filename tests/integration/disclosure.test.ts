@@ -67,6 +67,14 @@ describe("disclosure core: the three-way flip", () => {
       expect(active, `${name} must be inactive before open`).not.toContain(name);
       expect(s.session.systemPrompt, `${name} must not be declared before open`).not.toContain(name);
     }
+
+    // Unsearchable before open: tool_search cannot reach a direct gated tool
+    // that has never been activated, so the search bypass finds nothing.
+    s.setResponses([reply([call("tool_search", { query: "show artifact frontmatter selector" })])]);
+    await s.session.prompt("Search for the show tool before opening anything.");
+    const searchBeforeOpen = latestToolResultText(s.session, "tool_search") ?? "";
+    expect(searchBeforeOpen).not.toContain("tw_show");
+    expect(s.session.getActiveToolNames()).not.toContain("tw_show");
   });
 
   test("after open the gated tools are declared and callable; after close they are gone and unsearchable again", async () => {
