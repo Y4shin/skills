@@ -584,6 +584,21 @@ function outcome(text: string, details: Record<string, unknown>): ToolOutcome {
   return { text, details };
 }
 
+/**
+ * Compute the active set after closing one open skill: the skill's tools that
+ * no remaining open skill still needs leave the set, and the closer itself
+ * leaves when nothing stays open.
+ */
+function activeAfterClose(active: string[], closing: SkillEntry, remaining: Set<string>): string[] {
+  const stillNeeded = new Set<string>();
+  for (const name of remaining) {
+    for (const tool of skillEntry(name)?.toolset ?? []) stillNeeded.add(tool);
+  }
+  const removed = new Set(closing.toolset.filter((tool) => !stillNeeded.has(tool)));
+  if (remaining.size === 0) removed.add(CLOSER);
+  return active.filter((tool) => !removed.has(tool));
+}
+
 // ─── Tool factory ──────────────────────────────────────────────────────────────
 
 interface Tool {
@@ -935,6 +950,38 @@ export function createTools(): Record<string, Tool> {
         );
       },
       { activeByDefault: true },
+    ),
+
+    tw_close: defStructured(
+      "Close a named open workflow skill, removing the tools no other open skill still needs. " +
+        "Other open skills stay open. Refuses when the named skill is not open.",
+      Type.Object({ skill: Type.String({ description: "The workflow skill to close" }) }),
+      async (p, ctx) => {
+        const entry = typeof p.skill === "string" ? skillEntry(p.skill) : undefined;
+        if (!entry) {
+          return outcome(`Refused: '${String(p.skill)}' is not an openable skill.`, {
+            closed: false,
+            reason: `'${String(p.skill)}' is not an openable skill`,
+          });
+        }
+        const activeSet = requireActiveSet(ctx);
+        const active = activeSet.get();
+        const open = currentOpenSkills(ctx);
+        if (!open.has(entry.name)) {
+          return outcome(`Refused: '${entry.name}' is not open.`, {
+            closed: false,
+            reason: `'${entry.name}' is not open`,
+          });
+        }
+        const remaining = new Set([...open].filter((name) => name !== entry.name));
+        const next = activeAfterClose(active, entry, remaining);
+        activeSet.set(next);
+        const removed = active.filter((tool) => !next.includes(tool));
+        return outcome(
+          `Closed ${entry.name}: removed ${removed.length > 0 ? removed.join(", ") : "nothing"}.`,
+          { closed: true, skill: entry.name, removed, active: next, open: [...remaining] },
+        );
+      },
     ),
   };
 }

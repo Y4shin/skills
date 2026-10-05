@@ -109,4 +109,48 @@ describe("disclosure core: tw_open", () => {
     // The nested skill's own tools joined the declared set.
     expect(active).toContain("tw_show");
   });
+
+  test("tw_close removes only the closed skill's unneeded tools", async () => {
+    const active = [...IDLE];
+    const ctx = disclosureCtx(active);
+    await tools.tw_open.execute({ skill: "wayfinder", effort: "e" }, ctx);
+    await tools.tw_open.execute({ skill: "skill-creator", effort: "e" }, ctx);
+
+    const result = (await tools.tw_close.execute({ skill: "skill-creator" }, ctx)) as ToolResult;
+    expect(result.text).toContain("Closed skill-creator");
+    expect(result.details.closed).toBe(true);
+    // The closed skill's own tools are gone.
+    expect(active).not.toContain("tw_show");
+    // The still-open phase keeps its own tools, and tw_close stays declared
+    // because a skill is still open.
+    for (const tool of ["tw_frontier", "tw_list", "tw_dependency_levels", "tw_get", "tw_close", "tw_open", "tw_next"]) {
+      expect(active, `${tool} must survive closing the nested skill`).toContain(tool);
+    }
+  });
+
+  test("tw_close on the last open skill returns to the idle set", async () => {
+    const active = [...IDLE];
+    const ctx = disclosureCtx(active);
+    await tools.tw_open.execute({ skill: "wayfinder", effort: "e" }, ctx);
+    await tools.tw_close.execute({ skill: "wayfinder" }, ctx);
+
+    // The workflow part of the declared set is idle again: no toolset, no
+    // closer, exactly the dispatcher pair.
+    expect(active).toEqual(expect.arrayContaining(["tw_open", "tw_next"]));
+    for (const tool of ["tw_close", "tw_frontier", "tw_list", "tw_dependency_levels", "tw_get"]) {
+      expect(active).not.toContain(tool);
+    }
+  });
+
+  test("tw_close refuses a skill that is not open", async () => {
+    const active = [...IDLE];
+    const ctx = disclosureCtx(active);
+    await tools.tw_open.execute({ skill: "wayfinder", effort: "e" }, ctx);
+    const before = [...active];
+
+    const result = (await tools.tw_close.execute({ skill: "skill-creator" }, ctx)) as ToolResult;
+    expect(result.details.closed).toBe(false);
+    expect(result.details.reason).toContain("not open");
+    expect(active).toEqual(before);
+  });
 });
