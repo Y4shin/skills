@@ -295,6 +295,65 @@ describe("liveFrontier", () => {
   });
 });
 
+describe("schema 5 graph semantics", () => {
+  test("a bug-only effort needs no architecture document and stays clean", () => {
+    // Bug reports enter as efforts whose defect is one bug ticket; the ticket
+    // graph needs no interface contracts, so there is no architecture
+    // document, and a missing one is not an anomaly.
+    const idx = index([
+      map("billing", "billing"),
+      spec("billing", "billing"),
+      ticket("fix-login", "billing", { subtype: "bug", workflow_state: "done" }),
+    ]);
+    const g = graphFor(idx, "billing");
+    expect(g.anomalies).toEqual([]);
+    expect(effortFrontier(g)).toEqual([]);
+    expect(effortFinalizable(g)).toBeNull();
+  });
+
+  test("an open bug-only effort shows its bug ticket on the frontier", () => {
+    const idx = index([
+      map("billing", "billing"),
+      spec("billing", "billing"),
+      ticket("fix-login", "billing", { subtype: "bug", workflow_state: "todo" }),
+    ]);
+    expect(effortFrontier(graphFor(idx, "billing")).map((a) => a.slug)).toEqual(["fix-login"]);
+  });
+
+  test("architecture and review artifacts ride along without entering the graph", () => {
+    const core = [
+      map("billing", "billing"),
+      spec("billing", "billing"),
+      ticket("login", "billing", { workflow_state: "todo" }),
+    ];
+    const withAux = [
+      ...core,
+      art("architecture", "billing", "docs/tasks/billing/architecture.md"),
+      art("review", "billing", "docs/tasks/billing/review.md"),
+    ];
+    expect(effortFrontier(graphFor(index(withAux), "billing")).map((a) => a.slug))
+      .toEqual(effortFrontier(graphFor(index(core), "billing")).map((a) => a.slug));
+    expect(effortLevels(graphFor(index(withAux), "billing")).tickets)
+      .toEqual(effortLevels(graphFor(index(core), "billing")).tickets);
+    expect(effortFinalizable(graphFor(index(withAux), "billing")))
+      .toEqual(effortFinalizable(graphFor(index(core), "billing")));
+  });
+
+  test("a spec-plus-zero-tickets effort stays not finalizable on the same terms as before", () => {
+    // The architecture document does not substitute for tickets: to-tickets
+    // produces the architecture and the ticket graph together, so an effort
+    // with a spec (and even an architecture) but no tickets is mid-flight.
+    const idx = index([
+      map("billing", "billing"),
+      spec("billing", "billing"),
+      art("architecture", "billing", "docs/tasks/billing/architecture.md"),
+    ]);
+    const reason = effortFinalizable(graphFor(idx, "billing"));
+    expect(reason).not.toBeNull();
+    expect(reason).toMatch(/no tickets/);
+  });
+});
+
 describe("itemFinalizable", () => {
   test("done is ready to finalize", () => {
     expect(itemFinalizable(task("research", "billing", { workflow_state: "done" }))).toBeNull();
