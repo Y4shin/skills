@@ -539,4 +539,65 @@ describe("factory gate", () => {
       expect(labels.get(name)).toBe(expected);
     }
   });
+
+  describe("write lockdown guard", () => {
+    /** Fire the registered tool_call guard and fail loudly if it is absent. */
+    function fireGuard(
+      stub: StubExtensionAPI,
+      cwd: string,
+      toolName: string,
+      input: Record<string, unknown>,
+    ): Promise<any> {
+      const handlers = stub.handlers["tool_call"];
+      expect(handlers, "the guard must register a tool_call handler").toBeDefined();
+      expect(handlers.length).toBe(1);
+      return handlers[0](
+        { type: "tool_call", toolCallId: "guard-1", toolName, input },
+        { cwd, ui: stub.ui },
+      );
+    }
+
+    test("refuses write and edit under docs/tasks for relative and absolute paths", async () => {
+      const repo = setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const blockedPaths = [
+        "docs/tasks/effort-one/map.md",
+        "docs/tasks/effort-one/tasks/research/task.md",
+        // Normalized before the containment check: traversal cannot slip past.
+        "docs/../docs/tasks/effort-one/map.md",
+        join(repo, "docs/tasks/effort-one/map.md"),
+      ];
+      for (const path of blockedPaths) {
+        const result = await fireGuard(stub, repo, "write", { path, content: "x" });
+        expect(result, `write '${path}' must be blocked`).toMatchObject({ block: true });
+        expect(result.reason, `write '${path}' must carry the lockdown reason`).toContain("write lockdown");
+      }
+
+      const editPaths = [
+        "docs/tasks/effort-one/tickets/one/ticket.md",
+        join(repo, "docs/tasks/effort-one/tickets/one/ticket.md"),
+      ];
+      for (const path of editPaths) {
+        const result = await fireGuard(stub, repo, "edit", { path, edits: [] });
+        expect(result, `edit '${path}' must be blocked`).toMatchObject({ block: true });
+        expect(result.reason, `edit '${path}' must carry the lockdown reason`).toContain("write lockdown");
+      }
+    });
+
+    test("registers exactly one tool_call handler in a personal repo and none in a work repo", () => {
+      setupPersonalRepo();
+      const personalStub = createStub();
+      factory(personalStub);
+      expect(personalStub.handlers["tool_call"]).toBeDefined();
+      expect(personalStub.handlers["tool_call"].length).toBe(1);
+
+      setupWorkRepo();
+      const workStub = createStub();
+      factory(workStub);
+      expect(workStub.handlers["tool_call"]).toBeUndefined();
+    });
+  });
 });

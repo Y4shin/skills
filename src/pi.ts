@@ -14,7 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext, InputEvent, InputEventResult } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext, InputEvent, InputEventResult, ToolCallEvent, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import YAML from "yaml";
 
@@ -836,6 +836,54 @@ export function createTools(): Record<string, Tool> {
   };
 }
 
+// ─── Write lockdown guard ──────────────────────────────────────────────────
+
+/**
+ * The reason a blocked write or edit carries: it names the lockdown and the
+ * legal alternative, so a model that hits it can reroute to a tw_* tool.
+ */
+function lockdownReason(toolName: string, path: string): string {
+  return (
+    `write lockdown: '${path}' is under docs/tasks/, which only the named tw_* tools may write; ` +
+    `the built-in ${toolName} is refused on that tree. Use the matching tw_* tool for this change.`
+  );
+}
+
+/**
+ * True when the target path sits inside the session repo's docs/tasks tree.
+ * Relative paths resolve against the session cwd, absolute paths are taken
+ * as given; both are normalized before the containment check, so `..`
+ * traversal cannot slip past and a sibling directory such as
+ * `docs/tasks-archive` does not match.
+ */
+function isTaskTreePath(path: string, cwd: string): boolean {
+  const resolved = resolvePath(cwd, path);
+  const tree = taskRoot(findRoot(cwd));
+  const rel = relative(tree, resolved);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+/**
+ * The tool_call guard: refuses the built-in write and edit on docs/tasks/**,
+ * so the named tw_* tools are the only writers of the tree. It is a hook,
+ * not a declared tool, so it is independent of the active tool set and
+ * blocks in every phase, including while a skill toolset is open. Reading
+ * the tree (read, bash) stays allowed, and no command-string scanning
+ * exists: a shell command cannot be gated soundly, so the residual risk
+ * that bash mutates the tree is accepted and documented in
+ * docs/repo-gating.md.
+ */
+async function guardTaskTreeWrites(
+  event: ToolCallEvent,
+  ctx: ExtensionContext,
+): Promise<ToolCallEventResult | undefined> {
+  if (event.toolName !== "write" && event.toolName !== "edit") return undefined;
+  const path = event.input.path;
+  if (typeof path !== "string" || path.trim() === "") return undefined;
+  if (!isTaskTreePath(path, ctx.cwd)) return undefined;
+  return { block: true, reason: lockdownReason(event.toolName, path) };
+}
+
 // ─── Pi extension entry point ──────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
@@ -880,6 +928,12 @@ export default function (pi: ExtensionAPI) {
         },
       });
     }
+
+    // Write lockdown: the built-in write and edit are refused on
+    // docs/tasks/**; the named tw_* tools are the only writers of the tree.
+    // A tool_call hook, so it runs in every phase regardless of the active
+    // tool set.
+    pi.on("tool_call", guardTaskTreeWrites);
   }
 
   // ── notify_user tool ────────────────────────────────────────────────
