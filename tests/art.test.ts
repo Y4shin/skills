@@ -122,6 +122,41 @@ describe("schema 5 types", () => {
   });
 });
 
+describe("legacy arch spec shape", () => {
+  test("type: arch spec still parses as its own type", () => {
+    const arch = fromFrontmatter(
+      { type: "arch spec", title: "Architecture", status: "stable" },
+      "eff",
+    );
+    expect(arch.type).toBe("arch spec");
+    expect(arch.workflow_state).toBeNull();
+  });
+
+  test("an arch-spec.md at the effort root is not an orphan", () => {
+    // The v4 shape stays readable until the migration runs, so a v4 tree
+    // keeps parsing with no anomaly raised against its arch spec.
+    const map = fromFrontmatter({ type: "map", status: "stable" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    const arch = fromFrontmatter({ type: "arch spec", status: "stable" }, "eff");
+    arch.path = "/repo/docs/tasks/eff/arch-spec.md";
+    expect(findAnomalies([map, arch])).toEqual([]);
+  });
+
+  test("a v4 tree with both the legacy and the schema-5 shape parses cleanly", () => {
+    // The migration renames arch-spec.md to architecture.md; before it runs,
+    // a tree can hold either (or, mid-effort, both in different efforts).
+    const legacyMap = fromFrontmatter({ type: "map", status: "stable" }, "old-eff");
+    legacyMap.path = "/repo/docs/tasks/old-eff/map.md";
+    const legacy = fromFrontmatter({ type: "arch spec", status: "stable" }, "old-eff");
+    legacy.path = "/repo/docs/tasks/old-eff/arch-spec.md";
+    const newMap = fromFrontmatter({ type: "map", status: "stable" }, "new-eff");
+    newMap.path = "/repo/docs/tasks/new-eff/map.md";
+    const modern = fromFrontmatter({ type: "architecture", status: "stable" }, "new-eff");
+    modern.path = "/repo/docs/tasks/new-eff/architecture.md";
+    expect(findAnomalies([legacyMap, legacy, newMap, modern])).toEqual([]);
+  });
+});
+
 describe("fromFrontmatter v3 shape", () => {
   test("maps kind to type and type to subtype", () => {
     const art = fromFrontmatter({ kind: "task", type: "feature", slug: "login", map: "auth", status: "draft" });
