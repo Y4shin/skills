@@ -599,5 +599,28 @@ describe("factory gate", () => {
       factory(workStub);
       expect(workStub.handlers["tool_call"]).toBeUndefined();
     });
+
+    test("allows write and edit outside docs/tasks, including docs/bugs", async () => {
+      const repo = setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const allowedCases: Array<{ toolName: string; path: string }> = [
+        // docs/bugs is out of the guard scope: the bug substrate retires.
+        { toolName: "write", path: "docs/bugs/login-loop.md" },
+        { toolName: "write", path: join(repo, "docs/bugs/login-loop.md") },
+        { toolName: "write", path: "README.md" },
+        { toolName: "write", path: join(tmpdir(), "write-lockdown-elsewhere", "notes.md") },
+        { toolName: "edit", path: "src/index.ts" },
+        // A sibling directory is not the tree: the match is not a prefix test.
+        { toolName: "edit", path: "docs/tasks-archive/notes.md" },
+      ];
+      for (const { toolName, path } of allowedCases) {
+        const input = toolName === "write" ? { path, content: "x" } : { path, edits: [] };
+        const result = await fireGuard(stub, repo, toolName, input);
+        expect(result, `${toolName} '${path}' must pass the guard unblocked`).toBeUndefined();
+      }
+    });
   });
 });
