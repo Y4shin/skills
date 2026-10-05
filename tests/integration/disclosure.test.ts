@@ -117,6 +117,65 @@ describe("disclosure core: the three-way flip", () => {
   });
 });
 
+describe("disclosure core: nested opens", () => {
+  test("a phase open nests skill-creator, closes it, and the phase stays open with its tools intact", async () => {
+    const s = await disclosureSession();
+    sessions.push(s);
+
+    // Open a phase.
+    s.setResponses([reply([call("tw_open", { skill: "wayfinder", effort: "some-effort" })])]);
+    await s.session.prompt("Open wayfinder.");
+    const phaseSet = new Set(s.session.getActiveToolNames());
+
+    // Nest skill-creator inside the phase.
+    s.setResponses([reply([call("tw_open", { skill: "skill-creator", effort: "some-effort" })])]);
+    await s.session.prompt("Nest skill-creator.");
+
+    // The declared set is the union of both toolsets plus the dispatcher trio.
+    const nested = new Set(s.session.getActiveToolNames());
+    for (const tool of phaseSet) {
+      expect(nested.has(tool), `${tool} must survive the nested open`).toBe(true);
+    }
+    expect(nested.has("tw_show"), "the nested skill's own tool is declared").toBe(true);
+    for (const tool of ["tw_open", "tw_next", "tw_close"]) {
+      expect(nested.has(tool), `${tool} is declared while skills are open`).toBe(true);
+    }
+
+    // Close the nested skill: the phase is still open with its own tools.
+    s.setResponses([reply([call("tw_close", { skill: "skill-creator" })])]);
+    await s.session.prompt("Close skill-creator.");
+
+    const afterClose = new Set(s.session.getActiveToolNames());
+    expect(afterClose.has("tw_show"), "the closed skill's tool is gone").toBe(false);
+    for (const tool of phaseSet) {
+      expect(afterClose.has(tool), `${tool} keeps the phase open with its own tools intact`).toBe(true);
+    }
+  });
+
+  test("the opener refuses a duplicate and a conflicting skill without disturbing the set", async () => {
+    const s = await disclosureSession();
+    sessions.push(s);
+
+    s.setResponses([reply([call("tw_open", { skill: "wayfinder", effort: "some-effort" })])]);
+    await s.session.prompt("Open wayfinder.");
+    const opened = [...s.session.getActiveToolNames()];
+
+    // Duplicate.
+    s.setResponses([reply([call("tw_open", { skill: "wayfinder", effort: "some-effort" })])]);
+    await s.session.prompt("Open wayfinder again.");
+    const duplicateResult = latestToolResultText(s.session, "tw_open") ?? "";
+    expect(duplicateResult).toContain("already open");
+    expect(s.session.getActiveToolNames()).toEqual(opened);
+
+    // Conflicting phase.
+    s.setResponses([reply([call("tw_open", { skill: "to-spec", effort: "some-effort" })])]);
+    await s.session.prompt("Try to open to-spec.");
+    const conflictResult = latestToolResultText(s.session, "tw_open") ?? "";
+    expect(conflictResult).toContain("conflicts");
+    expect(s.session.getActiveToolNames()).toEqual(opened);
+  });
+});
+
 describe("disclosure core: telemetry absorption", () => {
   test("the opener records telemetry; the model never calls telemetry_skill_context", async () => {
     const telemetryCalls: Array<Record<string, unknown>> = [];
