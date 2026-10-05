@@ -24,6 +24,8 @@ interface ArtOpts {
   blocked_by?: string[];
   subtype?: string | null;
   shape?: "v3" | "v4";
+  ready_for_spec?: boolean;
+  origin_effort?: string | null;
 }
 
 function art(type: string, slug: string, path: string, opts: ArtOpts = {}): Artifact {
@@ -37,6 +39,8 @@ function art(type: string, slug: string, path: string, opts: ArtOpts = {}): Arti
     mode: null,
     size: null,
     blocked_by: opts.blocked_by ?? [],
+    ready_for_spec: opts.ready_for_spec ?? false,
+    origin_effort: opts.origin_effort ?? null,
     shape: opts.shape ?? "v4",
     path,
     data: {},

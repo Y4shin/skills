@@ -14,6 +14,7 @@ import {
   type Artifact,
   type WorkItemInfo,
 } from "../src/core/art.js";
+import { parse, dump } from "../src/core/frontmatter.js";
 
 describe("fromFrontmatter v4 shape", () => {
   test("parses a task artifact", () => {
@@ -154,6 +155,43 @@ describe("legacy arch spec shape", () => {
     const modern = fromFrontmatter({ type: "architecture", status: "stable" }, "new-eff");
     modern.path = "/repo/docs/tasks/new-eff/architecture.md";
     expect(findAnomalies([legacyMap, legacy, newMap, modern])).toEqual([]);
+  });
+});
+
+describe("map frontmatter, schema 5", () => {
+  test("ready_for_spec reads as false when absent", () => {
+    expect(fromFrontmatter({ type: "map" }).ready_for_spec).toBe(false);
+  });
+
+  test("ready_for_spec reads as false when explicitly false", () => {
+    // The user amendment: an explicit false is allowed, and absent and false
+    // are treated identically by every consumer.
+    expect(fromFrontmatter({ type: "map", ready_for_spec: false }).ready_for_spec).toBe(false);
+  });
+
+  test("ready_for_spec reads as true only when the boolean is set", () => {
+    expect(fromFrontmatter({ type: "map", ready_for_spec: true }).ready_for_spec).toBe(true);
+  });
+
+  test("a non-boolean ready_for_spec reads as false, never truthy", () => {
+    expect(fromFrontmatter({ type: "map", ready_for_spec: "true" }).ready_for_spec).toBe(false);
+  });
+
+  test("origin_effort round-trips when present and is null when absent", () => {
+    expect(fromFrontmatter({ type: "map", origin_effort: "auth" }).origin_effort).toBe("auth");
+    expect(fromFrontmatter({ type: "map" }).origin_effort).toBeNull();
+    expect(fromFrontmatter({ type: "map", origin_effort: "  " }).origin_effort).toBeNull();
+  });
+
+  test("the schema-5 map fields survive a full frontmatter round-trip", () => {
+    const text = dump({
+      data: { type: "map", title: "Follow-up", ready_for_spec: true, origin_effort: "auth" },
+      body: "# Follow-up\n",
+    });
+    const doc = parse(text);
+    const art = fromFrontmatter(doc.data);
+    expect(art.ready_for_spec).toBe(true);
+    expect(art.origin_effort).toBe("auth");
   });
 });
 

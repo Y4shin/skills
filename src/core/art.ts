@@ -47,6 +47,17 @@ export interface Artifact {
   size: string | null;
   /** Kind-scoped, effort-scoped. */
   blocked_by: string[];
+  /**
+   * Map only (schema 5): the spec gate flag Wayfinder's reconcile sets last.
+   * Absent reads as false, and an explicit false is allowed: the two are
+   * treated identically by every consumer. Only the boolean true reads true.
+   */
+  ready_for_spec: boolean;
+  /**
+   * Map only (schema 5): the effort this one spun out of, set on a follow-up
+   * effort's map. A field on the child, never a graph edge.
+   */
+  origin_effort: string | null;
   /** Which frontmatter shape was read. */
   shape: ArtifactShape;
   /**
@@ -113,6 +124,8 @@ export function fromFrontmatter(data: FrontmatterData, dirName?: string): Artifa
     mode: str(data.mode),
     size: str(data.size),
     blocked_by: strList(data.blocked_by),
+    ready_for_spec: data.ready_for_spec === true,
+    origin_effort: str(data.origin_effort),
     shape,
     data,
   };
