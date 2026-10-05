@@ -44,6 +44,9 @@ const trackedRepos: string[] = [];
 let globalSettings: { dir: string; cleanup: () => void } | undefined;
 
 const GATED_NAMES = [
+  "tw_open",
+  "tw_next",
+  "tw_close",
   "tw_show",
   "tw_get",
   "tw_set",
@@ -548,6 +551,26 @@ describe("factory gate", () => {
       const expected = suffix.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       expect(labels.get(name)).toBe(expected);
     }
+  });
+
+  describe("disclosure registration", () => {
+    test("the dispatcher pair registers always-declared; every other workflow tool registers gated", () => {
+      setupPersonalRepo();
+      const stub = createStub();
+      factory(stub);
+
+      const byName = new Map(stub.tools.map((t: any) => [t.name, t]));
+      for (const name of ["tw_open", "tw_next"]) {
+        expect(byName.get(name)?.defaultActive, `${name} is declared in every state`).toBe(true);
+        expect(byName.get(name)?.exposure, `${name} is direct`).toBe("direct");
+      }
+      // The bypass-free combination the prototype proved: direct (never
+      // reachable through tool_search) and off until the opener activates it.
+      for (const name of GATED_NAMES.filter((n) => n.startsWith("tw_") && n !== "tw_open" && n !== "tw_next")) {
+        expect(byName.get(name)?.defaultActive, `${name} is off until an opener activates it`).toBe(false);
+        expect(byName.get(name)?.exposure, `${name} is direct, never deferred`).toBe("direct");
+      }
+    });
   });
 
   describe("write lockdown guard", () => {

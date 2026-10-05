@@ -184,9 +184,10 @@ describe("task-workflow tools", () => {
   beforeAll(() => { tools = createTools(); });
 
   describe("registration", () => {
-    test("registers exactly the shrunken surface after the dead-surface deletion", () => {
+    test("registers exactly the disclosed surface: the gated workflow tools plus the dispatcher trio", () => {
       const names = Object.keys(tools).sort();
       expect(names).toEqual([
+        "tw_close",
         "tw_context",
         "tw_dependency_levels",
         "tw_finalizable",
@@ -194,6 +195,8 @@ describe("task-workflow tools", () => {
         "tw_get",
         "tw_list",
         "tw_map_finalizable",
+        "tw_next",
+        "tw_open",
         "tw_resolve_uncertainty",
         "tw_set",
         "tw_show",
