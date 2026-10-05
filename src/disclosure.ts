@@ -100,22 +100,13 @@ export function skillEntry(name: string): SkillEntry | undefined {
   return SKILL_REGISTRY.find((s) => s.name === name);
 }
 
-/** The workflow tools the given open set declares: dispatcher plus toolsets. */
-export function declaredSetFor(open: Iterable<string>): string[] {
-  const openSet = open instanceof Set ? open : new Set(open);
-  const declared = new Set<string>(ALWAYS_DECLARED);
-  if (openSet.size > 0) declared.add(CLOSER);
-  for (const name of openSet) {
-    for (const tool of skillEntry(name)?.toolset ?? []) declared.add(tool);
-  }
-  return [...declared];
-}
-
 /**
  * A tool only this skill's toolset contains. The open-set derivation keys on
  * signature tools, so a skill is open exactly when its signature tool is
  * active; that keeps the derivation exact even when toolsets share tools.
- * The registry must give every skill one; registerDisclosure enforces it.
+ * Every skill must have one: the first derivation over a registry that
+ * breaks the rule throws and names the skill, so the gap cannot pass
+ * silently.
  */
 export function signatureToolOf(entry: SkillEntry): string {
   const others = new Set<string>();
