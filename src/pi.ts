@@ -1394,6 +1394,41 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
+    tw_mark_blocked: def(
+      "Mark a planning task blocked (workflow_state: blocked) and record the reason in the task body: the " +
+        "named write for a task that cannot complete yet (missing evidence, a pending human or environment " +
+        "prerequisite). Re-blocking replaces the recorded reason. Refuses an empty reason, a task that is " +
+        "already done or deprecated (blocking must not resurrect finished work), tickets (this marks planning " +
+        "tasks), and v3-shape artifacts.",
+      {
+        selector: Str("Planning task slug or path"),
+        reason: Str("Why the task is blocked and what would unblock it"),
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const reason = typeof p.reason === "string" ? p.reason.trim() : "";
+        if (reason === "") {
+          throw new Error("reason is empty: a blocked marking states what would unblock the task");
+        }
+        const { path, art, doc } = resolveArt(root, p.selector, "task");
+        requireV4Shape(art);
+        if (art.status === "deprecated") {
+          throw new Error(`'${art.slug}' is deprecated; deprecated counts as done`);
+        }
+        if (art.workflow_state === "done") {
+          throw new Error(`'${art.slug}' is already done; a done task cannot be marked blocked`);
+        }
+        doc.data.workflow_state = "blocked";
+        // The reason is tool-owned: replace any previous Blocked line so a
+        // re-blocking updates the record instead of accumulating lines.
+        const kept = doc.body.split("\n").filter((line) => !/^Blocked: /.test(line));
+        while (kept.length > 0 && kept[kept.length - 1].trim() === "") kept.pop();
+        doc.body = `${kept.join("\n")}\n\nBlocked: ${reason}\n`;
+        writeFileSync(path, dump(doc), "utf-8");
+        return `marked '${art.slug}' blocked (workflow_state: blocked)`;
+      },
+    ),
+
     tw_resolve_uncertainty: def(
       "Record a ticket's uncertainty resolution: writes the resolution next to the ticket's .work/uncertainty.md, deletes the uncertainty file, and returns the resolution path for the re-run pointer. Refuses when the ticket has no uncertainty file, so it can never serve as a generic writer.",
       { selector: Str("Ticket slug or path"), resolution: Str("The resolution text to record") },

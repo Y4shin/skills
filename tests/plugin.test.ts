@@ -203,6 +203,7 @@ describe("task-workflow tools", () => {
         "tw_get",
         "tw_list",
         "tw_map_finalizable",
+        "tw_mark_blocked",
         "tw_mark_done",
         "tw_next",
         "tw_open",
@@ -1971,5 +1972,99 @@ describe("task-workflow tools: tw_mark_done, the ticket half", () => {
     writeFileSync(p, readFileSync(p, "utf-8").replace("status: stable", "status: deprecated"), "utf-8");
     await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t2))).rejects.toThrow(/deprecated/);
     rmSync(t2, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_mark_blocked, the blocked marking for planning tasks", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function taskPath(t: string): string {
+    return join(t, "docs/tasks/specgate/tasks/decide/task.md");
+  }
+
+  test("marks a planning task blocked and records the reason in the task body", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const out = await tools.tw_mark_blocked.execute(
+      { selector: "decide", reason: "the auth provider docs are unreachable; retry with the vendored copy" },
+      ctx(t),
+    );
+    expect(out).toMatch(/blocked/);
+    const doc = parse(readFileSync(taskPath(t), "utf-8"));
+    expect(doc.data.workflow_state).toBe("blocked");
+    expect(doc.data.status).toBe("stable");
+    expect(doc.body).toContain(
+      "Blocked: the auth provider docs are unreachable; retry with the vendored copy",
+    );
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("re-blocking replaces the recorded reason instead of accumulating lines", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_mark_blocked.execute({ selector: "decide", reason: "first reason" }, ctx(t));
+    await tools.tw_mark_blocked.execute({ selector: "decide", reason: "second reason" }, ctx(t));
+    const doc = parse(readFileSync(taskPath(t), "utf-8"));
+    expect(doc.body).toContain("Blocked: second reason");
+    expect(doc.body).not.toContain("Blocked: first reason");
+    expect(doc.data.workflow_state).toBe("blocked");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty reason", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(tools.tw_mark_blocked.execute({ selector: "decide", reason: "  " }, ctx(t))).rejects.toThrow(
+      /reason is empty/,
+    );
+    expect(parse(readFileSync(taskPath(t), "utf-8")).data.workflow_state).toBe("todo");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a done or deprecated task: blocking must not resurrect finished work", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeFileSync(taskPath(t), readFileSync(taskPath(t), "utf-8").replace("todo", "done"), "utf-8");
+    await expect(
+      tools.tw_mark_blocked.execute({ selector: "decide", reason: "x" }, ctx(t)),
+    ).rejects.toThrow(/already done/);
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp();
+    writeMd(
+      join(t2, "docs/tasks/deprec-eff/map.md"),
+      "type: map\ntitle: Deprec\nstatus: stable\n",
+      "\n# Deprec\n\n## Non-goals\n\n- Nothing.\n\n## Non-negotiable facts\n\n**Success test:** x.\n",
+    );
+    writeMd(
+      join(t2, "docs/tasks/deprec-eff/tasks/gone/task.md"),
+      "type: task\nsubtype: manual\ntitle: Gone\nstatus: deprecated\nworkflow_state: done\nblocked_by: []\n",
+    );
+    await expect(
+      tools.tw_mark_blocked.execute({ selector: "gone", reason: "x" }, ctx(t2)),
+    ).rejects.toThrow(/deprecated/);
+    rmSync(t2, { recursive: true, force: true });
+  });
+
+  test("refuses a ticket selector: this marks planning tasks only", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(
+      join(t, "docs/tasks/specgate/tickets/land-it/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Land it\nstatus: stable\nworkflow_state: ready\nblocked_by: []\n",
+    );
+    await expect(
+      tools.tw_mark_blocked.execute({ selector: "land-it", reason: "x" }, ctx(t)),
+    ).rejects.toThrow(/has type 'ticket', not 'task'/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape task", async () => {
+    const t = mkTmp();
+    writeMd(
+      join(t, "docs/tasks/legacy-decide/task.md"),
+      "kind: task\ntitle: Legacy decide\nslug: legacy-decide\nstatus: todo\nslices: []\n",
+    );
+    await expect(
+      tools.tw_mark_blocked.execute({ selector: "legacy-decide", reason: "x" }, ctx(t)),
+    ).rejects.toThrow(/schema-5 migration/);
+    rmSync(t, { recursive: true, force: true });
   });
 });
