@@ -202,6 +202,7 @@ describe("task-workflow tools", () => {
         "tw_get",
         "tw_list",
         "tw_map_finalizable",
+        "tw_mark_done",
         "tw_next",
         "tw_open",
         "tw_resolve_uncertainty",
@@ -1091,6 +1092,12 @@ function setReadyForSpec(t: string, value: boolean): void {
   );
 }
 
+/** Finish the fixture's planning task by hand (fixture setup, not a tool call). */
+function finishDecideTaskInTree(t: string): void {
+  const p = join(t, "docs/tasks/specgate/tasks/decide/task.md");
+  writeFileSync(p, readFileSync(p, "utf-8").replace("workflow_state: todo", "workflow_state: done"), "utf-8");
+}
+
 describe("task-workflow tools: tw_write_section, the map-section writer", () => {
   let tools: Record<string, { description: string; execute: Function }>;
 
@@ -1355,6 +1362,139 @@ describe("task-workflow tools: tw_finalize_map, the ready_for_spec checking tool
     writeMd(join(t, "docs/tasks/maps/legacy/map.md"), "kind: map\ntitle: Legacy\nslug: legacy\nstatus: draft\n");
     await expect(tools.tw_finalize_map.execute({ selector: "legacy" }, ctx(t))).rejects.toThrow(
       /schema-5 migration/,
+    );
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_mark_done, the planning half", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  /** Write the task's results back to the map, the way a planning task closes. */
+  async function writeBackDecide(t: string): Promise<void> {
+    await tools.tw_write_section.execute(
+      {
+        selector: "specgate",
+        section: "Decisions so far",
+        content: "- Settled in decide: the gate refuses with named missing items.",
+      },
+      ctx(t),
+    );
+  }
+
+  test("marks a planning task done after its results were written back to the map", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await writeBackDecide(t);
+    const out = await tools.tw_mark_done.execute({ selector: "decide" }, ctx(t));
+    expect(out).toContain("decide");
+    expect(out).toMatch(/done/);
+    const doc = parse(readFileSync(join(t, "docs/tasks/specgate/tasks/decide/task.md"), "utf-8"));
+    expect(doc.data.workflow_state).toBe("done");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses when the map does not reference the task's recorded results", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(tools.tw_mark_done.execute({ selector: "decide" }, ctx(t))).rejects.toThrow(
+      /not written back to the map first/,
+    );
+    await expect(tools.tw_mark_done.execute({ selector: "decide" }, ctx(t))).rejects.toThrow(
+      /tw_write_section/,
+    );
+    // The refusal leaves the task untouched.
+    const doc = parse(readFileSync(join(t, "docs/tasks/specgate/tasks/decide/task.md"), "utf-8"));
+    expect(doc.data.workflow_state).toBe("todo");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("does not count a longer hyphenated slug as the reference", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_write_section.execute(
+      { selector: "specgate", section: "Decisions so far", content: "- Settled in decide-v2 instead." },
+      ctx(t),
+    );
+    await expect(tools.tw_mark_done.execute({ selector: "decide" }, ctx(t))).rejects.toThrow(
+      /not written back to the map first/,
+    );
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an already-done or deprecated task", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await writeBackDecide(t);
+    finishDecideTaskInTree(t);
+    await expect(tools.tw_mark_done.execute({ selector: "decide" }, ctx(t))).rejects.toThrow(/already done/);
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp();
+    writeMd(
+      join(t2, "docs/tasks/deprec-eff/map.md"),
+      "type: map\ntitle: Deprec\nstatus: stable\n",
+      "\n# Deprec\n\n## Non-goals\n\n- Nothing.\n\n## Non-negotiable facts\n\n**Success test:** x.\n",
+    );
+    writeMd(
+      join(t2, "docs/tasks/deprec-eff/tasks/gone/task.md"),
+      "type: task\nsubtype: manual\ntitle: Gone\nstatus: deprecated\nworkflow_state: done\nblocked_by: []\n",
+    );
+    await tools.tw_write_section.execute(
+      { selector: "deprec-eff", section: "Decisions so far", content: "- Settled in gone." },
+      ctx(t2),
+    );
+    await expect(tools.tw_mark_done.execute({ selector: "gone" }, ctx(t2))).rejects.toThrow(/deprecated/);
+    rmSync(t2, { recursive: true, force: true });
+  });
+
+  test("refuses a ticket selector: the planning half marks planning tasks only", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(
+      join(t, "docs/tasks/specgate/tickets/land-it/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Land it\nstatus: stable\nworkflow_state: todo\nblocked_by: []\n",
+    );
+    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t))).rejects.toThrow(
+      /has type 'ticket', not 'task'/,
+    );
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape task", async () => {
+    const t = mkTmp();
+    writeMd(
+      join(t, "docs/tasks/maps/legacy/map.md"),
+      "kind: map\ntitle: Legacy\nslug: legacy\nstatus: draft\n",
+    );
+    writeMd(
+      join(t, "docs/tasks/legacy-decide/task.md"),
+      "kind: task\ntitle: Legacy decide\nslug: legacy-decide\nstatus: todo\nslices: []\nmap: legacy\n",
+    );
+    await expect(tools.tw_mark_done.execute({ selector: "legacy-decide" }, ctx(t))).rejects.toThrow(
+      /schema-5 migration/,
+    );
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("clears a set ready_for_spec on the map when the done-marking changes the plan", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await writeBackDecide(t);
+    // The flag set after the write-back: the out-of-order state where the
+    // done-marking itself must clear the flag (an unfinished task remained
+    // when the map was finalized).
+    setReadyForSpec(t, true);
+    const out = await tools.tw_mark_done.execute({ selector: "decide" }, ctx(t));
+    expect(out).toContain("ready_for_spec cleared");
+    expect(parse(specGateMap(t)).data.ready_for_spec).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses when the effort has no map to write the results back to", async () => {
+    const t = mkTmp();
+    writeMd(
+      join(t, "docs/tasks/mapless/tasks/decide/task.md"),
+      "type: task\nsubtype: grilling\ntitle: Decide\nstatus: stable\nworkflow_state: todo\nblocked_by: []\n",
+    );
+    await expect(tools.tw_mark_done.execute({ selector: "decide" }, ctx(t))).rejects.toThrow(
+      /no map/,
     );
     rmSync(t, { recursive: true, force: true });
   });

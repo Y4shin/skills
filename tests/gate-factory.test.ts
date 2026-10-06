@@ -54,6 +54,7 @@ const GATED_NAMES = [
   "tw_dependency_levels",
   "tw_frontier",
   "tw_map_finalizable",
+  "tw_mark_done",
   "tw_resolve_uncertainty",
   "tw_state",
   "tw_state_set",

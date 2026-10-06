@@ -642,6 +642,16 @@ function clearReadyForSpec(doc: Document): boolean {
   return true;
 }
 
+/**
+ * True when a body references the slug as a stand-alone token: the write-back
+ * pointer convention (a short statement plus the task slug). A longer
+ * hyphenated slug that merely contains this one is not a reference.
+ */
+function referencesSlug(body: string, slug: string): boolean {
+  const escaped = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|[^\\w-])${escaped}(?![\\w-])`).test(body);
+}
+
 // ─── Tool factory ──────────────────────────────────────────────────────────────
 
 interface Tool {
@@ -938,6 +948,43 @@ export function createTools(): Record<string, Tool> {
         doc.data.ready_for_spec = true;
         writeFileSync(path, dump(doc), "utf-8");
         return `map finalized: ready_for_spec = true in ${relative(root, path)}`;
+      },
+    ),
+
+    tw_mark_done: def(
+      "Mark a planning task done (workflow_state: done). Refuses a task that is already done or deprecated, " +
+        "and refuses when the task's recorded results were not written back to its effort's map first: the map " +
+        "must reference the task, which a tw_write_section write-back does. The planning done-marking clears " +
+        "ready_for_spec, so the next Wayfinder pass re-runs the reconcile.",
+      { selector: Str("Planning task slug or path") },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const { path, art, doc } = resolveArt(root, p.selector, "task");
+        requireV4Shape(art);
+        if (art.status === "deprecated") {
+          throw new Error(`'${art.slug}' is deprecated; deprecated counts as done`);
+        }
+        if (art.workflow_state === "done") {
+          throw new Error(`'${art.slug}' is already done`);
+        }
+        const mapArt = graphForPath(effortGraphs(scanMemo(root)()), path)?.map ?? null;
+        if (mapArt === null || !mapArt.path) {
+          throw new Error(
+            `'${art.slug}' sits in an effort with no map; there is no map its recorded results could have been written back to`,
+          );
+        }
+        const mapDoc = parseArtifactFile(mapArt.path).doc;
+        if (!referencesSlug(mapDoc.body, art.slug)) {
+          throw new Error(
+            `'${art.slug}' cannot be marked done: its recorded results were not written back to the map first; ` +
+              `write them with tw_write_section (the map must reference '${art.slug}') before marking done`,
+          );
+        }
+        doc.data.workflow_state = "done";
+        const cleared = clearReadyForSpec(mapDoc);
+        if (cleared) writeFileSync(mapArt.path, dump(mapDoc), "utf-8");
+        writeFileSync(path, dump(doc), "utf-8");
+        return `marked '${art.slug}' done (workflow_state: done)${cleared ? "; ready_for_spec cleared" : ""}`;
       },
     ),
 
