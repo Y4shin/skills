@@ -39,3 +39,44 @@ automatic run.
 ## Blocked by
 
 - migrate-v4-to-v5 (the guide documents the reshape that ticket implements).
+
+## Implementation notes
+
+- Landed 2026-10-06 by the land worker. Merged `ticket/migration-target-and-upgrade-resource`
+  (5 wip commits, tip `d19b80a`) into the landing branch
+  `task/migration-target-and-upgrade-resource` (created at base `f3db0fe`, the
+  tip of `task/implementation-transition-tools`; the landing branch did not
+  exist at land time, so it was recreated at the TDD report's landing point,
+  same pattern as `migrate-v4-to-v5` and `write-lockdown-guard` before it)
+  with `--no-ff`; ticket branch deleted. Full suite 925/925 passing after the
+  merge; typecheck clean.
+- Scope: six files (`docs/migration-target.yaml`, the new
+  `skills/engineering/setup-workflow/resources/upgrade-4-to-5.md`,
+  `skills/engineering/setup-workflow/SKILL.md`,
+  `docs/engineering/setup-workflow.md`, `tests/setup-workflow-scripts.test.ts`,
+  `tests/skills.test.ts`), +446/-167.
+- All four criteria landed: the target file stamps `schema_version: 5` with no
+  schema-3 claims left; the upgrade resource follows the
+  `upgrade-3-to-4.md` shape and covers the architecture rename, the map body
+  reshape, the state stamp, and the `docs/bugs/` non-touch; the version table
+  routes a v4 repo to it (detection keys on `schema_version` < 5, the no-op
+  message names schema_version 5); the ticket's test file is green with a new
+  `docs/migration-target.yaml` describe block pinning the schema-5 target.
+- Divergences beyond the ticket's four named content areas, recorded by the
+  TDD worker and held at review: the target file was rewritten in one
+  consistent state beyond the named sections (the v3-era file promoted retired
+  phases and described `docs/bugs/` as live); `tests/skills.test.ts`'s
+  setup-workflow block moved from v4 to v5 (the arch-spec'd version bump);
+  the docs page and the skill's commit messages/branch names re-synced to 5
+  per the project's docs rule.
+- Validation at merge: `npm test` 925 passed across 17 files;
+  `npx vitest run tests/setup-workflow-scripts.test.ts` 9 passed;
+  `npm run typecheck` clean. No lint tool is configured in this repo.
+- Residual risks (non-blocking, from verification): `CONTEXT.md` and the
+  doctor/overview prose still speak v4 (owned by `overview-doctor-rescope`
+  and `docs-resync`); the onboard branch still scaffolds `docs/bugs/`
+  directories, contradicting the target's static-archive statement, flagged
+  for the coherence pass; the guide's transcript comes from a fixture without
+  `index.md`/`CHANGELOG.md`, so real v4 repos will not see those backfill
+  lines; the no-primary-architecture-doc corner (hoist plus destination-
+  collision report) was verified manually but has no automated test.
