@@ -193,6 +193,7 @@ describe("task-workflow tools", () => {
     test("registers exactly the disclosed surface: the gated workflow tools plus the dispatcher trio", () => {
       const names = Object.keys(tools).sort();
       expect(names).toEqual([
+        "tw_add_ticket",
         "tw_close",
         "tw_context",
         "tw_dependency_levels",
@@ -1607,6 +1608,150 @@ describe("task-workflow tools: tw_write_spec, the specification writer", () => {
     await expect(
       tools.tw_write_spec.execute({ selector: "legacy", content: "# x" }, ctx(t)),
     ).rejects.toThrow(/schema-5 migration/);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_add_ticket, the ticket creator", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function ticketPath(t: string, slug: string): string {
+    return join(t, "docs/tasks/specgate/tickets", slug, "ticket.md");
+  }
+
+  test("creates a ticket through the frontmatter seam with the v5 ticket shape", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const out = await tools.tw_add_ticket.execute(
+      {
+        effort: "specgate",
+        slug: "land-it",
+        title: "Land it",
+        subtype: "feature",
+        content: "## What to build\n\nThe gate.",
+      },
+      ctx(t),
+    );
+    expect(out).toContain("land-it");
+    const doc = parse(readFileSync(ticketPath(t, "land-it"), "utf-8"));
+    expect(doc.data.type).toBe("ticket");
+    expect(doc.data.subtype).toBe("feature");
+    expect(doc.data.title).toBe("Land it");
+    expect(doc.data.status).toBe("stable");
+    expect(doc.data.workflow_state).toBe("ready");
+    expect(doc.data.blocked_by).toEqual([]);
+    // Size is absent when not given: absent means m.
+    expect(doc.data).not.toHaveProperty("size");
+    expect(doc.data).not.toHaveProperty("mode");
+    expect(doc.body).toBe("\n## What to build\n\nThe gate.\n");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("lands size, mode, and blocked_by when given", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_add_ticket.execute(
+      { effort: "specgate", slug: "first", title: "First", subtype: "bug", size: "s", mode: "human", blocked_by: [] },
+      ctx(t),
+    );
+    await tools.tw_add_ticket.execute(
+      {
+        effort: "specgate",
+        slug: "second",
+        title: "Second",
+        subtype: "feature",
+        size: "l",
+        blocked_by: ["first"],
+      },
+      ctx(t),
+    );
+    const second = parse(readFileSync(ticketPath(t, "second"), "utf-8"));
+    expect(second.data.size).toBe("l");
+    expect(second.data.blocked_by).toEqual(["first"]);
+    expect(second.data).not.toHaveProperty("mode");
+    const first = parse(readFileSync(ticketPath(t, "first"), "utf-8"));
+    expect(first.data.mode).toBe("human");
+    expect(first.data.size).toBe("s");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a duplicate slug: an existing ticket, or any artifact with that slug in the effort", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_add_ticket.execute(
+      { effort: "specgate", slug: "land-it", title: "Land it", subtype: "feature" },
+      ctx(t),
+    );
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "specgate", slug: "land-it", title: "Again", subtype: "feature" }, ctx(t)),
+    ).rejects.toThrow(/already exists/);
+    // The task slug is taken too: slugs are unique per effort.
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "specgate", slug: "decide", title: "Clash", subtype: "feature" }, ctx(t)),
+    ).rejects.toThrow(/already exists/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an unsafe slug", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    for (const slug of ["Land It", "land/it", "../escape", "-lead", ""]) {
+      await expect(
+        tools.tw_add_ticket.execute({ effort: "specgate", slug, title: "T", subtype: "feature" }, ctx(t)),
+      ).rejects.toThrow(/invalid slug/);
+    }
+    expect(existsSync(join(t, "docs/tasks/specgate/tickets"))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a subtype that is not feature or bug, and a bad size or mode", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "specgate", slug: "x", title: "T", subtype: "chore" }, ctx(t)),
+    ).rejects.toThrow(/subtype/);
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "specgate", slug: "x", title: "T", subtype: "feature", size: "xxl" }, ctx(t)),
+    ).rejects.toThrow(/size/);
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "specgate", slug: "x", title: "T", subtype: "feature", mode: "afk" }, ctx(t)),
+    ).rejects.toThrow(/mode/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses blocked_by edges that dangle or cross the kind: tickets block tickets", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_add_ticket.execute(
+        { effort: "specgate", slug: "x", title: "T", subtype: "feature", blocked_by: ["ghost"] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/'ghost' is not an existing ticket/);
+    // A planning task is not a ticket edge target (kind-scoped).
+    await expect(
+      tools.tw_add_ticket.execute(
+        { effort: "specgate", slug: "x", title: "T", subtype: "feature", blocked_by: ["decide"] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/tickets block tickets/);
+    expect(existsSync(ticketPath(t, "x"))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an effort with no map or spec anchor, so the graph gains no orphans", async () => {
+    const t = mkTmp();
+    mkdirSync(join(t, "docs/tasks/orphan-effort"), { recursive: true });
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "orphan-effort", slug: "x", title: "T", subtype: "feature" }, ctx(t)),
+    ).rejects.toThrow(/neither a map nor a spec/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an unknown effort and an archived effort", async () => {
+    const t = mkTmp(); seedV4Tree(t);
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "no-such-effort", slug: "x", title: "T", subtype: "feature" }, ctx(t)),
+    ).rejects.toThrow(/no live effort/);
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "old-effort", slug: "x", title: "T", subtype: "feature" }, ctx(t)),
+    ).rejects.toThrow(/no live effort/);
     rmSync(t, { recursive: true, force: true });
   });
 });

@@ -20,7 +20,7 @@ import { Type, type TSchema } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
-import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, readMapSection, writeMapSection, MAP_SECTION_NON_GOALS, MAP_SECTION_NON_NEGOTIABLE_FACTS, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
+import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, readMapSection, writeMapSection, MAP_SECTION_NON_GOALS, MAP_SECTION_NON_NEGOTIABLE_FACTS, TICKET_SUBTYPES, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
 import {
   CLOSER,
   buildOpenParameters,
@@ -677,6 +677,9 @@ function liveEffortDir(root: string, selector: string): string | null {
   for (const candidate of candidates) {
     const rel = relative(taskRoot(root), candidate);
     if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) continue;
+    // An archived effort is not live: its directory sits under archive/.
+    const first = rel.split(/[\\/]/)[0];
+    if (first === "archive") continue;
     if (isDir(candidate)) return candidate;
   }
   return null;
@@ -689,6 +692,68 @@ function liveEffortDir(root: string, selector: string): string | null {
  */
 function normalizedBody(content: string): string {
   return `\n${content.trim()}\n`;
+}
+
+/**
+ * The slug shape every created artifact must carry: it becomes a directory
+ * name under docs/tasks/, so anything else (spaces, slashes, traversal,
+ * leading hyphen) is refused before it can escape the tree.
+ */
+const SAFE_SLUG = /^[a-z0-9][a-z0-9-]*$/;
+
+const TICKET_SIZES = ["s", "m", "l", "xl"] as const;
+
+/**
+ * The ticket frontmatter the v5 ticket writers agree on: stable and ready,
+ * so a created or split ticket sits on the frontier its blockers allow.
+ * Edges are kind-scoped and effort-scoped: only existing tickets of the same
+ * effort are legal targets.
+ */
+interface TicketSeed {
+  slug: string;
+  title: string;
+  subtype: string;
+  size?: string;
+  mode?: string;
+  blocked_by: string[];
+  content?: string;
+}
+
+function ticketDocument(seed: TicketSeed): Document {
+  const data: FrontmatterData = {
+    type: "ticket",
+    subtype: seed.subtype,
+    title: seed.title,
+    status: "stable",
+    workflow_state: "ready",
+    blocked_by: [...seed.blocked_by],
+  };
+  if (seed.size !== undefined) data.size = seed.size;
+  if (seed.mode !== undefined) data.mode = seed.mode;
+  return { data, body: seed.content !== undefined ? normalizedBody(seed.content) : "\n" };
+}
+
+/**
+ * Validate one created ticket's shape: slug, title, subtype, size, and mode.
+ * Throws with the offending field named. blocked_by is validated against the
+ * effort's scanned tickets by the caller (it needs the scan).
+ */
+function validateTicketSeed(seed: TicketSeed): void {
+  if (!SAFE_SLUG.test(seed.slug)) {
+    throw new Error(`invalid slug '${seed.slug}': use lowercase letters, digits, and hyphens (a slug becomes a directory name)`);
+  }
+  if (typeof seed.title !== "string" || seed.title.trim() === "") {
+    throw new Error(`ticket '${seed.slug}' has no title`);
+  }
+  if (!(TICKET_SUBTYPES as readonly string[]).includes(seed.subtype)) {
+    throw new Error(`invalid subtype '${seed.subtype}': a ticket is '${TICKET_SUBTYPES.join("' or '")}'`);
+  }
+  if (seed.size !== undefined && !(TICKET_SIZES as readonly string[]).includes(seed.size)) {
+    throw new Error(`invalid size '${seed.size}': use ${TICKET_SIZES.join(" | ")} (absent means m)`);
+  }
+  if (seed.mode !== undefined && seed.mode !== "human") {
+    throw new Error(`invalid mode '${seed.mode}': the only mode value is 'human'; omit it otherwise`);
+  }
 }
 
 // ─── Tool factory ──────────────────────────────────────────────────────────────
@@ -1040,6 +1105,85 @@ export function createTools(): Record<string, Tool> {
         const path = join(effortDir, "spec.md");
         writeFileSync(path, dump(doc), "utf-8");
         return `wrote ${relative(root, path)} (created, status: ${publish ? "stable" : "draft"})`;
+      },
+    ),
+
+    tw_add_ticket: def(
+      "Create an implementation ticket at docs/tasks/<effort>/tickets/<slug>/ticket.md: the only ticket " +
+        "creator, writing through the frontmatter seam. Writes type: ticket with the given subtype (feature " +
+        "or bug), status: stable, workflow_state: ready, and validates blocked_by at creation (kind-scoped: " +
+        "only existing tickets of the same effort; create in dependency order, no second wiring pass). " +
+        "Refuses an unsafe or duplicate slug, a size or mode outside the schema, a blocked_by edge that " +
+        "dangles or crosses the kind, and an effort with no map or spec anchor.",
+      {
+        effort: Str("The effort slug the ticket lands in"),
+        slug: Str("The ticket slug (lowercase letters, digits, hyphens)"),
+        title: Str("The ticket title"),
+        subtype: { type: "string" as const, enum: [...TICKET_SUBTYPES], description: "feature or bug" },
+        size: { type: "string" as const, optional: true, enum: [...TICKET_SIZES], description: "s | m | l | xl; absent means m" },
+        mode: OptStr("'human' when the human must implement it; omit otherwise"),
+        blocked_by: { type: "array" as const, items: { type: "string" as const }, optional: true, description: "Ticket slugs in the same effort that must be done first" },
+        content: OptStr("The ticket body (what to build)"),
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const seed: TicketSeed = {
+          slug: String(p.slug ?? ""),
+          title: typeof p.title === "string" ? p.title : "",
+          subtype: String(p.subtype ?? ""),
+          size: typeof p.size === "string" ? p.size : undefined,
+          mode: typeof p.mode === "string" ? p.mode : undefined,
+          blocked_by: Array.isArray(p.blocked_by) ? p.blocked_by.map(String) : [],
+          content: typeof p.content === "string" ? p.content : undefined,
+        };
+        validateTicketSeed(seed);
+
+        const effortDir = liveEffortDir(root, p.effort);
+        if (effortDir === null) {
+          throw new Error(`no live effort '${p.effort}': create the effort (a map at docs/tasks/<effort>/map.md) before adding tickets`);
+        }
+        const anchor = directoryLeaf(effortDir, "map") ?? directoryLeaf(effortDir, "spec");
+        if (anchor === null) {
+          throw new Error(
+            `effort '${p.effort}' has neither a map nor a spec: adding a ticket there would orphan it in the graph`,
+          );
+        }
+        requireV4Shape(parseArtifactFile(anchor).art);
+
+        const index = scanMemo(root)();
+        const inEffort = (path: string): boolean => {
+          const rel = relative(effortDir, path);
+          return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+        };
+        const clash = index.hits.find((h) => h.art.slug === seed.slug && inEffort(h.path));
+        if (clash !== undefined) {
+          throw new Error(`'${seed.slug}' already exists in '${p.effort}' (${clash.art.type} at ${relative(root, clash.path)})`);
+        }
+        if (isDir(join(effortDir, "tickets", seed.slug))) {
+          throw new Error(`'${seed.slug}' already exists in '${p.effort}' (its ticket directory is there)`);
+        }
+
+        for (const target of seed.blocked_by) {
+          if (target === seed.slug) {
+            throw new Error(`ticket '${seed.slug}' cannot block on itself`);
+          }
+          const known = index.hits.find(
+            (h) => h.art.type === "ticket" && h.art.slug === target && inEffort(h.path),
+          );
+          if (known === undefined) {
+            throw new Error(
+              `blocked_by target '${target}' is not an existing ticket in '${p.effort}': create the tickets in ` +
+                `dependency order (edges are kind-scoped: tickets block tickets)`,
+            );
+          }
+        }
+
+        const ticketDir = join(effortDir, "tickets", seed.slug);
+        const ticketPath = join(ticketDir, "ticket.md");
+        mkdirSync(ticketDir, { recursive: true });
+        writeFileSync(ticketPath, dump(ticketDocument(seed)), "utf-8");
+        const sizeNote = seed.size !== undefined ? `, size: ${seed.size}` : "";
+        return `created ${relative(root, ticketPath)} (${seed.subtype}${sizeNote})`;
       },
     ),
 
