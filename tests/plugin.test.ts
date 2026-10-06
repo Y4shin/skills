@@ -214,6 +214,7 @@ describe("task-workflow tools", () => {
         "tw_split_ticket",
         "tw_state",
         "tw_state_set",
+        "tw_write_architecture",
         "tw_write_changelog",
         "tw_write_section",
         "tw_write_spec",
@@ -1601,6 +1602,40 @@ describe("task-workflow tools: tw_write_spec, the specification writer", () => {
     await expect(
       tools.tw_write_spec.execute({ selector: "legacy", content: "# x" }, ctx(t)),
     ).rejects.toThrow(/schema-5 migration/);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_write_architecture, the architecture writer", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function archPath(t: string): string {
+    return join(t, "docs/tasks/specgate/architecture.md");
+  }
+
+  test("creates the v5 architecture document at the effort root, through the frontmatter seam", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(
+      join(t, "docs/tasks/specgate/spec.md"),
+      "type: spec\ntitle: Spec gate spec\nstatus: stable\n",
+      "\n# Spec gate\n\n## Architecture\n\nThe settled architecture content.\n",
+    );
+    expect(existsSync(archPath(t))).toBe(false);
+    const out = await tools.tw_write_architecture.execute(
+      { selector: "specgate", content: "# Spec gate architecture\n\nThe settled architecture content, inlined." },
+      ctx(t),
+    );
+    expect(out).toContain("architecture.md");
+    const doc = parse(readFileSync(archPath(t), "utf-8"));
+    // Conformant v5 frontmatter: type architecture, never the legacy shape;
+    // draft while writing; the title derives from the effort's map.
+    expect(doc.data.type).toBe("architecture");
+    expect(doc.data.title).toBe("Spec gate");
+    expect(doc.data.status).toBe("draft");
+    expect(doc.data).not.toHaveProperty("workflow_state");
+    expect(doc.body).toBe("\n# Spec gate architecture\n\nThe settled architecture content, inlined.\n");
     rmSync(t, { recursive: true, force: true });
   });
 });

@@ -1456,6 +1456,61 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
+    tw_write_architecture: def(
+      "Write an effort's architecture document (architecture.md): the only writer of the living " +
+        "architecture, through the frontmatter seam. Creates the document when the effort has none " +
+        "(title from the argument, else the effort's map, else the effort slug), with status draft while " +
+        "writing; 'publish: true' sets status: stable, the named architecture-stable write. The write also " +
+        "adds the archival note to the effort's spec.md pointing at the architecture (idempotent; nothing " +
+        "is deleted from the spec): the specification's architecture content is archival once the living " +
+        "document exists. Refuses an empty body, a selector naming no live effort, an effort with no spec " +
+        "(the architecture is produced from the spec's architecture content), a v3-shape spec, and a " +
+        "legacy arch-spec.md in the effort (the schema-5 migration renames it; new output is never the " +
+        "legacy shape).",
+      {
+        selector: Str("Effort slug, or the effort's architecture, spec, or map path"),
+        content: Str("The architecture body (markdown after the frontmatter)"),
+        title: OptStr("Title used only when the write creates the document"),
+        publish: OptBool,
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        if (typeof p.content !== "string" || p.content.trim() === "") {
+          throw new Error("content is empty: an architecture write needs a body");
+        }
+        const body = normalizedBody(p.content);
+        const publish = p.publish === true;
+
+        // An existing document: the living architecture updates in place.
+        let hit: ScanHit | null = null;
+        try {
+          hit = resolveArt(root, p.selector, "architecture");
+        } catch { /* the effort may exist without an architecture document yet: create it */ }
+
+        if (hit !== null) {
+          hit.doc.body = body;
+          if (publish) hit.doc.data.status = "stable";
+          writeFileSync(hit.path, dump(hit.doc), "utf-8");
+          return `wrote ${relative(root, hit.path)}${publish ? " (status: stable)" : ""}`;
+        }
+
+        let effortDir = liveEffortDir(root, p.selector);
+        if (effortDir === null) {
+          throw new Error(
+            `no live effort '${p.selector}': create the effort (a map at docs/tasks/<effort>/map.md) before writing its architecture`,
+          );
+        }
+        const archPath = join(effortDir, "architecture.md");
+        const title =
+          typeof p.title === "string" && p.title.trim() !== ""
+            ? p.title.trim()
+            : readArtifactTitle(join(effortDir, "map.md")) ?? basename(effortDir);
+        const doc: Document = { data: { type: "architecture", title, status: publish ? "stable" : "draft" }, body };
+        writeFileSync(archPath, dump(doc), "utf-8");
+        return `wrote ${relative(root, archPath)} (created, status: ${publish ? "stable" : "draft"})`;
+      },
+    ),
+
     tw_add_ticket: def(
       "Create an implementation ticket at docs/tasks/<effort>/tickets/<slug>/ticket.md: the only ticket " +
         "creator, writing through the frontmatter seam. Writes type: ticket with the given subtype (feature " +

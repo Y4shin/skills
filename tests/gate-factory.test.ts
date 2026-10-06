@@ -67,6 +67,7 @@ const GATED_NAMES = [
   "tw_mark_blocked",
   "tw_archive_effort",
   "tw_record_out_of_scope",
+  "tw_write_architecture",
   "tw_write_changelog",
   "notify_user",
 ];

@@ -110,13 +110,23 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     name: "to-tickets",
     takesTarget: false,
     gate: "effort",
-    // The ticket-graph phase: creates tickets, splits oversized ones, wires
-    // and verifies the dependency levels, and reads the settled spec and map.
-    // tw_map_finalizable rides as the entry's private tool (the open-set
-    // derivation needs one no other entry contains) until the architecture
-    // writer lands in to-tickets-architecture and becomes the natural
-    // signature.
-    toolset: ["tw_add_ticket", "tw_split_ticket", "tw_dependency_levels", "tw_map_finalizable", "tw_get", "tw_list"],
+    // The ticket-graph phase: produces the living architecture document and
+    // the ticket graph from the settled spec. Creates tickets in dependency
+    // order (tw_add_ticket validates blocked_by at creation), splits
+    // oversized ones, verifies the dependency levels, and writes the
+    // architecture through its writer. tw_write_architecture is its
+    // signature tool: to-tickets-architecture rotated it here from the
+    // interim tw_map_finalizable when the writer landed; tw_map_finalizable
+    // stays disclosed as the graph-state read check.
+    toolset: [
+      "tw_write_architecture",
+      "tw_add_ticket",
+      "tw_split_ticket",
+      "tw_dependency_levels",
+      "tw_map_finalizable",
+      "tw_get",
+      "tw_list",
+    ],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-spec", "implement-ticket", "finalize-effort"],
   },
   {

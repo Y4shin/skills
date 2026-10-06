@@ -588,7 +588,10 @@ describe("the phase-to-toolset registry", () => {
         "tw_write_section",
       ],
       "to-spec": ["tw_get", "tw_list", "tw_write_spec"],
-      "to-tickets": ["tw_add_ticket", "tw_dependency_levels", "tw_get", "tw_list", "tw_map_finalizable", "tw_split_ticket"],
+      // The signature tool is the architecture writer: to-tickets-architecture
+      // rotated it here from the interim tw_map_finalizable when the writer
+      // landed. tw_map_finalizable stays disclosed as the graph-state read.
+      "to-tickets": ["tw_add_ticket", "tw_dependency_levels", "tw_get", "tw_list", "tw_map_finalizable", "tw_split_ticket", "tw_write_architecture"],
       "implement-ticket": [
         "tw_add_ticket",
         "tw_dependency_levels",
