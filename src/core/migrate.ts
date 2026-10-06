@@ -549,8 +549,9 @@ const TASK_CATEGORIES = new Set<string>(TASK_SUBTYPES);
 /**
  * The OKF types that are auxiliary files beside a primary artifact, derived
  * structurally from the model: every known type that is not itself a primary
- * artifact (a task, ticket, map, spec, or arch spec). A new aux type in
- * `art.ts` is therefore picked up automatically instead of drifting.
+ * artifact (a task, ticket, map, spec, the schema-5 architecture and review
+ * documents, and the legacy arch spec). A new aux type in `art.ts` is
+ * therefore picked up automatically instead of drifting.
  */
 const PRIMARY_TYPES = new Set<string>([
   "task", "ticket", "map", "spec",
