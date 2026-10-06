@@ -608,6 +608,9 @@ describe("factory gate", () => {
       const blockedPaths = [
         "docs/tasks/effort-one/map.md",
         "docs/tasks/effort-one/tasks/research/task.md",
+        // The changelog sits under the tree, so the built-ins are refused there
+        // too and the changelog writer stays the only writer of it.
+        "docs/tasks/CHANGELOG.md",
         // Normalized before the containment check: traversal cannot slip past.
         "docs/../docs/tasks/effort-one/map.md",
         join(repo, "docs/tasks/effort-one/map.md"),
