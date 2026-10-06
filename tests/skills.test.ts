@@ -563,10 +563,14 @@ describe("skill cross-references", () => {
     expect(content).toContain("type");
     expect(content).toContain("resources/feature.md");
     expect(content).toContain("resources/bug.md");
-    expect(content).toContain("resources/research.md");
-    expect(content).toContain("resources/prototype.md");
-    expect(content).toContain("resources/grilling.md");
-    expect(content).toContain("resources/manual.md");
+    // The planning resources consolidate under wayfinder/resources (ticket
+    // wayfinder-reconcile-and-passes); the planning subtypes delegate to
+    // their standalone skills.
+    expect(content).toContain("wayfinder/resources/");
+    expect(content).not.toContain("implement-task/resources/research.md");
+    expect(content).not.toContain("implement-task/resources/prototype.md");
+    expect(content).not.toContain("implement-task/resources/grilling.md");
+    expect(content).not.toContain("implement-task/resources/manual.md");
     expect(content).toMatch(/absent.*feature|feature.*default|\btype:\s*feature\b/i);
   });
 
@@ -642,9 +646,9 @@ describe("skill cross-references", () => {
   });
 
   for (const resource of ["research", "prototype", "grilling", "manual"]) {
-    test(`implement-task ${resource} resource exists and is non-coding`, () => {
-      const content = readFile(`skills/engineering/implement-task/resources/${resource}.md`);
-      expect(content).toContain("Implement Task");
+    test(`the ${resource} planning resource lives under wayfinder and is non-coding`, () => {
+      const content = readFile(`skills/engineering/wayfinder/resources/${resource}.md`);
+      expect(content).toContain("Wayfinder Planning Resource");
       expect(content).toContain("Completion evidence");
     });
   }
@@ -1205,6 +1209,7 @@ describe("dead surface deletion (corpus check)", () => {
 // The tool names the new planning prose may reference: the surviving surface
 // after the overhaul rename.
 const SURVIVING_TOOLS = new Set([
+  // v4 surface.
   "tw_show",
   "tw_get",
   "tw_mark_done",
@@ -1219,6 +1224,15 @@ const SURVIVING_TOOLS = new Set([
   "tw_state",
   "tw_state_set",
   "tw_context",
+  // The v5 named-transition and disclosure tools as they landed:
+  // disclosure-open-close-core (tw_open, tw_close, tw_next),
+  // implementation-transition-tools (tw_mark_blocked,
+  // tw_record_out_of_scope).
+  "tw_open",
+  "tw_close",
+  "tw_next",
+  "tw_mark_blocked",
+  "tw_record_out_of_scope",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -1355,12 +1369,108 @@ describe("wayfinder planning resources v4", () => {
       const content = wayfinderFile(join("resources", `${subtype}.md`));
       const templates = extractFrontmatterTemplates(content);
       expect(templates.length).toBeGreaterThan(0);
-      for (const template of templates) {
-        expect(frontmatterKeys(template)).toContain("subtype");
-        expect(template).toMatch(new RegExp(`^subtype: ${subtype}$`, "m"));
-        assertTemplateConforms(template);
-      }
+      // The merged resources may carry other templates (findings); the task
+      // template is the one pinned to the subtype.
+      const taskTemplate = templates.find((t) => /^type: task$/m.test(t));
+      expect(taskTemplate, `${subtype} resource carries a type: task template`).toBeDefined();
+      expect(frontmatterKeys(taskTemplate!)).toContain("subtype");
+      expect(taskTemplate).toMatch(new RegExp(`^subtype: ${subtype}$`, "m"));
+      assertTemplateConforms(taskTemplate!);
     }
+  });
+});
+
+// ─── wayfinder v5: the absorbed planning phase (wayfinder-reconcile-and-passes) ──
+
+describe("wayfinder v5 (wayfinder-reconcile-and-passes)", () => {
+  const content = readFile("skills/engineering/wayfinder/SKILL.md");
+
+  test("wayfinder is user-invoked with the correct frontmatter", () => {
+    const fm = parseFrontmatter(content);
+    expect(fm["name"]).toBe("wayfinder");
+    expect(fm["disable-model-invocation"]).toBe("true");
+  });
+
+  test("the skill opens through tw_open and releases the pass through tw_close", () => {
+    expect(content).toMatch(/tw_open/);
+    expect(content).toMatch(/tw_close wayfinder/);
+  });
+
+  test("a pass is bounded to one frontier snapshot and at most one grilling", () => {
+    expect(content).toMatch(/one frontier snapshot/i);
+    expect(content).toMatch(/at most one grilling/i);
+  });
+
+  test("a pass works the non-grilling ready tasks, then runs exactly one grilling", () => {
+    expect(content).toMatch(/non-grilling ready tasks/i);
+    expect(content).toMatch(/exactly one grilling/i);
+  });
+
+  test("planning work is serialized per kind", () => {
+    expect(content).toMatch(/never two grillings at once/i);
+    expect(content).toMatch(/research and prototype\s+may run concurrently/i);
+  });
+
+  test("a pass releases and never rolls into the next frontier", () => {
+    expect(content).toMatch(/never rolls into the next frontier/i);
+    expect(content).toMatch(/releases?/i);
+  });
+
+  test("an empty ready frontier triggers the reconcile step", () => {
+    expect(content).toMatch(/when the snapshot's ready frontier is empty/i);
+    expect(content).toMatch(/the pass runs the reconcile step/i);
+  });
+
+  test("the reconcile sets the ready flag only through tw_finalize_map", () => {
+    expect(content).toMatch(/tw_finalize_map/);
+    expect(content).toMatch(/only setter of/i);
+    expect(content).toMatch(/Never set the flag any other way/i);
+  });
+
+  test("tw_finalize_map refuses naming every missing item", () => {
+    expect(content).toMatch(/naming\s+every\s+missing\s+item/i);
+  });
+
+  test("every planning task writes its results back before marking itself done", () => {
+    expect(content).toMatch(/writes its own results back to the map through\s+`tw_write_section` as its final step/i);
+    expect(content).toMatch(/before it marks itself done with\s+`tw_mark_done`/i);
+  });
+
+  test("the write-back pointer convention: the map must reference the task slug", () => {
+    expect(content).toMatch(/referencing the task's slug as a stand-alone token/i);
+    expect(content).toMatch(/`tw_mark_done` refuses the\s+done-marking while the map does not reference the task/i);
+  });
+
+  test("wayfinder never re-synthesizes decisions from task bodies", () => {
+    expect(content).toMatch(/never re-synthesizes decisions from task bodies/i);
+  });
+
+  test("a done-marking clears the flag, so post-reconcile plan changes force one more pass", () => {
+    expect(content).toMatch(/A done-marking clears\s+a set ready flag/i);
+    expect(content).toMatch(/forces one more\s+pass/i);
+  });
+
+  test("planning resources consolidate under wayfinder/resources; the implement-task duplicates are gone", () => {
+    for (const subtype of ["research", "prototype", "grilling", "manual"]) {
+      expect(existsSync(join(PROJECT, `skills/engineering/wayfinder/resources/${subtype}.md`))).toBe(true);
+      expect(existsSync(join(PROJECT, `skills/engineering/implement-task/resources/${subtype}.md`))).toBe(false);
+    }
+  });
+
+  test("each planning resource carries the write-back pointer convention and the done-marking order", () => {
+    for (const subtype of ["research", "prototype", "grilling", "manual"]) {
+      const content = readFile(`skills/engineering/wayfinder/resources/${subtype}.md`);
+      expect(content).toMatch(/tw_write_section/);
+      expect(content).toMatch(/tw_mark_done\b/);
+      expect(content).toMatch(/stand-alone token/i);
+    }
+  });
+
+  test("the grilling resource creates the task document and delegates the method to the grilling skill", () => {
+    const content = readFile("skills/engineering/wayfinder/resources/grilling.md");
+    expect(content).toMatch(/`grilling` skill/);
+    expect(content).not.toMatch(/one question at a time/i);
+    expect(content).not.toMatch(/answer on[\s\S]*behalf/i);
   });
 });
 
@@ -1758,10 +1868,16 @@ describe("implement-task v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/legacy artifacts keep today's behavior|absent subtype defaults/i);
   });
 
-  test("dispatch names all six subtypes and routes each to its resource", () => {
-    for (const subtype of ["research", "prototype", "grilling", "manual", "feature", "bug"]) {
+  test("dispatch routes feature and bug to their resources and delegates the planning subtypes", () => {
+    for (const subtype of ["feature", "bug"]) {
       expect(content).toContain(`resources/${subtype}.md`);
     }
+    // Planning subtypes delegate to their standalone skills; manual runs the
+    // consolidated wayfinder resource (no standalone skill).
+    expect(content).toMatch(/`research` skill/i);
+    expect(content).toMatch(/`prototype` skill/i);
+    expect(content).toMatch(/`grilling` skill/i);
+    expect(content).toContain("wayfinder/resources/manual.md");
   });
 
   test("resolves artifacts through the resolver, with no hardcoded task-path template", () => {
@@ -2275,7 +2391,7 @@ describe("planning resources v4 touch (overhaul-execution-skills)", () => {
   test.each(["research", "prototype", "grilling", "manual"])(
     "%s marks the task done via the named done tool after the map write-back",
     (subtype) => {
-      const content = readFile(`skills/engineering/implement-task/resources/${subtype}.md`);
+      const content = readFile(`skills/engineering/wayfinder/resources/${subtype}.md`);
       expect(content).toMatch(/tw_write_section/);
       expect(content).toMatch(/tw_mark_done\b/);
       expect(content).not.toContain("tw_set");
@@ -2284,7 +2400,7 @@ describe("planning resources v4 touch (overhaul-execution-skills)", () => {
   );
 
   test("research captures findings in the task directory with frontmatter", () => {
-    const content = readFile("skills/engineering/implement-task/resources/research.md");
+    const content = readFile("skills/engineering/wayfinder/resources/research.md");
     expect(content).toMatch(/docs\/tasks\/<effort>\/tasks\/<task-slug>\/findings\.md/);
     const templates = extractFrontmatterTemplates(content);
     const findings = templates.find((t) => /^type: findings$/m.test(t));
