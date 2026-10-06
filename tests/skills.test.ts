@@ -1205,6 +1205,7 @@ describe("dead surface deletion (corpus check)", () => {
 // The tool names the new planning prose may reference: the surviving surface
 // after the overhaul rename.
 const SURVIVING_TOOLS = new Set([
+  // v4 surface.
   "tw_show",
   "tw_get",
   "tw_mark_done",
@@ -1219,6 +1220,15 @@ const SURVIVING_TOOLS = new Set([
   "tw_state",
   "tw_state_set",
   "tw_context",
+  // The v5 named-transition and disclosure tools as they landed:
+  // disclosure-open-close-core (tw_open, tw_close, tw_next),
+  // implementation-transition-tools (tw_mark_blocked,
+  // tw_record_out_of_scope).
+  "tw_open",
+  "tw_close",
+  "tw_next",
+  "tw_mark_blocked",
+  "tw_record_out_of_scope",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -1361,6 +1371,43 @@ describe("wayfinder planning resources v4", () => {
         assertTemplateConforms(template);
       }
     }
+  });
+});
+
+// ─── wayfinder v5: the absorbed planning phase (wayfinder-reconcile-and-passes) ──
+
+describe("wayfinder v5 (wayfinder-reconcile-and-passes)", () => {
+  const content = readFile("skills/engineering/wayfinder/SKILL.md");
+
+  test("wayfinder is user-invoked with the correct frontmatter", () => {
+    const fm = parseFrontmatter(content);
+    expect(fm["name"]).toBe("wayfinder");
+    expect(fm["disable-model-invocation"]).toBe("true");
+  });
+
+  test("the skill opens through tw_open and releases the pass through tw_close", () => {
+    expect(content).toMatch(/tw_open/);
+    expect(content).toMatch(/tw_close wayfinder/);
+  });
+
+  test("a pass is bounded to one frontier snapshot and at most one grilling", () => {
+    expect(content).toMatch(/one frontier snapshot/i);
+    expect(content).toMatch(/at most one grilling/i);
+  });
+
+  test("a pass works the non-grilling ready tasks, then runs exactly one grilling", () => {
+    expect(content).toMatch(/non-grilling ready tasks/i);
+    expect(content).toMatch(/exactly one grilling/i);
+  });
+
+  test("planning work is serialized per kind", () => {
+    expect(content).toMatch(/never two grillings at once/i);
+    expect(content).toMatch(/research and prototype\s+may run concurrently/i);
+  });
+
+  test("a pass releases and never rolls into the next frontier", () => {
+    expect(content).toMatch(/never rolls into the next frontier/i);
+    expect(content).toMatch(/releases?/i);
   });
 });
 
