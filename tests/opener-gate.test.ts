@@ -52,6 +52,11 @@ beforeAll(() => {
       data: { type: "ticket", subtype: "feature", title: "Two", status: "stable", workflow_state: "done", blocked_by: ["one"] },
     },
   });
+  // A planning effort whose reconcile never ran: the flag is absent, which
+  // reads false.
+  writeEffort("unreconciled", {
+    "map.md": { data: { type: "map", title: "Unreconciled effort" } },
+  });
 });
 
 afterAll(() => {
@@ -80,6 +85,40 @@ interface ToolResult {
     disclosed?: string[];
   };
 }
+
+// ─── The to-spec flag gate ────────────────────────────────────────────────────────
+
+describe("the to-spec flag gate", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => {
+    tools = createTools();
+  });
+
+  test("refuses when ready_for_spec is false and points back to Wayfinder", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "to-spec", effort: "unreconciled" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(false);
+    expect(result.details.reason).toContain("ready_for_spec");
+    expect(result.details.reason).toMatch(/wayfinder/i);
+    expect(result.details.legal_next).toEqual(["run wayfinder"]);
+    // A refused open activates nothing.
+    expect(active).toEqual([...ALWAYS_DECLARED]);
+  });
+
+  test("opens when ready_for_spec is true and discloses the spec writer", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const ctx = disclosureCtx(active);
+    const result = (await tools.tw_open.execute({ skill: "to-spec", effort: "ready-effort" }, ctx)) as ToolResult;
+    expect(result.details.opened).toBe(true);
+    for (const tool of ["tw_write_spec", "tw_close"]) {
+      expect(active).toContain(tool);
+    }
+  });
+});
 
 // ─── The opener gate ──────────────────────────────────────────────────────────
 

@@ -96,7 +96,10 @@ export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "to-spec",
     takesTarget: false,
-    gate: "effort",
+    // The spec phase's only gate is the flag: the producer (the Wayfinder
+    // reconcile, through tw_finalize_map) owns the check, the consumer owns
+    // only the flag.
+    gate: "spec-ready",
     // The spec phase: synthesizes the specification from the settled record
     // and writes it through the spec writer. tw_write_spec is its signature
     // tool.

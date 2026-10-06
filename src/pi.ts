@@ -890,22 +890,57 @@ function phaseGate(
   entry: SkillEntry,
   args: { effort?: unknown; target?: unknown },
 ): GateRefusal | null {
+  const effort = String(args.effort ?? "");
   switch (entry.gate) {
     case "none":
       return null;
     case "effort":
-    case "spec-ready":
+      return requireLiveEffort(root, effort);
+    case "spec-ready": {
+      const missing = requireLiveEffort(root, effort);
+      if (missing !== null) return missing;
+      // ready_for_spec is the only thing to-spec checks: the producer (the
+      // Wayfinder reconcile, through tw_finalize_map) owns every other
+      // precondition, the consumer owns only the flag.
+      const mapPath = directoryLeaf(liveEffortDir(root, effort)!, "map");
+      if (mapPath === null) {
+        return {
+          reason: `no map in '${effort}': the Wayfinder reconcile has not run`,
+          legalNext: ["run wayfinder"],
+        };
+      }
+      try {
+        if (parseArtifactFile(mapPath).art.ready_for_spec !== true) {
+          return {
+            reason:
+              `the map of '${effort}' has ready_for_spec false: the Wayfinder reconcile has not set it; ` +
+              `a run that finished every planning task but skipped reconciliation is refused here`,
+            legalNext: ["run wayfinder"],
+          };
+        }
+      } catch {
+        return {
+          reason: `the map of '${effort}' is not a readable artifact; the Wayfinder reconcile has not run`,
+          legalNext: ["run wayfinder"],
+        };
+      }
+      return null;
+    }
     case "implementation": {
-      const effort = String(args.effort ?? "");
-      if (liveEffortDir(root, effort) !== null) return null;
-      const live = liveEffortSlugs(root);
-      const hint = live.length > 0 ? `; live efforts: ${live.join(", ")}` : "; no efforts exist yet";
-      return {
-        reason: `no live effort '${effort}'${hint}`,
-        legalNext: ["run intake"],
-      };
+      return requireLiveEffort(root, effort);
     }
   }
+}
+
+/** The shared unknown-effort refusal every effort-taking phase starts with. */
+function requireLiveEffort(root: string, effort: string): GateRefusal | null {
+  if (liveEffortDir(root, effort) !== null) return null;
+  const live = liveEffortSlugs(root);
+  const hint = live.length > 0 ? `; live efforts: ${live.join(", ")}` : "; no efforts exist yet";
+  return {
+    reason: `no live effort '${effort}'${hint}`,
+    legalNext: ["run intake"],
+  };
 }
 
 /**
