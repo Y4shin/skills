@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
 import YAML from "yaml";
 import { createTools } from "../src/pi.js";
-import { parse } from "../src/core/frontmatter.js";
+import { parse, dump } from "../src/core/frontmatter.js";
 import {
   MAP_SECTION_NON_GOALS,
   MAP_SECTION_NON_NEGOTIABLE_FACTS,
@@ -197,6 +197,7 @@ describe("task-workflow tools", () => {
         "tw_context",
         "tw_dependency_levels",
         "tw_finalizable",
+        "tw_finalize_map",
         "tw_frontier",
         "tw_get",
         "tw_list",
@@ -1207,6 +1208,154 @@ describe("task-workflow tools: tw_write_section, the map-section writer", () => 
         ctx(t),
       ),
     ).rejects.toThrow(/single '##' heading name/);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_finalize_map, the ready_for_spec checking tool", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  const GOOD_FACTS = "**Success test:** the gate refuses in a fixture tree.\n\n- The schema stays additive.";
+
+  /** Rewrite the fixture map's body, keeping its frontmatter. */
+  function setSpecGateBody(t: string, body: string): void {
+    const path = join(t, "docs/tasks/specgate/map.md");
+    const doc = parse(readFileSync(path, "utf-8"));
+    writeFileSync(path, dump({ data: doc.data, body }), "utf-8");
+  }
+
+  /** Finish the fixture's planning task by hand (fixture setup, not a tool call). */
+  function finishDecideTask(t: string): void {
+    const p = join(t, "docs/tasks/specgate/tasks/decide/task.md");
+    writeFileSync(p, readFileSync(p, "utf-8").replace("workflow_state: todo", "workflow_state: done"), "utf-8");
+  }
+
+  /** Fill both schema-5 sections through the section writer. */
+  async function fillSections(t: string): Promise<void> {
+    await tools.tw_write_section.execute(
+      { selector: "specgate", section: MAP_SECTION_NON_GOALS, content: "- No dark mode." },
+      ctx(t),
+    );
+    await tools.tw_write_section.execute(
+      { selector: "specgate", section: MAP_SECTION_NON_NEGOTIABLE_FACTS, content: GOOD_FACTS },
+      ctx(t),
+    );
+  }
+
+  test("refuses when the planning frontier is non-empty, naming the ready task", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await fillSections(t);
+    await expect(tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t))).rejects.toThrow(
+      /planning frontier is not empty: decide/,
+    );
+    // A refusal never sets the flag.
+    expect(parse(specGateMap(t)).data.ready_for_spec).not.toBe(true);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses when ## Non-goals is missing, empty, or when the facts section is missing", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    finishDecideTask(t);
+    setSpecGateBody(t, "\n# Spec gate\n\n## Destination\n\nDone.\n\n## Non-negotiable facts\n");
+    await expect(tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t))).rejects.toThrow(
+      /no '## Non-goals' section/,
+    );
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp(); seedPlanningTree(t2);
+    finishDecideTask(t2);
+    await expect(tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t2))).rejects.toThrow(
+      /'## Non-goals' is empty/,
+    );
+    rmSync(t2, { recursive: true, force: true });
+
+    const t3 = mkTmp(); seedPlanningTree(t3);
+    finishDecideTask(t3);
+    setSpecGateBody(t3, "\n# Spec gate\n\n## Destination\n\nDone.\n\n## Non-goals\n\n- No dark mode.\n");
+    await expect(tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t3))).rejects.toThrow(
+      /no '## Non-negotiable facts' section/,
+    );
+    rmSync(t3, { recursive: true, force: true });
+  });
+
+  test("refuses when ## Non-negotiable facts is empty or does not open with the bolded success test", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    finishDecideTask(t);
+    await expect(tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t))).rejects.toThrow(
+      /'## Non-negotiable facts' is empty/,
+    );
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp(); seedPlanningTree(t2);
+    finishDecideTask(t2);
+    await tools.tw_write_section.execute(
+      { selector: "specgate", section: MAP_SECTION_NON_GOALS, content: "- No dark mode." },
+      ctx(t2),
+    );
+    await tools.tw_write_section.execute(
+      { selector: "specgate", section: MAP_SECTION_NON_NEGOTIABLE_FACTS, content: "- Success test: not bolded." },
+      ctx(t2),
+    );
+    await expect(tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t2))).rejects.toThrow(
+      /does not open with the bolded effort-level success-test line/,
+    );
+    expect(parse(specGateMap(t2)).data.ready_for_spec).not.toBe(true);
+    rmSync(t2, { recursive: true, force: true });
+  });
+
+  test("reports every failed check together, exactly what is missing", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const error = await tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t)).catch((e) => e);
+    expect(error.message).toMatch(/3 check\(s\) failed/);
+    expect(error.message).toMatch(/planning frontier is not empty: decide/);
+    expect(error.message).toMatch(/'## Non-goals' is empty/);
+    expect(error.message).toMatch(/'## Non-negotiable facts' is empty/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("sets ready_for_spec: true only when every check passes, and only through this tool", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    setReadyForSpec(t, true);
+    await fillSections(t);
+    // The section writes cleared the flag: the post-write state is unreconciled.
+    expect(parse(specGateMap(t)).data.ready_for_spec).toBe(false);
+    finishDecideTask(t);
+    const out = await tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t));
+    expect(out).toContain("ready_for_spec = true");
+    expect(parse(specGateMap(t)).data.ready_for_spec).toBe(true);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("leaves a set flag untouched on a refusal", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    setReadyForSpec(t, true);
+    // Sections are empty placeholders and the task is open: refused.
+    await expect(tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t))).rejects.toThrow(/failed/);
+    expect(parse(specGateMap(t)).data.ready_for_spec).toBe(true);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("the planning frontier is the task kind: an unfinished ticket does not block the finalize", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await fillSections(t);
+    finishDecideTask(t);
+    writeMd(
+      join(t, "docs/tasks/specgate/tickets/land-it/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Land it\nstatus: stable\nworkflow_state: todo\nblocked_by: []\n",
+    );
+    const out = await tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t));
+    expect(out).toContain("ready_for_spec = true");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape map", async () => {
+    const t = mkTmp();
+    writeMd(join(t, "docs/tasks/maps/legacy/map.md"), "kind: map\ntitle: Legacy\nslug: legacy\nstatus: draft\n");
+    await expect(tools.tw_finalize_map.execute({ selector: "legacy" }, ctx(t))).rejects.toThrow(
+      /schema-5 migration/,
+    );
     rmSync(t, { recursive: true, force: true });
   });
 });

@@ -20,7 +20,7 @@ import { Type, type TSchema } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
-import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, writeMapSection, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
+import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, readMapSection, writeMapSection, MAP_SECTION_NON_GOALS, MAP_SECTION_NON_NEGOTIABLE_FACTS, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
 import {
   CLOSER,
   buildOpenParameters,
@@ -896,6 +896,48 @@ export function createTools(): Record<string, Tool> {
         const cleared = clearReadyForSpec(doc);
         writeFileSync(path, dump(doc), "utf-8");
         return `wrote '## ${section}' in ${relative(root, path)}${cleared ? "; ready_for_spec cleared" : ""}`;
+      },
+    ),
+
+    tw_finalize_map: def(
+      "Check an effort map is ready for the spec phase and set ready_for_spec: true: the only setter of the " +
+        "flag, and it sets it last. Refuses, naming every missing item, when the planning frontier is not empty, " +
+        "'## Non-goals' is missing or empty, or '## Non-negotiable facts' is missing, empty, or does not open " +
+        "with the bolded success-test line.",
+      { selector: Str("Map slug or path") },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const { path, art, doc } = resolveArt(root, p.selector, "map");
+        requireV4Shape(art);
+        const graph = graphForPath(effortGraphs(scanMemo(root)()), path);
+        const missing: string[] = [];
+        // The planning frontier is the ready edge of the task kind: the
+        // vocabulary splits planning tasks from implementation tickets, and
+        // only the planning kind gates the hand-off to the spec phase.
+        const frontier = (graph === null ? [] : effortFrontier(graph)).filter((a) => a.type === "task");
+        if (frontier.length > 0) {
+          missing.push(`the planning frontier is not empty: ${frontier.map((a) => a.slug).join(", ")}`);
+        }
+        const nonGoals = readMapSection(doc.body, MAP_SECTION_NON_GOALS);
+        if (nonGoals === null) missing.push(`the map has no '## ${MAP_SECTION_NON_GOALS}' section`);
+        else if (nonGoals.length === 0) missing.push(`'## ${MAP_SECTION_NON_GOALS}' is empty`);
+        const facts = readMapSection(doc.body, MAP_SECTION_NON_NEGOTIABLE_FACTS);
+        if (facts === null) missing.push(`the map has no '## ${MAP_SECTION_NON_NEGOTIABLE_FACTS}' section`);
+        else if (facts.length === 0) missing.push(`'## ${MAP_SECTION_NON_NEGOTIABLE_FACTS}' is empty`);
+        else if (!/^\*\*.*\*\*/.test(facts[0].trim())) {
+          missing.push(
+            `'## ${MAP_SECTION_NON_NEGOTIABLE_FACTS}' does not open with the bolded effort-level success-test line`,
+          );
+        }
+        if (missing.length > 0) {
+          throw new Error(
+            `cannot finalize the map '${art.slug}'; ${missing.length} check(s) failed:\n- ${missing.join("\n- ")}`,
+          );
+        }
+        // Every check passed: the flag is set last, in the single write.
+        doc.data.ready_for_spec = true;
+        writeFileSync(path, dump(doc), "utf-8");
+        return `map finalized: ready_for_spec = true in ${relative(root, path)}`;
       },
     ),
 
