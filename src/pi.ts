@@ -689,25 +689,6 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    tw_set: def(
-      "Set a scalar frontmatter field (auto-typed: int, bool, null, string).",
-      { selector: Str("Slug or path"), field: Str("Field name"), value: Str("New value") },
-      async (p, ctx) => {
-        const root = findRoot(ctx.directory);
-        const { path, doc } = resolveArt(root, p.selector);
-        let v: unknown = p.value;
-        const lc = p.value.toLowerCase();
-        if (lc === "true") v = true;
-        else if (lc === "false") v = false;
-        else if (lc === "null") v = null;
-        else if (/^-?\d+$/.test(p.value)) v = parseInt(p.value, 10);
-        else if (/^-?\d+\.\d+$/.test(p.value)) v = parseFloat(p.value);
-        doc.data[p.field] = v;
-        writeFileSync(path, dump(doc), "utf-8");
-        return `${p.field} = ${p.value}`;
-      },
-    ),
-
     tw_list: def(
       "List artifacts (maps, specs, tasks, tickets). Excludes archived by default.",
       {

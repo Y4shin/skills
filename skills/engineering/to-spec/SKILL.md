@@ -36,8 +36,7 @@ status: draft   # stable once the user approves the spec
 ---
 ```
 
-4. When the user approves the spec, flip its `status` to `stable` with
-   `tw_set docs/tasks/<effort>/spec.md status stable`.
+4. When the user approves the spec, flip its `status` to `stable`.
 <spec-template>
 
 ## Problem Statement

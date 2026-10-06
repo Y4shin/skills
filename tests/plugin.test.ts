@@ -198,7 +198,6 @@ describe("task-workflow tools", () => {
         "tw_next",
         "tw_open",
         "tw_resolve_uncertainty",
-        "tw_set",
         "tw_show",
         "tw_state",
         "tw_state_set",
@@ -259,44 +258,6 @@ describe("task-workflow tools", () => {
       const t = mkTmp(); seedTree(t);
       const out = await tools.tw_get.execute({ selector: "login", field: "nonexistent" }, ctx(t));
       expect(out).toBe("");
-    });
-  });
-
-  describe("tw_set", () => {
-    test("sets a string value", async () => {
-      const t = mkTmp(); seedTree(t);
-      const out = await tools.tw_set.execute({ selector: "login", field: "status", value: "in-progress" }, ctx(t));
-      expect(out).toContain("in-progress");
-      const got = await tools.tw_get.execute({ selector: "login", field: "status" }, ctx(t));
-      expect(got).toBe("in-progress");
-    });
-
-    test("sets an int value", async () => {
-      const t = mkTmp(); seedTree(t);
-      await tools.tw_set.execute({ selector: "login", field: "started_at", value: "42" }, ctx(t));
-      const got = await tools.tw_get.execute({ selector: "login", field: "started_at" }, ctx(t));
-      expect(got).toBe("42");
-    });
-
-    test("sets a bool value", async () => {
-      const t = mkTmp(); seedTree(t);
-      await tools.tw_set.execute({ selector: "login", field: "flag", value: "true" }, ctx(t));
-      const got = await tools.tw_get.execute({ selector: "login", field: "flag" }, ctx(t));
-      expect(got).toBe("true");
-    });
-
-    test("sets null value", async () => {
-      const t = mkTmp(); seedTree(t);
-      await tools.tw_set.execute({ selector: "login", field: "map", value: "null" }, ctx(t));
-      const got = await tools.tw_get.execute({ selector: "login", field: "map" }, ctx(t));
-      expect(got).toBe("null");  // tw_get returns String(null) = "null"
-    });
-
-    test("persists to disk", async () => {
-      const t = mkTmp(); seedTree(t);
-      await tools.tw_set.execute({ selector: "login", field: "status", value: "done" }, ctx(t));
-      const onDisk = require("fs").readFileSync(join(t, "docs/tasks/login/task.md"), "utf-8");
-      expect(onDisk).toContain("status: done");
     });
   });
 
@@ -604,13 +565,6 @@ describe("task-workflow tools", () => {
   });
 
   describe("slice resolution", () => {
-    test("tw_set works on slices by slug", async () => {
-      const t = mkTmp(); seedTree(t);
-      await tools.tw_set.execute({ selector: "do-thing", field: "status", value: "in-progress" }, ctx(t));
-      const got = await tools.tw_get.execute({ selector: "do-thing", field: "status" }, ctx(t));
-      expect(got).toBe("in-progress");
-    });
-
     test("tw_show works on slices by path", async () => {
       const t = mkTmp(); seedTree(t);
       const path = join(t, "docs/tasks/login/slices/1-do-thing.md");

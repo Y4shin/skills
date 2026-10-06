@@ -35,7 +35,6 @@ const GATED_WORKFLOW_TOOLS = [
   "tw_close",
   "tw_show",
   "tw_get",
-  "tw_set",
   "tw_list",
   "tw_finalizable",
   "tw_dependency_levels",
@@ -88,7 +87,7 @@ describe("disclosure core: the three-way flip", () => {
     for (const name of ["tw_close", "tw_frontier", "tw_list", "tw_dependency_levels", "tw_get"]) {
       expect(opened, `${name} must be declared once wayfinder is open`).toContain(name);
     }
-    for (const name of ["tw_show", "tw_state", "tw_set", "tw_finalizable"]) {
+    for (const name of ["tw_show", "tw_state", "tw_finalize_map", "tw_finalizable"]) {
       expect(opened, `${name} belongs to no open skill`).not.toContain(name);
     }
 

@@ -87,20 +87,20 @@ describe("tool dispatch and filesystem round-trip", () => {
     expect(lastAssistantText(s.session)).toContain("kind is task");
   });
 
-  test("tw_get reads a field after tw_set mutates it", async () => {
+  test("tw_state_set writes the state file and tw_state reads it back", async () => {
     const s = await session();
-    await openSkill(s, "to-spec");
+    await openSkill(s, "intake");
     s.setResponses([
-      reply([call("tw_set", { selector: "login", field: "status", value: "in-progress" })]),
-      reply([call("tw_get", { selector: "login", field: "status" })]),
-      (ctx: Context) => reply(`status now: ${latestToolResultText(ctx, "tw_get") ?? "?"}`),
+      reply([call("tw_state_set", { field: "task", value: "login" })]),
+      reply([call("tw_state", {})]),
+      (ctx: Context) => reply(`state now: ${latestToolResultText(ctx, "tw_state") ?? "?"}`),
     ]);
-    await s.session.prompt("Set login to in-progress, then read it back.");
+    await s.session.prompt("Point the task pointer at login, then read the state back.");
     // The open (and its nested telemetry call) precede the two workflow calls.
-    expect(toolCallNames(s.events).slice(-2)).toEqual(["tw_set", "tw_get"]);
-    expect(lastAssistantText(s.session)).toContain("status now: in-progress");
-    const onDisk = readFileSync(join(s.cwd, "docs/tasks/login/task.md"), "utf-8");
-    expect(onDisk).toContain("status: in-progress");
+    expect(toolCallNames(s.events).slice(-2)).toEqual(["tw_state_set", "tw_state"]);
+    expect(lastAssistantText(s.session)).toContain("task: login");
+    const onDisk = readFileSync(join(s.cwd, "docs/tasks/state.yaml"), "utf-8");
+    expect(onDisk).toContain("task: login");
   });
 
   test("tw_show works on slices by slug", async () => {
@@ -114,22 +114,6 @@ describe("tool dispatch and filesystem round-trip", () => {
     const result = toolResultTexts(s.session, "tw_show")[0];
     expect(result).toContain("kind: slice");
     expect(result).toContain("slug: do-thing");
-  });
-
-  test("tw_set works on slices by slug", async () => {
-    const s = await session();
-    await openSkill(s, "to-spec");
-    s.setResponses([
-      reply([call("tw_set", { selector: "do-thing", field: "status", value: "in-progress" })]),
-      (ctx: Context) => {
-        const result = latestToolResultText(ctx, "tw_set") ?? "";
-        return reply(result.includes("in-progress") ? "set ok" : "set failed");
-      },
-    ]);
-    await s.session.prompt("Set do-thing to in-progress.");
-    expect(lastAssistantText(s.session)).toContain("set ok");
-    const onDisk = readFileSync(join(s.cwd, "docs/tasks/login/slices/1-do-thing.md"), "utf-8");
-    expect(onDisk).toContain("status: in-progress");
   });
 
   test("tw_dependency_levels returns levels", async () => {

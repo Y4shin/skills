@@ -23,9 +23,9 @@ diagnosing-bugs ─▶ implement-task (subtype: bug) ─────────
 Everything is a file under `docs/tasks/` (an OKF bundle: one directory per
 **effort** holding `map.md`, `spec.md`, `tasks/` decision tasks, and
 `tickets/` implementation tickets) plus `docs/bugs/`. There is no external
-issue tracker. The `tw_*` Pi tools are read-only queries over that tree; the
-only writers are the agent's own edits plus `tw_set`, `tw_state_set`, and
-`tw_resolve_uncertainty`.
+issue tracker. The `tw_*` Pi tools query that tree; under the write lockdown
+its only writers are the named `tw_*` tools, with `tw_state_set` for the
+state file and `tw_resolve_uncertainty` for uncertainty resolutions.
 
 ## The substrate the flow runs on
 

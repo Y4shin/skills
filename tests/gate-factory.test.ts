@@ -49,7 +49,6 @@ const GATED_NAMES = [
   "tw_close",
   "tw_show",
   "tw_get",
-  "tw_set",
   "tw_list",
   "tw_finalizable",
   "tw_dependency_levels",

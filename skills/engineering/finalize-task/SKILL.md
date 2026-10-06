@@ -100,12 +100,8 @@ are tools you invoke as functions, **not** shell binaries: wrapping them in a
 the sequence. Call them as tools, and run the shell steps in a separate bash
 block.
 
-1. **Call the Pi tool** to mark the ticket done (one owner of the marking:
-   finalize):
-
-   ```
-   tw_set <ticket-path> workflow_state done   # Pi tool, not a shell command
-   ```
+1. Mark the ticket done in its frontmatter, `workflow_state: done` (one
+   owner of the marking: finalize).
 
 2. **Call the Pi tool** to verify the ticket is finalizable; the check also
    surfaces the effort graph's anomalies, which you should report if any
@@ -149,12 +145,7 @@ If it does not return ready, stop here and report the effort's remaining work.
 If it returns ready:
 
 1. Mark the map and its done items to `status: deprecated` (the
-   archived-effort convention; `workflow_state` stays `done`). For each done
-   item and the map, **call the Pi tool**:
-
-   ```
-   tw_set <artifact-path> status deprecated   # Pi tool, not a shell command
-   ```
+   archived-effort convention; `workflow_state` stays `done`).
 
 2. **Archive the effort directory** (shell, safe under `set -e`; this runs
    on main, where the per-ticket close-outs left the landed work):

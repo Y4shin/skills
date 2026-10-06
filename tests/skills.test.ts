@@ -712,7 +712,7 @@ describe("skill cross-references", () => {
         // Wrapping a Pi tool call in a set -e shell block fails with
         // command not found and aborts the archive mid-sequence (see
         // docs/bugs/finalize-task-set-e-tool-confusion.md).
-        expect(m[1]).not.toMatch(/tw_state_set|tw_set|tw_finalizable|tw_map_finalizable/);
+        expect(m[1]).not.toMatch(/tw_state_set|tw_finalizable|tw_map_finalizable/);
       }
     }
     expect(shellBlocks).toBeGreaterThan(0);
@@ -1166,7 +1166,9 @@ describe("dead surface deletion (corpus check)", () => {
 const SURVIVING_TOOLS = new Set([
   "tw_show",
   "tw_get",
-  "tw_set",
+  "tw_mark_done",
+  "tw_write_section",
+  "tw_finalize_map",
   "tw_list",
   "tw_frontier",
   "tw_dependency_levels",
@@ -1828,7 +1830,7 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
   test("the chain never marks the ticket done; finalize owns the marking", () => {
     const beforeToolbelt = content.split("## Failure toolbelt")[0];
     // No chain step sets the field: the marking has one owner, finalize.
-    expect(beforeToolbelt).not.toMatch(/tw_set[^)]*workflow_state/);
+    expect(beforeToolbelt).not.toMatch(/tw_mark_done|tw_set[^)]*workflow_state/);
     expect(beforeToolbelt).not.toMatch(/workflow_state.{0,20}done/);
     expect(content).toMatch(/\/skill:finalize-task/);
   });
@@ -2230,10 +2232,12 @@ describe("standards direct reads (overhaul-execution-skills)", () => {
 
 describe("planning resources v4 touch (overhaul-execution-skills)", () => {
   test.each(["research", "prototype", "grilling", "manual"])(
-    "%s marks the task done via the set tool, workflow_state done",
+    "%s marks the task done via the named done tool after the map write-back",
     (subtype) => {
       const content = readFile(`skills/engineering/implement-task/resources/${subtype}.md`);
-      expect(content).toMatch(/tw_set[^`]*workflow_state done/);
+      expect(content).toMatch(/tw_write_section/);
+      expect(content).toMatch(/tw_mark_done\b/);
+      expect(content).not.toContain("tw_set");
       expectOnlySurvivingTools(content);
     },
   );
@@ -2263,8 +2267,9 @@ describe("finalize-task v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/implement-task reported its chains landed|chains landed/i);
   });
 
-  test("the per-ticket close-out marks workflow_state done via the set tool, then verifies", () => {
-    expect(content).toMatch(/tw_set[^`]*workflow_state done|tw_set <ticket-path> workflow_state done/);
+  test("the per-ticket close-out marks the ticket done without the set tool, then verifies", () => {
+    expect(content).not.toContain("tw_set");
+    expect(content).toMatch(/workflow_state:? done/);
     expect(content).toContain("tw_finalizable <ticket-slug>");
     // The finalizable check also surfaces the effort graph's anomalies.
     expect(content).toMatch(/anomal/i);

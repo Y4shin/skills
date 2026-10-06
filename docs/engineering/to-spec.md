@@ -14,8 +14,7 @@ Solution, an extensive numbered list of User Stories, Implementation
 Decisions, Testing Decisions, Out of Scope, and Further Notes.
 
 The spec file carries frontmatter (`type: spec`) and starts as
-`status: draft`. When you approve it, the status flips to `stable` with
-`tw_set docs/tasks/<effort>/spec.md status stable`.
+`status: draft`. When you approve it, the status flips to `stable`.
 
 ## When to reach for it
 

@@ -52,7 +52,7 @@ describe("disclosure core: tw_open", () => {
     for (const tool of ["tw_frontier", "tw_list", "tw_dependency_levels"]) {
       expect(active, `${tool} must be declared once wayfinder is open`).toContain(tool);
     }
-    for (const tool of ["tw_show", "tw_state", "tw_set", "tw_finalizable"]) {
+    for (const tool of ["tw_show", "tw_state", "tw_resolve_uncertainty", "tw_finalizable"]) {
       expect(active, `${tool} belongs to no open skill and stays undeclared`).not.toContain(tool);
     }
   });

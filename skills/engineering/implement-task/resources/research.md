@@ -20,10 +20,10 @@ the task body when the result is small:
 5. If research reveals a new precise requirement, record it as discovered work
    and ask Wayfinder to add the dependent task. Do not silently broaden this
    task.
-6. Mark the task done with `tw_set <task-path> workflow_state done` only when
-   the evidence is sufficient for its stated decision. Otherwise mark it
-   blocked with `tw_set <task-path> workflow_state blocked` and explain what
-   is missing.
+6. Write the result back to the map with `tw_write_section`, then mark the
+   task done with `tw_mark_done <task-path>` only when the evidence is
+   sufficient for its stated decision. Otherwise leave the task blocked
+   (`workflow_state: blocked`) and explain what is missing.
 
 ## Completion evidence
 

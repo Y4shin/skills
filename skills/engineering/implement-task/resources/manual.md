@@ -13,10 +13,10 @@ human or environment work.
    on the user's behalf.
 4. Record URLs, identifiers, configuration locations, row counts, or other
    facts needed by dependent tasks. Never record secrets.
-5. Mark the task done with `tw_set <task-path> workflow_state done` only when
-   the evidence in its acceptance criteria is present. If the prerequisite
-   cannot be completed, leave it blocked with `tw_set <task-path>
-   workflow_state blocked` and a reason.
+5. Write the result back to the map with `tw_write_section`, then mark the
+   task done with `tw_mark_done <task-path>` only when the evidence in its
+   acceptance criteria is present. If the prerequisite cannot be completed,
+   leave it blocked (`workflow_state: blocked`) with a reason.
 
 ## Completion evidence
 

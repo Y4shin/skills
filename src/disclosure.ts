@@ -64,7 +64,11 @@ export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "to-spec",
     takesTarget: false,
-    toolset: ["tw_get", "tw_list", "tw_set"],
+    // tw_set's replacement, swapped in the same commit that removed tw_set:
+    // without a private tool here the first open-set derivation throws (see
+    // signatureToolOf). Provisional; opener-gate-and-toolsets replaces the
+    // whole table.
+    toolset: ["tw_get", "tw_list", "tw_write_section", "tw_finalize_map"],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-tickets", "implement-ticket", "finalize-effort"],
   },
   {

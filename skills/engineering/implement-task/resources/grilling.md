@@ -10,9 +10,10 @@ Resolves a `type: grilling` task. This is a human-in-the-loop decision task.
 3. Include a concrete recommended answer with every question.
 4. Follow the decision tree: settle parent decisions before dependent choices.
 5. After each answer, update the task body with the decision and its newly
-   opened questions. Keep the map's `Decisions so far` index current.
+   opened questions. Keep the map's `Decisions so far` index current with
+   `tw_write_section`.
 6. Never answer for the user and never mark the task done (with
-   `tw_set <task-path> workflow_state done`) while required human decisions
+   `tw_mark_done <task-path>`) while required human decisions
    remain.
 7. When the question is settled, record the final decision, rejected options,
    constraints, and consequences for dependent tasks.
