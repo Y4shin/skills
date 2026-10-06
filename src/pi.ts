@@ -1768,7 +1768,31 @@ export function createTools(): Record<string, Tool> {
         if (reason !== null) {
           throw new Error(`cannot archive '${art.slug}': ${reason}`);
         }
+        // The archive precondition: an effort does not archive while a finding
+        // is undispositioned. The review artifact carries the findings and
+        // their dispositions; its writer sets dispositioned: true when every
+        // finding is resolved into a ticket, an accepted follow-up effort, or
+        // an explicit informational acceptance — the same
+        // producer-owns-the-check, consumer-owns-the-flag shape as
+        // ready_for_spec. A superseded (deprecated) review no longer blocks.
+        // The gate lives here, in the finalize-effort tooling, so the triage
+        // can complete inside the open phase: a refused archive still has the
+        // triage tools declared.
         const liveDir = join(taskRoot(root), effortKey);
+        const unDispositioned = scanMemo(root)().hits.filter(
+          (h) =>
+            isInside(liveDir, h.path) &&
+            h.art.type === "review" &&
+            h.art.status !== "deprecated" &&
+            h.art.data.dispositioned !== true,
+        );
+        if (unDispositioned.length > 0) {
+          throw new Error(
+            `cannot archive '${effortKey}': ${unDispositioned.map((h) => relative(root, h.path)).join(", ")} ` +
+              `carry undispositioned findings; disposition every finding (in-scope: an implementation ticket, ` +
+              `out-of-scope: a follow-up effort after a human yes, informational: accepted) before archiving`,
+          );
+        }
         const destDir = join(taskRoot(root), "archive", effortKey);
         if (existsSync(destDir)) {
           throw new Error(

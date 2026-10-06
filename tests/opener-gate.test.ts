@@ -11,7 +11,7 @@
  * opener refuse or open, and does a refusal name the legal next calls.
  */
 
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -144,6 +144,39 @@ beforeAll(() => {
       data: { type: "ticket", subtype: "bug", title: "Fix two", status: "stable", workflow_state: "done", blocked_by: ["fix-one"] },
     },
   });
+  // Finalizable efforts whose review artifact is the archive gate's subject:
+  // one with undispositioned findings, one fully dispositioned, one whose
+  // superseded review no longer blocks.
+  const doneTickets = (slugs: string[]) =>
+    Object.fromEntries(
+      slugs.map((slug, i) => [
+        `tickets/${slug}/ticket.md`,
+        {
+          data: {
+            type: "ticket", subtype: "feature", title: slug, status: "stable", workflow_state: "done",
+            blocked_by: i === 0 ? [] : [slugs[i - 1]!],
+          },
+        },
+      ]),
+    );
+  writeEffort("review-pending", {
+    "map.md": { data: { type: "map", title: "Review pending", ready_for_spec: true } },
+    "spec.md": { data: { type: "spec", title: "Review pending spec", status: "stable" } },
+    "review.md": { data: { type: "review", title: "Review pending review" } },
+    ...doneTickets(["done-a"]),
+  });
+  writeEffort("review-dispositioned", {
+    "map.md": { data: { type: "map", title: "Reviewed", ready_for_spec: true } },
+    "spec.md": { data: { type: "spec", title: "Reviewed spec", status: "stable" } },
+    "review.md": { data: { type: "review", title: "Reviewed review", dispositioned: true } },
+    ...doneTickets(["done-a"]),
+  });
+  writeEffort("review-superseded", {
+    "map.md": { data: { type: "map", title: "Superseded review", ready_for_spec: true } },
+    "spec.md": { data: { type: "spec", title: "Superseded review spec", status: "stable" } },
+    "review.md": { data: { type: "review", title: "Old review", status: "deprecated" } },
+    ...doneTickets(["done-a"]),
+  });
 });
 
 afterAll(() => {
@@ -172,6 +205,45 @@ interface ToolResult {
     disclosed?: string[];
   };
 }
+
+// ─── The finalize-effort archive gate: undispositioned findings ──────────────
+
+describe("the finalize-effort archive gate", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => {
+    tools = createTools();
+  });
+
+  test("refuses the archive move while a finding is undispositioned", async () => {
+    await expect(
+      tools.tw_archive_effort.execute({ selector: "review-pending" }, { directory: repo }),
+    ).rejects.toThrow(/undispositioned/);
+    await expect(
+      tools.tw_archive_effort.execute({ selector: "review-pending" }, { directory: repo }),
+    ).rejects.toThrow(/review\.md/);
+    // Nothing moved.
+    expect(existsSync(join(repo, "docs", "tasks", "review-pending", "map.md"))).toBe(true);
+    expect(existsSync(join(repo, "docs", "tasks", "archive", "review-pending"))).toBe(false);
+  });
+
+  test("archives when every finding is dispositioned", async () => {
+    const out = (await tools.tw_archive_effort.execute(
+      { selector: "review-dispositioned" },
+      { directory: repo },
+    )) as unknown as string;
+    expect(out).toContain("archived");
+    expect(existsSync(join(repo, "docs", "tasks", "archive", "review-dispositioned", "map.md"))).toBe(true);
+  });
+
+  test("a superseded (deprecated) review artifact no longer blocks the archive", async () => {
+    const out = (await tools.tw_archive_effort.execute(
+      { selector: "review-superseded" },
+      { directory: repo },
+    )) as unknown as string;
+    expect(out).toContain("archived");
+  });
+});
 
 // ─── The implementation gate: the architecture document ──────────────────────
 
