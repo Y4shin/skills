@@ -1488,7 +1488,7 @@ export function createTools(): Record<string, Tool> {
         "legacy arch-spec.md in the effort (the schema-5 migration renames it; new output is never the " +
         "legacy shape).",
       {
-        selector: Str("Effort slug, or the effort's architecture, spec, or map path"),
+        selector: Str("Effort slug, or the effort's architecture or map path"),
         content: Str("The architecture body (markdown after the frontmatter)"),
         title: OptStr("Title used only when the write creates the document"),
         publish: OptBool,
@@ -1547,6 +1547,21 @@ export function createTools(): Record<string, Tool> {
           );
         }
         const archPath = join(effortDir, "architecture.md");
+        // One living document per effort: a v5 architecture document the
+        // effort already holds elsewhere (the migration's multi-document
+        // rename corner) is a duplication to resolve, not to add to.
+        const duplicates = index.hits.filter(
+          (h) =>
+            isInside(effortDir, h.path) &&
+            h.art.type === "architecture" &&
+            resolvePath(h.path) !== resolvePath(archPath),
+        );
+        if (duplicates.length > 0) {
+          throw new Error(
+            `effort '${effortName}' already holds architecture document(s) elsewhere ` +
+              `(${duplicates.map((h) => relative(root, h.path)).join(", ")}): resolve the duplication before creating another one`,
+          );
+        }
         const title =
           typeof p.title === "string" && p.title.trim() !== ""
             ? p.title.trim()

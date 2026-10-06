@@ -1740,6 +1740,21 @@ describe("task-workflow tools: tw_write_architecture, the architecture writer", 
     rmSync(t, { recursive: true, force: true });
   });
 
+  test("refuses when the effort already holds an architecture document elsewhere", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    mkdirSync(join(t, "docs/tasks/specgate/nested"), { recursive: true });
+    writeMd(
+      join(t, "docs/tasks/specgate/nested/architecture.md"),
+      "type: architecture\ntitle: Nested\nstatus: stable\n",
+    );
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "specgate", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/architecture document/);
+    expect(existsSync(archPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
   test("adds the archival note to spec.md pointing at the architecture, deleting nothing", async () => {
     const t = mkTmp(); seedPlanningTree(t);
     const specBody = "\n# Spec gate\n\n## Architecture\n\nThe settled architecture content.\n\n## Decisions\n\n- One.\n";
