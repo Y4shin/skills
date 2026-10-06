@@ -1503,6 +1503,58 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
+    tw_record_out_of_scope: def(
+      "Record a consciously ruled-out request in the global out-of-scope knowledge base " +
+        "(docs/tasks/out-of-scope/<slug>.md) and update its index: the escape hatch that keeps a rejected ask " +
+        "from being re-debated. The note carries the request and the reason it was ruled out; the index lists " +
+        "one bullet per note, sorted by slug, and is created with the bundle's index frontmatter when missing. " +
+        "Refuses a duplicate slug, an empty request or reason (a rejection without a reason is not a record), " +
+        "and an unsafe slug.",
+      {
+        slug: Str("The note slug (the filename without .md)"),
+        title: Str("The note title (the request in a few words)"),
+        request: Str("The request that was ruled out"),
+        reason: Str("Why it was ruled out"),
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const slug = String(p.slug ?? "").trim();
+        if (!SAFE_SLUG.test(slug)) {
+          throw new Error(`invalid slug '${slug}': use lowercase letters, digits, and hyphens`);
+        }
+        const title = typeof p.title === "string" ? p.title.trim() : "";
+        if (title === "") throw new Error("title is empty: a note names the request");
+        const request = typeof p.request === "string" ? p.request.trim() : "";
+        if (request === "") throw new Error("request is empty: a note states the request it records");
+        const reason = typeof p.reason === "string" ? p.reason.trim() : "";
+        if (reason === "") throw new Error("reason is empty: a rejection without a reason is not a record");
+
+        const kbDir = join(taskRoot(root), "out-of-scope");
+        const notePath = join(kbDir, `${slug}.md`);
+        if (isFile(notePath)) {
+          throw new Error(`'${slug}' is already recorded in the out-of-scope KB: the same no is not recorded twice`);
+        }
+        const note: Document = {
+          data: { type: "out-of-scope note", title, status: "stable" },
+          body: `\n## Request\n\n${request}\n\n## Reason\n\n${reason}\n`,
+        };
+        mkdirSync(kbDir, { recursive: true });
+        writeFileSync(notePath, dump(note), "utf-8");
+
+        const indexPath = join(kbDir, "index.md");
+        const indexDoc: Document = isFile(indexPath)
+          ? parse(readFileSync(indexPath, "utf-8"))
+          : { data: { type: "out-of-scope note", title: "out-of-scope", status: "stable" }, body: "\n# out-of-scope\n" };
+        const existing = (readMapSection(indexDoc.body, "Notes") ?? []).filter((l) => l.trim() !== "");
+        const bullets = [...existing, `- [${title}](${slug}.md)`];
+        const slugOf = (line: string): string => /\]\((.+)\.md\)\s*$/.exec(line)?.[1] ?? line;
+        bullets.sort((a, b) => slugOf(a).localeCompare(slugOf(b)));
+        indexDoc.body = writeMapSection(indexDoc.body, "Notes", bullets.join("\n"));
+        writeFileSync(indexPath, dump(indexDoc), "utf-8");
+        return `recorded ${relative(root, notePath)} and updated ${relative(root, indexPath)}`;
+      },
+    ),
+
     tw_state: def(
       "Show the current workflow state (map and task pointers) from state.yaml.",
       {},

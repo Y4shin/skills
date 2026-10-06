@@ -207,6 +207,7 @@ describe("task-workflow tools", () => {
         "tw_mark_done",
         "tw_next",
         "tw_open",
+        "tw_record_out_of_scope",
         "tw_resolve_uncertainty",
         "tw_show",
         "tw_split_ticket",
@@ -2167,6 +2168,96 @@ describe("task-workflow tools: tw_write_changelog, the changelog writer", () => 
       tools.tw_write_changelog.execute({ slug: "x", title: "T", content: "C", date: "October 2" }, ctx(t)),
     ).rejects.toThrow(/date/);
     expect(existsSync(changelogPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_record_out_of_scope, the out-of-scope KB writer", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function kbDir(t: string): string {
+    return join(t, "docs/tasks/out-of-scope");
+  }
+
+  test("writes the note with the request and the reason, through the frontmatter seam", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const out = await tools.tw_record_out_of_scope.execute(
+      {
+        slug: "mainframe-port",
+        title: "Mainframe port",
+        request: "Port the CLI to OS/390.",
+        reason: "No user runs it there; the port cost exceeds the value.",
+      },
+      ctx(t),
+    );
+    expect(out).toContain("mainframe-port.md");
+    const doc = parse(readFileSync(join(kbDir(t), "mainframe-port.md"), "utf-8"));
+    expect(doc.data.type).toBe("out-of-scope note");
+    expect(doc.data.title).toBe("Mainframe port");
+    expect(doc.data.status).toBe("stable");
+    expect(doc.body).toBe("\n## Request\n\nPort the CLI to OS/390.\n\n## Reason\n\nNo user runs it there; the port cost exceeds the value.\n");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("updates the index with one bullet per note, sorted by slug", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(kbDir(t), "index.md"), "type: out-of-scope note\ntitle: out-of-scope\nstatus: stable\n", "\n# out-of-scope\n\n## Notes\n\n- [Zeta](zeta.md)\n");
+    await tools.tw_record_out_of_scope.execute(
+      { slug: "alpha", title: "Alpha", request: "R", reason: "Q" },
+      ctx(t),
+    );
+    await tools.tw_record_out_of_scope.execute(
+      { slug: "mid", title: "Mid", request: "R", reason: "Q" },
+      ctx(t),
+    );
+    const doc = parse(readFileSync(join(kbDir(t), "index.md"), "utf-8"));
+    expect(readMapSection(doc.body, "Notes")).toEqual([
+      "- [Alpha](alpha.md)",
+      "- [Mid](mid.md)",
+      "- [Zeta](zeta.md)",
+    ]);
+    // The index frontmatter survives the update.
+    expect(doc.data.type).toBe("out-of-scope note");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("creates the index when missing, with the bundle's index frontmatter", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_record_out_of_scope.execute(
+      { slug: "alpha", title: "Alpha", request: "R", reason: "Q" },
+      ctx(t),
+    );
+    const doc = parse(readFileSync(join(kbDir(t), "index.md"), "utf-8"));
+    expect(doc.data.type).toBe("out-of-scope note");
+    expect(doc.data.title).toBe("out-of-scope");
+    expect(doc.data.status).toBe("stable");
+    expect(readMapSection(doc.body, "Notes")).toEqual(["- [Alpha](alpha.md)"]);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a duplicate slug: the same no is not recorded twice", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_record_out_of_scope.execute({ slug: "alpha", title: "Alpha", request: "R", reason: "Q" }, ctx(t));
+    await expect(
+      tools.tw_record_out_of_scope.execute({ slug: "alpha", title: "Alpha again", request: "R2", reason: "Q2" }, ctx(t)),
+    ).rejects.toThrow(/already recorded/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty request or reason: a rejection without a reason is not a record", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_record_out_of_scope.execute({ slug: "x", title: "X", request: "  ", reason: "Q" }, ctx(t)),
+    ).rejects.toThrow(/request is empty/);
+    await expect(
+      tools.tw_record_out_of_scope.execute({ slug: "x", title: "X", request: "R", reason: "" }, ctx(t)),
+    ).rejects.toThrow(/reason is empty/);
+    await expect(
+      tools.tw_record_out_of_scope.execute({ slug: "Bad Slug", title: "X", request: "R", reason: "Q" }, ctx(t)),
+    ).rejects.toThrow(/invalid slug/);
+    expect(existsSync(kbDir(t))).toBe(false);
     rmSync(t, { recursive: true, force: true });
   });
 });
