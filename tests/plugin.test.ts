@@ -212,6 +212,7 @@ describe("task-workflow tools", () => {
         "tw_split_ticket",
         "tw_state",
         "tw_state_set",
+        "tw_write_changelog",
         "tw_write_section",
         "tw_write_spec",
       ]);
@@ -2065,6 +2066,107 @@ describe("task-workflow tools: tw_mark_blocked, the blocked marking for planning
     await expect(
       tools.tw_mark_blocked.execute({ selector: "legacy-decide", reason: "x" }, ctx(t)),
     ).rejects.toThrow(/schema-5 migration/);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_write_changelog, the changelog writer", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function changelogPath(t: string): string {
+    return join(t, "docs/tasks/CHANGELOG.md");
+  }
+
+  function writeChangelog(t: string, body: string): void {
+    writeMd(changelogPath(t), "type: changelog\ntitle: Task Changelog\n", body);
+  }
+
+  test("creates the changelog when missing, with conformant frontmatter", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const out = await tools.tw_write_changelog.execute(
+      { slug: "land-it", title: "Land it", content: "The ticket landed with the gate enforced.", date: "2026-10-02" },
+      ctx(t),
+    );
+    expect(out).toContain("CHANGELOG.md");
+    const doc = parse(readFileSync(changelogPath(t), "utf-8"));
+    expect(doc.data.type).toBe("changelog");
+    expect(doc.data.title).toBe("Task Changelog");
+    expect(doc.body).toContain("## 2026-10-02, Land it (land-it)");
+    expect(doc.body).toContain("The ticket landed with the gate enforced.");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("lands the new entry on top of the dated region, below any release block", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeChangelog(
+      t,
+      "\n# Task Changelog\n\n# task-workflow\n\n## 4.0.0\n\n### Major Changes\n\n- 5816b6b: The v4 overhaul.\n\n## 2026-09-29, Older entry (older-ticket)\n\nOlder.\n",
+    );
+    await tools.tw_write_changelog.execute(
+      { slug: "land-it", title: "Land it", content: "Newest.", date: "2026-10-02" },
+      ctx(t),
+    );
+    const body = parse(readFileSync(changelogPath(t), "utf-8")).body;
+    const release = body.indexOf("## 4.0.0");
+    const newEntry = body.indexOf("## 2026-10-02, Land it (land-it)");
+    const oldEntry = body.indexOf("## 2026-09-29, Older entry (older-ticket)");
+    expect(release).toBeLessThan(newEntry);
+    expect(newEntry).toBeLessThan(oldEntry);
+    // The release block survives untouched above the dated region.
+    expect(body).toContain("### Major Changes");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("appends the first entry after the heading when no dated region exists", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeChangelog(t, "\n# Task Changelog\n");
+    await tools.tw_write_changelog.execute(
+      { slug: "land-it", title: "Land it", content: "First.", date: "2026-10-02" },
+      ctx(t),
+    );
+    const body = parse(readFileSync(changelogPath(t), "utf-8")).body;
+    expect(body.indexOf("# Task Changelog")).toBeLessThan(body.indexOf("## 2026-10-02, Land it (land-it)"));
+    expect(body.trimEnd().endsWith("First.")).toBe(true);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("dates the entry today when no date is given", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_write_changelog.execute(
+      { slug: "land-it", title: "Land it", content: "Dated now." },
+      ctx(t),
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    expect(readFileSync(changelogPath(t), "utf-8")).toContain(`## ${today}, Land it (land-it)`);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a duplicate entry for the same slug", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeChangelog(t, "\n# Task Changelog\n\n## 2026-10-01, Land it (land-it)\n\nAlready recorded.\n");
+    await expect(
+      tools.tw_write_changelog.execute({ slug: "land-it", title: "Land it", content: "Again." }, ctx(t)),
+    ).rejects.toThrow(/already has an entry/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty slug, title, or content, and a malformed date", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_write_changelog.execute({ slug: "", title: "T", content: "C" }, ctx(t)),
+    ).rejects.toThrow(/invalid slug/);
+    await expect(
+      tools.tw_write_changelog.execute({ slug: "x", title: "  ", content: "C" }, ctx(t)),
+    ).rejects.toThrow(/title/);
+    await expect(
+      tools.tw_write_changelog.execute({ slug: "x", title: "T", content: "   " }, ctx(t)),
+    ).rejects.toThrow(/content is empty/);
+    await expect(
+      tools.tw_write_changelog.execute({ slug: "x", title: "T", content: "C", date: "October 2" }, ctx(t)),
+    ).rejects.toThrow(/date/);
+    expect(existsSync(changelogPath(t))).toBe(false);
     rmSync(t, { recursive: true, force: true });
   });
 });

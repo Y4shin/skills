@@ -1448,6 +1448,61 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
+    tw_write_changelog: def(
+      "Append a changelog entry to docs/tasks/CHANGELOG.md: the only writer of the changelog. The entry " +
+        "heading is '## <date>, <title> (<slug>)' and it lands on top of the dated-entry region (below any " +
+        "release block), so the newest entry reads first; the entry must reference its ticket slug, which is " +
+        "what the ticket done-marking checks. Creates the changelog with conformant frontmatter when missing. " +
+        "Refuses a duplicate entry for the same slug, an empty slug, title, or content, and a date outside " +
+        "YYYY-MM-DD.",
+      {
+        slug: Str("The ticket slug the entry records"),
+        title: Str("The entry title (usually the ticket title)"),
+        content: Str("The entry body: the key changes and decisions, and the outcome"),
+        date: OptStr("The entry date (YYYY-MM-DD); today when absent"),
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const slug = String(p.slug ?? "").trim();
+        if (!SAFE_SLUG.test(slug)) {
+          throw new Error(`invalid slug '${slug}': use lowercase letters, digits, and hyphens`);
+        }
+        const title = typeof p.title === "string" ? p.title.trim() : "";
+        if (title === "") throw new Error("title is empty: an entry names what landed");
+        const content = typeof p.content === "string" ? p.content.trim() : "";
+        if (content === "") throw new Error("content is empty: an entry states the changes and the outcome");
+        const date =
+          typeof p.date === "string" && p.date.trim() !== "" ? p.date.trim() : new Date().toISOString().slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          throw new Error(`invalid date '${date}': use YYYY-MM-DD`);
+        }
+        const heading = `## ${date}, ${title} (${slug})`;
+        const entryLines = [heading, "", ...content.split("\n")];
+
+        const changelogPath = join(taskRoot(root), "CHANGELOG.md");
+        const doc: Document = isFile(changelogPath)
+          ? parse(readFileSync(changelogPath, "utf-8"))
+          : { data: { type: "changelog", title: "Task Changelog" }, body: "\n# Task Changelog\n" };
+
+        const escaped = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        if (new RegExp(`^## .*\\(${escaped}\\)\\s*$`, "m").test(doc.body)) {
+          throw new Error(`the changelog already has an entry for '${slug}': one entry per landed ticket`);
+        }
+
+        const lines = doc.body.split("\n");
+        const firstDated = lines.findIndex((line) => /^## \d{4}-\d{2}-\d{2},/.test(line));
+        if (firstDated === -1) {
+          while (lines.length > 0 && lines[lines.length - 1].trim() === "") lines.pop();
+          doc.body = [...lines, "", ...entryLines, ""].join("\n");
+        } else {
+          lines.splice(firstDated, 0, "", ...entryLines, "");
+          doc.body = lines.join("\n");
+        }
+        writeFileSync(changelogPath, dump(doc), "utf-8");
+        return `wrote ${relative(root, changelogPath)}: ${heading}`;
+      },
+    ),
+
     tw_state: def(
       "Show the current workflow state (map and task pointers) from state.yaml.",
       {},
