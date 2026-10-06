@@ -1,12 +1,14 @@
 /**
  * Structural & grep tests for the text-based grilling skill and the
- * Wayfinder text resource. (The browser-visualized grilling-with-ui variant
+ * Wayfinder grilling resource. (The browser-visualized grilling-with-ui variant
  * and its CLI were dropped in the adopt-mp-skills-way map, grilling #1 Q15;
  * the seams that asserted them are removed.)
  *
  *  - skills/engineering/grilling/SKILL.md is the text-based skill (plain-text
- *    rounds, not ask_user_question), and skills/engineering/wayfinder/resources/
- *    grilling.md drives that text path.
+ *    rounds, not ask_user_question), and skills/engineering/wayfinder/
+ *    resources/grilling.md creates the task document and delegates every
+ *    session to that skill (wayfinder-reconcile-and-passes; the interview
+ *    method has one home).
  */
 
 import { readFileSync } from "node:fs";
@@ -41,12 +43,17 @@ describe("seam 2c - text-based grilling skill uses plain-text rounds, not the CL
 
 // ─── Seam 2d: wayfinder grilling.md drives the text path ─────────
 
-describe("seam 2d — wayfinder grilling.md drives the text path, not the CLI", () => {
+describe("seam 2d - wayfinder grilling.md delegates the method to the grilling skill", () => {
   const content = readFile("skills/engineering/wayfinder/resources/grilling.md");
 
-  test("asks one question at a time and does not answer for the user", () => {
-    expect(content).toMatch(/one question at a time/i);
-    expect(content).toMatch(/must not answer on[\s\S]*the user's behalf/i);
+  test("delegates every session to the grilling skill", () => {
+    expect(content).toMatch(/`grilling` skill/);
+  });
+
+  test("does not restate how questions are asked", () => {
+    expect(content).not.toMatch(/one question at a time/i);
+    expect(content).not.toMatch(/answer on[\s\S]*behalf/i);
+    expect(content).not.toMatch(/\bQ1\b/);
   });
 
   test("does not mention the CLI / visualizer", () => {

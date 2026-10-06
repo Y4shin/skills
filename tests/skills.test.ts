@@ -563,10 +563,14 @@ describe("skill cross-references", () => {
     expect(content).toContain("type");
     expect(content).toContain("resources/feature.md");
     expect(content).toContain("resources/bug.md");
-    expect(content).toContain("resources/research.md");
-    expect(content).toContain("resources/prototype.md");
-    expect(content).toContain("resources/grilling.md");
-    expect(content).toContain("resources/manual.md");
+    // The planning resources consolidate under wayfinder/resources (ticket
+    // wayfinder-reconcile-and-passes); the planning subtypes delegate to
+    // their standalone skills.
+    expect(content).toContain("wayfinder/resources/");
+    expect(content).not.toContain("implement-task/resources/research.md");
+    expect(content).not.toContain("implement-task/resources/prototype.md");
+    expect(content).not.toContain("implement-task/resources/grilling.md");
+    expect(content).not.toContain("implement-task/resources/manual.md");
     expect(content).toMatch(/absent.*feature|feature.*default|\btype:\s*feature\b/i);
   });
 
@@ -642,9 +646,9 @@ describe("skill cross-references", () => {
   });
 
   for (const resource of ["research", "prototype", "grilling", "manual"]) {
-    test(`implement-task ${resource} resource exists and is non-coding`, () => {
-      const content = readFile(`skills/engineering/implement-task/resources/${resource}.md`);
-      expect(content).toContain("Implement Task");
+    test(`the ${resource} planning resource lives under wayfinder and is non-coding`, () => {
+      const content = readFile(`skills/engineering/wayfinder/resources/${resource}.md`);
+      expect(content).toContain("Wayfinder Planning Resource");
       expect(content).toContain("Completion evidence");
     });
   }
@@ -1365,11 +1369,13 @@ describe("wayfinder planning resources v4", () => {
       const content = wayfinderFile(join("resources", `${subtype}.md`));
       const templates = extractFrontmatterTemplates(content);
       expect(templates.length).toBeGreaterThan(0);
-      for (const template of templates) {
-        expect(frontmatterKeys(template)).toContain("subtype");
-        expect(template).toMatch(new RegExp(`^subtype: ${subtype}$`, "m"));
-        assertTemplateConforms(template);
-      }
+      // The merged resources may carry other templates (findings); the task
+      // template is the one pinned to the subtype.
+      const taskTemplate = templates.find((t) => /^type: task$/m.test(t));
+      expect(taskTemplate, `${subtype} resource carries a type: task template`).toBeDefined();
+      expect(frontmatterKeys(taskTemplate!)).toContain("subtype");
+      expect(taskTemplate).toMatch(new RegExp(`^subtype: ${subtype}$`, "m"));
+      assertTemplateConforms(taskTemplate!);
     }
   });
 });
@@ -1442,6 +1448,29 @@ describe("wayfinder v5 (wayfinder-reconcile-and-passes)", () => {
   test("a done-marking clears the flag, so post-reconcile plan changes force one more pass", () => {
     expect(content).toMatch(/A done-marking clears\s+a set ready flag/i);
     expect(content).toMatch(/forces one more\s+pass/i);
+  });
+
+  test("planning resources consolidate under wayfinder/resources; the implement-task duplicates are gone", () => {
+    for (const subtype of ["research", "prototype", "grilling", "manual"]) {
+      expect(existsSync(join(PROJECT, `skills/engineering/wayfinder/resources/${subtype}.md`))).toBe(true);
+      expect(existsSync(join(PROJECT, `skills/engineering/implement-task/resources/${subtype}.md`))).toBe(false);
+    }
+  });
+
+  test("each planning resource carries the write-back pointer convention and the done-marking order", () => {
+    for (const subtype of ["research", "prototype", "grilling", "manual"]) {
+      const content = readFile(`skills/engineering/wayfinder/resources/${subtype}.md`);
+      expect(content).toMatch(/tw_write_section/);
+      expect(content).toMatch(/tw_mark_done\b/);
+      expect(content).toMatch(/stand-alone token/i);
+    }
+  });
+
+  test("the grilling resource creates the task document and delegates the method to the grilling skill", () => {
+    const content = readFile("skills/engineering/wayfinder/resources/grilling.md");
+    expect(content).toMatch(/`grilling` skill/);
+    expect(content).not.toMatch(/one question at a time/i);
+    expect(content).not.toMatch(/answer on[\s\S]*behalf/i);
   });
 });
 
@@ -1839,10 +1868,16 @@ describe("implement-task v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/legacy artifacts keep today's behavior|absent subtype defaults/i);
   });
 
-  test("dispatch names all six subtypes and routes each to its resource", () => {
-    for (const subtype of ["research", "prototype", "grilling", "manual", "feature", "bug"]) {
+  test("dispatch routes feature and bug to their resources and delegates the planning subtypes", () => {
+    for (const subtype of ["feature", "bug"]) {
       expect(content).toContain(`resources/${subtype}.md`);
     }
+    // Planning subtypes delegate to their standalone skills; manual runs the
+    // consolidated wayfinder resource (no standalone skill).
+    expect(content).toMatch(/`research` skill/i);
+    expect(content).toMatch(/`prototype` skill/i);
+    expect(content).toMatch(/`grilling` skill/i);
+    expect(content).toContain("wayfinder/resources/manual.md");
   });
 
   test("resolves artifacts through the resolver, with no hardcoded task-path template", () => {
@@ -2356,7 +2391,7 @@ describe("planning resources v4 touch (overhaul-execution-skills)", () => {
   test.each(["research", "prototype", "grilling", "manual"])(
     "%s marks the task done via the named done tool after the map write-back",
     (subtype) => {
-      const content = readFile(`skills/engineering/implement-task/resources/${subtype}.md`);
+      const content = readFile(`skills/engineering/wayfinder/resources/${subtype}.md`);
       expect(content).toMatch(/tw_write_section/);
       expect(content).toMatch(/tw_mark_done\b/);
       expect(content).not.toContain("tw_set");
@@ -2365,7 +2400,7 @@ describe("planning resources v4 touch (overhaul-execution-skills)", () => {
   );
 
   test("research captures findings in the task directory with frontmatter", () => {
-    const content = readFile("skills/engineering/implement-task/resources/research.md");
+    const content = readFile("skills/engineering/wayfinder/resources/research.md");
     expect(content).toMatch(/docs\/tasks\/<effort>\/tasks\/<task-slug>\/findings\.md/);
     const templates = extractFrontmatterTemplates(content);
     const findings = templates.find((t) => /^type: findings$/m.test(t));

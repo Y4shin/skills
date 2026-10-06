@@ -39,10 +39,10 @@ const subtype = tw_get(selector, "subtype") || tw_get(selector, "type") || "feat
 const mode = tw_get(selector, "mode")
 
 const resources = {
-  research: "resources/research.md",
-  prototype: "resources/prototype.md",
-  grilling: "resources/grilling.md",
-  manual: "resources/manual.md",
+  research: "skills/engineering/wayfinder/resources/research.md",
+  prototype: "skills/engineering/wayfinder/resources/prototype.md",
+  grilling: "skills/engineering/wayfinder/resources/grilling.md",
+  manual: "skills/engineering/wayfinder/resources/manual.md",
   feature: "resources/feature.md",
   bug: "resources/bug.md",
 }
@@ -72,29 +72,27 @@ routers.
 ## Skill delegation for planning subtypes
 
 Under the two-phase model, planning subtypes (research, prototype, grilling,
-manual) come from wayfinder; implementation subtypes (feature, bug) come from
-`to-tickets`. The per-subtype resources above remain the inline definition and
-fallback for each subtype. Where a standalone skill of the same name exists,
-the orchestrator MAY delegate to it instead of running the resource inline:
+manual) come from wayfinder, which works the planning frontier itself. The
+planning resources consolidate under `skills/engineering/wayfinder/resources/`:
+each one creates the task document and carries the write-back and done-marking
+steps. Where a standalone skill of the same name exists, delegate to it:
 
 - **`subtype: research`** -- delegate to the `research` skill (a background
   agent that investigates against primary sources and leaves cited Markdown).
-  Use this when the question benefits from a dedicated background agent; the
-  research resource is the inline fallback for smaller lookups.
 - **`subtype: prototype`** -- delegate to the `prototype` skill (throwaway
-  code that answers one design question, either a logic HTML file or
-  toggleable UI variants). Use this when the design question needs a concrete
-  artifact; the prototype resource is the inline fallback.
-- **`subtype: grilling`** and **`subtype: manual`** -- no standalone skill;
-  run the per-subtype resource inline as today.
+  code that answers one design question).
+- **`subtype: grilling`** -- delegate to the `grilling` skill, which owns the
+  interview method.
+- **`subtype: manual`** -- no standalone skill; run
+  `skills/engineering/wayfinder/resources/manual.md` inline.
 
 The artifact subtype and the skill **coexist**: the subtype is the planning
 artifact category (wayfinder creates it with acceptance criteria,
 `blocked_by`, etc.); the skill is the reusable discipline (the background-agent
 process, the throwaway-code conventions). Delegating to the skill does not
 replace the task document; the skill's output feeds back into the task's
-findings or notes, and the task is marked done when its acceptance criteria
-are met.
+findings or notes, and the task is marked done (through the resource's
+write-back and `tw_mark_done` steps) when its acceptance criteria are met.
 
 ## Effort frontier mode
 
