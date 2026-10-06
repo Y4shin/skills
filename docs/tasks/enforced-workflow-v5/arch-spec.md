@@ -469,6 +469,9 @@ of any of these.
 - `src/core/art.ts`: schema-5 types, legacy tolerance, map-section names.
 - `src/core/graph.ts`: `ready_for_spec` awareness (frontier, finalizability).
 - `src/core/migrate.ts`, `src/migrate-cli.ts`: v5 branch and reshape.
+- `src/disclosure.ts`: pure disclosure engine; `SKILL_REGISTRY` (toolsets
+  plus the symmetric conflicts table), open-set derivation keyed on
+  per-skill signature tools, union building and runtime validation.
 - `src/pi.ts`: named transition tools; opener/closer/next; toolset registry;
   guard; telemetry absorption; pack/unpack for archive and changelog.
 - `docs/migration-target.yaml`, `skills/engineering/setup-workflow/resources/upgrade-4-to-5.md`:
@@ -504,37 +507,82 @@ exports to the tickets that depend on it.
    Contract: v4 artifacts still parse; new producers write v5 only.
 3. **`planning-transition-tools`** exports `tw_write_section`,
    `tw_finalize_map`, and planning `tw_mark_done`, and removes `tw_set`.
-   Contract: `tw_finalize_map` sets `ready_for_spec: true` only when the
-   planning frontier is empty and both map sections are present and
-   non-empty with a success test; it is the only setter; plan edits clear the
-   flag.
+   As landed: `tw_write_section` is general over `##` section names (the two
+   schema-5 sections are the tested contract), because the settled
+   write-back amendment needs short statements plus pointers in
+   `## Decisions so far`; the `tw_mark_done` write-back precondition is a
+   slug-reference check (the map body must reference the task slug as a
+   stand-alone token), which fixes the write-back pointer convention;
+   planning `tw_mark_done` also clears a set `ready_for_spec`; all three v5
+   writers refuse v3-shape artifacts. A pure `writeMapSection` in
+   `src/core/art.ts` pairs with the existing `readMapSection`. Contract:
+   `tw_finalize_map` sets `ready_for_spec: true` only when the planning
+   frontier is empty and both map sections are present and non-empty with a
+   success test; it is the only setter; plan edits clear the flag.
 4. **`write-lockdown-guard`** exports a `tool_call` guard for `write`/`edit`
    under `docs/tasks/**`. Contract: independent of the active set; relative
    and absolute paths matched; `docs/bugs/**` and everything else allowed.
-5. **`migrate-v4-to-v5`** exports the v5 `detectVintage` branch and the
-   v4-to-5 reshape. Contract: idempotent, YAML-verified, failure leaves the
+5. **`migrate-v4-to-v5`** exports the v5 vintage detection and the
+   v4-to-5 reshape. As landed: `detectVintage` needed no new branch, the
+   stamp read already returns the version and a test pins
+   `report.from === 5`; `MigrateReport.to` is `5` and the CLI no-op message
+   names `schema_version 5`; an effort holding several architecture
+   documents renames each `arch-spec.md` to `architecture.md` in place
+   rather than hoisting (the single-doc case still lands at the effort
+   root). Contract: idempotent, YAML-verified, failure leaves the
    tree untouched, interrupted run resumes, archives covered, `state.yaml`
    stamped `schema_version: 5`.
 6. **`migration-target-and-upgrade-resource`** exports the schema-5
    `docs/migration-target.yaml` and `upgrade-4-to-5.md`. Contract:
-   `setup-workflow` routes a v4 repo to the new guide.
+   `setup-workflow` routes a v4 repo to the new guide. The guide must
+   describe the landed v5 output: a `MigrateReport.to` of `5` and the CLI
+   no-op message naming `schema_version 5`, plus the rename behavior for an
+   effort holding several architecture documents (each renamed to
+   `architecture.md` in place, the single-doc case at the effort root).
 7. **`implementation-transition-tools`** exports `tw_write_spec`,
    `tw_add_ticket`, `tw_split_ticket`, ticket `tw_mark_done`, the changelog
-   writer, `tw_record_out_of_scope`, and the archive move. Contract: every
+   writer, `tw_record_out_of_scope`, and the archive move. It owns the
+   ticket half of `tw_mark_done` (the planning half refuses tickets with a
+   message naming its scope) and restores the interim named-writer gaps:
+   ticket done-marking, spec `status: stable`, archive deprecation, and
+   marking a planning task blocked. Its writers follow the landed planning
+   writers' refusal of v3-shape artifacts. Contract: every
    remaining workflow write is covered; no legitimate step needs `bash` on
-   the tree.
+   the tree; each registered tool keeps the registry's private
+   signature-tool constraint intact.
 8. **`disclosure-open-close-core`** exports `tw_open`, `tw_close`, `tw_next`,
    the gated registration (`exposure: "direct"`, `defaultActive: false`), the
    discriminated union, the symmetric exclusivity table, the two-state
    declared set, the nested-open integration test, and telemetry absorption.
-   Contract: `tw_open` refuses duplicates and conflicts; `tw_close` names its
+   As landed: the engine lives in a new pure module `src/disclosure.ts`
+   (`SKILL_REGISTRY` with toolsets and the symmetric `conflicts` table,
+   `openSkillsIn`/`signatureToolOf`, `buildOpenParameters`,
+   `validateOpenArgs`, `duplicateReason`/`conflictReason`, and the
+   `ALWAYS_DECLARED`/`CLOSER` constants), while `src/pi.ts` gains the three
+   structured tools, the gated registration, and transcript restore on
+   resume/fork. The open set is derived from the active tool set, so every
+   registry entry must keep a private signature tool no other entry contains
+   (`signatureToolOf` throws otherwise). Refusals return a `reason` plus the
+   currently-open set; `legal_next` is ticket 9's deliverable. The registry
+   toolsets are provisional until tickets 9 and 14 replace them. Contract:
+   `tw_open` refuses duplicates and conflicts; `tw_close` names its
    skill and removes only unneeded tools; `tw_next` is always declared.
 9. **`opener-gate-and-toolsets`** exports the per-phase preconditions and
    per-skill toolsets. Contract: a refused open activates nothing and returns
-   `legal_next`; the phase-to-toolset table is the single registry.
+   `legal_next`; the phase-to-toolset table is the single registry. This
+   ticket replaces the provisional `SKILL_REGISTRY` toolsets left by
+   disclosure-open-close-core with the real phase-to-toolset table and owns
+   `legal_next` on refusals; every entry it lands must keep a private
+   signature tool no other entry contains, or the open-set derivation
+   throws.
 10. **`wayfinder-reconcile-and-passes`** exports the absorbed planning phase.
     Contract: one frontier snapshot, at most one grilling, reconcile through
-    `tw_finalize_map`, resources under `wayfinder/resources`.
+    `tw_finalize_map`, resources under `wayfinder/resources`. The resources
+    must instruct the write-back pointer in the slug-reference shape (the
+    map body must reference the task slug as a stand-alone token or
+    `tw_mark_done` refuses) and use the general `tw_write_section` for
+    `## Decisions so far`; a done-marking clears `ready_for_spec`, so any
+    post-reconcile reopen forces one more pass.
 11. **`to-tickets-architecture`** exports the architecture-plus-tickets
     phase. Contract: `arch-spec.md`/`architecture.md` is produced from the
     spec's architecture content plus exports, seams, and contracts.
@@ -589,8 +637,13 @@ assert the internal shape of a helper.
   the disclosure ticket.
 - **The write guard is best-effort against a determined shell.** The residual
   risk is accepted and documented; no ticket attempts a sound shell gate.
-- **`ready_for_spec` auto-clear must cover every plan writer.** The
-  transition-tool tickets own that list; a missed writer is a stale flag.
+- **`ready_for_spec` auto-clear must cover every plan writer.** Planning
+  `tw_mark_done` already clears the flag; `implementation-transition-tools`
+  owns the remaining writers; a missed writer is a stale flag.
+- **The open-set derivation keys on signature tools.** Two skills whose
+  toolsets overlap fully cannot both be modeled; tickets 9 and 14 must keep
+  one private tool per skill or revisit the derivation (the throw makes the
+  constraint visible, not silent).
 - **This effort runs in v4 mode.** The v5 openers and gates do not exist
   during implementation, so the ticket pipeline and the current skills run
   against the v4 tree until the relevant tickets land.
