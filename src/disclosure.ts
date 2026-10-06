@@ -34,66 +34,110 @@ export interface SkillEntry {
 }
 
 /**
- * The skill registry.
- *
- * The toolsets are provisional: opener-gate-and-toolsets owns the real
- * per-skill table (and skill-creator-nested-toolset the real skill-creator
- * toolset). The provisional entries keep every existing workflow tool
- * reachable and give each skill a private tool, which the open-set
- * derivation requires to stay exact (see signatureToolOf).
+ * The skill registry: one table, skill to toolset plus skill to gate. It is
+ * the single source of the phase toolsets and of the opener's preconditions
+ * (which gate applies); the gate evaluation itself reads the artifact tree in
+ * src/pi.ts through the art.ts/graph.ts seams. The toolsets below disclose
+ * every registered workflow tool exactly where the workflow uses it, and
+ * every entry keeps one private signature tool, which the open-set
+ * derivation requires (see signatureToolOf).
  */
 export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "intake",
     takesTarget: false,
-    toolset: ["tw_state", "tw_state_set"],
+    // The front door: it surveys existing efforts for duplicates and links,
+    // creates the effort, and adds the bug ticket a bug report becomes.
+    // tw_state_set is its signature tool.
+    toolset: ["tw_state", "tw_state_set", "tw_list", "tw_get", "tw_add_ticket"],
     conflicts: ["setup-workflow", "wayfinder", "to-spec", "to-tickets", "implement-ticket", "finalize-effort"],
   },
   {
     name: "setup-workflow",
     takesTarget: false,
+    // Bootstrap and migration: it reads the tree and the artifact schema and
+    // runs the migration CLI through the shell. tw_context is its signature
+    // tool.
     toolset: ["tw_context", "tw_get", "tw_list"],
     conflicts: ["intake", "wayfinder", "to-spec", "to-tickets", "implement-ticket", "finalize-effort"],
   },
   {
     name: "wayfinder",
     takesTarget: false,
-    toolset: ["tw_list", "tw_frontier", "tw_dependency_levels", "tw_get"],
+    // The planning phase: works the planning frontier, writes results back
+    // through the map-section writer, marks planning tasks done and blocked,
+    // records deferred work in the out-of-scope KB, and runs the reconcile,
+    // which sets ready_for_spec through tw_finalize_map. tw_write_section is
+    // its signature tool.
+    toolset: [
+      "tw_write_section",
+      "tw_finalize_map",
+      "tw_frontier",
+      "tw_mark_done",
+      "tw_mark_blocked",
+      "tw_record_out_of_scope",
+      "tw_get",
+      "tw_list",
+    ],
     conflicts: ["intake", "setup-workflow", "to-spec", "to-tickets", "implement-ticket", "finalize-effort"],
   },
   {
     name: "to-spec",
     takesTarget: false,
-    // tw_set's replacement, swapped in the same commit that removed tw_set:
-    // without a private tool here the first open-set derivation throws (see
-    // signatureToolOf). Provisional; opener-gate-and-toolsets replaces the
-    // whole table.
-    toolset: ["tw_get", "tw_list", "tw_write_section", "tw_finalize_map"],
+    // The spec phase: synthesizes the specification from the settled record
+    // and writes it through the spec writer. tw_write_spec is its signature
+    // tool.
+    toolset: ["tw_write_spec", "tw_get", "tw_list"],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-tickets", "implement-ticket", "finalize-effort"],
   },
   {
     name: "to-tickets",
     takesTarget: false,
-    toolset: ["tw_get", "tw_list", "tw_map_finalizable"],
+    // The ticket-graph phase: creates tickets, splits oversized ones, wires
+    // and verifies the dependency levels, and reads the settled spec and map.
+    // tw_map_finalizable rides as the entry's private tool (the open-set
+    // derivation needs one no other entry contains) until the architecture
+    // writer lands in to-tickets-architecture and becomes the natural
+    // signature.
+    toolset: ["tw_add_ticket", "tw_split_ticket", "tw_dependency_levels", "tw_map_finalizable", "tw_get", "tw_list"],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-spec", "implement-ticket", "finalize-effort"],
   },
   {
     name: "implement-ticket",
     takesTarget: true,
-    toolset: ["tw_get", "tw_list", "tw_resolve_uncertainty"],
+    // The implementation phase: owns the ticket frontier and levels, creates
+    // and splits tickets, marks tickets done (after the changelog entry),
+    // resolves uncertainties, and writes the per-ticket changelog entry.
+    // tw_write_changelog is its signature tool.
+    toolset: [
+      "tw_frontier",
+      "tw_dependency_levels",
+      "tw_add_ticket",
+      "tw_split_ticket",
+      "tw_mark_done",
+      "tw_mark_blocked",
+      "tw_write_changelog",
+      "tw_resolve_uncertainty",
+      "tw_get",
+      "tw_list",
+    ],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-spec", "to-tickets", "finalize-effort"],
   },
   {
     name: "finalize-effort",
     takesTarget: false,
-    toolset: ["tw_get", "tw_list", "tw_finalizable"],
+    // The effort close: runs the holistic review, triages findings into
+    // tickets in the current effort, and performs the archive move.
+    // tw_archive_effort is its signature tool.
+    toolset: ["tw_add_ticket", "tw_finalizable", "tw_archive_effort", "tw_get", "tw_list"],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-spec", "to-tickets", "implement-ticket"],
   },
   {
     name: "skill-creator",
     takesTarget: false,
-    // Provisional: skill-creator-nested-toolset replaces this with the
-    // toolset built from the bundled scripts.
+    // Provisional until skill-creator-nested-toolset registers the bundled
+    // scripts and replaces this entry: tw_show keeps the private signature
+    // tool the open-set derivation requires.
     toolset: ["tw_show"],
     conflicts: [],
   },

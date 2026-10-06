@@ -49,8 +49,42 @@ const GATED_WORKFLOW_TOOLS = [
 /** The declared set idle: exactly the dispatcher pair on the workflow surface. */
 const IDLE_WORKFLOW = ["tw_open", "tw_next"];
 
+/**
+ * A fixture effort the opener's gate can resolve: map with the flag set, a
+ * stable spec, a stable architecture document, and a ready plus a done
+ * ticket, so every phase open (including the target-carrying ticket open)
+ * passes.
+ */
+function fixtureFiles(): Record<string, string> {
+  const fm = (data: Record<string, unknown>): string =>
+    `---\n${Object.entries(data)
+      .map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
+      .join("\n")}\n---\n`;
+  return {
+    "docs/tasks/some-effort/map.md": fm({ type: "map", title: "Some effort", ready_for_spec: true }),
+    "docs/tasks/some-effort/spec.md": fm({ type: "spec", title: "Some effort spec", status: "stable" }),
+    "docs/tasks/some-effort/arch-spec.md": fm({ type: "arch spec", title: "Some effort architecture", status: "stable" }),
+    "docs/tasks/some-effort/tickets/a-ticket/ticket.md": fm({
+      type: "ticket",
+      subtype: "feature",
+      title: "A ticket",
+      status: "stable",
+      workflow_state: "ready",
+      blocked_by: [],
+    }),
+    "docs/tasks/some-effort/tickets/a-done-ticket/ticket.md": fm({
+      type: "ticket",
+      subtype: "feature",
+      title: "A done ticket",
+      status: "stable",
+      workflow_state: "done",
+      blocked_by: [],
+    }),
+  };
+}
+
 function disclosureSession(): Promise<TaskSession> {
-  return createTaskSession({ extensions: [taskWorkflow, createToolSearchExtension()] });
+  return createTaskSession({ extensions: [taskWorkflow, createToolSearchExtension()], projectFiles: fixtureFiles() });
 }
 
 describe("disclosure core: the three-way flip", () => {
@@ -84,10 +118,10 @@ describe("disclosure core: the three-way flip", () => {
     await s.session.prompt("Open wayfinder.");
 
     const opened = s.session.getActiveToolNames();
-    for (const name of ["tw_close", "tw_frontier", "tw_list", "tw_dependency_levels", "tw_get"]) {
+    for (const name of ["tw_close", "tw_frontier", "tw_list", "tw_write_section", "tw_get"]) {
       expect(opened, `${name} must be declared once wayfinder is open`).toContain(name);
     }
-    for (const name of ["tw_show", "tw_state", "tw_finalize_map", "tw_finalizable"]) {
+    for (const name of ["tw_show", "tw_state", "tw_dependency_levels", "tw_finalizable"]) {
       expect(opened, `${name} belongs to no open skill`).not.toContain(name);
     }
 
@@ -185,7 +219,7 @@ describe("disclosure core: nested opens", () => {
 
 describe("disclosure core: transcript persistence", () => {
   test("open state survives /tree navigation via the transcript restore path", async () => {
-    const s = await createTaskSession({ extensions: [taskWorkflow], persisted: true });
+    const s = await createTaskSession({ extensions: [taskWorkflow], persisted: true, projectFiles: fixtureFiles() });
     sessions.push(s);
 
     s.setResponses([reply([call("tw_open", { skill: "wayfinder", effort: "some-effort" })])]);
@@ -215,7 +249,11 @@ describe("disclosure core: transcript persistence", () => {
   });
 
   test("open state survives resume via the transcript restore path", async () => {
-    const s1 = await createTaskSession({ extensions: [taskWorkflow], persisted: true });
+    const s1 = await createTaskSession({
+      extensions: [taskWorkflow],
+      persisted: true,
+      projectFiles: fixtureFiles(),
+    });
     s1.setResponses([reply([call("tw_open", { skill: "wayfinder", effort: "some-effort" })])]);
     await s1.session.prompt("Open wayfinder.");
     const file = s1.session.sessionFile;
@@ -233,7 +271,7 @@ describe("disclosure core: transcript persistence", () => {
     sessions.push(s2);
 
     const resumed = s2.session.getActiveToolNames();
-    for (const name of ["tw_close", "tw_frontier", "tw_list", "tw_dependency_levels", "tw_get"]) {
+    for (const name of ["tw_close", "tw_frontier", "tw_list", "tw_write_section", "tw_get"]) {
       expect(resumed, `${name} must be restored from the transcript on resume`).toContain(name);
     }
     // And the restored set is live: a gated tool really executes.
@@ -259,6 +297,7 @@ describe("disclosure core: telemetry absorption", () => {
     const s = await createTaskSession({
       extensions: [taskWorkflow],
       customTools: [fakeTelemetry],
+      projectFiles: fixtureFiles(),
     });
     sessions.push(s);
 
@@ -292,7 +331,11 @@ describe("disclosure core: telemetry absorption", () => {
         return { content: [{ type: "text", text: "recorded" }], details: {} };
       },
     };
-    const s = await createTaskSession({ extensions: [taskWorkflow], customTools: [fakeTelemetry] });
+    const s = await createTaskSession({
+      extensions: [taskWorkflow],
+      customTools: [fakeTelemetry],
+      projectFiles: fixtureFiles(),
+    });
     sessions.push(s);
 
     s.setResponses([reply([call("tw_open", { skill: "wayfinder", effort: "some-effort" })])]);

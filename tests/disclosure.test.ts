@@ -8,17 +8,43 @@
  * integration tests in tests/integration/disclosure.test.ts.
  */
 
-import { beforeAll, describe, expect, test } from "vitest";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
+import { dump } from "../src/core/frontmatter.js";
 import { createTools } from "../src/pi.js";
 
 /** The idle declared set: what registration leaves active before any open. */
 const IDLE = ["tw_open", "tw_next"];
 
+let repo: string;
+
+beforeAll(() => {
+  // The opener reads the artifact tree (the gate lives in the same call as
+  // the disclosure), so the fake session context needs a real fixture tree
+  // with the efforts these tests open.
+  repo = join(tmpdir(), `disclosure-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
+  for (const slug of ["e", "some-effort"]) {
+    const map = join(repo, "docs", "tasks", slug, "map.md");
+    mkdirSync(dirname(map), { recursive: true });
+    writeFileSync(
+      map,
+      dump({ data: { type: "map", title: `Fixture ${slug}`, ready_for_spec: true }, body: "\n" }),
+      "utf-8",
+    );
+  }
+});
+
+afterAll(() => {
+  rmSync(repo, { recursive: true, force: true });
+});
+
 /** A tool context with an in-memory active set standing in for the session. */
 function disclosureCtx(active: string[]) {
   return {
-    directory: "/tmp/disclosure-test",
+    directory: repo,
     getActiveTools: () => [...active],
     setActiveTools: (names: string[]) => {
       active.splice(0, active.length, ...names);
@@ -46,21 +72,21 @@ describe("disclosure core: tw_open", () => {
     expect(result.details).toMatchObject({ opened: true, skill: "wayfinder" });
     // The declared set is now the open skill's toolset plus the dispatcher
     // trio; every gated workflow tool that stayed closed is still absent.
+    // (The toolsets come from the opener-gate-and-toolsets registry.)
     expect(active).toContain("tw_close");
     expect(active).toContain("tw_open");
     expect(active).toContain("tw_next");
-    for (const tool of ["tw_frontier", "tw_list", "tw_dependency_levels"]) {
+    for (const tool of ["tw_frontier", "tw_list", "tw_write_section", "tw_finalize_map", "tw_mark_done"]) {
       expect(active, `${tool} must be declared once wayfinder is open`).toContain(tool);
     }
-    for (const tool of ["tw_show", "tw_state", "tw_resolve_uncertainty", "tw_finalizable"]) {
+    for (const tool of ["tw_show", "tw_state", "tw_resolve_uncertainty", "tw_finalizable", "tw_dependency_levels"]) {
       expect(active, `${tool} belongs to no open skill and stays undeclared`).not.toContain(tool);
     }
   });
 
-  test("opening to-spec discloses the swapped-in planning writers and derives from the new signature", async () => {
-    // to-spec's provisional toolset gained tw_write_section/tw_finalize_map in
-    // the same commit that removed tw_set: without a private tool there the
-    // first open-set derivation throws (see signatureToolOf).
+  test("opening to-spec discloses the spec writer and derives from the new signature", async () => {
+    // The opener-gate-and-toolsets registry gives to-spec the spec writer and
+    // moves the planning writers to wayfinder, where the write-backs live.
     const active = [...IDLE];
     const ctx = disclosureCtx(active);
     const result = (await tools.tw_open.execute(
@@ -68,16 +94,16 @@ describe("disclosure core: tw_open", () => {
       ctx,
     )) as ToolResult;
     expect(result.details.opened).toBe(true);
-    for (const tool of ["tw_write_section", "tw_finalize_map", "tw_get", "tw_list", "tw_close"]) {
+    for (const tool of ["tw_write_spec", "tw_get", "tw_list", "tw_close"]) {
       expect(active, `${tool} must be declared once to-spec is open`).toContain(tool);
     }
     // The open-set derivation keys on the signature tool: with to-spec's
-    // writers active, the router names to-spec as the open skill.
+    // writer active, the router names to-spec as the open skill.
     const next = (await tools.tw_next.execute({}, ctx)) as ToolResult;
     expect(next.text).toContain("to-spec");
     await tools.tw_close.execute({ skill: "to-spec" }, ctx);
     expect(active).toEqual(expect.arrayContaining([...IDLE]));
-    for (const tool of ["tw_close", "tw_write_section", "tw_finalize_map", "tw_get", "tw_list"]) {
+    for (const tool of ["tw_close", "tw_write_spec", "tw_get", "tw_list"]) {
       expect(active, `${tool} must leave the declared set when to-spec closes`).not.toContain(tool);
     }
   });
@@ -169,7 +195,7 @@ describe("disclosure core: tw_open", () => {
     expect(active).not.toContain("tw_show");
     // The still-open phase keeps its own tools, and tw_close stays declared
     // because a skill is still open.
-    for (const tool of ["tw_frontier", "tw_list", "tw_dependency_levels", "tw_get", "tw_close", "tw_open", "tw_next"]) {
+    for (const tool of ["tw_frontier", "tw_list", "tw_write_section", "tw_get", "tw_close", "tw_open", "tw_next"]) {
       expect(active, `${tool} must survive closing the nested skill`).toContain(tool);
     }
   });
@@ -183,7 +209,7 @@ describe("disclosure core: tw_open", () => {
     // The workflow part of the declared set is idle again: no toolset, no
     // closer, exactly the dispatcher pair.
     expect(active).toEqual(expect.arrayContaining(["tw_open", "tw_next"]));
-    for (const tool of ["tw_close", "tw_frontier", "tw_list", "tw_dependency_levels", "tw_get"]) {
+    for (const tool of ["tw_close", "tw_frontier", "tw_list", "tw_write_section", "tw_get"]) {
       expect(active).not.toContain(tool);
     }
   });

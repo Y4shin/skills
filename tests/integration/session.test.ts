@@ -118,7 +118,9 @@ describe("tool dispatch and filesystem round-trip", () => {
 
   test("tw_dependency_levels returns levels", async () => {
     const s = await session();
-    await openSkill(s, "wayfinder");
+    // Dependency levels are the ticket-graph and implementation phases' tools
+    // now; wayfinder's toolset carries the planning frontier instead.
+    await openSkill(s, "to-tickets");
     s.setResponses([
       reply([call("tw_dependency_levels", { selector: "auth" })]),
       (ctx: Context) => reply(latestToolResultText(ctx, "tw_dependency_levels") ?? "?"),

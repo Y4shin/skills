@@ -200,6 +200,12 @@ export async function createTaskSession(options: TaskSessionOptions = {}): Promi
 
 
 export function seedTaskTree(cwd: string): void {
+  // A v4 effort the opener's gate resolves: the phase opens carry this slug.
+  mkdirSync(join(cwd, "docs/tasks/test-effort"), { recursive: true });
+  writeFileSync(
+    join(cwd, "docs/tasks/test-effort/map.md"),
+    "---\ntype: map\ntitle: Test effort\nstatus: stable\n---\n",
+  );
   mkdirSync(join(cwd, "docs/tasks/login/slices"), { recursive: true });
   writeFileSync(
     join(cwd, "docs/tasks/login/task.md"),
