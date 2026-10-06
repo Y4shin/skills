@@ -58,6 +58,7 @@ const GATED_NAMES = [
   "tw_state",
   "tw_state_set",
   "tw_context",
+  "tw_write_section",
   "notify_user",
 ];
 

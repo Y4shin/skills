@@ -20,7 +20,7 @@ import { Type, type TSchema } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
-import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
+import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, writeMapSection, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
 import {
   CLOSER,
   buildOpenParameters,
@@ -618,6 +618,30 @@ async function recordSkillTelemetry(
   }
 }
 
+// ─── Planning transition helpers ────────────────────────────────────────────
+
+/**
+ * The v5 named writers write schema-5 shape only. A v3-shape artifact goes
+ * through the one-hop migration first: bolting v5 fields onto a v3 file
+ * would create a hybrid shape the model does not define.
+ */
+function requireV4Shape(art: Artifact): void {
+  if (art.shape === "v3") {
+    throw new Error(`'${art.slug}' is a v3-shape artifact; run the schema-5 migration before using the v5 writers`);
+  }
+}
+
+/**
+ * Clear the map's ready_for_spec flag on a planning write. Only a present
+ * `true` is rewritten: absent and explicit false already read false, so the
+ * frontmatter keeps its minimal shape. Returns whether the document changed.
+ */
+function clearReadyForSpec(doc: Document): boolean {
+  if (doc.data.ready_for_spec !== true) return false;
+  doc.data.ready_for_spec = false;
+  return true;
+}
+
 // ─── Tool factory ──────────────────────────────────────────────────────────────
 
 interface Tool {
@@ -846,6 +870,32 @@ export function createTools(): Record<string, Tool> {
         const undone = tasks.filter((t: any) => !t.done).map((t: any) => t.slug || "?");
         if (undone.length === 0) return "ready to finalize: all children done";
         throw new Error(`unfinished children: ${undone.join(", ")}`);
+      },
+    ),
+
+    tw_write_section: def(
+      "Write a '##' body section of an effort map: the only writer of the map body. " +
+        "Carries '## Non-goals' and '## Non-negotiable facts', whose first line is the bolded effort-level " +
+        "success test. Every write clears ready_for_spec, so a post-reconcile map change forces one more " +
+        "Wayfinder pass.",
+      {
+        selector: Str("Map slug or path"),
+        section: Str("The '##' heading name, without the marks"),
+        content: Str("The section body; an empty string seeds an empty placeholder"),
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const { path, art, doc } = resolveArt(root, p.selector, "map");
+        requireV4Shape(art);
+        const section = typeof p.section === "string" ? p.section.trim() : "";
+        if (section === "") throw new Error("section name is empty");
+        if (/\n/.test(section)) {
+          throw new Error(`section name '${section.replace(/\n.*/s, "")}' must be a single '##' heading name`);
+        }
+        doc.body = writeMapSection(doc.body, section, typeof p.content === "string" ? p.content : "");
+        const cleared = clearReadyForSpec(doc);
+        writeFileSync(path, dump(doc), "utf-8");
+        return `wrote '## ${section}' in ${relative(root, path)}${cleared ? "; ready_for_spec cleared" : ""}`;
       },
     ),
 

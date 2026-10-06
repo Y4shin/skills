@@ -8,6 +8,12 @@ import { dirname, join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
 import YAML from "yaml";
 import { createTools } from "../src/pi.js";
+import { parse } from "../src/core/frontmatter.js";
+import {
+  MAP_SECTION_NON_GOALS,
+  MAP_SECTION_NON_NEGOTIABLE_FACTS,
+  readMapSection,
+} from "../src/core/art.js";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 
@@ -201,6 +207,7 @@ describe("task-workflow tools", () => {
         "tw_show",
         "tw_state",
         "tw_state_set",
+        "tw_write_section",
       ]);
     });
 
@@ -1045,5 +1052,161 @@ describe("task-workflow tools: v4 effort-grouped tree", () => {
         tools.tw_show.execute({ selector: join(t, "docs/tasks/billing/tickets/raw/ticket.md") }, ctx(t)),
       ).rejects.toThrow(/not a recognised artifact/);
     });
+  });
+});
+
+// ─── Planning transition writers (schema 5) ──────────────────────────────────
+
+/**
+ * The v4 effort fixture the planning writers run against: a map carrying the
+ * schema-5 section placeholders (empty, as intake seeds them) and one open
+ * planning task, so the finalize gate has a frontier to refuse on.
+ */
+function seedPlanningTree(t: string, frontmatter = "type: map\ntitle: Spec gate\nstatus: stable\n"): void {
+  const base = join(t, "docs/tasks");
+  writeMd(
+    join(base, "specgate/map.md"),
+    frontmatter,
+    "\n# Spec gate\n\n## Destination\n\nThe gate is mechanical.\n\n## Non-goals\n\n## Non-negotiable facts\n",
+  );
+  writeMd(
+    join(base, "specgate/tasks/decide/task.md"),
+    "type: task\nsubtype: grilling\ntitle: Decide\nstatus: stable\nworkflow_state: todo\nblocked_by: []\n",
+  );
+}
+
+/** The map file of the planning fixture, re-read from disk. */
+function specGateMap(t: string): string {
+  return readFileSync(join(t, "docs/tasks/specgate/map.md"), "utf-8");
+}
+
+/** Flip the fixture map's flag to the reconciled state. */
+function setReadyForSpec(t: string, value: boolean): void {
+  const text = specGateMap(t);
+  writeFileSync(
+    join(t, "docs/tasks/specgate/map.md"),
+    text.replace("status: stable", `status: stable\nready_for_spec: ${value}`),
+    "utf-8",
+  );
+}
+
+describe("task-workflow tools: tw_write_section, the map-section writer", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  test("writes ## Non-goals into the empty placeholder and preserves the frontmatter", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const out = await tools.tw_write_section.execute(
+      { selector: "specgate", section: MAP_SECTION_NON_GOALS, content: "- No dark mode.\n- No theming." },
+      ctx(t),
+    );
+    expect(out).toContain("Non-goals");
+    const doc = parse(specGateMap(t));
+    expect(readMapSection(doc.body, MAP_SECTION_NON_GOALS)).toEqual(["- No dark mode.", "- No theming."]);
+    // The write goes through the frontmatter seam: the fields survive.
+    expect(doc.data.type).toBe("map");
+    expect(doc.data.title).toBe("Spec gate");
+    // An absent flag stays absent: the minimal frontmatter shape.
+    expect(doc.data).not.toHaveProperty("ready_for_spec");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("writes ## Non-negotiable facts including the success test line", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_write_section.execute(
+      {
+        selector: "specgate",
+        section: MAP_SECTION_NON_NEGOTIABLE_FACTS,
+        content: "**Success test:** the gate refuses in a fixture tree.\n\n- The schema stays additive.",
+      },
+      ctx(t),
+    );
+    const doc = parse(specGateMap(t));
+    const facts = readMapSection(doc.body, MAP_SECTION_NON_NEGOTIABLE_FACTS);
+    expect(facts![0]).toMatch(/^\*\*Success test:\*\*/);
+    expect(facts).toContain("- The schema stays additive.");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("replaces an existing section's content on a rewrite", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_write_section.execute(
+      { selector: "specgate", section: MAP_SECTION_NON_GOALS, content: "- First take." },
+      ctx(t),
+    );
+    await tools.tw_write_section.execute(
+      { selector: "specgate", section: MAP_SECTION_NON_GOALS, content: "- Second take." },
+      ctx(t),
+    );
+    const doc = parse(specGateMap(t));
+    expect(readMapSection(doc.body, MAP_SECTION_NON_GOALS)).toEqual(["- Second take."]);
+    expect(specGateMap(t)).not.toContain("First take");
+    // The sections after the rewritten one survive intact.
+    expect(readMapSection(doc.body, MAP_SECTION_NON_NEGOTIABLE_FACTS)).toEqual([]);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("appends a section the map does not have yet", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_write_section.execute(
+      { selector: "specgate", section: "Decisions so far", content: "- Settled: one writer." },
+      ctx(t),
+    );
+    const doc = parse(specGateMap(t));
+    expect(readMapSection(doc.body, "Decisions so far")).toEqual(["- Settled: one writer."]);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("clears a set ready_for_spec on every write, so a post-reconcile plan edit forces one more pass", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    setReadyForSpec(t, true);
+    await tools.tw_write_section.execute(
+      { selector: "specgate", section: MAP_SECTION_NON_GOALS, content: "- Revised after reconcile." },
+      ctx(t),
+    );
+    expect(parse(specGateMap(t)).data.ready_for_spec).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("clears the flag again on the next write: a reordered success test or a reopened task's re-write-back", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    setReadyForSpec(t, true);
+    await tools.tw_write_section.execute(
+      {
+        selector: "specgate",
+        section: MAP_SECTION_NON_NEGOTIABLE_FACTS,
+        content: "- The facts first.\n\n**Success test:** moved below the facts.",
+      },
+      ctx(t),
+    );
+    expect(parse(specGateMap(t)).data.ready_for_spec).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape map: the v5 writers write schema-5 shape only", async () => {
+    const t = mkTmp();
+    writeMd(
+      join(t, "docs/tasks/maps/legacy/map.md"),
+      "kind: map\ntitle: Legacy\nslug: legacy\nstatus: draft\n",
+    );
+    await expect(
+      tools.tw_write_section.execute({ selector: "legacy", section: "Non-goals", content: "- x" }, ctx(t)),
+    ).rejects.toThrow(/schema-5 migration/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty or multi-heading section name", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_write_section.execute({ selector: "specgate", section: "  ", content: "- x" }, ctx(t)),
+    ).rejects.toThrow(/section name is empty/);
+    await expect(
+      tools.tw_write_section.execute(
+        { selector: "specgate", section: "Non-goals\n## Injected", content: "- x" },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/single '##' heading name/);
+    rmSync(t, { recursive: true, force: true });
   });
 });

@@ -379,6 +379,41 @@ export function readMapSection(body: string, name: string): string[] | null {
   return lines;
 }
 
+/**
+ * Write one `##` section into a map body: the writer side of the section
+ * seam `readMapSection` reads. The section to replace is found by canonical
+ * name (aliases resolved, first match wins, running to the next `##`
+ * heading), and its content lines are replaced; the existing heading text is
+ * preserved, because renames belong to the migration. A section the body does
+ * not carry yet is appended after a blank margin under its canonical name.
+ * Empty content seeds an empty placeholder, which reads as `[]` through
+ * `readMapSection`.
+ */
+export function writeMapSection(body: string, name: string, content: string): string {
+  const wanted = canonicalSectionName(name.trim());
+  const lines = body.split("\n");
+  let start = -1;
+  let end = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    const heading = /^##\s+(.+?)\s*$/.exec(lines[i]);
+    if (heading === null) continue;
+    if (start >= 0) { end = i; break; }
+    if (canonicalSectionName(heading[1]) === wanted) start = i;
+  }
+  const contentLines = content.replace(/^\n+/, "").replace(/\n+$/, "").split("\n");
+  if (start === -1) {
+    const trimmed = [...lines];
+    while (trimmed.length > 0 && trimmed[trimmed.length - 1] === "") trimmed.pop();
+    return [...trimmed, "", `## ${wanted}`, "", ...contentLines, ""].join("\n");
+  }
+  const out = [...lines.slice(0, start + 1), "", ...contentLines];
+  while (out.length > 0 && out[out.length - 1] === "") out.pop();
+  const after = lines.slice(end);
+  if (after.length > 0) out.push("", ...after);
+  else out.push("");
+  return out.join("\n");
+}
+
 // ─── Whole-set checks ─────────────────────────────────────────────────────
 
 /**
