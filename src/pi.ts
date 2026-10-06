@@ -724,6 +724,26 @@ function normalizedBody(content: string): string {
 }
 
 /**
+ * The archival note the architecture writer leaves in the effort's spec: the
+ * specification's architecture content is archival once the living
+ * architecture document exists, so the spec carries a pointer to it. The
+ * note is appended once (idempotent) and nothing is deleted from the spec.
+ * Returns whether the spec was written.
+ */
+const ARCHIVAL_NOTE_MARKER = "The architecture content in this specification is archival";
+
+function ensureArchivalNote(specPath: string): boolean {
+  const doc = parseArtifactFile(specPath).doc;
+  if (doc.body.includes(ARCHIVAL_NOTE_MARKER)) return false;
+  const note =
+    "> The architecture content in this specification is archival: the living architecture " +
+    "document is [architecture.md](architecture.md); update it there, not here.";
+  doc.body = `${doc.body.replace(/\n+$/, "")}\n\n${note}\n`;
+  writeFileSync(specPath, dump(doc), "utf-8");
+  return true;
+}
+
+/**
  * The slug shape every created artifact must carry: it becomes a directory
  * name under docs/tasks/, so anything else (spaces, slashes, traversal,
  * leading hyphen) is refused before it can escape the tree.
@@ -1453,6 +1473,104 @@ export function createTools(): Record<string, Tool> {
         const path = join(effortDir, "spec.md");
         writeFileSync(path, dump(doc), "utf-8");
         return `wrote ${relative(root, path)} (created, status: ${publish ? "stable" : "draft"})`;
+      },
+    ),
+
+    tw_write_architecture: def(
+      "Write an effort's architecture document (architecture.md): the only writer of the living " +
+        "architecture, through the frontmatter seam. Creates the document when the effort has none " +
+        "(title from the argument, else the effort's map, else the effort slug), with status draft while " +
+        "writing; 'publish: true' sets status: stable, the named architecture-stable write. The write also " +
+        "adds the archival note to the effort's spec.md pointing at the architecture (idempotent; nothing " +
+        "is deleted from the spec): the specification's architecture content is archival once the living " +
+        "document exists. Refuses an empty body, a selector naming no live effort, an effort with no spec " +
+        "(the architecture is produced from the spec's architecture content), a v3-shape spec, and a " +
+        "legacy arch-spec.md in the effort (the schema-5 migration renames it; new output is never the " +
+        "legacy shape).",
+      {
+        selector: Str("Effort slug, or the effort's architecture or map path"),
+        content: Str("The architecture body (markdown after the frontmatter)"),
+        title: OptStr("Title used only when the write creates the document"),
+        publish: OptBool,
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        if (typeof p.content !== "string" || p.content.trim() === "") {
+          throw new Error("content is empty: an architecture write needs a body");
+        }
+        const body = normalizedBody(p.content);
+        const publish = p.publish === true;
+
+        // An existing document: the living architecture updates in place.
+        let hit: ScanHit | null = null;
+        try {
+          hit = resolveArt(root, p.selector, "architecture");
+        } catch { /* the effort may exist without an architecture document yet: create it */ }
+
+        if (hit !== null) {
+          hit.doc.body = body;
+          if (publish) hit.doc.data.status = "stable";
+          const specPath = join(dirname(hit.path), "spec.md");
+          const noted = isFile(specPath) ? ensureArchivalNote(specPath) : false;
+          writeFileSync(hit.path, dump(hit.doc), "utf-8");
+          return `wrote ${relative(root, hit.path)}${publish ? " (status: stable)" : ""}` +
+            (noted ? "; the spec now points at the architecture" : "");
+        }
+
+        let effortDir = liveEffortDir(root, p.selector);
+        if (effortDir === null) {
+          throw new Error(
+            `no live effort '${p.selector}': create the effort (a map at docs/tasks/<effort>/map.md) before writing its architecture`,
+          );
+        }
+        const effortName = basename(effortDir);
+        // The architecture consumes the architecture content already recorded
+        // in the spec: no spec, nothing to produce the document from.
+        const specPath = join(effortDir, "spec.md");
+        if (!isFile(specPath)) {
+          throw new Error(
+            `effort '${effortName}' has no spec: the architecture is produced from the spec's architecture content; ` +
+              `write the spec with tw_write_spec first`,
+          );
+        }
+        requireV4Shape(parseArtifactFile(specPath).art);
+        const index = scanMemo(root)();
+        // Legacy tolerance is input-only: a legacy arch-spec.md in the effort
+        // means the tree has not been migrated, and creating the v5 document
+        // beside it would leave two architecture documents in one effort.
+        const legacy = index.hits.filter((h) => isInside(effortDir, h.path) && h.art.type === "arch spec");
+        if (legacy.length > 0) {
+          throw new Error(
+            `effort '${effortName}' still holds the legacy architecture shape ` +
+              `(${legacy.map((h) => relative(root, h.path)).join(", ")}): run the schema-5 migration ` +
+              `(it renames arch-spec.md to architecture.md) before using the v5 architecture writer`,
+          );
+        }
+        const archPath = join(effortDir, "architecture.md");
+        // One living document per effort: a v5 architecture document the
+        // effort already holds elsewhere (the migration's multi-document
+        // rename corner) is a duplication to resolve, not to add to.
+        const duplicates = index.hits.filter(
+          (h) =>
+            isInside(effortDir, h.path) &&
+            h.art.type === "architecture" &&
+            resolvePath(h.path) !== resolvePath(archPath),
+        );
+        if (duplicates.length > 0) {
+          throw new Error(
+            `effort '${effortName}' already holds architecture document(s) elsewhere ` +
+              `(${duplicates.map((h) => relative(root, h.path)).join(", ")}): resolve the duplication before creating another one`,
+          );
+        }
+        const title =
+          typeof p.title === "string" && p.title.trim() !== ""
+            ? p.title.trim()
+            : readArtifactTitle(join(effortDir, "map.md")) ?? basename(effortDir);
+        const doc: Document = { data: { type: "architecture", title, status: publish ? "stable" : "draft" }, body };
+        writeFileSync(archPath, dump(doc), "utf-8");
+        const noted = ensureArchivalNote(specPath);
+        return `wrote ${relative(root, archPath)} (created, status: ${publish ? "stable" : "draft"})` +
+          (noted ? "; the spec now points at the architecture" : "");
       },
     ),
 

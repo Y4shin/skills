@@ -1227,12 +1227,20 @@ const SURVIVING_TOOLS = new Set([
   // The v5 named-transition and disclosure tools as they landed:
   // disclosure-open-close-core (tw_open, tw_close, tw_next),
   // implementation-transition-tools (tw_mark_blocked,
-  // tw_record_out_of_scope).
+  // tw_record_out_of_scope, tw_add_ticket, tw_split_ticket,
+  // tw_write_spec, tw_finalize_map, tw_write_section), and
+  // to-tickets-architecture (tw_write_architecture).
   "tw_open",
   "tw_close",
   "tw_next",
   "tw_mark_blocked",
   "tw_record_out_of_scope",
+  "tw_add_ticket",
+  "tw_split_ticket",
+  "tw_write_spec",
+  "tw_finalize_map",
+  "tw_write_section",
+  "tw_write_architecture",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -1675,7 +1683,6 @@ describe("to-tickets v4 (overhaul-planning-skills)", () => {
 
   test("tickets live under the effort's tickets/ subtree", () => {
     expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<ticket-slug>\/ticket\.md/);
-    expect(content).toMatch(/directory is the registration/i);
   });
 
   test("no map-array registration language", () => {
@@ -1684,11 +1691,14 @@ describe("to-tickets v4 (overhaul-planning-skills)", () => {
     expect(content).not.toMatch(/entry to the map frontmatter/i);
   });
 
-  test("the honest contract: files written by hand, the graph queryable", () => {
-    expect(content).toMatch(/written by hand/i);
-    expect(content).toMatch(/graph queryable/i);
-    // No claim of tool support for creation.
-    expect(content).not.toMatch(/tools? (write|create|generate) (the )?tickets/i);
+  test("the honest contract: the tools write the tickets and the graph", () => {
+    // The v5 transition tools own every write: tw_add_ticket creates the
+    // tickets, tw_write_architecture writes the living architecture. The
+    // v4 by-hand contract is retired (the write guard refuses hand edits).
+    expect(content).toMatch(/tw_add_ticket/);
+    expect(content).toMatch(/tw_write_architecture/);
+    expect(content).not.toMatch(/written by hand/i);
+    expect(content).not.toMatch(/No tw_\* tool (writes|creates)/i);
   });
 
   test("queries the graph via the surviving tools", () => {
@@ -1718,6 +1728,104 @@ describe("to-tickets v4 (overhaul-planning-skills)", () => {
     } finally {
       rmSync(t, { recursive: true, force: true });
     }
+  });
+});
+
+// ─── to-tickets v5 (to-tickets-architecture) ─────────────────────
+
+describe("to-tickets v5 (to-tickets-architecture)", () => {
+  const content = readFile("skills/engineering/to-tickets/SKILL.md");
+  const docsPage = readFile("docs/engineering/to-tickets.md");
+
+  test("to-tickets is user-invoked with the correct frontmatter", () => {
+    const fm = parseFrontmatter(content);
+    expect(fm["name"]).toBe("to-tickets");
+    expect(fm["disable-model-invocation"]).toBe("true");
+  });
+
+  test("the skill opens through tw_open and releases the phase through tw_close", () => {
+    expect(content).toMatch(/tw_open/);
+    expect(content).toMatch(/tw_close to-tickets/);
+  });
+
+  test("produces the architecture document plus the ticket graph from a spec", () => {
+    expect(content).toMatch(/architecture document/i);
+    expect(content).toMatch(/ticket graph/i);
+    expect(content).toMatch(/from the spec|from a spec|produced from the spec/i);
+  });
+
+  test("the architecture inlines the spec's architecture content in full", () => {
+    expect(content).toMatch(/inlines? the spec's architecture content in full/i);
+  });
+
+  test("the architecture adds exports, existing abstractions, do-not-reimplement, seams, and per-ticket interface contracts", () => {
+    expect(content).toMatch(/per-ticket exports/i);
+    expect(content).toMatch(/existing abstractions/i);
+    expect(content).toMatch(/do-not-reimplement/i);
+    expect(content).toMatch(/seams/i);
+    expect(content).toMatch(/interface contracts/i);
+  });
+
+  test("the architecture is the living document and the spec's architecture content becomes archival", () => {
+    expect(content).toMatch(/living architecture/i);
+    expect(content).toMatch(/archival/i);
+  });
+
+  test("the writer is tw_write_architecture, the only writer of the architecture document", () => {
+    expect(content).toMatch(/tw_write_architecture/);
+    expect(content).toMatch(/only writer of the architecture document/i);
+  });
+
+  test("a note pointing at the architecture is added to spec.md, and nothing is deleted", () => {
+    expect(content).toMatch(/note to `spec\.md` pointing at the architecture/);
+    expect(content).toMatch(/nothing is deleted|deletes nothing/i);
+  });
+
+  test("a bug-only effort produces tickets with no architecture document", () => {
+    expect(content).toMatch(/bug-only/i);
+    expect(content).toMatch(/no architecture document/i);
+    expect(content).toMatch(/skip the architecture/i);
+  });
+
+  test("tickets are created through tw_add_ticket in dependency order: creation-order wiring", () => {
+    expect(content).toMatch(/tw_add_ticket/);
+    expect(content).toMatch(/validates `blocked_by` at creation/i);
+    expect(content).toMatch(/dependency order/i);
+    // The retired second wiring pass has no mechanism: the write guard
+    // refuses hand edits, so the prose must not teach one.
+    expect(content).not.toMatch(/second pass/);
+    expect(content).not.toMatch(/editing the frontmatter/i);
+  });
+
+  test("splits go through tw_split_ticket, not hand edits", () => {
+    expect(content).toMatch(/tw_split_ticket/);
+  });
+
+  test("the phase ends with a publish write, so the document is stable for implementation", () => {
+    expect(content).toMatch(/publish write \(`publish: true`\)/);
+    expect(content).toMatch(/stable/);
+  });
+
+  test("the prose does not restate the opener preconditions", () => {
+    expect(content).not.toMatch(/ready_for_spec/);
+  });
+
+  test("references only surviving tools", () => {
+    expectOnlySurvivingTools(content);
+    expectOnlySurvivingTools(docsPage);
+  });
+
+  test("the docs page describes the architecture output and the tool-written tickets", () => {
+    expect(docsPage).toMatch(/tw_write_architecture/);
+    expect(docsPage).toMatch(/tw_add_ticket/);
+    expect(docsPage).toMatch(/architecture document/i);
+    expect(docsPage).toMatch(/no architecture document|bug-only/i);
+  });
+
+  test("every frontmatter template conforms by construction", () => {
+    const templates = extractFrontmatterTemplates(content);
+    expect(templates.length).toBeGreaterThan(0);
+    for (const template of templates) assertTemplateConforms(template);
   });
 });
 

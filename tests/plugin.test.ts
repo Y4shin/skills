@@ -214,6 +214,7 @@ describe("task-workflow tools", () => {
         "tw_split_ticket",
         "tw_state",
         "tw_state_set",
+        "tw_write_architecture",
         "tw_write_changelog",
         "tw_write_section",
         "tw_write_spec",
@@ -1601,6 +1602,193 @@ describe("task-workflow tools: tw_write_spec, the specification writer", () => {
     await expect(
       tools.tw_write_spec.execute({ selector: "legacy", content: "# x" }, ctx(t)),
     ).rejects.toThrow(/schema-5 migration/);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_write_architecture, the architecture writer", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function archPath(t: string): string {
+    return join(t, "docs/tasks/specgate/architecture.md");
+  }
+
+  test("creates the v5 architecture document at the effort root, through the frontmatter seam", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(
+      join(t, "docs/tasks/specgate/spec.md"),
+      "type: spec\ntitle: Spec gate spec\nstatus: stable\n",
+      "\n# Spec gate\n\n## Architecture\n\nThe settled architecture content.\n",
+    );
+    expect(existsSync(archPath(t))).toBe(false);
+    const out = await tools.tw_write_architecture.execute(
+      { selector: "specgate", content: "# Spec gate architecture\n\nThe settled architecture content, inlined." },
+      ctx(t),
+    );
+    expect(out).toContain("architecture.md");
+    const doc = parse(readFileSync(archPath(t), "utf-8"));
+    // Conformant v5 frontmatter: type architecture, never the legacy shape;
+    // draft while writing; the title derives from the effort's map.
+    expect(doc.data.type).toBe("architecture");
+    expect(doc.data.title).toBe("Spec gate");
+    expect(doc.data.status).toBe("draft");
+    expect(doc.data).not.toHaveProperty("workflow_state");
+    expect(doc.body).toBe("\n# Spec gate architecture\n\nThe settled architecture content, inlined.\n");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("uses the given title when creating and derives it from the map otherwise", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    await tools.tw_write_architecture.execute(
+      { selector: "specgate", title: "Chosen title", content: "# Body" },
+      ctx(t),
+    );
+    expect(parse(readFileSync(archPath(t), "utf-8")).data.title).toBe("Chosen title");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("rewrites the body of an existing document and preserves its frontmatter: the living architecture", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(archPath(t), "type: architecture\ntitle: Spec gate architecture\nstatus: draft\n", "\n# Old body\n");
+    await tools.tw_write_architecture.execute(
+      { selector: "specgate", content: "# Rewritten\n\nThe architecture, updated in place." },
+      ctx(t),
+    );
+    const doc = parse(readFileSync(archPath(t), "utf-8"));
+    expect(doc.body).toBe("\n# Rewritten\n\nThe architecture, updated in place.\n");
+    expect(doc.data.type).toBe("architecture");
+    expect(doc.data.title).toBe("Spec gate architecture");
+    // A content write does not touch the lifecycle: still draft.
+    expect(doc.data.status).toBe("draft");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("publish sets status: stable, the architecture-stable named write", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    await tools.tw_write_architecture.execute(
+      { selector: "specgate", content: "# Body", publish: true },
+      ctx(t),
+    );
+    expect(parse(readFileSync(archPath(t), "utf-8")).data.status).toBe("stable");
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp(); seedPlanningTree(t2);
+    writeMd(join(t2, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    writeMd(archPath(t2), "type: architecture\ntitle: A\nstatus: draft\n", "\n# Draft\n");
+    await tools.tw_write_architecture.execute(
+      { selector: "specgate", content: "# Settled", publish: true },
+      ctx(t2),
+    );
+    expect(parse(readFileSync(archPath(t2), "utf-8")).data.status).toBe("stable");
+    rmSync(t2, { recursive: true, force: true });
+  });
+
+  test("refuses an empty content", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "specgate", content: "   " }, ctx(t)),
+    ).rejects.toThrow(/empty/);
+    expect(existsSync(archPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a selector that names no live effort", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "no-such-effort", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/no live effort/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an effort with no spec: the architecture is produced from the spec's architecture content", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "specgate", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/no spec/);
+    expect(existsSync(archPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape spec: the v5 writers write schema-5 shape only", async () => {
+    const t = mkTmp();
+    writeMd(join(t, "docs/tasks/maps/legacy/map.md"), "kind: map\ntitle: Legacy\nslug: legacy\nstatus: draft\n");
+    writeMd(join(t, "docs/tasks/maps/legacy/spec.md"), "kind: spec\ntitle: Legacy spec\nslug: legacy\nstatus: draft\n");
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "legacy", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/schema-5 migration/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a legacy arch-spec.md in the effort: legacy shape is tolerated as input only, never produced", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    writeMd(
+      join(t, "docs/tasks/specgate/arch-spec.md"),
+      "type: arch spec\ntitle: Legacy architecture\nstatus: stable\n",
+    );
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "specgate", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/schema-5 migration/);
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "specgate", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/arch-spec\.md/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses when the effort already holds an architecture document elsewhere", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    mkdirSync(join(t, "docs/tasks/specgate/nested"), { recursive: true });
+    writeMd(
+      join(t, "docs/tasks/specgate/nested/architecture.md"),
+      "type: architecture\ntitle: Nested\nstatus: stable\n",
+    );
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "specgate", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/architecture document/);
+    expect(existsSync(archPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("adds the archival note to spec.md pointing at the architecture, deleting nothing", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const specBody = "\n# Spec gate\n\n## Architecture\n\nThe settled architecture content.\n\n## Decisions\n\n- One.\n";
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n", specBody);
+    await tools.tw_write_architecture.execute({ selector: "specgate", content: "# Body" }, ctx(t));
+    const doc = parse(readFileSync(join(t, "docs/tasks/specgate/spec.md"), "utf-8"));
+    // Nothing is deleted from the specification.
+    expect(doc.body).toContain("The settled architecture content.");
+    expect(doc.body).toContain("## Decisions");
+    expect(doc.body).toContain("- One.");
+    // The note points at the living architecture document.
+    expect(doc.body).toMatch(/archival/);
+    expect(doc.body).toContain("architecture.md");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("the note is added once: rewrites never duplicate it", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    await tools.tw_write_architecture.execute({ selector: "specgate", content: "# First" }, ctx(t));
+    const afterFirst = readFileSync(join(t, "docs/tasks/specgate/spec.md"), "utf-8");
+    await tools.tw_write_architecture.execute({ selector: "specgate", content: "# Second" }, ctx(t));
+    expect(readFileSync(join(t, "docs/tasks/specgate/spec.md"), "utf-8")).toBe(afterFirst);
+    const doc = parse(afterFirst);
+    expect(doc.body.match(/archival/g)?.length).toBe(1);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("an update to the living document ensures the note too", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    writeMd(archPath(t), "type: architecture\ntitle: A\nstatus: draft\n", "\n# Existing\n");
+    await tools.tw_write_architecture.execute({ selector: "specgate", content: "# Updated" }, ctx(t));
+    expect(readFileSync(join(t, "docs/tasks/specgate/spec.md"), "utf-8")).toMatch(/archival/);
     rmSync(t, { recursive: true, force: true });
   });
 });
