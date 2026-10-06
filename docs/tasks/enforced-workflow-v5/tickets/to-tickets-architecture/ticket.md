@@ -46,3 +46,29 @@ ticket through the named transition tools, and it opens through `tw_open`.
   writers are the tools this skill calls).
 - disclosure-open-close-core (the skill opens through `tw_open`).
 - opener-gate-and-toolsets (the to-tickets gate and toolset).
+
+## Implementation notes
+
+- The architecture writer landed as `tw_write_architecture` in `src/pi.ts`
+  with a `publish: true` parameter, mirroring `tw_write_spec`'s named
+  stable write; the landed implementation gate refuses a non-stable
+  architecture document, so the writer needed the flag.
+- The writer carries an additive refusal family beyond the ticket doc's
+  letter, each test-pinned: no spec present, a legacy effort-root
+  `arch-spec.md` is accepted as input only (never written to), and a
+  duplicate architecture document elsewhere is refused (one living
+  architecture document per effort).
+- The private signature tool rotated to `tw_write_architecture` as
+  planned, but `tw_map_finalizable` stays in the to-tickets toolset as a
+  disclosed read check: removing it would leave a registered tool
+  disclosed by no phase toolset and fail the disclosure invariant.
+- Bug-only handling is prose-level in the skill, not tool-enforced (a
+  mid-creation tool check would be unsound); the landed implementation
+  gate already exempts bug-only efforts.
+- Slice 2's tests were green on arrival; they pin the update/publish path
+  that slice 1's write path already carried.
+- Downstream impact recorded for implement-ticket-skill (17) and
+  docs-resync (20): teach the `publish: true` write, do not assume
+  `tw_map_finalizable` is gone, treat the writer name as shipped surface.
+- Full divergence detail: `deviation-reports/to-tickets-architecture.md`
+  alongside this ticket doc.
