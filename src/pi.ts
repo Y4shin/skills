@@ -1500,6 +1500,29 @@ export function createTools(): Record<string, Tool> {
             `no live effort '${p.selector}': create the effort (a map at docs/tasks/<effort>/map.md) before writing its architecture`,
           );
         }
+        const effortName = basename(effortDir);
+        // The architecture consumes the architecture content already recorded
+        // in the spec: no spec, nothing to produce the document from.
+        const specPath = join(effortDir, "spec.md");
+        if (!isFile(specPath)) {
+          throw new Error(
+            `effort '${effortName}' has no spec: the architecture is produced from the spec's architecture content; ` +
+              `write the spec with tw_write_spec first`,
+          );
+        }
+        requireV4Shape(parseArtifactFile(specPath).art);
+        const index = scanMemo(root)();
+        // Legacy tolerance is input-only: a legacy arch-spec.md in the effort
+        // means the tree has not been migrated, and creating the v5 document
+        // beside it would leave two architecture documents in one effort.
+        const legacy = index.hits.filter((h) => isInside(effortDir, h.path) && h.art.type === "arch spec");
+        if (legacy.length > 0) {
+          throw new Error(
+            `effort '${effortName}' still holds the legacy architecture shape ` +
+              `(${legacy.map((h) => relative(root, h.path)).join(", ")}): run the schema-5 migration ` +
+              `(it renames arch-spec.md to architecture.md) before using the v5 architecture writer`,
+          );
+        }
         const archPath = join(effortDir, "architecture.md");
         const title =
           typeof p.title === "string" && p.title.trim() !== ""

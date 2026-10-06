@@ -1686,6 +1686,59 @@ describe("task-workflow tools: tw_write_architecture, the architecture writer", 
     expect(parse(readFileSync(archPath(t2), "utf-8")).data.status).toBe("stable");
     rmSync(t2, { recursive: true, force: true });
   });
+
+  test("refuses an empty content", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "specgate", content: "   " }, ctx(t)),
+    ).rejects.toThrow(/empty/);
+    expect(existsSync(archPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a selector that names no live effort", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "no-such-effort", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/no live effort/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an effort with no spec: the architecture is produced from the spec's architecture content", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "specgate", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/no spec/);
+    expect(existsSync(archPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape spec: the v5 writers write schema-5 shape only", async () => {
+    const t = mkTmp();
+    writeMd(join(t, "docs/tasks/maps/legacy/map.md"), "kind: map\ntitle: Legacy\nslug: legacy\nstatus: draft\n");
+    writeMd(join(t, "docs/tasks/maps/legacy/spec.md"), "kind: spec\ntitle: Legacy spec\nslug: legacy\nstatus: draft\n");
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "legacy", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/schema-5 migration/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a legacy arch-spec.md in the effort: legacy shape is tolerated as input only, never produced", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    writeMd(
+      join(t, "docs/tasks/specgate/arch-spec.md"),
+      "type: arch spec\ntitle: Legacy architecture\nstatus: stable\n",
+    );
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "specgate", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/schema-5 migration/);
+    await expect(
+      tools.tw_write_architecture.execute({ selector: "specgate", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/arch-spec\.md/);
+    rmSync(t, { recursive: true, force: true });
+  });
 });
 
 describe("task-workflow tools: tw_add_ticket, the ticket creator", () => {
