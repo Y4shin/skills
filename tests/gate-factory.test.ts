@@ -61,6 +61,13 @@ const GATED_NAMES = [
   "tw_context",
   "tw_finalize_map",
   "tw_write_section",
+  "tw_write_spec",
+  "tw_add_ticket",
+  "tw_split_ticket",
+  "tw_mark_blocked",
+  "tw_archive_effort",
+  "tw_record_out_of_scope",
+  "tw_write_changelog",
   "notify_user",
 ];
 
@@ -601,6 +608,9 @@ describe("factory gate", () => {
       const blockedPaths = [
         "docs/tasks/effort-one/map.md",
         "docs/tasks/effort-one/tasks/research/task.md",
+        // The changelog sits under the tree, so the built-ins are refused there
+        // too and the changelog writer stays the only writer of it.
+        "docs/tasks/CHANGELOG.md",
         // Normalized before the containment check: traversal cannot slip past.
         "docs/../docs/tasks/effort-one/map.md",
         join(repo, "docs/tasks/effort-one/map.md"),

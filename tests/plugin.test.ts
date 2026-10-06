@@ -193,6 +193,8 @@ describe("task-workflow tools", () => {
     test("registers exactly the disclosed surface: the gated workflow tools plus the dispatcher trio", () => {
       const names = Object.keys(tools).sort();
       expect(names).toEqual([
+        "tw_add_ticket",
+        "tw_archive_effort",
         "tw_close",
         "tw_context",
         "tw_dependency_levels",
@@ -202,14 +204,19 @@ describe("task-workflow tools", () => {
         "tw_get",
         "tw_list",
         "tw_map_finalizable",
+        "tw_mark_blocked",
         "tw_mark_done",
         "tw_next",
         "tw_open",
+        "tw_record_out_of_scope",
         "tw_resolve_uncertainty",
         "tw_show",
+        "tw_split_ticket",
         "tw_state",
         "tw_state_set",
+        "tw_write_changelog",
         "tw_write_section",
+        "tw_write_spec",
       ]);
     });
 
@@ -1446,18 +1453,6 @@ describe("task-workflow tools: tw_mark_done, the planning half", () => {
     rmSync(t2, { recursive: true, force: true });
   });
 
-  test("refuses a ticket selector: the planning half marks planning tasks only", async () => {
-    const t = mkTmp(); seedPlanningTree(t);
-    writeMd(
-      join(t, "docs/tasks/specgate/tickets/land-it/ticket.md"),
-      "type: ticket\nsubtype: feature\ntitle: Land it\nstatus: stable\nworkflow_state: todo\nblocked_by: []\n",
-    );
-    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t))).rejects.toThrow(
-      /has type 'ticket', not 'task'/,
-    );
-    rmSync(t, { recursive: true, force: true });
-  });
-
   test("refuses a v3-shape task", async () => {
     const t = mkTmp();
     writeMd(
@@ -1495,6 +1490,897 @@ describe("task-workflow tools: tw_mark_done, the planning half", () => {
     );
     await expect(tools.tw_mark_done.execute({ selector: "decide" }, ctx(t))).rejects.toThrow(
       /no map/,
+    );
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+// ─── Implementation transition tools (implementation-transition-tools) ────
+
+describe("task-workflow tools: tw_write_spec, the specification writer", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function specPath(t: string): string {
+    return join(t, "docs/tasks/specgate/spec.md");
+  }
+
+  test("creates a draft spec when the effort has none, through the frontmatter seam", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    expect(existsSync(specPath(t))).toBe(false);
+    const out = await tools.tw_write_spec.execute(
+      { selector: "specgate", content: "# Spec gate specification\n\nThe settled decisions." },
+      ctx(t),
+    );
+    expect(out).toContain("spec.md");
+    const doc = parse(readFileSync(specPath(t), "utf-8"));
+    // Conformant spec frontmatter: draft while writing, title from the map.
+    expect(doc.data.type).toBe("spec");
+    expect(doc.data.title).toBe("Spec gate");
+    expect(doc.data.status).toBe("draft");
+    expect(doc.data).not.toHaveProperty("workflow_state");
+    expect(doc.body).toBe("\n# Spec gate specification\n\nThe settled decisions.\n");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("uses the given title when creating and derives it from the map otherwise", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_write_spec.execute(
+      { selector: "specgate", title: "Chosen title", content: "# Body" },
+      ctx(t),
+    );
+    expect(parse(readFileSync(specPath(t), "utf-8")).data.title).toBe("Chosen title");
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp();
+    writeMd(join(t2, "docs/tasks/bare/map.md"), "type: map\ntitle: Bare effort\nstatus: stable\n");
+    await tools.tw_write_spec.execute({ selector: "bare", content: "# Body" }, ctx(t2));
+    expect(parse(readFileSync(join(t2, "docs/tasks/bare/spec.md"), "utf-8")).data.title).toBe("Bare effort");
+    rmSync(t2, { recursive: true, force: true });
+  });
+
+  test("rewrites the body of an existing spec and preserves its frontmatter", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(specPath(t), "type: spec\ntitle: Spec gate spec\nstatus: draft\n", "\n# Old body\n");
+    await tools.tw_write_spec.execute(
+      { selector: "specgate", content: "# Rewritten\n\nThe synthesized specification." },
+      ctx(t),
+    );
+    const doc = parse(readFileSync(specPath(t), "utf-8"));
+    expect(doc.body).toBe("\n# Rewritten\n\nThe synthesized specification.\n");
+    expect(doc.data.type).toBe("spec");
+    expect(doc.data.title).toBe("Spec gate spec");
+    // A content write does not touch the lifecycle: still draft.
+    expect(doc.data.status).toBe("draft");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("publish sets status: stable, the spec-stable named write", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_write_spec.execute(
+      { selector: "specgate", content: "# Spec gate specification\n\nSettled.", publish: true },
+      ctx(t),
+    );
+    expect(parse(readFileSync(specPath(t), "utf-8")).data.status).toBe("stable");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("publish flips an existing draft spec to stable", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(specPath(t), "type: spec\ntitle: Spec gate spec\nstatus: draft\n", "\n# Draft\n");
+    await tools.tw_write_spec.execute(
+      { selector: "specgate", content: "# Draft\n\nNow settled.", publish: true },
+      ctx(t),
+    );
+    expect(parse(readFileSync(specPath(t), "utf-8")).data.status).toBe("stable");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty content", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_write_spec.execute({ selector: "specgate", content: "   " }, ctx(t)),
+    ).rejects.toThrow(/empty/);
+    expect(existsSync(specPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a selector that names no live effort", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_write_spec.execute({ selector: "no-such-effort", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/no live effort/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape spec: the v5 writers write schema-5 shape only", async () => {
+    const t = mkTmp();
+    writeMd(join(t, "docs/tasks/maps/legacy/map.md"), "kind: map\ntitle: Legacy\nslug: legacy\nstatus: draft\n");
+    writeMd(join(t, "docs/tasks/maps/legacy/spec.md"), "kind: spec\ntitle: Legacy spec\nslug: legacy\nstatus: draft\n");
+    await expect(
+      tools.tw_write_spec.execute({ selector: "legacy", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/schema-5 migration/);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_add_ticket, the ticket creator", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function ticketPath(t: string, slug: string): string {
+    return join(t, "docs/tasks/specgate/tickets", slug, "ticket.md");
+  }
+
+  test("creates a ticket through the frontmatter seam with the v5 ticket shape", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const out = await tools.tw_add_ticket.execute(
+      {
+        effort: "specgate",
+        slug: "land-it",
+        title: "Land it",
+        subtype: "feature",
+        content: "## What to build\n\nThe gate.",
+      },
+      ctx(t),
+    );
+    expect(out).toContain("land-it");
+    const doc = parse(readFileSync(ticketPath(t, "land-it"), "utf-8"));
+    expect(doc.data.type).toBe("ticket");
+    expect(doc.data.subtype).toBe("feature");
+    expect(doc.data.title).toBe("Land it");
+    expect(doc.data.status).toBe("stable");
+    expect(doc.data.workflow_state).toBe("ready");
+    expect(doc.data.blocked_by).toEqual([]);
+    // Size is absent when not given: absent means m.
+    expect(doc.data).not.toHaveProperty("size");
+    expect(doc.data).not.toHaveProperty("mode");
+    expect(doc.body).toBe("\n## What to build\n\nThe gate.\n");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("lands size, mode, and blocked_by when given", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_add_ticket.execute(
+      { effort: "specgate", slug: "first", title: "First", subtype: "bug", size: "s", mode: "human", blocked_by: [] },
+      ctx(t),
+    );
+    await tools.tw_add_ticket.execute(
+      {
+        effort: "specgate",
+        slug: "second",
+        title: "Second",
+        subtype: "feature",
+        size: "l",
+        blocked_by: ["first"],
+      },
+      ctx(t),
+    );
+    const second = parse(readFileSync(ticketPath(t, "second"), "utf-8"));
+    expect(second.data.size).toBe("l");
+    expect(second.data.blocked_by).toEqual(["first"]);
+    expect(second.data).not.toHaveProperty("mode");
+    const first = parse(readFileSync(ticketPath(t, "first"), "utf-8"));
+    expect(first.data.mode).toBe("human");
+    expect(first.data.size).toBe("s");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a duplicate slug: an existing ticket, or any artifact with that slug in the effort", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_add_ticket.execute(
+      { effort: "specgate", slug: "land-it", title: "Land it", subtype: "feature" },
+      ctx(t),
+    );
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "specgate", slug: "land-it", title: "Again", subtype: "feature" }, ctx(t)),
+    ).rejects.toThrow(/already exists/);
+    // The task slug is taken too: slugs are unique per effort.
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "specgate", slug: "decide", title: "Clash", subtype: "feature" }, ctx(t)),
+    ).rejects.toThrow(/already exists/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an unsafe slug", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    for (const slug of ["Land It", "land/it", "../escape", "-lead", ""]) {
+      await expect(
+        tools.tw_add_ticket.execute({ effort: "specgate", slug, title: "T", subtype: "feature" }, ctx(t)),
+      ).rejects.toThrow(/invalid slug/);
+    }
+    expect(existsSync(join(t, "docs/tasks/specgate/tickets"))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a subtype that is not feature or bug, and a bad size or mode", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "specgate", slug: "x", title: "T", subtype: "chore" }, ctx(t)),
+    ).rejects.toThrow(/subtype/);
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "specgate", slug: "x", title: "T", subtype: "feature", size: "xxl" }, ctx(t)),
+    ).rejects.toThrow(/size/);
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "specgate", slug: "x", title: "T", subtype: "feature", mode: "afk" }, ctx(t)),
+    ).rejects.toThrow(/mode/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses blocked_by edges that dangle or cross the kind: tickets block tickets", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_add_ticket.execute(
+        { effort: "specgate", slug: "x", title: "T", subtype: "feature", blocked_by: ["ghost"] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/'ghost' is not an existing ticket/);
+    // A planning task is not a ticket edge target (kind-scoped).
+    await expect(
+      tools.tw_add_ticket.execute(
+        { effort: "specgate", slug: "x", title: "T", subtype: "feature", blocked_by: ["decide"] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/tickets block tickets/);
+    expect(existsSync(ticketPath(t, "x"))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an effort with no map or spec anchor, so the graph gains no orphans", async () => {
+    const t = mkTmp();
+    mkdirSync(join(t, "docs/tasks/orphan-effort"), { recursive: true });
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "orphan-effort", slug: "x", title: "T", subtype: "feature" }, ctx(t)),
+    ).rejects.toThrow(/neither a map nor a spec/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an unknown effort and an archived effort", async () => {
+    const t = mkTmp(); seedV4Tree(t);
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "no-such-effort", slug: "x", title: "T", subtype: "feature" }, ctx(t)),
+    ).rejects.toThrow(/no live effort/);
+    await expect(
+      tools.tw_add_ticket.execute({ effort: "old-effort", slug: "x", title: "T", subtype: "feature" }, ctx(t)),
+    ).rejects.toThrow(/no live effort/);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_split_ticket, the escape-hatch split", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  /** The fixture: a live effort whose in-flight ticket "big" splits. */
+  function seedSplitTree(t: string, originalState = "workflow_state: in-progress"): void {
+    seedPlanningTree(t);
+    writeMd(
+      join(t, "docs/tasks/specgate/tickets/base/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Base\nstatus: stable\nworkflow_state: todo\nblocked_by: []\n",
+    );
+    writeMd(
+      join(t, "docs/tasks/specgate/tickets/big/ticket.md"),
+      `type: ticket\nsubtype: bug\ntitle: Big\nstatus: stable\n${originalState}\nsize: l\nblocked_by: [base]\n`,
+      "\n## What to build\n\nToo big.\n",
+    );
+  }
+
+  function originalPath(t: string): string {
+    return join(t, "docs/tasks/specgate/tickets/big/ticket.md");
+  }
+
+  function subPath(t: string, slug: string): string {
+    return join(t, "docs/tasks/specgate/tickets", slug, "ticket.md");
+  }
+
+  test("creates the sub-tickets and supersedes the original as deprecated plus done", async () => {
+    const t = mkTmp(); seedSplitTree(t);
+    const out = await tools.tw_split_ticket.execute(
+      {
+        selector: "big",
+        subtickets: [
+          { slug: "big-one", title: "Big one", size: "s", content: "## What to build\n\nPart one." },
+          { slug: "big-two", title: "Big two", blocked_by: ["big-one"] },
+        ],
+      },
+      ctx(t),
+    );
+    expect(out.text).toContain("big-one");
+    expect(out.text).toContain("deprecated");
+
+    // The sub-tickets inherit the original's subtype and edges.
+    const one = parse(readFileSync(subPath(t, "big-one"), "utf-8"));
+    expect(one.data.type).toBe("ticket");
+    expect(one.data.subtype).toBe("bug");
+    expect(one.data.status).toBe("stable");
+    expect(one.data.workflow_state).toBe("ready");
+    expect(one.data.blocked_by).toEqual(["base"]);
+    expect(one.data.size).toBe("s");
+    expect(one.body).toBe("\n## What to build\n\nPart one.\n");
+
+    const two = parse(readFileSync(subPath(t, "big-two"), "utf-8"));
+    expect(two.data.blocked_by).toEqual(["base", "big-one"]);
+    // Size absent when not given.
+    expect(two.data).not.toHaveProperty("size");
+
+    // The original: deprecated plus done, with a body note naming the subs.
+    const original = parse(readFileSync(originalPath(t), "utf-8"));
+    expect(original.data.status).toBe("deprecated");
+    expect(original.data.workflow_state).toBe("done");
+    expect(original.body).toContain("Superseded by big-one, big-two.");
+    expect(original.body).toContain("Too big.");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an original that is already done or deprecated", async () => {
+    const t = mkTmp(); seedSplitTree(t, "workflow_state: done");
+    await expect(
+      tools.tw_split_ticket.execute({ selector: "big", subtickets: [{ slug: "x", title: "X" }] }, ctx(t)),
+    ).rejects.toThrow(/already done/);
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp(); seedSplitTree(t2, "workflow_state: done");
+    const p = originalPath(t2);
+    writeFileSync(p, readFileSync(p, "utf-8").replace("status: stable", "status: deprecated"), "utf-8");
+    await expect(
+      tools.tw_split_ticket.execute({ selector: "big", subtickets: [{ slug: "x", title: "X" }] }, ctx(t2)),
+    ).rejects.toThrow(/deprecated/);
+    rmSync(t2, { recursive: true, force: true });
+  });
+
+  test("refuses sub slugs that collide with existing artifacts or each other", async () => {
+    const t = mkTmp(); seedSplitTree(t);
+    await expect(
+      tools.tw_split_ticket.execute(
+        { selector: "big", subtickets: [{ slug: "base", title: "Clash" }] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/already exists/);
+    await expect(
+      tools.tw_split_ticket.execute(
+        { selector: "big", subtickets: [{ slug: "a", title: "A" }, { slug: "a", title: "A again" }] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/duplicate|already/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a split that keeps the original's slug or dangles an edge", async () => {
+    const t = mkTmp(); seedSplitTree(t);
+    await expect(
+      tools.tw_split_ticket.execute(
+        { selector: "big", subtickets: [{ slug: "big", title: "Same" }] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/superseded|slug/);
+    await expect(
+      tools.tw_split_ticket.execute(
+        { selector: "big", subtickets: [{ slug: "a", title: "A", blocked_by: ["ghost"] }] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/'ghost' is not an existing ticket/);
+    expect(existsSync(subPath(t, "a"))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty sub-ticket list and an invalid sub seed", async () => {
+    const t = mkTmp(); seedSplitTree(t);
+    await expect(tools.tw_split_ticket.execute({ selector: "big", subtickets: [] }, ctx(t))).rejects.toThrow(
+      /at least one sub-ticket/,
+    );
+    await expect(
+      tools.tw_split_ticket.execute({ selector: "big", subtickets: [{ slug: "Bad Slug", title: "X" }] }, ctx(t)),
+    ).rejects.toThrow(/invalid slug/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape original", async () => {
+    const t = mkTmp();
+    writeMd(join(t, "docs/tasks/maps/legacy/map.md"), "kind: map\ntitle: Legacy\nslug: legacy\nstatus: draft\n");
+    writeMd(
+      join(t, "docs/tasks/maps/legacy/tickets/big/ticket.md"),
+      "kind: ticket\ntitle: Big\nslug: big\nstatus: stable\n",
+    );
+    await expect(
+      tools.tw_split_ticket.execute({ selector: "big", subtickets: [{ slug: "x", title: "X" }] }, ctx(t)),
+    ).rejects.toThrow(/schema-5 migration/);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_mark_done, the ticket half", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  /** The fixture: a landed ticket whose changelog entry may or may not exist. */
+  function seedTicketDoneTree(t: string, changelogBody?: string): void {
+    seedPlanningTree(t);
+    writeMd(
+      join(t, "docs/tasks/specgate/tickets/land-it/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Land it\nstatus: stable\nworkflow_state: in-progress\nsize: m\nblocked_by: []\n",
+    );
+    writeMd(
+      join(t, "docs/tasks/CHANGELOG.md"),
+      "type: changelog\ntitle: Task Changelog\n",
+      changelogBody ?? "\n# Task Changelog\n",
+    );
+  }
+
+  function ticketPath(t: string): string {
+    return join(t, "docs/tasks/specgate/tickets/land-it/ticket.md");
+  }
+
+  test("marks a ticket done when the changelog references it: the entry lands before the done-marking", async () => {
+    const t = mkTmp();
+    seedTicketDoneTree(
+      t,
+      "\n# Task Changelog\n\n## 2026-10-01, Land it (land-it)\n\nThe ticket landed.\n",
+    );
+    const out = await tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t));
+    expect(out).toMatch(/done/);
+    const doc = parse(readFileSync(ticketPath(t), "utf-8"));
+    expect(doc.data.workflow_state).toBe("done");
+    // The status is not the done-ness field; it stays as it was.
+    expect(doc.data.status).toBe("stable");
+    // A ticket done-marking is not a plan change: no ready_for_spec on the ticket.
+    expect(doc.data).not.toHaveProperty("ready_for_spec");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses when the changelog has no entry for the ticket, naming the changelog writer", async () => {
+    const t = mkTmp(); seedTicketDoneTree(t);
+    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t))).rejects.toThrow(
+      /tw_write_changelog/,
+    );
+    // The refusal leaves the ticket untouched.
+    expect(parse(readFileSync(ticketPath(t), "utf-8")).data.workflow_state).toBe("in-progress");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("does not count a longer hyphenated slug as the changelog reference", async () => {
+    const t = mkTmp();
+    seedTicketDoneTree(
+      t,
+      "\n# Task Changelog\n\n## 2026-10-01, Other (land-it-v2)\n\nAnother ticket landed.\n",
+    );
+    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t))).rejects.toThrow(
+      /tw_write_changelog/,
+    );
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses when the changelog does not exist yet", async () => {
+    const t = mkTmp(); seedTicketDoneTree(t);
+    rmSync(join(t, "docs/tasks/CHANGELOG.md"));
+    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t))).rejects.toThrow(
+      /changelog/,
+    );
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an already-done or deprecated ticket", async () => {
+    const t = mkTmp();
+    seedTicketDoneTree(t, "\n# Task Changelog\n\n## 2026-10-01, Land it (land-it)\n\nLanded.\n");
+    writeFileSync(ticketPath(t), readFileSync(ticketPath(t), "utf-8").replace("in-progress", "done"), "utf-8");
+    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t))).rejects.toThrow(/already done/);
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp();
+    seedTicketDoneTree(t2, "\n# Task Changelog\n\n## 2026-10-01, Land it (land-it)\n\nLanded.\n");
+    const p = ticketPath(t2);
+    writeFileSync(p, readFileSync(p, "utf-8").replace("status: stable", "status: deprecated"), "utf-8");
+    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t2))).rejects.toThrow(/deprecated/);
+    rmSync(t2, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_mark_blocked, the blocked marking for planning tasks", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function taskPath(t: string): string {
+    return join(t, "docs/tasks/specgate/tasks/decide/task.md");
+  }
+
+  test("marks a planning task blocked and records the reason in the task body", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const out = await tools.tw_mark_blocked.execute(
+      { selector: "decide", reason: "the auth provider docs are unreachable; retry with the vendored copy" },
+      ctx(t),
+    );
+    expect(out).toMatch(/blocked/);
+    const doc = parse(readFileSync(taskPath(t), "utf-8"));
+    expect(doc.data.workflow_state).toBe("blocked");
+    expect(doc.data.status).toBe("stable");
+    expect(doc.body).toContain(
+      "Blocked: the auth provider docs are unreachable; retry with the vendored copy",
+    );
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("re-blocking replaces the recorded reason instead of accumulating lines", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_mark_blocked.execute({ selector: "decide", reason: "first reason" }, ctx(t));
+    await tools.tw_mark_blocked.execute({ selector: "decide", reason: "second reason" }, ctx(t));
+    const doc = parse(readFileSync(taskPath(t), "utf-8"));
+    expect(doc.body).toContain("Blocked: second reason");
+    expect(doc.body).not.toContain("Blocked: first reason");
+    expect(doc.data.workflow_state).toBe("blocked");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty reason", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(tools.tw_mark_blocked.execute({ selector: "decide", reason: "  " }, ctx(t))).rejects.toThrow(
+      /reason is empty/,
+    );
+    expect(parse(readFileSync(taskPath(t), "utf-8")).data.workflow_state).toBe("todo");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a done or deprecated task: blocking must not resurrect finished work", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeFileSync(taskPath(t), readFileSync(taskPath(t), "utf-8").replace("todo", "done"), "utf-8");
+    await expect(
+      tools.tw_mark_blocked.execute({ selector: "decide", reason: "x" }, ctx(t)),
+    ).rejects.toThrow(/already done/);
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp();
+    writeMd(
+      join(t2, "docs/tasks/deprec-eff/map.md"),
+      "type: map\ntitle: Deprec\nstatus: stable\n",
+      "\n# Deprec\n\n## Non-goals\n\n- Nothing.\n\n## Non-negotiable facts\n\n**Success test:** x.\n",
+    );
+    writeMd(
+      join(t2, "docs/tasks/deprec-eff/tasks/gone/task.md"),
+      "type: task\nsubtype: manual\ntitle: Gone\nstatus: deprecated\nworkflow_state: done\nblocked_by: []\n",
+    );
+    await expect(
+      tools.tw_mark_blocked.execute({ selector: "gone", reason: "x" }, ctx(t2)),
+    ).rejects.toThrow(/deprecated/);
+    rmSync(t2, { recursive: true, force: true });
+  });
+
+  test("refuses a ticket selector: this marks planning tasks only", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(
+      join(t, "docs/tasks/specgate/tickets/land-it/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Land it\nstatus: stable\nworkflow_state: ready\nblocked_by: []\n",
+    );
+    await expect(
+      tools.tw_mark_blocked.execute({ selector: "land-it", reason: "x" }, ctx(t)),
+    ).rejects.toThrow(/has type 'ticket', not 'task'/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape task", async () => {
+    const t = mkTmp();
+    writeMd(
+      join(t, "docs/tasks/legacy-decide/task.md"),
+      "kind: task\ntitle: Legacy decide\nslug: legacy-decide\nstatus: todo\nslices: []\n",
+    );
+    await expect(
+      tools.tw_mark_blocked.execute({ selector: "legacy-decide", reason: "x" }, ctx(t)),
+    ).rejects.toThrow(/schema-5 migration/);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_write_changelog, the changelog writer", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function changelogPath(t: string): string {
+    return join(t, "docs/tasks/CHANGELOG.md");
+  }
+
+  function writeChangelog(t: string, body: string): void {
+    writeMd(changelogPath(t), "type: changelog\ntitle: Task Changelog\n", body);
+  }
+
+  test("creates the changelog when missing, with conformant frontmatter", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const out = await tools.tw_write_changelog.execute(
+      { slug: "land-it", title: "Land it", content: "The ticket landed with the gate enforced.", date: "2026-10-02" },
+      ctx(t),
+    );
+    expect(out).toContain("CHANGELOG.md");
+    const doc = parse(readFileSync(changelogPath(t), "utf-8"));
+    expect(doc.data.type).toBe("changelog");
+    expect(doc.data.title).toBe("Task Changelog");
+    expect(doc.body).toContain("## 2026-10-02, Land it (land-it)");
+    expect(doc.body).toContain("The ticket landed with the gate enforced.");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("lands the new entry on top of the dated region, below any release block", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeChangelog(
+      t,
+      "\n# Task Changelog\n\n# task-workflow\n\n## 4.0.0\n\n### Major Changes\n\n- 5816b6b: The v4 overhaul.\n\n## 2026-09-29, Older entry (older-ticket)\n\nOlder.\n",
+    );
+    await tools.tw_write_changelog.execute(
+      { slug: "land-it", title: "Land it", content: "Newest.", date: "2026-10-02" },
+      ctx(t),
+    );
+    const body = parse(readFileSync(changelogPath(t), "utf-8")).body;
+    const release = body.indexOf("## 4.0.0");
+    const newEntry = body.indexOf("## 2026-10-02, Land it (land-it)");
+    const oldEntry = body.indexOf("## 2026-09-29, Older entry (older-ticket)");
+    expect(release).toBeLessThan(newEntry);
+    expect(newEntry).toBeLessThan(oldEntry);
+    // The release block survives untouched above the dated region.
+    expect(body).toContain("### Major Changes");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("appends the first entry after the heading when no dated region exists", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeChangelog(t, "\n# Task Changelog\n");
+    await tools.tw_write_changelog.execute(
+      { slug: "land-it", title: "Land it", content: "First.", date: "2026-10-02" },
+      ctx(t),
+    );
+    const body = parse(readFileSync(changelogPath(t), "utf-8")).body;
+    expect(body.indexOf("# Task Changelog")).toBeLessThan(body.indexOf("## 2026-10-02, Land it (land-it)"));
+    expect(body.trimEnd().endsWith("First.")).toBe(true);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("dates the entry today when no date is given", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_write_changelog.execute(
+      { slug: "land-it", title: "Land it", content: "Dated now." },
+      ctx(t),
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    expect(readFileSync(changelogPath(t), "utf-8")).toContain(`## ${today}, Land it (land-it)`);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a duplicate entry for the same slug", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeChangelog(t, "\n# Task Changelog\n\n## 2026-10-01, Land it (land-it)\n\nAlready recorded.\n");
+    await expect(
+      tools.tw_write_changelog.execute({ slug: "land-it", title: "Land it", content: "Again." }, ctx(t)),
+    ).rejects.toThrow(/already has an entry/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty slug, title, or content, and a malformed date", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_write_changelog.execute({ slug: "", title: "T", content: "C" }, ctx(t)),
+    ).rejects.toThrow(/invalid slug/);
+    await expect(
+      tools.tw_write_changelog.execute({ slug: "x", title: "  ", content: "C" }, ctx(t)),
+    ).rejects.toThrow(/title/);
+    await expect(
+      tools.tw_write_changelog.execute({ slug: "x", title: "T", content: "   " }, ctx(t)),
+    ).rejects.toThrow(/content is empty/);
+    await expect(
+      tools.tw_write_changelog.execute({ slug: "x", title: "T", content: "C", date: "October 2" }, ctx(t)),
+    ).rejects.toThrow(/date/);
+    expect(existsSync(changelogPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_record_out_of_scope, the out-of-scope KB writer", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function kbDir(t: string): string {
+    return join(t, "docs/tasks/out-of-scope");
+  }
+
+  test("writes the note with the request and the reason, through the frontmatter seam", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const out = await tools.tw_record_out_of_scope.execute(
+      {
+        slug: "mainframe-port",
+        title: "Mainframe port",
+        request: "Port the CLI to OS/390.",
+        reason: "No user runs it there; the port cost exceeds the value.",
+      },
+      ctx(t),
+    );
+    expect(out).toContain("mainframe-port.md");
+    const doc = parse(readFileSync(join(kbDir(t), "mainframe-port.md"), "utf-8"));
+    expect(doc.data.type).toBe("out-of-scope note");
+    expect(doc.data.title).toBe("Mainframe port");
+    expect(doc.data.status).toBe("stable");
+    expect(doc.body).toBe("\n## Request\n\nPort the CLI to OS/390.\n\n## Reason\n\nNo user runs it there; the port cost exceeds the value.\n");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("updates the index with one bullet per note, sorted by slug", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(kbDir(t), "index.md"), "type: out-of-scope note\ntitle: out-of-scope\nstatus: stable\n", "\n# out-of-scope\n\n## Notes\n\n- [Zeta](zeta.md)\n");
+    await tools.tw_record_out_of_scope.execute(
+      { slug: "alpha", title: "Alpha", request: "R", reason: "Q" },
+      ctx(t),
+    );
+    await tools.tw_record_out_of_scope.execute(
+      { slug: "mid", title: "Mid", request: "R", reason: "Q" },
+      ctx(t),
+    );
+    const doc = parse(readFileSync(join(kbDir(t), "index.md"), "utf-8"));
+    expect(readMapSection(doc.body, "Notes")).toEqual([
+      "- [Alpha](alpha.md)",
+      "- [Mid](mid.md)",
+      "- [Zeta](zeta.md)",
+    ]);
+    // The index frontmatter survives the update.
+    expect(doc.data.type).toBe("out-of-scope note");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("creates the index when missing, with the bundle's index frontmatter", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_record_out_of_scope.execute(
+      { slug: "alpha", title: "Alpha", request: "R", reason: "Q" },
+      ctx(t),
+    );
+    const doc = parse(readFileSync(join(kbDir(t), "index.md"), "utf-8"));
+    expect(doc.data.type).toBe("out-of-scope note");
+    expect(doc.data.title).toBe("out-of-scope");
+    expect(doc.data.status).toBe("stable");
+    expect(readMapSection(doc.body, "Notes")).toEqual(["- [Alpha](alpha.md)"]);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a duplicate slug: the same no is not recorded twice", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_record_out_of_scope.execute({ slug: "alpha", title: "Alpha", request: "R", reason: "Q" }, ctx(t));
+    await expect(
+      tools.tw_record_out_of_scope.execute({ slug: "alpha", title: "Alpha again", request: "R2", reason: "Q2" }, ctx(t)),
+    ).rejects.toThrow(/already recorded/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty request or reason: a rejection without a reason is not a record", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_record_out_of_scope.execute({ slug: "x", title: "X", request: "  ", reason: "Q" }, ctx(t)),
+    ).rejects.toThrow(/request is empty/);
+    await expect(
+      tools.tw_record_out_of_scope.execute({ slug: "x", title: "X", request: "R", reason: "" }, ctx(t)),
+    ).rejects.toThrow(/reason is empty/);
+    await expect(
+      tools.tw_record_out_of_scope.execute({ slug: "Bad Slug", title: "X", request: "R", reason: "Q" }, ctx(t)),
+    ).rejects.toThrow(/invalid slug/);
+    expect(existsSync(kbDir(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_archive_effort, the archive move", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  const INDEX_FM = 'type: index\nokf_version: "0.2"\ntitle: docs/tasks\n';
+
+  /** A finished effort, plus a root index listing it as live. */
+  function seedArchiveTree(t: string, withIndex = true): void {
+    const base = join(t, "docs/tasks");
+    writeMd(join(base, "winding-down/map.md"), "type: map\ntitle: Winding down\nstatus: stable\n");
+    writeMd(join(base, "winding-down/spec.md"), "type: spec\ntitle: Winding down spec\nstatus: stable\n");
+    writeMd(
+      join(base, "winding-down/tasks/decide/task.md"),
+      "type: task\nsubtype: research\ntitle: Decide\nstatus: stable\nworkflow_state: done\nblocked_by: []\n",
+    );
+    writeMd(
+      join(base, "winding-down/tickets/land/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Land\nstatus: stable\nworkflow_state: done\nblocked_by: []\n",
+    );
+    if (withIndex) {
+      writeMd(
+        join(base, "index.md"),
+        INDEX_FM,
+        "\n# docs/tasks\n\n## Live\n\n- enforced-workflow-v5\n- winding-down\n\n## Archived\n\n- old-effort\n",
+      );
+    }
+    mkdirSync(join(base, "archive/old-effort"), { recursive: true });
+    writeMd(join(base, "archive/old-effort/map.md"), "type: map\ntitle: Old effort\nstatus: deprecated\n");
+  }
+
+  test("refuses an effort that is not finalizable, naming what remains", async () => {
+    const t = mkTmp(); seedArchiveTree(t);
+    writeFileSync(
+      join(t, "docs/tasks/winding-down/tickets/land/ticket.md"),
+      readFileSync(join(t, "docs/tasks/winding-down/tickets/land/ticket.md"), "utf-8").replace("done", "todo"),
+      "utf-8",
+    );
+    await expect(tools.tw_archive_effort.execute({ selector: "winding-down" }, ctx(t))).rejects.toThrow(
+      /unfinished item\(s\): land/,
+    );
+    // The refusal moves nothing and deprecates nothing.
+    expect(existsSync(join(t, "docs/tasks/winding-down/map.md"))).toBe(true);
+    expect(existsSync(join(t, "docs/tasks/archive/winding-down"))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("deprecates the map and its done items, then moves the effort to the archive", async () => {
+    const t = mkTmp(); seedArchiveTree(t);
+    const out = await tools.tw_archive_effort.execute({ selector: "winding-down" }, ctx(t));
+    expect(out).toContain("archive/winding-down");
+    expect(existsSync(join(t, "docs/tasks/winding-down"))).toBe(false);
+
+    const map = parse(readFileSync(join(t, "docs/tasks/archive/winding-down/map.md"), "utf-8"));
+    expect(map.data.status).toBe("deprecated");
+    expect(map.data).not.toHaveProperty("workflow_state");
+    const ticket = parse(readFileSync(join(t, "docs/tasks/archive/winding-down/tickets/land/ticket.md"), "utf-8"));
+    expect(ticket.data.status).toBe("deprecated");
+    expect(ticket.data.workflow_state).toBe("done");
+    const task = parse(readFileSync(join(t, "docs/tasks/archive/winding-down/tasks/decide/task.md"), "utf-8"));
+    expect(task.data.status).toBe("deprecated");
+    expect(task.data.workflow_state).toBe("done");
+    // The spec is not a done item: it keeps its status.
+    const spec = parse(readFileSync(join(t, "docs/tasks/archive/winding-down/spec.md"), "utf-8"));
+    expect(spec.data.status).toBe("stable");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("updates the root index: the effort leaves Live and joins Archived, both sorted", async () => {
+    const t = mkTmp(); seedArchiveTree(t);
+    await tools.tw_archive_effort.execute({ selector: "winding-down" }, ctx(t));
+    const doc = parse(readFileSync(join(t, "docs/tasks/index.md"), "utf-8"));
+    expect(readMapSection(doc.body, "Live")).toEqual(["- enforced-workflow-v5"]);
+    expect(readMapSection(doc.body, "Archived")).toEqual(["- old-effort", "- winding-down"]);
+    // The index frontmatter survives.
+    expect(doc.data.type).toBe("index");
+    expect(doc.data.okf_version).toBe("0.2");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("creates the root index with the migration's shape when it is missing", async () => {
+    const t = mkTmp(); seedArchiveTree(t, false);
+    const out = await tools.tw_archive_effort.execute({ selector: "winding-down" }, ctx(t));
+    expect(out).toContain("index");
+    const doc = parse(readFileSync(join(t, "docs/tasks/index.md"), "utf-8"));
+    expect(doc.data.type).toBe("index");
+    expect(doc.data.okf_version).toBe("0.2");
+    expect(doc.data.title).toBe("docs/tasks");
+    expect(readMapSection(doc.body, "Live")).toEqual(["(none)"]);
+    // A missing index carries no memory of earlier archives: this run's move
+    // is the only entry it can list.
+    expect(readMapSection(doc.body, "Archived")).toEqual(["- winding-down"]);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an already-archived effort and a destination collision", async () => {
+    const t = mkTmp(); seedArchiveTree(t);
+    await expect(tools.tw_archive_effort.execute({ selector: "old-effort" }, ctx(t))).rejects.toThrow(
+      /not a live effort/,
+    );
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp(); seedArchiveTree(t2);
+    mkdirSync(join(t2, "docs/tasks/archive/winding-down"), { recursive: true });
+    await expect(tools.tw_archive_effort.execute({ selector: "winding-down" }, ctx(t2))).rejects.toThrow(
+      /already exists/,
+    );
+    // The collision refuses without deprecating the live map.
+    expect(parse(readFileSync(join(t2, "docs/tasks/winding-down/map.md"), "utf-8")).data.status).toBe("stable");
+    rmSync(t2, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape map: run the migration first", async () => {
+    const t = mkTmp();
+    writeMd(join(t, "docs/tasks/maps/legacy/map.md"), "kind: map\ntitle: Legacy\nslug: legacy\nstatus: draft\n");
+    writeMd(join(t, "docs/tasks/maps/legacy/tasks/decide/task.md"), "kind: task\ntitle: Decide\nslug: decide\nstatus: done\n");
+    await expect(tools.tw_archive_effort.execute({ selector: "legacy" }, ctx(t))).rejects.toThrow(
+      /schema-5 migration/,
     );
     rmSync(t, { recursive: true, force: true });
   });

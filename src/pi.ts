@@ -11,7 +11,7 @@
  * - Algorithms belong in tools, not in skill prose.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext, InputEvent, InputEventResult, ToolCallEvent, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
@@ -20,7 +20,7 @@ import { Type, type TSchema } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
-import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, readMapSection, writeMapSection, MAP_SECTION_NON_GOALS, MAP_SECTION_NON_NEGOTIABLE_FACTS, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
+import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, readMapSection, writeMapSection, effortDirOf, MAP_SECTION_NON_GOALS, MAP_SECTION_NON_NEGOTIABLE_FACTS, TICKET_SUBTYPES, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
 import {
   CLOSER,
   buildOpenParameters,
@@ -43,6 +43,7 @@ import {
   type ScanIndexLike,
 } from "./core/graph.js";
 import { toObject, fromObject, freshState, isPointerName, POINTER_NAMES, type WorkflowState } from "./core/state.js";
+import { OKF_VERSION } from "./core/migrate.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 
@@ -215,6 +216,17 @@ function isFile(p: string): boolean {
 
 function readYaml(p: string): unknown {
   return YAML.parse(readFileSync(p, "utf-8"));
+}
+
+/** The frontmatter title of an artifact file, or null when it has none. */
+function readArtifactTitle(path: string): string | null {
+  if (!isFile(path)) return null;
+  try {
+    const title = parse(readFileSync(path, "utf-8")).data.title;
+    return typeof title === "string" && title.trim() !== "" ? title : null;
+  } catch {
+    return null;
+  }
 }
 
 function writeYaml(p: string, data: unknown): void {
@@ -643,6 +655,34 @@ function clearReadyForSpec(doc: Document): boolean {
 }
 
 /**
+ * The ticket half of the done-marking: the changelog entry lands before the
+ * done-marking (the per-ticket close-out order), so the changelog must
+ * reference the ticket as a stand-alone token, the same pointer convention
+ * the planning half enforces against the map. A ticket done-marking is not a
+ * plan change: ready_for_spec stays untouched.
+ */
+function markTicketDone(root: string, path: string, art: Artifact, doc: Document): string {
+  const changelogPath = join(taskRoot(root), "CHANGELOG.md");
+  if (!isFile(changelogPath)) {
+    throw new Error(
+      `'${art.slug}' cannot be marked done: the changelog (${relative(root, changelogPath)}) does not exist; ` +
+        `write the ticket's changelog entry with tw_write_changelog first`,
+    );
+  }
+  const changelogDoc = parse(readFileSync(changelogPath, "utf-8"));
+  if (!referencesSlug(changelogDoc.body, art.slug)) {
+    throw new Error(
+      `'${art.slug}' cannot be marked done: the changelog has no entry for it yet; the changelog entry lands ` +
+        `before the done-marking, so write it with tw_write_changelog (the entry must reference '${art.slug}') ` +
+        `and mark the ticket done after`,
+    );
+  }
+  doc.data.workflow_state = "done";
+  writeFileSync(path, dump(doc), "utf-8");
+  return `marked '${art.slug}' done (workflow_state: done)`;
+}
+
+/**
  * True when a body references the slug as a stand-alone token: the write-back
  * pointer convention (a short statement plus the task slug). A longer
  * hyphenated slug that merely contains this one is not a reference.
@@ -650,6 +690,105 @@ function clearReadyForSpec(doc: Document): boolean {
 function referencesSlug(body: string, slug: string): boolean {
   const escaped = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(?:^|[^\\w-])${escaped}(?![\\w-])`).test(body);
+}
+
+/**
+ * The live effort directory a selector names, or null. The selector may be
+ * the effort slug, an effort-directory path, or a path to an artifact inside
+ * the effort (its map resolves it). The resolved directory must sit inside
+ * the task tree, so a traversal selector names no effort.
+ */
+function liveEffortDir(root: string, selector: string): string | null {
+  const candidates = [resolvePath(taskRoot(root), selector)];
+  try {
+    candidates.push(dirname(resolveArt(root, selector, "map").path));
+  } catch { /* not a map selector */ }
+  for (const candidate of candidates) {
+    const rel = relative(taskRoot(root), candidate);
+    if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) continue;
+    // An archived effort is not live: its directory sits under archive/.
+    const first = rel.split(/[\\/]/)[0];
+    if (first === "archive") continue;
+    if (isDir(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Normalize a whole-body write: trimmed content wrapped in single blank
+ * margins, so a dumped document reads with one blank line after the opening
+ * fence and ends with exactly one newline.
+ */
+function normalizedBody(content: string): string {
+  return `\n${content.trim()}\n`;
+}
+
+/**
+ * The slug shape every created artifact must carry: it becomes a directory
+ * name under docs/tasks/, so anything else (spaces, slashes, traversal,
+ * leading hyphen) is refused before it can escape the tree.
+ */
+const SAFE_SLUG = /^[a-z0-9][a-z0-9-]*$/;
+
+const TICKET_SIZES = ["s", "m", "l", "xl"] as const;
+
+/** True when a path sits strictly inside a directory. */
+function isInside(dir: string, path: string): boolean {
+  const rel = relative(dir, path);
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
+
+/**
+ * The ticket frontmatter the v5 ticket writers agree on: stable and ready,
+ * so a created or split ticket sits on the frontier its blockers allow.
+ * Edges are kind-scoped and effort-scoped: only existing tickets of the same
+ * effort are legal targets.
+ */
+interface TicketSeed {
+  slug: string;
+  title: string;
+  subtype: string;
+  size?: string;
+  mode?: string;
+  blocked_by: string[];
+  content?: string;
+}
+
+function ticketDocument(seed: TicketSeed): Document {
+  const data: FrontmatterData = {
+    type: "ticket",
+    subtype: seed.subtype,
+    title: seed.title,
+    status: "stable",
+    workflow_state: "ready",
+    blocked_by: [...seed.blocked_by],
+  };
+  if (seed.size !== undefined) data.size = seed.size;
+  if (seed.mode !== undefined) data.mode = seed.mode;
+  return { data, body: seed.content !== undefined ? normalizedBody(seed.content) : "\n" };
+}
+
+/**
+ * Validate one created ticket's shape: slug, title, subtype, size, and mode.
+ * Throws with the offending field named. blocked_by is validated against the
+ * effort's scanned tickets by the caller (it needs the scan).
+ */
+function validateTicketSeed(seed: TicketSeed): void {
+  if (!SAFE_SLUG.test(seed.slug)) {
+    throw new Error(`invalid slug '${seed.slug}': use lowercase letters, digits, and hyphens (a slug becomes a directory name)`);
+  }
+  if (typeof seed.title !== "string" || seed.title.trim() === "") {
+    throw new Error(`ticket '${seed.slug}' has no title`);
+  }
+  if (!(TICKET_SUBTYPES as readonly string[]).includes(seed.subtype)) {
+    throw new Error(`invalid subtype '${seed.subtype}': a ticket is '${TICKET_SUBTYPES.join("' or '")}'`);
+  }
+  if (seed.size !== undefined && !(TICKET_SIZES as readonly string[]).includes(seed.size)) {
+    throw new Error(`invalid size '${seed.size}': use ${TICKET_SIZES.join(" | ")} (absent means m)`);
+  }
+  if (seed.mode !== undefined && seed.mode !== "human") {
+    throw new Error(`invalid mode '${seed.mode}': the only mode value is 'human'; omit it otherwise`);
+  }
 }
 
 // ─── Tool factory ──────────────────────────────────────────────────────────────
@@ -696,6 +835,21 @@ const Str = (d: string) => ({ type: "string" as const, description: d });
 const OptStr = (d: string) => ({ type: "string" as const, optional: true as const, description: d });
 const Bool = (d: string) => ({ type: "boolean" as const, description: d });
 const OptBool = { type: "boolean" as const, optional: true as const };
+
+/**
+ * Render one root-index section the way the migration renders it: one bullet
+ * per effort, or the '(none)' placeholder when the list is empty.
+ */
+function indexSection(names: string[]): string {
+  return names.length === 0 ? "(none)" : names.map((n) => `- ${n}`).join("\n");
+}
+
+/** The effort names one root-index section lists (bullets only). */
+function indexNames(body: string, section: string): string[] {
+  return (readMapSection(body, section) ?? [])
+    .filter((line) => /^- /.test(line.trim()))
+    .map((line) => line.trim().replace(/^- /, ""));
+}
 
 export function createTools(): Record<string, Tool> {
   return {
@@ -951,21 +1105,289 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
-    tw_mark_done: def(
-      "Mark a planning task done (workflow_state: done). Refuses a task that is already done or deprecated, " +
-        "and refuses when the task's recorded results were not written back to its effort's map first: the map " +
-        "must reference the task, which a tw_write_section write-back does. The planning done-marking clears " +
-        "ready_for_spec, so the next Wayfinder pass re-runs the reconcile.",
-      { selector: Str("Planning task slug or path") },
+    tw_write_spec: def(
+      "Write an effort's specification (spec.md): the only writer of the spec body, through the " +
+        "frontmatter seam. Creates the spec when the effort has none (title from the argument, else the " +
+        "effort's map, else the effort slug), with status draft while writing. 'publish: true' sets " +
+        "status: stable, the named spec-stable write; a plain write leaves the status untouched. Refuses " +
+        "an empty body, a selector naming no live effort, and v3-shape artifacts.",
+      {
+        selector: Str("Effort slug, or the effort's spec or map path"),
+        content: Str("The specification body (markdown after the frontmatter)"),
+        title: OptStr("Title used only when the write creates the spec"),
+        publish: OptBool,
+      },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
-        const { path, art, doc } = resolveArt(root, p.selector, "task");
+        if (typeof p.content !== "string" || p.content.trim() === "") {
+          throw new Error("content is empty: a spec write needs a body");
+        }
+        const body = normalizedBody(p.content);
+        const publish = p.publish === true;
+
+        let hit: ScanHit | null = null;
+        try {
+          hit = resolveArt(root, p.selector, "spec");
+        } catch { /* the effort may exist without a spec yet: create it */ }
+
+        if (hit !== null) {
+          requireV4Shape(hit.art);
+          hit.doc.body = body;
+          if (publish) hit.doc.data.status = "stable";
+          writeFileSync(hit.path, dump(hit.doc), "utf-8");
+          return `wrote ${relative(root, hit.path)}${publish ? " (status: stable)" : ""}`;
+        }
+
+        const effortDir = liveEffortDir(root, p.selector);
+        if (effortDir === null) {
+          throw new Error(
+            `no live effort '${p.selector}': create the effort (a map at docs/tasks/<effort>/map.md) before writing its spec`,
+          );
+        }
+        const title =
+          typeof p.title === "string" && p.title.trim() !== ""
+            ? p.title.trim()
+            : readArtifactTitle(join(effortDir, "map.md")) ?? basename(effortDir);
+        const doc: Document = {
+          data: { type: "spec", title, status: publish ? "stable" : "draft" },
+          body,
+        };
+        const path = join(effortDir, "spec.md");
+        writeFileSync(path, dump(doc), "utf-8");
+        return `wrote ${relative(root, path)} (created, status: ${publish ? "stable" : "draft"})`;
+      },
+    ),
+
+    tw_add_ticket: def(
+      "Create an implementation ticket at docs/tasks/<effort>/tickets/<slug>/ticket.md: the only ticket " +
+        "creator, writing through the frontmatter seam. Writes type: ticket with the given subtype (feature " +
+        "or bug), status: stable, workflow_state: ready, and validates blocked_by at creation (kind-scoped: " +
+        "only existing tickets of the same effort; create in dependency order, no second wiring pass). " +
+        "Refuses an unsafe or duplicate slug, a size or mode outside the schema, a blocked_by edge that " +
+        "dangles or crosses the kind, and an effort with no map or spec anchor.",
+      {
+        effort: Str("The effort slug the ticket lands in"),
+        slug: Str("The ticket slug (lowercase letters, digits, hyphens)"),
+        title: Str("The ticket title"),
+        subtype: { type: "string" as const, enum: [...TICKET_SUBTYPES], description: "feature or bug" },
+        size: { type: "string" as const, optional: true, enum: [...TICKET_SIZES], description: "s | m | l | xl; absent means m" },
+        mode: OptStr("'human' when the human must implement it; omit otherwise"),
+        blocked_by: { type: "array" as const, items: { type: "string" as const }, optional: true, description: "Ticket slugs in the same effort that must be done first" },
+        content: OptStr("The ticket body (what to build)"),
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const seed: TicketSeed = {
+          slug: String(p.slug ?? ""),
+          title: typeof p.title === "string" ? p.title : "",
+          subtype: String(p.subtype ?? ""),
+          size: typeof p.size === "string" ? p.size : undefined,
+          mode: typeof p.mode === "string" ? p.mode : undefined,
+          blocked_by: Array.isArray(p.blocked_by) ? p.blocked_by.map(String) : [],
+          content: typeof p.content === "string" ? p.content : undefined,
+        };
+        validateTicketSeed(seed);
+
+        const effortDir = liveEffortDir(root, p.effort);
+        if (effortDir === null) {
+          throw new Error(`no live effort '${p.effort}': create the effort (a map at docs/tasks/<effort>/map.md) before adding tickets`);
+        }
+        const anchor = directoryLeaf(effortDir, "map") ?? directoryLeaf(effortDir, "spec");
+        if (anchor === null) {
+          throw new Error(
+            `effort '${p.effort}' has neither a map nor a spec: adding a ticket there would orphan it in the graph`,
+          );
+        }
+        requireV4Shape(parseArtifactFile(anchor).art);
+
+        const index = scanMemo(root)();
+        const inEffort = (path: string): boolean => isInside(effortDir, path);
+        const clash = index.hits.find((h) => h.art.slug === seed.slug && inEffort(h.path));
+        if (clash !== undefined) {
+          throw new Error(`'${seed.slug}' already exists in '${p.effort}' (${clash.art.type} at ${relative(root, clash.path)})`);
+        }
+        if (isDir(join(effortDir, "tickets", seed.slug))) {
+          throw new Error(`'${seed.slug}' already exists in '${p.effort}' (its ticket directory is there)`);
+        }
+
+        for (const target of seed.blocked_by) {
+          if (target === seed.slug) {
+            throw new Error(`ticket '${seed.slug}' cannot block on itself`);
+          }
+          const known = index.hits.find(
+            (h) => h.art.type === "ticket" && h.art.slug === target && inEffort(h.path),
+          );
+          if (known === undefined) {
+            throw new Error(
+              `blocked_by target '${target}' is not an existing ticket in '${p.effort}': create the tickets in ` +
+                `dependency order (edges are kind-scoped: tickets block tickets)`,
+            );
+          }
+        }
+
+        const ticketDir = join(effortDir, "tickets", seed.slug);
+        const ticketPath = join(ticketDir, "ticket.md");
+        mkdirSync(ticketDir, { recursive: true });
+        writeFileSync(ticketPath, dump(ticketDocument(seed)), "utf-8");
+        const sizeNote = seed.size !== undefined ? `, size: ${seed.size}` : "";
+        return `created ${relative(root, ticketPath)} (${seed.subtype}${sizeNote})`;
+      },
+    ),
+
+    tw_split_ticket: defStructured(
+      "Split a ticket into sub-tickets: the escape hatch that decomposes a failed or oversized ticket " +
+        "instead of ad-hoc files. Creates each sub-ticket (inheriting the original's subtype and blocked_by " +
+        "edges, chaining between subs through per-sub blocked_by) and supersedes the original as deprecated " +
+        "plus done with a body note naming its sub-tickets, so the graph absorbs the split and the history " +
+        "reads. Refuses an original that is already done or deprecated, duplicate or unsafe sub slugs, sub " +
+        "edges that dangle or name the superseded original, and v3-shape artifacts.",
+      Type.Object({
+        selector: Type.String({ description: "The original ticket slug or path" }),
+        subtickets: Type.Array(
+          Type.Object({
+            slug: Type.String({ description: "The sub-ticket slug (lowercase letters, digits, hyphens)" }),
+            title: Type.String({ description: "The sub-ticket title" }),
+            size: Type.Optional(
+              Type.Union(TICKET_SIZES.map((s) => Type.Literal(s)), { description: "s | m | l | xl; absent means m" }),
+            ),
+            blocked_by: Type.Optional(
+              Type.Array(
+                Type.String({ description: "Extra edges: sibling sub slugs (sequential work) or other tickets of the effort" }),
+              ),
+            ),
+            content: Type.Optional(Type.String({ description: "The sub-ticket body (what to build)" })),
+          }),
+          { description: "The sub-tickets that replace the original" },
+        ),
+      }),
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const subs: TicketSeed[] = (Array.isArray(p.subtickets) ? p.subtickets : []).map((raw: any) => ({
+          slug: String(raw?.slug ?? ""),
+          title: typeof raw?.title === "string" ? raw.title : "",
+          subtype: "",
+          size: typeof raw?.size === "string" ? raw.size : undefined,
+          blocked_by: Array.isArray(raw?.blocked_by) ? raw.blocked_by.map(String) : [],
+          content: typeof raw?.content === "string" ? raw.content : undefined,
+        }));
+        if (subs.length === 0) {
+          throw new Error("a split needs at least one sub-ticket");
+        }
+
+        const original = resolveArt(root, p.selector, "ticket");
+        requireV4Shape(original.art);
+        if (original.art.status === "deprecated") {
+          throw new Error(`'${original.art.slug}' is deprecated; deprecated counts as done`);
+        }
+        if (original.art.workflow_state === "done") {
+          throw new Error(`'${original.art.slug}' is already done; there is no work left to split`);
+        }
+        const effortKey = effortDirOf(original.path ?? "");
+        if (effortKey === null || effortKey.split(/[\\/]/)[0] === "archive") {
+          throw new Error(`'${original.art.slug}' sits in no live effort; splits happen in a live effort`);
+        }
+        const effortDir = dirname(dirname(dirname(resolvePath(original.path!))));
+        const inheritedSubtype = original.art.subtype ?? "feature";
+        for (const sub of subs) {
+          validateTicketSeed({ ...sub, subtype: inheritedSubtype });
+        }
+
+        const index = scanMemo(root)();
+        const inEffort = (path: string): boolean => isInside(effortDir, path);
+        const siblingSlugs = new Set<string>();
+        for (const sub of subs) {
+          if (siblingSlugs.has(sub.slug)) {
+            throw new Error(`duplicate sub-ticket slug '${sub.slug}' in the split`);
+          }
+          siblingSlugs.add(sub.slug);
+          if (sub.slug === original.art.slug) {
+            throw new Error(`'${sub.slug}' is the superseded original; a sub-ticket needs a new slug`);
+          }
+          const clash = index.hits.find((h) => h.art.slug === sub.slug && inEffort(h.path));
+          if (clash !== undefined) {
+            throw new Error(`'${sub.slug}' already exists in the effort (${clash.art.type} at ${relative(root, clash.path)})`);
+          }
+        }
+        for (const sub of subs) {
+          for (const target of sub.blocked_by) {
+            if (siblingSlugs.has(target)) continue;
+            if (target === original.art.slug) {
+              throw new Error(
+                `'${target}' is superseded by this split; its slug cannot be an edge target`,
+              );
+            }
+            const known = index.hits.find(
+              (h) => h.art.type === "ticket" && h.art.slug === target && inEffort(h.path),
+            );
+            if (known === undefined) {
+              throw new Error(
+                `blocked_by target '${target}' is not an existing ticket in the effort: edges are kind-scoped, tickets block tickets`,
+              );
+            }
+          }
+        }
+
+        const created: string[] = [];
+        for (const sub of subs) {
+          const seed: TicketSeed = {
+            ...sub,
+            subtype: inheritedSubtype,
+            // The sub-tickets inherit the original's edges and chain between
+            // themselves through the caller's per-sub blocked_by.
+            blocked_by: [...new Set([...original.art.blocked_by, ...sub.blocked_by])],
+          };
+          const ticketDir = join(effortDir, "tickets", sub.slug);
+          const ticketPath = join(ticketDir, "ticket.md");
+          mkdirSync(ticketDir, { recursive: true });
+          writeFileSync(ticketPath, dump(ticketDocument(seed)), "utf-8");
+          created.push(relative(root, ticketPath));
+        }
+
+        original.doc.data.status = "deprecated";
+        original.doc.data.workflow_state = "done";
+        original.doc.body = `${original.doc.body.replace(/\n+$/, "")}\n\nSuperseded by ${subs.map((s) => s.slug).join(", ")}.\n`;
+        writeFileSync(original.path!, dump(original.doc), "utf-8");
+
+        return outcome(
+          `split '${original.art.slug}': created ${created.join(", ")}; original superseded (status: deprecated, workflow_state: done).`,
+          { original: original.art.slug, created, supersededBy: subs.map((s) => s.slug) },
+        );
+      },
+    ),
+
+    tw_mark_done: def(
+      "Mark a planning task or an implementation ticket done (workflow_state: done). Both refuse items that " +
+        "are already done or deprecated (deprecated counts as done). A planning task refuses when its recorded " +
+        "results were not written back to its effort's map first: the map must reference the task, which a " +
+        "tw_write_section write-back does; the planning done-marking clears ready_for_spec, so the next " +
+        "Wayfinder pass re-runs the reconcile. An implementation ticket refuses when the changelog has no entry " +
+        "referencing it yet: the changelog entry lands before the done-marking (write it with tw_write_changelog), " +
+        "and a ticket done-marking is not a plan change, so it leaves ready_for_spec alone.",
+      { selector: Str("Planning task or ticket slug or path") },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        // Tasks take precedence when a slug could name either kind, so the
+        // planning half's resolution behavior is unchanged.
+        let hit: ScanHit;
+        try {
+          hit = resolveArt(root, p.selector, "task");
+        } catch (taskError) {
+          try {
+            hit = resolveArt(root, p.selector, "ticket");
+          } catch {
+            throw taskError;
+          }
+        }
+        const { path, art, doc } = hit;
         requireV4Shape(art);
         if (art.status === "deprecated") {
           throw new Error(`'${art.slug}' is deprecated; deprecated counts as done`);
         }
         if (art.workflow_state === "done") {
           throw new Error(`'${art.slug}' is already done`);
+        }
+        if (art.type === "ticket") {
+          return markTicketDone(root, path, art, doc);
         }
         const mapArt = graphForPath(effortGraphs(scanMemo(root)()), path)?.map ?? null;
         if (mapArt === null || !mapArt.path) {
@@ -988,6 +1410,109 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
+    tw_mark_blocked: def(
+      "Mark a planning task blocked (workflow_state: blocked) and record the reason in the task body: the " +
+        "named write for a task that cannot complete yet (missing evidence, a pending human or environment " +
+        "prerequisite). Re-blocking replaces the recorded reason. Refuses an empty reason, a task that is " +
+        "already done or deprecated (blocking must not resurrect finished work), tickets (this marks planning " +
+        "tasks), and v3-shape artifacts.",
+      {
+        selector: Str("Planning task slug or path"),
+        reason: Str("Why the task is blocked and what would unblock it"),
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const reason = typeof p.reason === "string" ? p.reason.trim() : "";
+        if (reason === "") {
+          throw new Error("reason is empty: a blocked marking states what would unblock the task");
+        }
+        const { path, art, doc } = resolveArt(root, p.selector, "task");
+        requireV4Shape(art);
+        if (art.status === "deprecated") {
+          throw new Error(`'${art.slug}' is deprecated; deprecated counts as done`);
+        }
+        if (art.workflow_state === "done") {
+          throw new Error(`'${art.slug}' is already done; a done task cannot be marked blocked`);
+        }
+        doc.data.workflow_state = "blocked";
+        // The reason is tool-owned: replace any previous Blocked line so a
+        // re-blocking updates the record instead of accumulating lines.
+        const kept = doc.body.split("\n").filter((line) => !/^Blocked: /.test(line));
+        while (kept.length > 0 && kept[kept.length - 1].trim() === "") kept.pop();
+        doc.body = `${kept.join("\n")}\n\nBlocked: ${reason}\n`;
+        writeFileSync(path, dump(doc), "utf-8");
+        return `marked '${art.slug}' blocked (workflow_state: blocked)`;
+      },
+    ),
+
+    tw_archive_effort: def(
+      "Archive a finished effort: the named archive move, so no archive step needs git mv or the shell. " +
+        "Checks the effort is finalizable (every task and ticket done; a spec implies at least one ticket), " +
+        "marks the map and its done items status: deprecated (workflow_state stays done; the archived-effort " +
+        "convention), moves docs/tasks/<effort>/ to docs/tasks/archive/<effort>/ as a unit, and updates the " +
+        "root index (docs/tasks/index.md): the effort leaves ## Live and joins ## Archived, both sorted. " +
+        "Refuses an effort that is not finalizable, an already-archived effort, a destination collision " +
+        "(refused, never overwritten), and v3-shape artifacts.",
+      { selector: Str("Effort slug, or the effort's map path") },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const { path, art } = resolveArt(root, p.selector, "map");
+        requireV4Shape(art);
+        const effortKey = effortDirOf(path);
+        if (effortKey === null || effortKey.split(/[\\/]/)[0] === "archive") {
+          throw new Error(`'${art.slug}' is not a live effort: it is archived or sits in no effort directory`);
+        }
+        const graph = graphForPath(effortGraphs(scanMemo(root)()), path);
+        if (graph === null) {
+          throw new Error(`'${art.slug}' sits in no effort graph; there is nothing coherent to archive`);
+        }
+        const reason = effortFinalizable(graph);
+        if (reason !== null) {
+          throw new Error(`cannot archive '${art.slug}': ${reason}`);
+        }
+        const liveDir = join(taskRoot(root), effortKey);
+        const destDir = join(taskRoot(root), "archive", effortKey);
+        if (existsSync(destDir)) {
+          throw new Error(
+            `archive destination '${relative(root, destDir)}' already exists: a collision is refused, never overwritten`,
+          );
+        }
+
+        // 1. Deprecate the map and its done items (finalizability guarantees
+        // every item is done). The spec keeps its status.
+        const deprecate = (artifactPath: string): void => {
+          const { doc } = parseArtifactFile(artifactPath);
+          doc.data.status = "deprecated";
+          writeFileSync(artifactPath, dump(doc), "utf-8");
+        };
+        deprecate(path);
+        for (const item of [...graph.tasks, ...graph.tickets]) {
+          if (item.path) deprecate(item.path);
+        }
+
+        // 2. The move, as a unit: non-artifact files (.work, findings) travel
+        // with the effort.
+        mkdirSync(dirname(destDir), { recursive: true });
+        renameSync(liveDir, destDir);
+
+        // 3. The root index: the effort leaves Live and joins Archived.
+        const indexPath = join(taskRoot(root), "index.md");
+        const indexDoc: Document = isFile(indexPath)
+          ? parse(readFileSync(indexPath, "utf-8"))
+          : { data: { type: "index", okf_version: OKF_VERSION, title: "docs/tasks" }, body: "\n# docs/tasks\n" };
+        const live = indexNames(indexDoc.body, "Live").filter((n) => n !== effortKey);
+        const archived = [...new Set([...indexNames(indexDoc.body, "Archived"), effortKey])].sort((a, b) =>
+          a.localeCompare(b),
+        );
+        let body = writeMapSection(indexDoc.body, "Live", indexSection(live.sort((a, b) => a.localeCompare(b))));
+        body = writeMapSection(body, "Archived", indexSection(archived));
+        indexDoc.body = body;
+        writeFileSync(indexPath, dump(indexDoc), "utf-8");
+
+        return `archived '${effortKey}' to ${relative(root, destDir)}; index updated (${relative(root, indexPath)})`;
+      },
+    ),
+
     tw_resolve_uncertainty: def(
       "Record a ticket's uncertainty resolution: writes the resolution next to the ticket's .work/uncertainty.md, deletes the uncertainty file, and returns the resolution path for the re-run pointer. Refuses when the ticket has no uncertainty file, so it can never serve as a generic writer.",
       { selector: Str("Ticket slug or path"), resolution: Str("The resolution text to record") },
@@ -1004,6 +1529,113 @@ export function createTools(): Record<string, Tool> {
         writeFileSync(resolutionPath, `${p.resolution.trim()}\n`, "utf-8");
         rmSync(uncertaintyPath);
         return relative(root, resolutionPath);
+      },
+    ),
+
+    tw_write_changelog: def(
+      "Append a changelog entry to docs/tasks/CHANGELOG.md: the only writer of the changelog. The entry " +
+        "heading is '## <date>, <title> (<slug>)' and it lands on top of the dated-entry region (below any " +
+        "release block), so the newest entry reads first; the entry must reference its ticket slug, which is " +
+        "what the ticket done-marking checks. Creates the changelog with conformant frontmatter when missing. " +
+        "Refuses a duplicate entry for the same slug, an empty slug, title, or content, and a date outside " +
+        "YYYY-MM-DD.",
+      {
+        slug: Str("The ticket slug the entry records"),
+        title: Str("The entry title (usually the ticket title)"),
+        content: Str("The entry body: the key changes and decisions, and the outcome"),
+        date: OptStr("The entry date (YYYY-MM-DD); today when absent"),
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const slug = String(p.slug ?? "").trim();
+        if (!SAFE_SLUG.test(slug)) {
+          throw new Error(`invalid slug '${slug}': use lowercase letters, digits, and hyphens`);
+        }
+        const title = typeof p.title === "string" ? p.title.trim() : "";
+        if (title === "") throw new Error("title is empty: an entry names what landed");
+        const content = typeof p.content === "string" ? p.content.trim() : "";
+        if (content === "") throw new Error("content is empty: an entry states the changes and the outcome");
+        const date =
+          typeof p.date === "string" && p.date.trim() !== "" ? p.date.trim() : new Date().toISOString().slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          throw new Error(`invalid date '${date}': use YYYY-MM-DD`);
+        }
+        const heading = `## ${date}, ${title} (${slug})`;
+        const entryLines = [heading, "", ...content.split("\n")];
+
+        const changelogPath = join(taskRoot(root), "CHANGELOG.md");
+        const doc: Document = isFile(changelogPath)
+          ? parse(readFileSync(changelogPath, "utf-8"))
+          : { data: { type: "changelog", title: "Task Changelog" }, body: "\n# Task Changelog\n" };
+
+        const escaped = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        if (new RegExp(`^## .*\\(${escaped}\\)\\s*$`, "m").test(doc.body)) {
+          throw new Error(`the changelog already has an entry for '${slug}': one entry per landed ticket`);
+        }
+
+        const lines = doc.body.split("\n");
+        const firstDated = lines.findIndex((line) => /^## \d{4}-\d{2}-\d{2},/.test(line));
+        if (firstDated === -1) {
+          while (lines.length > 0 && lines[lines.length - 1].trim() === "") lines.pop();
+          doc.body = [...lines, "", ...entryLines, ""].join("\n");
+        } else {
+          lines.splice(firstDated, 0, "", ...entryLines, "");
+          doc.body = lines.join("\n");
+        }
+        writeFileSync(changelogPath, dump(doc), "utf-8");
+        return `wrote ${relative(root, changelogPath)}: ${heading}`;
+      },
+    ),
+
+    tw_record_out_of_scope: def(
+      "Record a consciously ruled-out request in the global out-of-scope knowledge base " +
+        "(docs/tasks/out-of-scope/<slug>.md) and update its index: the escape hatch that keeps a rejected ask " +
+        "from being re-debated. The note carries the request and the reason it was ruled out; the index lists " +
+        "one bullet per note, sorted by slug, and is created with the bundle's index frontmatter when missing. " +
+        "Refuses a duplicate slug, an empty request or reason (a rejection without a reason is not a record), " +
+        "and an unsafe slug.",
+      {
+        slug: Str("The note slug (the filename without .md)"),
+        title: Str("The note title (the request in a few words)"),
+        request: Str("The request that was ruled out"),
+        reason: Str("Why it was ruled out"),
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const slug = String(p.slug ?? "").trim();
+        if (!SAFE_SLUG.test(slug)) {
+          throw new Error(`invalid slug '${slug}': use lowercase letters, digits, and hyphens`);
+        }
+        const title = typeof p.title === "string" ? p.title.trim() : "";
+        if (title === "") throw new Error("title is empty: a note names the request");
+        const request = typeof p.request === "string" ? p.request.trim() : "";
+        if (request === "") throw new Error("request is empty: a note states the request it records");
+        const reason = typeof p.reason === "string" ? p.reason.trim() : "";
+        if (reason === "") throw new Error("reason is empty: a rejection without a reason is not a record");
+
+        const kbDir = join(taskRoot(root), "out-of-scope");
+        const notePath = join(kbDir, `${slug}.md`);
+        if (isFile(notePath)) {
+          throw new Error(`'${slug}' is already recorded in the out-of-scope KB: the same no is not recorded twice`);
+        }
+        const note: Document = {
+          data: { type: "out-of-scope note", title, status: "stable" },
+          body: `\n## Request\n\n${request}\n\n## Reason\n\n${reason}\n`,
+        };
+        mkdirSync(kbDir, { recursive: true });
+        writeFileSync(notePath, dump(note), "utf-8");
+
+        const indexPath = join(kbDir, "index.md");
+        const indexDoc: Document = isFile(indexPath)
+          ? parse(readFileSync(indexPath, "utf-8"))
+          : { data: { type: "out-of-scope note", title: "out-of-scope", status: "stable" }, body: "\n# out-of-scope\n" };
+        const existing = (readMapSection(indexDoc.body, "Notes") ?? []).filter((l) => l.trim() !== "");
+        const bullets = [...existing, `- [${title}](${slug}.md)`];
+        const slugOf = (line: string): string => /\]\((.+)\.md\)\s*$/.exec(line)?.[1] ?? line;
+        bullets.sort((a, b) => slugOf(a).localeCompare(slugOf(b)));
+        indexDoc.body = writeMapSection(indexDoc.body, "Notes", bullets.join("\n"));
+        writeFileSync(indexPath, dump(indexDoc), "utf-8");
+        return `recorded ${relative(root, notePath)} and updated ${relative(root, indexPath)}`;
       },
     ),
 
