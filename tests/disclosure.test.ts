@@ -57,6 +57,31 @@ describe("disclosure core: tw_open", () => {
     }
   });
 
+  test("opening to-spec discloses the swapped-in planning writers and derives from the new signature", async () => {
+    // to-spec's provisional toolset gained tw_write_section/tw_finalize_map in
+    // the same commit that removed tw_set: without a private tool there the
+    // first open-set derivation throws (see signatureToolOf).
+    const active = [...IDLE];
+    const ctx = disclosureCtx(active);
+    const result = (await tools.tw_open.execute(
+      { skill: "to-spec", effort: "some-effort" },
+      ctx,
+    )) as ToolResult;
+    expect(result.details.opened).toBe(true);
+    for (const tool of ["tw_write_section", "tw_finalize_map", "tw_get", "tw_list", "tw_close"]) {
+      expect(active, `${tool} must be declared once to-spec is open`).toContain(tool);
+    }
+    // The open-set derivation keys on the signature tool: with to-spec's
+    // writers active, the router names to-spec as the open skill.
+    const next = (await tools.tw_next.execute({}, ctx)) as ToolResult;
+    expect(next.text).toContain("to-spec");
+    await tools.tw_close.execute({ skill: "to-spec" }, ctx);
+    expect(active).toEqual(expect.arrayContaining([...IDLE]));
+    for (const tool of ["tw_close", "tw_write_section", "tw_finalize_map", "tw_get", "tw_list"]) {
+      expect(active, `${tool} must leave the declared set when to-spec closes`).not.toContain(tool);
+    }
+  });
+
   test("refuses a duplicate open and leaves the declared set untouched", async () => {
     const active = [...IDLE];
     const ctx = disclosureCtx(active);
