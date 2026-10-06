@@ -65,6 +65,7 @@ const GATED_NAMES = [
   "tw_add_ticket",
   "tw_split_ticket",
   "tw_mark_blocked",
+  "tw_archive_effort",
   "tw_record_out_of_scope",
   "tw_write_changelog",
   "notify_user",

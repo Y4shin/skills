@@ -194,6 +194,7 @@ describe("task-workflow tools", () => {
       const names = Object.keys(tools).sort();
       expect(names).toEqual([
         "tw_add_ticket",
+        "tw_archive_effort",
         "tw_close",
         "tw_context",
         "tw_dependency_levels",
@@ -2258,6 +2259,129 @@ describe("task-workflow tools: tw_record_out_of_scope, the out-of-scope KB write
       tools.tw_record_out_of_scope.execute({ slug: "Bad Slug", title: "X", request: "R", reason: "Q" }, ctx(t)),
     ).rejects.toThrow(/invalid slug/);
     expect(existsSync(kbDir(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_archive_effort, the archive move", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  const INDEX_FM = 'type: index\nokf_version: "0.2"\ntitle: docs/tasks\n';
+
+  /** A finished effort, plus a root index listing it as live. */
+  function seedArchiveTree(t: string, withIndex = true): void {
+    const base = join(t, "docs/tasks");
+    writeMd(join(base, "winding-down/map.md"), "type: map\ntitle: Winding down\nstatus: stable\n");
+    writeMd(join(base, "winding-down/spec.md"), "type: spec\ntitle: Winding down spec\nstatus: stable\n");
+    writeMd(
+      join(base, "winding-down/tasks/decide/task.md"),
+      "type: task\nsubtype: research\ntitle: Decide\nstatus: stable\nworkflow_state: done\nblocked_by: []\n",
+    );
+    writeMd(
+      join(base, "winding-down/tickets/land/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Land\nstatus: stable\nworkflow_state: done\nblocked_by: []\n",
+    );
+    if (withIndex) {
+      writeMd(
+        join(base, "index.md"),
+        INDEX_FM,
+        "\n# docs/tasks\n\n## Live\n\n- enforced-workflow-v5\n- winding-down\n\n## Archived\n\n- old-effort\n",
+      );
+    }
+    mkdirSync(join(base, "archive/old-effort"), { recursive: true });
+    writeMd(join(base, "archive/old-effort/map.md"), "type: map\ntitle: Old effort\nstatus: deprecated\n");
+  }
+
+  test("refuses an effort that is not finalizable, naming what remains", async () => {
+    const t = mkTmp(); seedArchiveTree(t);
+    writeFileSync(
+      join(t, "docs/tasks/winding-down/tickets/land/ticket.md"),
+      readFileSync(join(t, "docs/tasks/winding-down/tickets/land/ticket.md"), "utf-8").replace("done", "todo"),
+      "utf-8",
+    );
+    await expect(tools.tw_archive_effort.execute({ selector: "winding-down" }, ctx(t))).rejects.toThrow(
+      /unfinished item\(s\): land/,
+    );
+    // The refusal moves nothing and deprecates nothing.
+    expect(existsSync(join(t, "docs/tasks/winding-down/map.md"))).toBe(true);
+    expect(existsSync(join(t, "docs/tasks/archive/winding-down"))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("deprecates the map and its done items, then moves the effort to the archive", async () => {
+    const t = mkTmp(); seedArchiveTree(t);
+    const out = await tools.tw_archive_effort.execute({ selector: "winding-down" }, ctx(t));
+    expect(out).toContain("archive/winding-down");
+    expect(existsSync(join(t, "docs/tasks/winding-down"))).toBe(false);
+
+    const map = parse(readFileSync(join(t, "docs/tasks/archive/winding-down/map.md"), "utf-8"));
+    expect(map.data.status).toBe("deprecated");
+    expect(map.data).not.toHaveProperty("workflow_state");
+    const ticket = parse(readFileSync(join(t, "docs/tasks/archive/winding-down/tickets/land/ticket.md"), "utf-8"));
+    expect(ticket.data.status).toBe("deprecated");
+    expect(ticket.data.workflow_state).toBe("done");
+    const task = parse(readFileSync(join(t, "docs/tasks/archive/winding-down/tasks/decide/task.md"), "utf-8"));
+    expect(task.data.status).toBe("deprecated");
+    expect(task.data.workflow_state).toBe("done");
+    // The spec is not a done item: it keeps its status.
+    const spec = parse(readFileSync(join(t, "docs/tasks/archive/winding-down/spec.md"), "utf-8"));
+    expect(spec.data.status).toBe("stable");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("updates the root index: the effort leaves Live and joins Archived, both sorted", async () => {
+    const t = mkTmp(); seedArchiveTree(t);
+    await tools.tw_archive_effort.execute({ selector: "winding-down" }, ctx(t));
+    const doc = parse(readFileSync(join(t, "docs/tasks/index.md"), "utf-8"));
+    expect(readMapSection(doc.body, "Live")).toEqual(["- enforced-workflow-v5"]);
+    expect(readMapSection(doc.body, "Archived")).toEqual(["- old-effort", "- winding-down"]);
+    // The index frontmatter survives.
+    expect(doc.data.type).toBe("index");
+    expect(doc.data.okf_version).toBe("0.2");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("creates the root index with the migration's shape when it is missing", async () => {
+    const t = mkTmp(); seedArchiveTree(t, false);
+    const out = await tools.tw_archive_effort.execute({ selector: "winding-down" }, ctx(t));
+    expect(out).toContain("index");
+    const doc = parse(readFileSync(join(t, "docs/tasks/index.md"), "utf-8"));
+    expect(doc.data.type).toBe("index");
+    expect(doc.data.okf_version).toBe("0.2");
+    expect(doc.data.title).toBe("docs/tasks");
+    expect(readMapSection(doc.body, "Live")).toEqual(["(none)"]);
+    // A missing index carries no memory of earlier archives: this run's move
+    // is the only entry it can list.
+    expect(readMapSection(doc.body, "Archived")).toEqual(["- winding-down"]);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an already-archived effort and a destination collision", async () => {
+    const t = mkTmp(); seedArchiveTree(t);
+    await expect(tools.tw_archive_effort.execute({ selector: "old-effort" }, ctx(t))).rejects.toThrow(
+      /not a live effort/,
+    );
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp(); seedArchiveTree(t2);
+    mkdirSync(join(t2, "docs/tasks/archive/winding-down"), { recursive: true });
+    await expect(tools.tw_archive_effort.execute({ selector: "winding-down" }, ctx(t2))).rejects.toThrow(
+      /already exists/,
+    );
+    // The collision refuses without deprecating the live map.
+    expect(parse(readFileSync(join(t2, "docs/tasks/winding-down/map.md"), "utf-8")).data.status).toBe("stable");
+    rmSync(t2, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape map: run the migration first", async () => {
+    const t = mkTmp();
+    writeMd(join(t, "docs/tasks/maps/legacy/map.md"), "kind: map\ntitle: Legacy\nslug: legacy\nstatus: draft\n");
+    writeMd(join(t, "docs/tasks/maps/legacy/tasks/decide/task.md"), "kind: task\ntitle: Decide\nslug: decide\nstatus: done\n");
+    await expect(tools.tw_archive_effort.execute({ selector: "legacy" }, ctx(t))).rejects.toThrow(
+      /schema-5 migration/,
+    );
     rmSync(t, { recursive: true, force: true });
   });
 });

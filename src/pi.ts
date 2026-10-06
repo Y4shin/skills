@@ -11,7 +11,7 @@
  * - Algorithms belong in tools, not in skill prose.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext, InputEvent, InputEventResult, ToolCallEvent, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
@@ -43,6 +43,7 @@ import {
   type ScanIndexLike,
 } from "./core/graph.js";
 import { toObject, fromObject, freshState, isPointerName, POINTER_NAMES, type WorkflowState } from "./core/state.js";
+import { OKF_VERSION } from "./core/migrate.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 
@@ -835,6 +836,21 @@ const OptStr = (d: string) => ({ type: "string" as const, optional: true as cons
 const Bool = (d: string) => ({ type: "boolean" as const, description: d });
 const OptBool = { type: "boolean" as const, optional: true as const };
 
+/**
+ * Render one root-index section the way the migration renders it: one bullet
+ * per effort, or the '(none)' placeholder when the list is empty.
+ */
+function indexSection(names: string[]): string {
+  return names.length === 0 ? "(none)" : names.map((n) => `- ${n}`).join("\n");
+}
+
+/** The effort names one root-index section lists (bullets only). */
+function indexNames(body: string, section: string): string[] {
+  return (readMapSection(body, section) ?? [])
+    .filter((line) => /^- /.test(line.trim()))
+    .map((line) => line.trim().replace(/^- /, ""));
+}
+
 export function createTools(): Record<string, Tool> {
   return {
     tw_show: def(
@@ -1426,6 +1442,74 @@ export function createTools(): Record<string, Tool> {
         doc.body = `${kept.join("\n")}\n\nBlocked: ${reason}\n`;
         writeFileSync(path, dump(doc), "utf-8");
         return `marked '${art.slug}' blocked (workflow_state: blocked)`;
+      },
+    ),
+
+    tw_archive_effort: def(
+      "Archive a finished effort: the named archive move, so no archive step needs git mv or the shell. " +
+        "Checks the effort is finalizable (every task and ticket done; a spec implies at least one ticket), " +
+        "marks the map and its done items status: deprecated (workflow_state stays done; the archived-effort " +
+        "convention), moves docs/tasks/<effort>/ to docs/tasks/archive/<effort>/ as a unit, and updates the " +
+        "root index (docs/tasks/index.md): the effort leaves ## Live and joins ## Archived, both sorted. " +
+        "Refuses an effort that is not finalizable, an already-archived effort, a destination collision " +
+        "(refused, never overwritten), and v3-shape artifacts.",
+      { selector: Str("Effort slug, or the effort's map path") },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const { path, art } = resolveArt(root, p.selector, "map");
+        requireV4Shape(art);
+        const effortKey = effortDirOf(path);
+        if (effortKey === null || effortKey.split(/[\\/]/)[0] === "archive") {
+          throw new Error(`'${art.slug}' is not a live effort: it is archived or sits in no effort directory`);
+        }
+        const graph = graphForPath(effortGraphs(scanMemo(root)()), path);
+        if (graph === null) {
+          throw new Error(`'${art.slug}' sits in no effort graph; there is nothing coherent to archive`);
+        }
+        const reason = effortFinalizable(graph);
+        if (reason !== null) {
+          throw new Error(`cannot archive '${art.slug}': ${reason}`);
+        }
+        const liveDir = join(taskRoot(root), effortKey);
+        const destDir = join(taskRoot(root), "archive", effortKey);
+        if (existsSync(destDir)) {
+          throw new Error(
+            `archive destination '${relative(root, destDir)}' already exists: a collision is refused, never overwritten`,
+          );
+        }
+
+        // 1. Deprecate the map and its done items (finalizability guarantees
+        // every item is done). The spec keeps its status.
+        const deprecate = (artifactPath: string): void => {
+          const { doc } = parseArtifactFile(artifactPath);
+          doc.data.status = "deprecated";
+          writeFileSync(artifactPath, dump(doc), "utf-8");
+        };
+        deprecate(path);
+        for (const item of [...graph.tasks, ...graph.tickets]) {
+          if (item.path) deprecate(item.path);
+        }
+
+        // 2. The move, as a unit: non-artifact files (.work, findings) travel
+        // with the effort.
+        mkdirSync(dirname(destDir), { recursive: true });
+        renameSync(liveDir, destDir);
+
+        // 3. The root index: the effort leaves Live and joins Archived.
+        const indexPath = join(taskRoot(root), "index.md");
+        const indexDoc: Document = isFile(indexPath)
+          ? parse(readFileSync(indexPath, "utf-8"))
+          : { data: { type: "index", okf_version: OKF_VERSION, title: "docs/tasks" }, body: "\n# docs/tasks\n" };
+        const live = indexNames(indexDoc.body, "Live").filter((n) => n !== effortKey);
+        const archived = [...new Set([...indexNames(indexDoc.body, "Archived"), effortKey])].sort((a, b) =>
+          a.localeCompare(b),
+        );
+        let body = writeMapSection(indexDoc.body, "Live", indexSection(live.sort((a, b) => a.localeCompare(b))));
+        body = writeMapSection(body, "Archived", indexSection(archived));
+        indexDoc.body = body;
+        writeFileSync(indexPath, dump(indexDoc), "utf-8");
+
+        return `archived '${effortKey}' to ${relative(root, destDir)}; index updated (${relative(root, indexPath)})`;
       },
     ),
 
