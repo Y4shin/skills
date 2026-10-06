@@ -195,8 +195,8 @@ describe("migrate: v3 vintage", () => {
     migrate(tree);
     const files = tree.snapshot();
 
-    const arch = fm(files["docs/tasks/task-tools-overhaul/arch-spec.md"]);
-    expect(arch.type).toBe("arch spec");
+    const arch = fm(files["docs/tasks/task-tools-overhaul/architecture.md"]);
+    expect(arch.type).toBe("architecture");
     expect(arch.title).toBe("Arch");
 
     const findings = fm(files["docs/tasks/task-tools-overhaul/tickets/my-task/findings.md"]);
@@ -725,9 +725,9 @@ describe("migrate: reporting", () => {
     const files = tree.snapshot();
     expect(report.needsHuman.some((h) => h.kind === "vendored-tree")).toBe(false);
     // The aux files stayed in the bundle and gained frontmatter. A single
-    // arch-spec hoists to the effort root; the deviation report stays beside
-    // the ticket.
-    expect(files["docs/tasks/effort/arch-spec.md"]).toBeDefined();
+    // The architecture document hoists to the effort root under its
+    // schema-5 name; the deviation report stays beside the ticket.
+    expect(files["docs/tasks/effort/architecture.md"]).toBeDefined();
     expect(files["docs/tasks/effort/tickets/my-task/deviation-reports/1-split.md"]).toBeDefined();
   });
 
@@ -786,8 +786,8 @@ describe("migrate: reporting", () => {
 describe("migrate: no two files collapse to one destination", () => {
   test("per-task arch specs in one effort each keep their own home", () => {
     // A v3 archive can hold several tasks in one effort, each with its own
-    // arch-spec.md. Collapsing them all to the effort root would silently
-    // lose all but one.
+    // architecture document. Collapsing them all to the effort root would
+    // silently lose all but one; the rename lands in place instead.
     const tree = port({
       "docs/tasks/state.yaml": "schema_version: 3\nmap: null\ntask: null\n",
       "docs/tasks/maps/effort/map.md":
@@ -802,8 +802,8 @@ describe("migrate: no two files collapse to one destination", () => {
     migrate(tree);
     const files = tree.snapshot();
 
-    const alpha = files["docs/tasks/archive/effort/tickets/alpha/arch-spec.md"];
-    const beta = files["docs/tasks/archive/effort/tickets/beta/arch-spec.md"];
+    const alpha = files["docs/tasks/archive/effort/tickets/alpha/architecture.md"];
+    const beta = files["docs/tasks/archive/effort/tickets/beta/architecture.md"];
     expect(alpha).toBeDefined();
     expect(beta).toBeDefined();
     expect(alpha).toContain("Alpha arch");
@@ -826,8 +826,8 @@ describe("migrate: no two files collapse to one destination", () => {
     });
     migrate(tree);
     const files = tree.snapshot();
-    expect(files["docs/tasks/archive/effort/tickets/alpha/arch-spec.md"]).toContain("Alpha");
-    expect(files["docs/tasks/archive/effort/tickets/beta/arch-spec.md"]).toContain("Beta");
+    expect(files["docs/tasks/archive/effort/tickets/alpha/architecture.md"]).toContain("Alpha");
+    expect(files["docs/tasks/archive/effort/tickets/beta/architecture.md"]).toContain("Beta");
   });
 
   test("a multi-arch-spec effort is idempotent", () => {
@@ -862,7 +862,7 @@ describe("migrate: no two files collapse to one destination", () => {
       "docs/tasks/solo/arch-spec.md": "# Solo arch\n",
     });
     migrate(tree);
-    expect(tree.snapshot()["docs/tasks/effort/arch-spec.md"]).toContain("Solo arch");
+    expect(tree.snapshot()["docs/tasks/effort/architecture.md"]).toContain("Solo arch");
   });
 
   test("no destination is claimed by two different sources", () => {
@@ -1223,6 +1223,22 @@ describe("migrate: schema 5", () => {
     expect(report.noop).toBe(false);
     const state = parseYamlFileForTest(tree.snapshot()["docs/tasks/state.yaml"]);
     expect(state).toEqual({ schema_version: 5, map: "my-effort", task: "my-ticket" });
+  });
+  test("type: arch spec becomes type: architecture, arch-spec.md becomes architecture.md", () => {
+    const tree = port({ ...V4_FILES });
+    const report = migrate(tree);
+    const files = tree.snapshot();
+
+    expect(files["docs/tasks/my-effort/arch-spec.md"]).toBeUndefined();
+    const arch = files["docs/tasks/my-effort/architecture.md"];
+    expect(arch).toBeDefined();
+    const data = fm(arch!);
+    expect(data.type).toBe("architecture");
+    expect(data.title).toBe("Architecture");
+    expect(arch).toContain("# Architecture");
+    const move = report.changes.find((c) => c.path === "docs/tasks/my-effort/architecture.md");
+    expect(move?.action).toBe("move");
+    expect(move?.from).toBe("docs/tasks/my-effort/arch-spec.md");
   });
 });
 
