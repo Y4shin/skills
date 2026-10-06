@@ -1,9 +1,9 @@
 /**
- * The version 4 migration.
+ * The migration to schema 5.
  *
  * One transformation takes any repo from any current state (fresh,
- * unversioned, v1 nested state, v2, v3, flat or maps-subtree layouts, and
- * archived trees) to the version 4 tree.
+ * unversioned, v1 nested state, v2, v3, v4, flat or maps-subtree layouts, and
+ * archived trees) to the schema-5 tree in a single idempotent hop.
  *
  * Pure over a TreePort: the transformation never touches node:fs directly.
  * All I/O goes through the port, which is what makes failure injection and
@@ -86,7 +86,7 @@ export interface HumanItem {
 export interface MigrateReport {
   /** Detected schema_version (0 = unversioned). */
   from: number;
-  to: 4;
+  to: 5;
   changes: Change[];
   needsHuman: HumanItem[];
   /** True when the tree is already v4 (idempotence). */
@@ -587,7 +587,7 @@ interface Plan {
 }
 
 /**
- * Migrate a tree to schema_version 4.
+ * Migrate a tree to schema_version 5.
  *
  * Every step is independently idempotent: it detects its own already-applied
  * state and skips. The progress marker is an optimization, not the
@@ -598,7 +598,7 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
   const progressPath = opts.progressPath ?? DEFAULT_PROGRESS_PATH;
   const allPaths = tree.list().map(posix);
 
-  // Idempotence: an already-v4 tree needs no plan, and every step below
+  // Idempotence: an already-migrated tree needs no plan, and every step below
   // detects its own already-applied state and stages nothing. The marker is
   // an optimization, not the correctness mechanism.
   const plan: Plan = {
@@ -668,10 +668,10 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
   if (opts.dryRun) {
     return {
       from,
-      to: 4,
+      to: 5,
       changes: plan.changes,
       needsHuman: plan.needsHuman,
-      noop: from === 4 && plan.changes.length === 0,
+      noop: from === 5 && plan.changes.length === 0,
     };
   }
 
@@ -703,13 +703,13 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
 
   return {
     from,
-    to: 4,
+    to: 5,
     changes: plan.changes,
     needsHuman: plan.needsHuman,
-    // "No-op" means the tree was already v4 and nothing was staged. A run
-    // that staged nothing on a non-v4 tree (a marker claiming steps that
+    // "No-op" means the tree was already schema 5 and nothing was staged. A
+    // run that staged nothing on an older tree (a marker claiming steps that
     // never landed) is not a no-op: the tree is still unmigrated.
-    noop: from === 4 && plan.changes.length === 0,
+    noop: from === 5 && plan.changes.length === 0,
   };
 }
 
@@ -1087,11 +1087,11 @@ function claimDest(plan: Plan, dest: string, source: string): boolean {
 // ─── Step 2: rebuild state.yaml ───────────────────────────────────────────────
 
 /**
- * Rebuild `state.yaml` as `{schema_version: 4, map, task}` with real nulls.
+ * Rebuild `state.yaml` as `{schema_version: 5, map, task}` with real nulls.
  *
  * The `map` pointer is seeded from the old `map` pointer (or the v1 `active`
  * block), and the legacy `slice` key is dropped. Unknown keys the state module
- * does not model are dropped too: v4 owns the shape.
+ * does not model are dropped too: the current schema owns the shape.
  */
 function rebuildState(tree: TreePort, paths: string[], plan: Plan, from: number): void {
   const state = freshState();
@@ -1105,8 +1105,9 @@ function rebuildState(tree: TreePort, paths: string[], plan: Plan, from: number)
     }
   }
   // The state module owns the shape: `toObject` puts the modeled pointers in
-  // place, and the migration is the only writer of the stamp.
-  const obj: Record<string, unknown> = { schema_version: 4, ...toObject(state) };
+  // place, and the migration is the only writer of the stamp. The stamp is
+  // always the current target: schema 5.
+  const obj: Record<string, unknown> = { schema_version: 5, ...toObject(state) };
   const content = stringifyYaml(obj);
   if (safeRead(tree, STATE_PATH) !== content) {
     if (claimDest(plan, STATE_PATH, STATE_PATH)) {
@@ -1114,7 +1115,7 @@ function rebuildState(tree: TreePort, paths: string[], plan: Plan, from: number)
       plan.changes.push({
         action: "rewrite",
         path: STATE_PATH,
-        detail: `rebuilt state.yaml at schema_version 4 (from vintage ${from})`,
+        detail: `rebuilt state.yaml at schema_version 5 (from vintage ${from})`,
       });
     }
   }
