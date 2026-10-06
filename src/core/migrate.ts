@@ -28,6 +28,8 @@ import {
   TYPE_LEAF,
   TASK_SUBTYPES,
   KNOWN_TYPES,
+  MAP_SECTION_NON_GOALS,
+  MAP_SECTION_NON_NEGOTIABLE_FACTS,
 } from "./art.js";
 import { fromObject, toObject, freshState } from "./state.js";
 
@@ -500,6 +502,43 @@ function titleFromBody(body: string): string | null {
 
 // ─── Layout classification ────────────────────────────────────────────────────
 
+// ─── Schema-5 map body reshape ────────────────────────────────────────────────
+
+/**
+ * The schema-5 map body reshape.
+ *
+ * `## Out of scope` becomes `## Non-goals` (the canonical name the schema-5
+ * reader resolves through the same alias; the section's content is kept
+ * verbatim), and `## Non-negotiable facts` is appended as an empty
+ * placeholder when missing, so a gate refusal names missing content, not a
+ * missing section. The success test line inside that section is authored
+ * later, never invented here.
+ *
+ * A body that already carries both sections is returned unchanged, byte for
+ * byte: the second-run guarantee rests on this.
+ */
+function reshapeMapBody(body: string): string {
+  const lines = body.split("\n");
+  const out: string[] = [];
+  let hasFacts = false;
+  for (const line of lines) {
+    const heading = /^##\s+(.+?)\s*$/.exec(line);
+    if (heading !== null) {
+      if (heading[1] === "Out of scope") {
+        out.push(`## ${MAP_SECTION_NON_GOALS}`);
+        continue;
+      }
+      if (heading[1] === MAP_SECTION_NON_NEGOTIABLE_FACTS) hasFacts = true;
+    }
+    out.push(line);
+  }
+  if (hasFacts) return out.join("\n");
+  // Append the placeholder: one blank line, then the bare heading.
+  let end = out.length;
+  while (end > 0 && out[end - 1].trim() === "") end--;
+  return [...out.slice(0, end), "", `## ${MAP_SECTION_NON_NEGOTIABLE_FACTS}`].join("\n") + "\n";
+}
+
 /**
  * The v3 workflow categories that plan a task rather than implement a ticket.
  * Derived from the model, so a new planning subtype in `art.ts` is classified
@@ -877,7 +916,9 @@ function reorganize(
       };
       if (claimDest(plan, dest, path)) {
         stageMoveIfNeeded(path, dest, plan);
-        plan.writes.set(dest, dumpVerified(dest, data, doc0(tree, path).body));
+        const rawBody = doc0(tree, path).body;
+        const body = type === "map" ? reshapeMapBody(rawBody) : rawBody;
+        plan.writes.set(dest, dumpVerified(dest, data, body));
         plan.changes.push({
           action: dest === path ? "rewrite" : "move",
           path: dest,
@@ -896,7 +937,8 @@ function reorganize(
     if (!claimDest(plan, dest, path)) continue;
 
     const shaped = shapeFrontmatter(doc.data, type, plan.needsHuman, dest);
-    const content = dumpVerified(dest, shaped, doc.body);
+    const body = type === "map" ? reshapeMapBody(doc.body) : doc.body;
+    const content = dumpVerified(dest, shaped, body);
     stageMoveIfNeeded(path, dest, plan);
     if (content !== safeRead(tree, path) || dest !== path) {
       plan.writes.set(dest, content);
@@ -906,8 +948,8 @@ function reorganize(
         from: dest === path ? undefined : path,
         detail:
           dest === path
-            ? `unified frontmatter on '${dest}'`
-            : `moved '${path}' to '${dest}' and unified its frontmatter`,
+            ? `applied the schema-5 reshape to '${dest}'`
+            : `moved '${path}' to '${dest}' and applied the schema-5 reshape`,
       });
     }
   }

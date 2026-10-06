@@ -9,6 +9,7 @@ import { describe, expect, test } from "vitest";
 import YAML from "yaml";
 import { migrate, verifyStagedWrite, type TreePort } from "../src/core/migrate.js";
 import { parse, dump } from "../src/core/frontmatter.js";
+import { readMapSection } from "../src/core/art.js";
 
 function parseYamlFileForTest(text: string): unknown {
   return YAML.parse(text);
@@ -1239,6 +1240,44 @@ describe("migrate: schema 5", () => {
     const move = report.changes.find((c) => c.path === "docs/tasks/my-effort/architecture.md");
     expect(move?.action).toBe("move");
     expect(move?.from).toBe("docs/tasks/my-effort/arch-spec.md");
+  });
+  test("the map body renames Out of scope to Non-goals and adds the facts placeholder", () => {
+    const tree = port({ ...V4_FILES });
+    migrate(tree);
+    const map = tree.snapshot()["docs/tasks/my-effort/map.md"]!;
+    const doc = parse(map);
+
+    // The legacy heading is gone; its content moved under the canonical name.
+    expect(map).not.toContain("## Out of scope");
+    expect(readMapSection(doc.body, "Non-goals")).toEqual(["not this"]);
+    // The facts section is added as an empty placeholder when missing, so a
+    // gate refusal names missing content, not a missing section.
+    expect(readMapSection(doc.body, "Non-negotiable facts")).toEqual([]);
+    // The frontmatter is untouched by the body reshape.
+    expect(doc.data.type).toBe("map");
+    expect(doc.data.title).toBe("My effort");
+  });
+
+  test("a schema-5 map that already carries both sections is left byte-identical", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 5\nmap: e\ntask: null\n",
+      "docs/tasks/e/map.md":
+        "---\ntype: map\ntitle: E\nstatus: stable\n---\n\n# E\n\n## Non-goals\n\nnot that\n\n## Non-negotiable facts\n\n**Success test.** ships\n",
+    });
+    migrate(tree);
+    const afterFirst = tree.snapshot();
+    const second = migrate(tree);
+    expect(second.noop).toBe(true);
+    expect(second.changes).toEqual([]);
+    expect(tree.snapshot()).toEqual(afterFirst);
+  });
+
+  test("a spec body keeps its own Out of scope section: the rename is map-only", () => {
+    const tree = port({ ...V4_FILES });
+    migrate(tree);
+    const spec = tree.snapshot()["docs/tasks/my-effort/spec.md"]!;
+    expect(spec).toContain("## Out of scope");
+    expect(spec).toContain("spec keeps its own");
   });
 });
 
