@@ -11,7 +11,7 @@
  * opener refuse or open, and does a refusal name the legal next calls.
  */
 
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -205,6 +205,26 @@ interface ToolResult {
     disclosed?: string[];
   };
 }
+
+// ─── The registry is the single source of the gates ───────────────────────────
+
+describe("the registry is the single source of the gates", () => {
+  test("no phase skill's prose restates the opener preconditions", () => {
+    // The gate preconditions live in the extension tools only (the registry
+    // row plus the evaluator); skill prose carries meaning and craft, never
+    // the phase gates. The v5 skills land against this registry, so whichever
+    // phase skill dirs exist are pinned here.
+    const phaseSkills = ["intake", "wayfinder", "to-spec", "to-tickets", "implement-ticket", "finalize-effort"];
+    const gatePhrases = /ready_for_spec|undispositioned|arch-spec\.md is missing|architecture\.md is missing/;
+    for (const skill of phaseSkills) {
+      const skillPath = join("skills", "engineering", skill, "SKILL.md");
+      const absolute = join(process.cwd(), skillPath);
+      if (!existsSync(absolute)) continue;
+      const prose = readFileSync(absolute, "utf-8");
+      expect(prose, `${skillPath} must not restate the opener preconditions`).not.toMatch(gatePhrases);
+    }
+  });
+});
 
 // ─── The finalize-effort archive gate: undispositioned findings ──────────────
 

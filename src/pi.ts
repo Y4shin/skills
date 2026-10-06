@@ -1772,9 +1772,9 @@ export function createTools(): Record<string, Tool> {
         // is undispositioned. The review artifact carries the findings and
         // their dispositions; its writer sets dispositioned: true when every
         // finding is resolved into a ticket, an accepted follow-up effort, or
-        // an explicit informational acceptance — the same
+        // an explicit informational acceptance (the same
         // producer-owns-the-check, consumer-owns-the-flag shape as
-        // ready_for_spec. A superseded (deprecated) review no longer blocks.
+        // ready_for_spec). A superseded (deprecated) review no longer blocks.
         // The gate lives here, in the finalize-effort tooling, so the triage
         // can complete inside the open phase: a refused archive still has the
         // triage tools declared.
