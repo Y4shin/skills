@@ -577,7 +577,13 @@ exports to the tickets that depend on it.
    throws.
 10. **`wayfinder-reconcile-and-passes`** exports the absorbed planning phase.
     Contract: one frontier snapshot, at most one grilling, reconcile through
-    `tw_finalize_map`, resources under `wayfinder/resources`. The resources
+    `tw_finalize_map`, resources under `wayfinder/resources`. As landed
+    upstream: `tw_open` evaluates every phase's preconditions through the
+    landed `phaseGate` evaluator in `src/pi.ts` (the single home for gate
+    logic), refuses with a `reason` plus `legal_next` on every refusal path
+    including duplicate and conflict, and activates the toolset only on
+    pass; wayfinder opens as an effort-kind gate, so its prose adds no
+    precondition check of its own. The resources
     must instruct the write-back pointer in the slug-reference shape (the
     map body must reference the task slug as a stand-alone token or
     `tw_mark_done` refuses) and use the general `tw_write_section` for
@@ -594,7 +600,15 @@ exports to the tickets that depend on it.
     second pass has no legal mechanism. Splits go through
     `tw_split_ticket`. The `architecture.md` writer is deliberately absent
     from the landed transition tools; this ticket owns it, and until it
-    lands those writes fail closed under the guard.
+    lands those writes fail closed under the guard. As landed upstream from
+    the opener gate: to-tickets opens through `tw_open` as an effort-kind
+    gate, and its registry entry's private signature tool is provisionally
+    `tw_map_finalizable`; this ticket lands the `architecture.md` writer and
+    rotates the private signature tool to it, so the open-set derivation
+    stays intact. The writer produces v5-shaped `architecture.md`
+    (`type: architecture`); `implement-ticket`'s landed opener accepts a
+    legacy `arch-spec.md` only as a tolerated input and names the rename in
+    its refusal, so new output is never the legacy shape.
 12. **`grilling-delegation-fix`** exports the single grilling-method home.
     Contract: every pointer resolves to the `grilling` skill; no resource
     restates the method.
@@ -605,7 +619,13 @@ exports to the tickets that depend on it.
     Contract: opens inside a phase without closing it.
 15. **`intake-skill`** exports the front door. Contract: always creates an
     effort with a map and one non-negotiables grilling task through the named
-    tools; retires `triage`.
+    tools; retires `triage`. As landed upstream from the opener gate: intake
+    opens through `tw_open` as a no-precondition gate (the landed gate kinds
+    are none, effort, spec-ready, and implementation; intake,
+    `setup-workflow`, and `skill-creator` are `none`), and its interim
+    toolset discloses only the tools that exist until this ticket and ticket
+    10 land the creation tools, so this ticket extends the registry toolset
+    as it lands them.
 16. **`to-spec-rescope`** exports the gated spec phase. Contract: checks only
     `ready_for_spec`; no seam or architecture interview.
 17. **`implement-ticket-skill`** exports the implementation phase. Contract:
@@ -617,13 +637,30 @@ exports to the tickets that depend on it.
     close-out's changelog write goes through `tw_write_changelog`, and
     `docs/tasks/CHANGELOG.md` is refused to the built-in `write`/`edit`, so
     the changelog writer is provably the only writer of it. The prose must
-    not describe a by-hand second wiring pass.
+    not describe a by-hand second wiring pass. As landed upstream from the
+    opener gate: implement-ticket opens as an implementation-kind gate whose
+    precondition refuses a missing or unstable `architecture.md`; a legacy
+    `arch-spec.md` is accepted with the rename named in the refusal, and
+    bug-only efforts, which have no architecture document, are exempt. The
+    toolset discloses `tw_mark_blocked`, but the landed tool is planning-only
+    (it refuses tickets); if the prose has implement-ticket block a ticket,
+    this ticket widens `tw_mark_blocked`'s scope.
 18. **`finalize-effort-skill`** exports the effort close. Contract: holistic
     review, finding triage, follow-up only after a human yes, archive gate.
     As landed upstream: the `review.md` writer is deliberately absent from
     the landed transition tools; this ticket owns it, and until it lands
     review writes fail closed under the guard. The archive move is
-    `tw_archive_effort` (a `renameSync`, no shell).
+    `tw_archive_effort` (a `renameSync`, no shell). As landed upstream from
+    the opener gate: the undispositioned-findings archive gate lives in
+    `tw_archive_effort`, not in the finalize-effort opener, because an
+    opener-level check would deadlock recovery after an interrupted run
+    (the triage tools are gated or guard-blocked while the toolset is
+    closed, so a refused reopen could never complete the triage). The gate
+    reads a `dispositioned: true` frontmatter flag on review artifacts, so
+    the review writer this ticket lands must set that flag; superseded and
+    deprecated reviews no longer block. If the landed review artifact shapes
+    that flag differently, the coherence pass adjusts the gate's read. The
+    finalize-effort opener itself is an effort-kind gate.
 19. **`overview-doctor-rescope`** exports the explainer and the narrowed
     doctor. Contract: overview points at `tw_next`; doctor owns only what the
     tools cannot self-diagnose.
@@ -666,6 +703,18 @@ assert the internal shape of a helper.
   toolsets overlap fully cannot both be modeled; tickets 9 and 14 must keep
   one private tool per skill or revisit the derivation (the throw makes the
   constraint visible, not silent).
+- **Two interim registry assignments are deliberate and owned by later
+  tickets.** To-tickets' private signature tool stays `tw_map_finalizable`
+  until ticket 11 lands the `architecture.md` writer and rotates it;
+  intake's toolset discloses only what exists until tickets 10 and 15 land
+  the creation tools. Both are recorded in code comments and the ticket 9
+  report, and each owning ticket updates the registry as it lands.
+- **`tw_mark_blocked` is disclosed to implement-ticket but refuses tickets.**
+  The landed tool is planning-only; ticket 17 owns the scope widening if its
+  prose has implement-ticket block a ticket.
+- **The archive gate's `dispositioned` flag is the interface ticket 18's
+  review writer must set.** A differently shaped flag on the landed review
+  artifact is coherence-pass input, not a contract change.
 - **This effort runs in v4 mode.** The v5 openers and gates do not exist
   during implementation, so the ticket pipeline and the current skills run
   against the v4 tree until the relevant tickets land.
