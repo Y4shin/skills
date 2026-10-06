@@ -929,7 +929,9 @@ function phaseGate(
     case "implementation": {
       const missing = requireLiveEffort(root, effort);
       if (missing !== null) return missing;
-      const graph = graphForEffortDir(effortGraphs(scanMemo(root)()), liveEffortDir(root, effort)!);
+      const effortDir = liveEffortDir(root, effort)!;
+      const index = scanMemo(root)();
+      const graph = graphForEffortDir(effortGraphs(index), effortDir);
       // The work-state checks come first: they diagnose the effort itself,
       // whether or not a target was named.
       if (graph?.spec != null) {
@@ -952,6 +954,29 @@ function phaseGate(
           };
         }
       }
+      // The architecture document: missing or unstable is an opener refusal,
+      // never a draft step. Bug-only efforts have none by design. The check
+      // reads arch-spec.md today and names the schema-5 rename: the target
+      // state's architecture.md is accepted before the migration runs.
+      if (graph !== null && !isBugOnly(graph)) {
+        const arch = architectureDocIn(index, effortDir);
+        if (arch === null) {
+          return {
+            reason:
+              `no architecture document in '${effort}': expected architecture.md (the schema-5 name), ` +
+              `or the legacy arch-spec.md until the migration renames it; the architecture document is never drafted here`,
+            legalNext: ["run to-tickets"],
+          };
+        }
+        if (arch.art.status !== null && arch.art.status !== "stable") {
+          return {
+            reason:
+              `'${relative(root, arch.path)}' has status '${arch.art.status}', not stable: ` +
+              `the architecture document is never drafted here`,
+            legalNext: ["run to-tickets"],
+          };
+        }
+      }
       // A ticket open carries the effort and the target.
       if (typeof args.target !== "string" || args.target.trim() === "") {
         return {
@@ -959,7 +984,7 @@ function phaseGate(
           legalNext: ["retry tw_open with the target ticket slug"],
         };
       }
-      return requireTicketTarget(root, effort, liveEffortDir(root, effort)!, graph, args.target);
+      return requireTicketTarget(root, effort, effortDir, graph, args.target);
     }
   }
 }
@@ -986,6 +1011,25 @@ function graphForEffortDir(graphs: Map<string, EffortGraph>, dir: string): Effor
 }
 
 /**
+ * The effort's architecture document, preferring the schema-5 name
+ * (architecture.md) over the legacy arch-spec.md the migration renames.
+ */
+function architectureDocIn(
+  index: ScanIndexLike,
+  effortDir: string,
+): { path: string; art: Artifact } | null {
+  const hits = index.hits.filter(
+    (h) => isInside(effortDir, h.path) && (h.art.type === "architecture" || h.art.type === "arch spec"),
+  );
+  return hits.find((h) => h.art.type === "architecture") ?? hits[0] ?? null;
+}
+
+/** Bug-only efforts have no architecture document by design. */
+function isBugOnly(graph: EffortGraph): boolean {
+  return graph.tickets.length > 0 && graph.tickets.every((t) => t.subtype === "bug");
+}
+
+/**
  * The target ticket's unfinished same-kind blockers, by slug. Done-ness is
  * itemFinalizable's: workflow_state done, deprecated counting as done.
  */
@@ -995,6 +1039,33 @@ function unfinishedBlockers(graph: EffortGraph, target: Artifact): string[] {
     .map((slug) => items.find((a) => a.slug === slug))
     .filter((a): a is Artifact => a !== undefined && itemFinalizable(a) !== null)
     .map((a) => a.slug);
+}
+
+/**
+ * Resolve the target as a ticket OF THIS EFFORT. Slugs are effort-scoped (the
+ * same ticket slug may exist in several efforts), so the effort's own tickets
+ * directory resolves first; a path selector falls back to the global
+ * resolver, and the containment check keeps a foreign ticket out.
+ */
+function resolveTicketInEffort(
+  root: string,
+  effortDir: string,
+  selector: string,
+): Artifact | null {
+  const local = join(effortDir, "tickets", selector, "ticket.md");
+  if (isFile(local)) {
+    try {
+      return parseArtifactFile(local).art;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const hit = resolveArt(root, selector, "ticket");
+    return hit.path && isInside(effortDir, hit.path) ? hit.art : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The ready frontier of the graph's ticket kind, by slug. */
@@ -1018,18 +1089,10 @@ function requireTicketTarget(
   graph: EffortGraph | null,
   target: string,
 ): GateRefusal | null {
-  let resolved: Artifact;
-  try {
-    resolved = resolveArt(root, target, "ticket").art;
-  } catch {
+  const resolved = resolveTicketInEffort(root, effortDir, target);
+  if (resolved === null) {
     return {
       reason: `no ticket '${target}' in '${effort}'`,
-      legalNext: readyTicketsOrRetry(graph),
-    };
-  }
-  if (!resolved.path || !isInside(effortDir, resolved.path)) {
-    return {
-      reason: `'${target}' is not a ticket of '${effort}'`,
       legalNext: readyTicketsOrRetry(graph),
     };
   }

@@ -27,11 +27,27 @@ beforeAll(() => {
   // with the efforts these tests open.
   repo = join(tmpdir(), `disclosure-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
   for (const slug of ["e", "some-effort"]) {
-    const map = join(repo, "docs", "tasks", slug, "map.md");
-    mkdirSync(dirname(map), { recursive: true });
+    const dir = join(repo, "docs", "tasks", slug);
+    mkdirSync(dir, { recursive: true });
     writeFileSync(
-      map,
+      join(dir, "map.md"),
       dump({ data: { type: "map", title: `Fixture ${slug}`, ready_for_spec: true }, body: "\n" }),
+      "utf-8",
+    );
+    // An implementable shape: the targetless ticket open must reach the
+    // missing-target refusal, not an earlier gate.
+    writeFileSync(
+      join(dir, "arch-spec.md"),
+      dump({ data: { type: "arch spec", title: `Fixture ${slug} architecture`, status: "stable" }, body: "\n" }),
+      "utf-8",
+    );
+    mkdirSync(join(dir, "tickets", "fixture-ticket"), { recursive: true });
+    writeFileSync(
+      join(dir, "tickets", "fixture-ticket", "ticket.md"),
+      dump({
+        data: { type: "ticket", subtype: "feature", title: "Fixture ticket", status: "stable", workflow_state: "ready", blocked_by: [] },
+        body: "\n",
+      }),
       "utf-8",
     );
   }

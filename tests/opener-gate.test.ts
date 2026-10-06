@@ -107,6 +107,43 @@ beforeAll(() => {
       },
     },
   });
+  // Ticket generation ran, the architecture document did not.
+  writeEffort("no-arch", {
+    "map.md": { data: { type: "map", title: "No arch", ready_for_spec: true } },
+    "spec.md": { data: { type: "spec", title: "No arch spec", status: "stable" } },
+    "tickets/only/ticket.md": {
+      data: { type: "ticket", subtype: "feature", title: "Only", status: "stable", workflow_state: "ready", blocked_by: [] },
+    },
+  });
+  // The architecture document exists but was never published.
+  writeEffort("draft-arch", {
+    "map.md": { data: { type: "map", title: "Draft arch", ready_for_spec: true } },
+    "spec.md": { data: { type: "spec", title: "Draft arch spec", status: "stable" } },
+    "arch-spec.md": { data: { type: "arch spec", title: "Draft arch architecture", status: "draft" } },
+    "tickets/only/ticket.md": {
+      data: { type: "ticket", subtype: "feature", title: "Only", status: "stable", workflow_state: "ready", blocked_by: [] },
+    },
+  });
+  // The schema-5 name: architecture.md at the effort root.
+  writeEffort("v5-arch", {
+    "map.md": { data: { type: "map", title: "V5 arch", ready_for_spec: true } },
+    "spec.md": { data: { type: "spec", title: "V5 arch spec", status: "stable" } },
+    "architecture.md": { data: { type: "architecture", title: "V5 arch architecture", status: "stable" } },
+    "tickets/only/ticket.md": {
+      data: { type: "ticket", subtype: "feature", title: "Only", status: "stable", workflow_state: "ready", blocked_by: [] },
+    },
+  });
+  // A bug-only effort: no architecture document by design.
+  writeEffort("bug-only", {
+    "map.md": { data: { type: "map", title: "Bug only", ready_for_spec: true } },
+    "spec.md": { data: { type: "spec", title: "Bug only spec", status: "stable" } },
+    "tickets/fix-one/ticket.md": {
+      data: { type: "ticket", subtype: "bug", title: "Fix one", status: "stable", workflow_state: "ready", blocked_by: [] },
+    },
+    "tickets/fix-two/ticket.md": {
+      data: { type: "ticket", subtype: "bug", title: "Fix two", status: "stable", workflow_state: "done", blocked_by: ["fix-one"] },
+    },
+  });
 });
 
 afterAll(() => {
@@ -135,6 +172,61 @@ interface ToolResult {
     disclosed?: string[];
   };
 }
+
+// ─── The implementation gate: the architecture document ──────────────────────
+
+describe("the implementation gate: the architecture document", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => {
+    tools = createTools();
+  });
+
+  test("refuses a missing architecture document, pointing at to-tickets and naming the v5 rename", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "no-arch", target: "only" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(false);
+    expect(result.details.reason).toContain("architecture");
+    expect(result.details.reason).toContain("architecture.md");
+    expect(result.details.reason).toContain("arch-spec.md");
+    expect(result.details.legal_next).toEqual(["run to-tickets"]);
+    expect(active).toEqual([...ALWAYS_DECLARED]);
+  });
+
+  test("refuses an unstable architecture document and never drafts one", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "draft-arch", target: "only" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(false);
+    expect(result.details.reason).toContain("draft");
+    expect(result.details.reason).toContain("not stable");
+    expect(result.details.legal_next).toEqual(["run to-tickets"]);
+    expect(active).toEqual([...ALWAYS_DECLARED]);
+  });
+
+  test("opens on a stable architecture.md, the schema-5 name", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "v5-arch", target: "only" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(true);
+  });
+
+  test("a bug-only effort needs no architecture document and opens", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "bug-only", target: "fix-one" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(true);
+  });
+});
 
 // ─── The implementation gate: the target ticket ──────────────────────────────
 
