@@ -1409,6 +1409,21 @@ describe("wayfinder v5 (wayfinder-reconcile-and-passes)", () => {
     expect(content).toMatch(/never rolls into the next frontier/i);
     expect(content).toMatch(/releases?/i);
   });
+
+  test("an empty ready frontier triggers the reconcile step", () => {
+    expect(content).toMatch(/when the snapshot's ready frontier is empty/i);
+    expect(content).toMatch(/the pass runs the reconcile step/i);
+  });
+
+  test("the reconcile sets the ready flag only through tw_finalize_map", () => {
+    expect(content).toMatch(/tw_finalize_map/);
+    expect(content).toMatch(/only setter of/i);
+    expect(content).toMatch(/Never set the flag any other way/i);
+  });
+
+  test("tw_finalize_map refuses naming every missing item", () => {
+    expect(content).toMatch(/naming\s+every\s+missing\s+item/i);
+  });
 });
 
 // ─── Conformance seam: fixture efforts built from the prose templates ──
