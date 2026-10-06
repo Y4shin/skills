@@ -1279,6 +1279,120 @@ describe("migrate: schema 5", () => {
     expect(spec).toContain("## Out of scope");
     expect(spec).toContain("spec keeps its own");
   });
+  test("the renames cover archived trees", () => {
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 4\nmap: null\ntask: null\n",
+      "docs/tasks/archive/old-effort/map.md":
+        "---\ntype: map\ntitle: Old\nstatus: deprecated\nworkflow_state: done\n---\n\n# Old\n\n## Out of scope\n\npast scope\n",
+      "docs/tasks/archive/old-effort/arch-spec.md":
+        "---\ntype: arch spec\ntitle: Old architecture\nstatus: deprecated\n---\n\n# Old architecture\n",
+    });
+    migrate(tree);
+    const files = tree.snapshot();
+
+    expect(files["docs/tasks/archive/old-effort/arch-spec.md"]).toBeUndefined();
+    expect(fm(files["docs/tasks/archive/old-effort/architecture.md"]!).type).toBe("architecture");
+    const mapDoc = parse(files["docs/tasks/archive/old-effort/map.md"]!);
+    expect(mapDoc.body).not.toContain("## Out of scope");
+    expect(readMapSection(mapDoc.body, "Non-goals")).toEqual(["past scope"]);
+    expect(readMapSection(mapDoc.body, "Non-negotiable facts")).toEqual([]);
+  });
+
+  test("every older vintage reaches schema 5 in one hop", () => {
+    // The legacy shape is shared; only the state file's vintage differs.
+    const legacy: Record<string, string> = {
+      "docs/tasks/maps/legacy-map/map.md":
+        "---\nkind: map\nslug: legacy-map\ntitle: Legacy\nstatus: active\ntasks: []\n---\n\n## Out of scope\n\nold scope\n",
+      "docs/tasks/legacy-task/task.md":
+        "---\nkind: task\ntype: feature\nslug: legacy-task\ntitle: Legacy task\nmap: legacy-map\nstatus: ready\nblocked_by: []\n---\n",
+      "docs/tasks/legacy-task/arch-spec.md": "# Legacy arch\n",
+    };
+    const vintages: Array<[string, string]> = [
+      ["unversioned", "map: legacy-map\ntask: legacy-task\n"],
+      ["v1", "active:\n  map: legacy-map\n  task: legacy-task\n"],
+      ["v2", "schema_version: 2\nmap: legacy-map\ntask: legacy-task\n"],
+      ["v3", "schema_version: 3\nmap: legacy-map\ntask: legacy-task\nslice: null\n"],
+    ];
+    for (const [name, state] of vintages) {
+      const tree = port({ "docs/tasks/state.yaml": state, ...legacy });
+      const report = migrate(tree); // one call: no second pass, no intermediate stop
+      const files = tree.snapshot();
+
+      expect(report.to, name).toBe(5);
+      expect(
+        parseYamlFileForTest(files["docs/tasks/state.yaml"]),
+        name,
+      ).toEqual({ schema_version: 5, map: "legacy-map", task: "legacy-task" });
+      expect(fm(files["docs/tasks/legacy-map/architecture.md"]!).type, name).toBe("architecture");
+      expect(files["docs/tasks/legacy-task/arch-spec.md"], name).toBeUndefined();
+      const mapDoc = parse(files["docs/tasks/legacy-map/map.md"]!);
+      expect(readMapSection(mapDoc.body, "Non-goals"), name).toEqual(["old scope"]);
+      expect(readMapSection(mapDoc.body, "Non-negotiable facts"), name).toEqual([]);
+    }
+  });
+
+  test("docs/bugs/ is untouched: a static archive, not a live substrate", () => {
+    const bugs: Record<string, string> = {
+      "docs/bugs/README.md": "# Bugs\n\nstatic archive\n",
+      "docs/bugs/2026-01-lost-writes/report.md":
+        "---\ntype: bug report\ntitle: Lost writes\n---\n\nbody\n",
+    };
+    const tree = port({ ...V4_FILES, ...bugs });
+    const report = migrate(tree);
+    const files = tree.snapshot();
+
+    expect(files["docs/bugs/README.md"]).toBe(bugs["docs/bugs/README.md"]);
+    expect(files["docs/bugs/2026-01-lost-writes/report.md"]).toBe(
+      bugs["docs/bugs/2026-01-lost-writes/report.md"],
+    );
+    expect(report.changes.filter((c) => c.path.startsWith("docs/bugs/"))).toEqual([]);
+    expect(report.needsHuman.filter((h) => h.path.startsWith("docs/bugs/"))).toEqual([]);
+  });
+
+  test("a second run over the migrated v5 tree is a no-op with byte-stable output", () => {
+    const tree = port({ ...V4_FILES });
+    migrate(tree);
+    const afterFirst = tree.snapshot();
+
+    const second = migrate(tree);
+    expect(second.noop).toBe(true);
+    expect(second.changes).toEqual([]);
+    expect(tree.snapshot()).toEqual(afterFirst);
+  });
+
+  test("a mid-hop failure leaves the tree byte-identical", () => {
+    for (const n of [1, 2, 3]) {
+      const tree = port({ ...V4_FILES });
+      const before = tree.snapshot();
+      expect(() => migrate(tree, { failAfterWrites: n })).toThrow();
+      expect(tree.snapshot()).toEqual(before);
+    }
+  });
+
+  test("an interrupted v4-to-5 hop resumes to the same end state", () => {
+    const uninterrupted = port({ ...V4_FILES });
+    migrate(uninterrupted);
+    const expected = uninterrupted.snapshot();
+
+    const interrupted = port({ ...V4_FILES });
+    expect(() => migrate(interrupted, { failAfterWrites: 1 })).toThrow();
+    const resumed = migrate(interrupted);
+    expect(resumed.noop).toBe(false);
+    expect(interrupted.snapshot()).toEqual(expected);
+  });
+
+  test("a v5-stamped tree reports its vintage as 5", () => {
+    // detectVintage's version-5 branch: the stamp reads back through the
+    // report on a tree that is already schema 5.
+    const tree = port({
+      "docs/tasks/state.yaml": "schema_version: 5\nmap: e\ntask: null\n",
+      "docs/tasks/e/map.md":
+        "---\ntype: map\ntitle: E\nstatus: stable\n---\n\n## Non-goals\n\nx\n\n## Non-negotiable facts\n\ny\n",
+    });
+    const report = migrate(tree);
+    expect(report.from).toBe(5);
+    expect(report.to).toBe(5);
+  });
 });
 
 describe("migrate: dry run", () => {
