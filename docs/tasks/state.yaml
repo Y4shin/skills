@@ -1,3 +1,3 @@
 schema_version: 4
 map: enforced-workflow-v5
-task: disclosure-open-close-core
+task: migrate-v4-to-v5

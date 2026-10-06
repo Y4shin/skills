@@ -46,3 +46,36 @@ substrate; the migration does not move it.
 
 - schema5-artifact-model (the reshape writes the new types, filenames, and
   section names the model defines).
+
+## Implementation notes
+
+- Landed at merge commit on `task/migrate-v4-to-v5` (6 wip commits
+  merged with `--no-ff` from `ticket/migrate-v4-to-v5`, landing point `bf2e3b1`,
+  the disclosure-open-close-core land). Diff touches `src/core/migrate.ts`,
+  `src/migrate-cli.ts`, `tests/migrate.test.ts`, `tests/fs-port.test.ts`.
+- Implementation: `schema_version: 5` stamp in `rebuildState`, `MigrateReport.to`
+  is 5, the arch-spec-to-architecture rename (type and filename, live and
+  archived; effort root for the single-doc case, in-place leaf rename when an
+  effort carries several architecture documents so nothing collapses), the map
+  body rename `## Out of scope` to `## Non-goals` with a `## Non-negotiable
+  facts` placeholder appended when missing, and the CLI schema-5 no-op message.
+  The reshape reuses the existing `reorganize` pass, `TreePort` staging, undo
+  journal, and YAML-verify-before-lands rule; it is a branch in the one engine.
+- TDD divergences (see the implementation report for the full list): the tests
+  pinning the v4 stamp were updated to schema 5 as the ticket spec'd;
+  `detectVintage` needed no new branch because the stamp read already returns 5
+  for a schema-5 tree; the repo's own `arch-spec.md` rename stays a human
+  `setup-workflow` action after v5 lands.
+- Validation at merge: `npm test` 848 passed across 17 files;
+  `npm run typecheck` clean; real-disk CLI smoke migrated a v4 fixture to 5 and
+  reported a byte-stable no-op on the second run with `docs/bugs/` untouched.
+- Residual risks carried forward: a map body with both `## Out of scope` and
+  `## Non-goals` yields two Non-goals sections (reader resolves
+  first-match-wins); `detectVintage` accepts stamps above 5 and reshapes down;
+  skill prose and `docs/migration-target.yaml` still describe v4, owned by
+  migration-target-and-upgrade-resource, overview-doctor-rescope, and
+  docs-resync.
+- Landing note: the landing branch did not exist at land time; it was created at
+  the TDD report's landing point and the merge run there. Full suite re-run on
+  the merge result: 848 passed, 0 failed. The unstaged `docs/tasks/state.yaml`
+  task-pointer edit was carried through checkout and left unstaged, as found.
