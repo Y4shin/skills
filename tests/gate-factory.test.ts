@@ -63,6 +63,7 @@ const GATED_NAMES = [
   "tw_write_section",
   "tw_write_spec",
   "tw_add_ticket",
+  "tw_split_ticket",
   "notify_user",
 ];
 

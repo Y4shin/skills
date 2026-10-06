@@ -208,6 +208,7 @@ describe("task-workflow tools", () => {
         "tw_open",
         "tw_resolve_uncertainty",
         "tw_show",
+        "tw_split_ticket",
         "tw_state",
         "tw_state_set",
         "tw_write_section",
@@ -1752,6 +1753,148 @@ describe("task-workflow tools: tw_add_ticket, the ticket creator", () => {
     await expect(
       tools.tw_add_ticket.execute({ effort: "old-effort", slug: "x", title: "T", subtype: "feature" }, ctx(t)),
     ).rejects.toThrow(/no live effort/);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_split_ticket, the escape-hatch split", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  /** The fixture: a live effort whose in-flight ticket "big" splits. */
+  function seedSplitTree(t: string, originalState = "workflow_state: in-progress"): void {
+    seedPlanningTree(t);
+    writeMd(
+      join(t, "docs/tasks/specgate/tickets/base/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Base\nstatus: stable\nworkflow_state: todo\nblocked_by: []\n",
+    );
+    writeMd(
+      join(t, "docs/tasks/specgate/tickets/big/ticket.md"),
+      `type: ticket\nsubtype: bug\ntitle: Big\nstatus: stable\n${originalState}\nsize: l\nblocked_by: [base]\n`,
+      "\n## What to build\n\nToo big.\n",
+    );
+  }
+
+  function originalPath(t: string): string {
+    return join(t, "docs/tasks/specgate/tickets/big/ticket.md");
+  }
+
+  function subPath(t: string, slug: string): string {
+    return join(t, "docs/tasks/specgate/tickets", slug, "ticket.md");
+  }
+
+  test("creates the sub-tickets and supersedes the original as deprecated plus done", async () => {
+    const t = mkTmp(); seedSplitTree(t);
+    const out = await tools.tw_split_ticket.execute(
+      {
+        selector: "big",
+        subtickets: [
+          { slug: "big-one", title: "Big one", size: "s", content: "## What to build\n\nPart one." },
+          { slug: "big-two", title: "Big two", blocked_by: ["big-one"] },
+        ],
+      },
+      ctx(t),
+    );
+    expect(out.text).toContain("big-one");
+    expect(out.text).toContain("deprecated");
+
+    // The sub-tickets inherit the original's subtype and edges.
+    const one = parse(readFileSync(subPath(t, "big-one"), "utf-8"));
+    expect(one.data.type).toBe("ticket");
+    expect(one.data.subtype).toBe("bug");
+    expect(one.data.status).toBe("stable");
+    expect(one.data.workflow_state).toBe("ready");
+    expect(one.data.blocked_by).toEqual(["base"]);
+    expect(one.data.size).toBe("s");
+    expect(one.body).toBe("\n## What to build\n\nPart one.\n");
+
+    const two = parse(readFileSync(subPath(t, "big-two"), "utf-8"));
+    expect(two.data.blocked_by).toEqual(["base", "big-one"]);
+    // Size absent when not given.
+    expect(two.data).not.toHaveProperty("size");
+
+    // The original: deprecated plus done, with a body note naming the subs.
+    const original = parse(readFileSync(originalPath(t), "utf-8"));
+    expect(original.data.status).toBe("deprecated");
+    expect(original.data.workflow_state).toBe("done");
+    expect(original.body).toContain("Superseded by big-one, big-two.");
+    expect(original.body).toContain("Too big.");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an original that is already done or deprecated", async () => {
+    const t = mkTmp(); seedSplitTree(t, "workflow_state: done");
+    await expect(
+      tools.tw_split_ticket.execute({ selector: "big", subtickets: [{ slug: "x", title: "X" }] }, ctx(t)),
+    ).rejects.toThrow(/already done/);
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp(); seedSplitTree(t2, "workflow_state: done");
+    const p = originalPath(t2);
+    writeFileSync(p, readFileSync(p, "utf-8").replace("status: stable", "status: deprecated"), "utf-8");
+    await expect(
+      tools.tw_split_ticket.execute({ selector: "big", subtickets: [{ slug: "x", title: "X" }] }, ctx(t2)),
+    ).rejects.toThrow(/deprecated/);
+    rmSync(t2, { recursive: true, force: true });
+  });
+
+  test("refuses sub slugs that collide with existing artifacts or each other", async () => {
+    const t = mkTmp(); seedSplitTree(t);
+    await expect(
+      tools.tw_split_ticket.execute(
+        { selector: "big", subtickets: [{ slug: "base", title: "Clash" }] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/already exists/);
+    await expect(
+      tools.tw_split_ticket.execute(
+        { selector: "big", subtickets: [{ slug: "a", title: "A" }, { slug: "a", title: "A again" }] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/duplicate|already/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a split that keeps the original's slug or dangles an edge", async () => {
+    const t = mkTmp(); seedSplitTree(t);
+    await expect(
+      tools.tw_split_ticket.execute(
+        { selector: "big", subtickets: [{ slug: "big", title: "Same" }] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/superseded|slug/);
+    await expect(
+      tools.tw_split_ticket.execute(
+        { selector: "big", subtickets: [{ slug: "a", title: "A", blocked_by: ["ghost"] }] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/'ghost' is not an existing ticket/);
+    expect(existsSync(subPath(t, "a"))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty sub-ticket list and an invalid sub seed", async () => {
+    const t = mkTmp(); seedSplitTree(t);
+    await expect(tools.tw_split_ticket.execute({ selector: "big", subtickets: [] }, ctx(t))).rejects.toThrow(
+      /at least one sub-ticket/,
+    );
+    await expect(
+      tools.tw_split_ticket.execute({ selector: "big", subtickets: [{ slug: "Bad Slug", title: "X" }] }, ctx(t)),
+    ).rejects.toThrow(/invalid slug/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape original", async () => {
+    const t = mkTmp();
+    writeMd(join(t, "docs/tasks/maps/legacy/map.md"), "kind: map\ntitle: Legacy\nslug: legacy\nstatus: draft\n");
+    writeMd(
+      join(t, "docs/tasks/maps/legacy/tickets/big/ticket.md"),
+      "kind: ticket\ntitle: Big\nslug: big\nstatus: stable\n",
+    );
+    await expect(
+      tools.tw_split_ticket.execute({ selector: "big", subtickets: [{ slug: "x", title: "X" }] }, ctx(t)),
+    ).rejects.toThrow(/schema-5 migration/);
     rmSync(t, { recursive: true, force: true });
   });
 });

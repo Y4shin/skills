@@ -20,7 +20,7 @@ import { Type, type TSchema } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
-import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, readMapSection, writeMapSection, MAP_SECTION_NON_GOALS, MAP_SECTION_NON_NEGOTIABLE_FACTS, TICKET_SUBTYPES, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
+import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, readMapSection, writeMapSection, effortDirOf, MAP_SECTION_NON_GOALS, MAP_SECTION_NON_NEGOTIABLE_FACTS, TICKET_SUBTYPES, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
 import {
   CLOSER,
   buildOpenParameters,
@@ -703,6 +703,12 @@ const SAFE_SLUG = /^[a-z0-9][a-z0-9-]*$/;
 
 const TICKET_SIZES = ["s", "m", "l", "xl"] as const;
 
+/** True when a path sits strictly inside a directory. */
+function isInside(dir: string, path: string): boolean {
+  const rel = relative(dir, path);
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
+
 /**
  * The ticket frontmatter the v5 ticket writers agree on: stable and ready,
  * so a created or split ticket sits on the frontier its blockers allow.
@@ -1151,10 +1157,7 @@ export function createTools(): Record<string, Tool> {
         requireV4Shape(parseArtifactFile(anchor).art);
 
         const index = scanMemo(root)();
-        const inEffort = (path: string): boolean => {
-          const rel = relative(effortDir, path);
-          return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
-        };
+        const inEffort = (path: string): boolean => isInside(effortDir, path);
         const clash = index.hits.find((h) => h.art.slug === seed.slug && inEffort(h.path));
         if (clash !== undefined) {
           throw new Error(`'${seed.slug}' already exists in '${p.effort}' (${clash.art.type} at ${relative(root, clash.path)})`);
@@ -1184,6 +1187,127 @@ export function createTools(): Record<string, Tool> {
         writeFileSync(ticketPath, dump(ticketDocument(seed)), "utf-8");
         const sizeNote = seed.size !== undefined ? `, size: ${seed.size}` : "";
         return `created ${relative(root, ticketPath)} (${seed.subtype}${sizeNote})`;
+      },
+    ),
+
+    tw_split_ticket: defStructured(
+      "Split a ticket into sub-tickets: the escape hatch that decomposes a failed or oversized ticket " +
+        "instead of ad-hoc files. Creates each sub-ticket (inheriting the original's subtype and blocked_by " +
+        "edges, chaining between subs through per-sub blocked_by) and supersedes the original as deprecated " +
+        "plus done with a body note naming its sub-tickets, so the graph absorbs the split and the history " +
+        "reads. Refuses an original that is already done or deprecated, duplicate or unsafe sub slugs, sub " +
+        "edges that dangle or name the superseded original, and v3-shape artifacts.",
+      Type.Object({
+        selector: Type.String({ description: "The original ticket slug or path" }),
+        subtickets: Type.Array(
+          Type.Object({
+            slug: Type.String({ description: "The sub-ticket slug (lowercase letters, digits, hyphens)" }),
+            title: Type.String({ description: "The sub-ticket title" }),
+            size: Type.Optional(
+              Type.Union(TICKET_SIZES.map((s) => Type.Literal(s)), { description: "s | m | l | xl; absent means m" }),
+            ),
+            blocked_by: Type.Optional(
+              Type.Array(
+                Type.String({ description: "Extra edges: sibling sub slugs (sequential work) or other tickets of the effort" }),
+              ),
+            ),
+            content: Type.Optional(Type.String({ description: "The sub-ticket body (what to build)" })),
+          }),
+          { description: "The sub-tickets that replace the original" },
+        ),
+      }),
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const subs: TicketSeed[] = (Array.isArray(p.subtickets) ? p.subtickets : []).map((raw: any) => ({
+          slug: String(raw?.slug ?? ""),
+          title: typeof raw?.title === "string" ? raw.title : "",
+          subtype: "",
+          size: typeof raw?.size === "string" ? raw.size : undefined,
+          blocked_by: Array.isArray(raw?.blocked_by) ? raw.blocked_by.map(String) : [],
+          content: typeof raw?.content === "string" ? raw.content : undefined,
+        }));
+        if (subs.length === 0) {
+          throw new Error("a split needs at least one sub-ticket");
+        }
+
+        const original = resolveArt(root, p.selector, "ticket");
+        requireV4Shape(original.art);
+        if (original.art.status === "deprecated") {
+          throw new Error(`'${original.art.slug}' is deprecated; deprecated counts as done`);
+        }
+        if (original.art.workflow_state === "done") {
+          throw new Error(`'${original.art.slug}' is already done; there is no work left to split`);
+        }
+        const effortKey = effortDirOf(original.path ?? "");
+        if (effortKey === null || effortKey.split(/[\\/]/)[0] === "archive") {
+          throw new Error(`'${original.art.slug}' sits in no live effort; splits happen in a live effort`);
+        }
+        const effortDir = dirname(dirname(dirname(resolvePath(original.path!))));
+        const inheritedSubtype = original.art.subtype ?? "feature";
+        for (const sub of subs) {
+          validateTicketSeed({ ...sub, subtype: inheritedSubtype });
+        }
+
+        const index = scanMemo(root)();
+        const inEffort = (path: string): boolean => isInside(effortDir, path);
+        const siblingSlugs = new Set<string>();
+        for (const sub of subs) {
+          if (siblingSlugs.has(sub.slug)) {
+            throw new Error(`duplicate sub-ticket slug '${sub.slug}' in the split`);
+          }
+          siblingSlugs.add(sub.slug);
+          if (sub.slug === original.art.slug) {
+            throw new Error(`'${sub.slug}' is the superseded original; a sub-ticket needs a new slug`);
+          }
+          const clash = index.hits.find((h) => h.art.slug === sub.slug && inEffort(h.path));
+          if (clash !== undefined) {
+            throw new Error(`'${sub.slug}' already exists in the effort (${clash.art.type} at ${relative(root, clash.path)})`);
+          }
+        }
+        for (const sub of subs) {
+          for (const target of sub.blocked_by) {
+            if (siblingSlugs.has(target)) continue;
+            if (target === original.art.slug) {
+              throw new Error(
+                `'${target}' is superseded by this split; its slug cannot be an edge target`,
+              );
+            }
+            const known = index.hits.find(
+              (h) => h.art.type === "ticket" && h.art.slug === target && inEffort(h.path),
+            );
+            if (known === undefined) {
+              throw new Error(
+                `blocked_by target '${target}' is not an existing ticket in the effort: edges are kind-scoped, tickets block tickets`,
+              );
+            }
+          }
+        }
+
+        const created: string[] = [];
+        for (const sub of subs) {
+          const seed: TicketSeed = {
+            ...sub,
+            subtype: inheritedSubtype,
+            // The sub-tickets inherit the original's edges and chain between
+            // themselves through the caller's per-sub blocked_by.
+            blocked_by: [...new Set([...original.art.blocked_by, ...sub.blocked_by])],
+          };
+          const ticketDir = join(effortDir, "tickets", sub.slug);
+          const ticketPath = join(ticketDir, "ticket.md");
+          mkdirSync(ticketDir, { recursive: true });
+          writeFileSync(ticketPath, dump(ticketDocument(seed)), "utf-8");
+          created.push(relative(root, ticketPath));
+        }
+
+        original.doc.data.status = "deprecated";
+        original.doc.data.workflow_state = "done";
+        original.doc.body = `${original.doc.body.replace(/\n+$/, "")}\n\nSuperseded by ${subs.map((s) => s.slug).join(", ")}.\n`;
+        writeFileSync(original.path!, dump(original.doc), "utf-8");
+
+        return outcome(
+          `split '${original.art.slug}': created ${created.join(", ")}; original superseded (status: deprecated, workflow_state: done).`,
+          { original: original.art.slug, created, supersededBy: subs.map((s) => s.slug) },
+        );
       },
     ),
 
