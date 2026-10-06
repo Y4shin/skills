@@ -724,6 +724,26 @@ function normalizedBody(content: string): string {
 }
 
 /**
+ * The archival note the architecture writer leaves in the effort's spec: the
+ * specification's architecture content is archival once the living
+ * architecture document exists, so the spec carries a pointer to it. The
+ * note is appended once (idempotent) and nothing is deleted from the spec.
+ * Returns whether the spec was written.
+ */
+const ARCHIVAL_NOTE_MARKER = "The architecture content in this specification is archival";
+
+function ensureArchivalNote(specPath: string): boolean {
+  const doc = parseArtifactFile(specPath).doc;
+  if (doc.body.includes(ARCHIVAL_NOTE_MARKER)) return false;
+  const note =
+    "> The architecture content in this specification is archival: the living architecture " +
+    "document is [architecture.md](architecture.md); update it there, not here.";
+  doc.body = `${doc.body.replace(/\n+$/, "")}\n\n${note}\n`;
+  writeFileSync(specPath, dump(doc), "utf-8");
+  return true;
+}
+
+/**
  * The slug shape every created artifact must carry: it becomes a directory
  * name under docs/tasks/, so anything else (spaces, slashes, traversal,
  * leading hyphen) is refused before it can escape the tree.
@@ -1490,8 +1510,11 @@ export function createTools(): Record<string, Tool> {
         if (hit !== null) {
           hit.doc.body = body;
           if (publish) hit.doc.data.status = "stable";
+          const specPath = join(dirname(hit.path), "spec.md");
+          const noted = isFile(specPath) ? ensureArchivalNote(specPath) : false;
           writeFileSync(hit.path, dump(hit.doc), "utf-8");
-          return `wrote ${relative(root, hit.path)}${publish ? " (status: stable)" : ""}`;
+          return `wrote ${relative(root, hit.path)}${publish ? " (status: stable)" : ""}` +
+            (noted ? "; the spec now points at the architecture" : "");
         }
 
         let effortDir = liveEffortDir(root, p.selector);
@@ -1530,7 +1553,9 @@ export function createTools(): Record<string, Tool> {
             : readArtifactTitle(join(effortDir, "map.md")) ?? basename(effortDir);
         const doc: Document = { data: { type: "architecture", title, status: publish ? "stable" : "draft" }, body };
         writeFileSync(archPath, dump(doc), "utf-8");
-        return `wrote ${relative(root, archPath)} (created, status: ${publish ? "stable" : "draft"})`;
+        const noted = ensureArchivalNote(specPath);
+        return `wrote ${relative(root, archPath)} (created, status: ${publish ? "stable" : "draft"})` +
+          (noted ? "; the spec now points at the architecture" : "");
       },
     ),
 

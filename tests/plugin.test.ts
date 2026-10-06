@@ -1739,6 +1739,43 @@ describe("task-workflow tools: tw_write_architecture, the architecture writer", 
     ).rejects.toThrow(/arch-spec\.md/);
     rmSync(t, { recursive: true, force: true });
   });
+
+  test("adds the archival note to spec.md pointing at the architecture, deleting nothing", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const specBody = "\n# Spec gate\n\n## Architecture\n\nThe settled architecture content.\n\n## Decisions\n\n- One.\n";
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n", specBody);
+    await tools.tw_write_architecture.execute({ selector: "specgate", content: "# Body" }, ctx(t));
+    const doc = parse(readFileSync(join(t, "docs/tasks/specgate/spec.md"), "utf-8"));
+    // Nothing is deleted from the specification.
+    expect(doc.body).toContain("The settled architecture content.");
+    expect(doc.body).toContain("## Decisions");
+    expect(doc.body).toContain("- One.");
+    // The note points at the living architecture document.
+    expect(doc.body).toMatch(/archival/);
+    expect(doc.body).toContain("architecture.md");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("the note is added once: rewrites never duplicate it", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    await tools.tw_write_architecture.execute({ selector: "specgate", content: "# First" }, ctx(t));
+    const afterFirst = readFileSync(join(t, "docs/tasks/specgate/spec.md"), "utf-8");
+    await tools.tw_write_architecture.execute({ selector: "specgate", content: "# Second" }, ctx(t));
+    expect(readFileSync(join(t, "docs/tasks/specgate/spec.md"), "utf-8")).toBe(afterFirst);
+    const doc = parse(afterFirst);
+    expect(doc.body.match(/archival/g)?.length).toBe(1);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("an update to the living document ensures the note too", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(join(t, "docs/tasks/specgate/spec.md"), "type: spec\ntitle: S\nstatus: stable\n");
+    writeMd(archPath(t), "type: architecture\ntitle: A\nstatus: draft\n", "\n# Existing\n");
+    await tools.tw_write_architecture.execute({ selector: "specgate", content: "# Updated" }, ctx(t));
+    expect(readFileSync(join(t, "docs/tasks/specgate/spec.md"), "utf-8")).toMatch(/archival/);
+    rmSync(t, { recursive: true, force: true });
+  });
 });
 
 describe("task-workflow tools: tw_add_ticket, the ticket creator", () => {
