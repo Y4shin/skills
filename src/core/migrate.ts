@@ -500,8 +500,6 @@ function titleFromBody(body: string): string | null {
   return m ? m[1].trim() : null;
 }
 
-// ─── Layout classification ────────────────────────────────────────────────────
-
 // ─── Schema-5 map body reshape ────────────────────────────────────────────────
 
 /**
@@ -538,6 +536,8 @@ function reshapeMapBody(body: string): string {
   while (end > 0 && out[end - 1].trim() === "") end--;
   return [...out.slice(0, end), "", `## ${MAP_SECTION_NON_NEGOTIABLE_FACTS}`].join("\n") + "\n";
 }
+
+// ─── Layout classification ────────────────────────────────────────────────────
 
 /**
  * The v3 workflow categories that plan a task rather than implement a ticket.
