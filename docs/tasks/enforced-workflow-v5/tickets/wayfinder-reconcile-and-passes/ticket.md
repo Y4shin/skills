@@ -56,3 +56,28 @@ keeps creating the task document and stops describing how questions are asked.
 - disclosure-open-close-core (the skill opens through `tw_open`).
 - opener-gate-and-toolsets (the Wayfinder gate and toolset come from the
   registry).
+
+## Implementation notes
+
+- Landed from `ticket/wayfinder-reconcile-and-passes` (5 wip commits on top of
+  cfbb199) into `task/wayfinder-reconcile-and-passes` via an `--no-ff` merge;
+  no conflicts.
+- `skills/engineering/wayfinder/SKILL.md` rewritten to the absorbed planning
+  phase: bounded pass (one `tw_frontier` snapshot, non-grilling ready tasks, at
+  most one grilling, release, never the next frontier), per-kind serialization
+  (never two grillings at once; research and prototype may run concurrently),
+  per-task write-back via `tw_write_section` before `tw_mark_done`, and the
+  reconcile on an empty ready frontier with the ready flag set only through
+  `tw_finalize_map`. Map body template at schema 5. Frontmatter
+  `disable-model-invocation: true`.
+- Resources consolidated under `wayfinder/resources/` (research, prototype,
+  grilling, manual); the duplicate `implement-task/resources/` planning files
+  are deleted; the `implement-task/SKILL.md` router and `research/SKILL.md`
+  repointed; `grilling.md` keeps the task document and delegates every session
+  to the `grilling` skill.
+- `docs/engineering/wayfinder.md` re-synced per project convention. New
+  `wayfinder v5` describe in `tests/skills.test.ts` and seam 2d rewritten in
+  `tests/skill-rewire.test.ts`; full suite 970/970 green, typecheck clean.
+- Divergence: prose says "the ready flag" rather than the literal
+  `ready_for_spec` token, because the landed opener-gate guard refuses that
+  token in phase-skill prose; behavior unchanged and pinned by tests.
