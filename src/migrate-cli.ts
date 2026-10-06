@@ -15,7 +15,7 @@ import { FsPort } from "./core/fs-port.js";
 function render(report: MigrateReport, dryRun: boolean): string {
   const lines: string[] = [];
   if (report.noop) {
-    lines.push("already on schema_version 4, nothing to do.");
+    lines.push("already on schema_version 5, nothing to do.");
     return lines.join("\n");
   }
   lines.push(
