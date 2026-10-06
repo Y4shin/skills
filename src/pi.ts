@@ -217,6 +217,17 @@ function readYaml(p: string): unknown {
   return YAML.parse(readFileSync(p, "utf-8"));
 }
 
+/** The frontmatter title of an artifact file, or null when it has none. */
+function readArtifactTitle(path: string): string | null {
+  if (!isFile(path)) return null;
+  try {
+    const title = parse(readFileSync(path, "utf-8")).data.title;
+    return typeof title === "string" && title.trim() !== "" ? title : null;
+  } catch {
+    return null;
+  }
+}
+
 function writeYaml(p: string, data: unknown): void {
   mkdirSync(dirname(p), { recursive: true });
   writeFileSync(p, YAML.stringify(data, { sortMapEntries: false, indentSeq: false, lineWidth: 0 }), "utf-8");
@@ -652,6 +663,34 @@ function referencesSlug(body: string, slug: string): boolean {
   return new RegExp(`(?:^|[^\\w-])${escaped}(?![\\w-])`).test(body);
 }
 
+/**
+ * The live effort directory a selector names, or null. The selector may be
+ * the effort slug, an effort-directory path, or a path to an artifact inside
+ * the effort (its map resolves it). The resolved directory must sit inside
+ * the task tree, so a traversal selector names no effort.
+ */
+function liveEffortDir(root: string, selector: string): string | null {
+  const candidates = [resolvePath(taskRoot(root), selector)];
+  try {
+    candidates.push(dirname(resolveArt(root, selector, "map").path));
+  } catch { /* not a map selector */ }
+  for (const candidate of candidates) {
+    const rel = relative(taskRoot(root), candidate);
+    if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) continue;
+    if (isDir(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Normalize a whole-body write: trimmed content wrapped in single blank
+ * margins, so a dumped document reads with one blank line after the opening
+ * fence and ends with exactly one newline.
+ */
+function normalizedBody(content: string): string {
+  return `\n${content.trim()}\n`;
+}
+
 // ─── Tool factory ──────────────────────────────────────────────────────────────
 
 interface Tool {
@@ -948,6 +987,59 @@ export function createTools(): Record<string, Tool> {
         doc.data.ready_for_spec = true;
         writeFileSync(path, dump(doc), "utf-8");
         return `map finalized: ready_for_spec = true in ${relative(root, path)}`;
+      },
+    ),
+
+    tw_write_spec: def(
+      "Write an effort's specification (spec.md): the only writer of the spec body, through the " +
+        "frontmatter seam. Creates the spec when the effort has none (title from the argument, else the " +
+        "effort's map, else the effort slug), with status draft while writing. 'publish: true' sets " +
+        "status: stable, the named spec-stable write; a plain write leaves the status untouched. Refuses " +
+        "an empty body, a selector naming no live effort, and v3-shape artifacts.",
+      {
+        selector: Str("Effort slug, or the effort's spec or map path"),
+        content: Str("The specification body (markdown after the frontmatter)"),
+        title: OptStr("Title used only when the write creates the spec"),
+        publish: OptBool,
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        if (typeof p.content !== "string" || p.content.trim() === "") {
+          throw new Error("content is empty: a spec write needs a body");
+        }
+        const body = normalizedBody(p.content);
+        const publish = p.publish === true;
+
+        let hit: ScanHit | null = null;
+        try {
+          hit = resolveArt(root, p.selector, "spec");
+        } catch { /* the effort may exist without a spec yet: create it */ }
+
+        if (hit !== null) {
+          requireV4Shape(hit.art);
+          hit.doc.body = body;
+          if (publish) hit.doc.data.status = "stable";
+          writeFileSync(hit.path, dump(hit.doc), "utf-8");
+          return `wrote ${relative(root, hit.path)}${publish ? " (status: stable)" : ""}`;
+        }
+
+        const effortDir = liveEffortDir(root, p.selector);
+        if (effortDir === null) {
+          throw new Error(
+            `no live effort '${p.selector}': create the effort (a map at docs/tasks/<effort>/map.md) before writing its spec`,
+          );
+        }
+        const title =
+          typeof p.title === "string" && p.title.trim() !== ""
+            ? p.title.trim()
+            : readArtifactTitle(join(effortDir, "map.md")) ?? basename(effortDir);
+        const doc: Document = {
+          data: { type: "spec", title, status: publish ? "stable" : "draft" },
+          body,
+        };
+        const path = join(effortDir, "spec.md");
+        writeFileSync(path, dump(doc), "utf-8");
+        return `wrote ${relative(root, path)} (created, status: ${publish ? "stable" : "draft"})`;
       },
     ),
 

@@ -210,6 +210,7 @@ describe("task-workflow tools", () => {
         "tw_state",
         "tw_state_set",
         "tw_write_section",
+        "tw_write_spec",
       ]);
     });
 
@@ -1496,6 +1497,116 @@ describe("task-workflow tools: tw_mark_done, the planning half", () => {
     await expect(tools.tw_mark_done.execute({ selector: "decide" }, ctx(t))).rejects.toThrow(
       /no map/,
     );
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+// ─── Implementation transition tools (implementation-transition-tools) ────
+
+describe("task-workflow tools: tw_write_spec, the specification writer", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function specPath(t: string): string {
+    return join(t, "docs/tasks/specgate/spec.md");
+  }
+
+  test("creates a draft spec when the effort has none, through the frontmatter seam", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    expect(existsSync(specPath(t))).toBe(false);
+    const out = await tools.tw_write_spec.execute(
+      { selector: "specgate", content: "# Spec gate specification\n\nThe settled decisions." },
+      ctx(t),
+    );
+    expect(out).toContain("spec.md");
+    const doc = parse(readFileSync(specPath(t), "utf-8"));
+    // Conformant spec frontmatter: draft while writing, title from the map.
+    expect(doc.data.type).toBe("spec");
+    expect(doc.data.title).toBe("Spec gate");
+    expect(doc.data.status).toBe("draft");
+    expect(doc.data).not.toHaveProperty("workflow_state");
+    expect(doc.body).toBe("\n# Spec gate specification\n\nThe settled decisions.\n");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("uses the given title when creating and derives it from the map otherwise", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_write_spec.execute(
+      { selector: "specgate", title: "Chosen title", content: "# Body" },
+      ctx(t),
+    );
+    expect(parse(readFileSync(specPath(t), "utf-8")).data.title).toBe("Chosen title");
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp();
+    writeMd(join(t2, "docs/tasks/bare/map.md"), "type: map\ntitle: Bare effort\nstatus: stable\n");
+    await tools.tw_write_spec.execute({ selector: "bare", content: "# Body" }, ctx(t2));
+    expect(parse(readFileSync(join(t2, "docs/tasks/bare/spec.md"), "utf-8")).data.title).toBe("Bare effort");
+    rmSync(t2, { recursive: true, force: true });
+  });
+
+  test("rewrites the body of an existing spec and preserves its frontmatter", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(specPath(t), "type: spec\ntitle: Spec gate spec\nstatus: draft\n", "\n# Old body\n");
+    await tools.tw_write_spec.execute(
+      { selector: "specgate", content: "# Rewritten\n\nThe synthesized specification." },
+      ctx(t),
+    );
+    const doc = parse(readFileSync(specPath(t), "utf-8"));
+    expect(doc.body).toBe("\n# Rewritten\n\nThe synthesized specification.\n");
+    expect(doc.data.type).toBe("spec");
+    expect(doc.data.title).toBe("Spec gate spec");
+    // A content write does not touch the lifecycle: still draft.
+    expect(doc.data.status).toBe("draft");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("publish sets status: stable, the spec-stable named write", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await tools.tw_write_spec.execute(
+      { selector: "specgate", content: "# Spec gate specification\n\nSettled.", publish: true },
+      ctx(t),
+    );
+    expect(parse(readFileSync(specPath(t), "utf-8")).data.status).toBe("stable");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("publish flips an existing draft spec to stable", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    writeMd(specPath(t), "type: spec\ntitle: Spec gate spec\nstatus: draft\n", "\n# Draft\n");
+    await tools.tw_write_spec.execute(
+      { selector: "specgate", content: "# Draft\n\nNow settled.", publish: true },
+      ctx(t),
+    );
+    expect(parse(readFileSync(specPath(t), "utf-8")).data.status).toBe("stable");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty content", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_write_spec.execute({ selector: "specgate", content: "   " }, ctx(t)),
+    ).rejects.toThrow(/empty/);
+    expect(existsSync(specPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a selector that names no live effort", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_write_spec.execute({ selector: "no-such-effort", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/no live effort/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a v3-shape spec: the v5 writers write schema-5 shape only", async () => {
+    const t = mkTmp();
+    writeMd(join(t, "docs/tasks/maps/legacy/map.md"), "kind: map\ntitle: Legacy\nslug: legacy\nstatus: draft\n");
+    writeMd(join(t, "docs/tasks/maps/legacy/spec.md"), "kind: spec\ntitle: Legacy spec\nslug: legacy\nstatus: draft\n");
+    await expect(
+      tools.tw_write_spec.execute({ selector: "legacy", content: "# x" }, ctx(t)),
+    ).rejects.toThrow(/schema-5 migration/);
     rmSync(t, { recursive: true, force: true });
   });
 });

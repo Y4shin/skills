@@ -61,6 +61,7 @@ const GATED_NAMES = [
   "tw_context",
   "tw_finalize_map",
   "tw_write_section",
+  "tw_write_spec",
   "notify_user",
 ];
 
