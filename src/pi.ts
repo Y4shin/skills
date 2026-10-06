@@ -959,7 +959,7 @@ function phaseGate(
           legalNext: ["retry tw_open with the target ticket slug"],
         };
       }
-      return null;
+      return requireTicketTarget(root, effort, liveEffortDir(root, effort)!, graph, args.target);
     }
   }
 }
@@ -983,6 +983,96 @@ function graphForEffortDir(graphs: Map<string, EffortGraph>, dir: string): Effor
     }
   }
   return null;
+}
+
+/**
+ * The target ticket's unfinished same-kind blockers, by slug. Done-ness is
+ * itemFinalizable's: workflow_state done, deprecated counting as done.
+ */
+function unfinishedBlockers(graph: EffortGraph, target: Artifact): string[] {
+  const items = [...graph.tasks, ...graph.tickets, ...graph.deprecated];
+  return target.blocked_by
+    .map((slug) => items.find((a) => a.slug === slug))
+    .filter((a): a is Artifact => a !== undefined && itemFinalizable(a) !== null)
+    .map((a) => a.slug);
+}
+
+/** The ready frontier of the graph's ticket kind, by slug. */
+function readyTicketSlugs(graph: EffortGraph): string[] {
+  return effortFrontier(graph)
+    .filter((a) => a.type === "ticket")
+    .map((a) => a.slug);
+}
+
+/**
+ * The target-ticket half of the implementation gate: the target must be a
+ * ticket of the effort, not done, not blocked, and on the ready frontier (an
+ * in-progress ticket is legal: a resumed run). Every refusal names the legal
+ * next call: the tickets that can be implemented instead, or the blockers
+ * that must land first.
+ */
+function requireTicketTarget(
+  root: string,
+  effort: string,
+  effortDir: string,
+  graph: EffortGraph | null,
+  target: string,
+): GateRefusal | null {
+  let resolved: Artifact;
+  try {
+    resolved = resolveArt(root, target, "ticket").art;
+  } catch {
+    return {
+      reason: `no ticket '${target}' in '${effort}'`,
+      legalNext: readyTicketsOrRetry(graph),
+    };
+  }
+  if (!resolved.path || !isInside(effortDir, resolved.path)) {
+    return {
+      reason: `'${target}' is not a ticket of '${effort}'`,
+      legalNext: readyTicketsOrRetry(graph),
+    };
+  }
+  const slug = resolved.slug;
+  // Done-ness gates on itemFinalizable: workflow_state done, deprecated
+  // counting as done.
+  if (itemFinalizable(resolved) === null) {
+    return {
+      reason: `ticket '${slug}' is done: there is nothing left to implement there`,
+      legalNext: readyTicketsOrRetry(graph),
+    };
+  }
+  if (resolved.workflow_state === "blocked") {
+    const blockers = graph === null ? [] : unfinishedBlockers(graph, resolved);
+    return {
+      reason:
+        blockers.length > 0
+          ? `ticket '${slug}' is blocked by ${blockers.join(", ")}`
+          : `ticket '${slug}' is marked blocked`,
+      legalNext:
+        blockers.length > 0
+          ? blockers.map((b) => `implement-ticket: ${b}`)
+          : [`retry tw_open once '${slug}' is unblocked`],
+    };
+  }
+  if (graph !== null && !readyTicketSlugs(graph).includes(slug)) {
+    const blockers = unfinishedBlockers(graph, resolved);
+    return {
+      reason: `ticket '${slug}' is not ready: blocked by ${blockers.join(", ")}`,
+      legalNext: blockers.map((b) => `implement-ticket: ${b}`),
+    };
+  }
+  return null;
+}
+
+/**
+ * The legal next for a target that cannot be worked: the ready tickets of the
+ * effort, or the retry hint when the frontier is empty.
+ */
+function readyTicketsOrRetry(graph: EffortGraph | null): string[] {
+  if (graph === null) return ["retry tw_open with the target ticket slug"];
+  const ready = readyTicketSlugs(graph);
+  return ready.length > 0 ? ready.map((slug) => `implement-ticket: ${slug}`) : ["retry tw_open with the target ticket slug"];
 }
 
 /**

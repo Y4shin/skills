@@ -74,6 +74,39 @@ beforeAll(() => {
       data: { type: "ticket", subtype: "feature", title: "Second", status: "stable", workflow_state: "done", blocked_by: ["first"] },
     },
   });
+  // A ticket marked blocked, one blocked by an unfinished ticket, and one
+  // gated behind an unfinished prerequisite without a blocked marking.
+  writeEffort("gated-effort", {
+    "map.md": { data: { type: "map", title: "Gated effort", ready_for_spec: true } },
+    "spec.md": { data: { type: "spec", title: "Gated effort spec", status: "stable" } },
+    "arch-spec.md": { data: { type: "arch spec", title: "Gated effort architecture", status: "stable" } },
+    "tickets/stuck/ticket.md": {
+      data: { type: "ticket", subtype: "feature", title: "Stuck", status: "stable", workflow_state: "ready", blocked_by: [] },
+    },
+    "tickets/marked-blocked/ticket.md": {
+      data: {
+        type: "ticket", subtype: "feature", title: "Marked blocked", status: "stable", workflow_state: "blocked", blocked_by: [],
+      },
+    },
+    "tickets/blocked-by-item/ticket.md": {
+      data: {
+        type: "ticket", subtype: "feature", title: "Blocked by item", status: "stable", workflow_state: "blocked", blocked_by: ["stuck"],
+      },
+    },
+    "tickets/gated/ticket.md": {
+      data: {
+        type: "ticket", subtype: "feature", title: "Gated", status: "stable", workflow_state: "ready", blocked_by: ["stuck"],
+      },
+    },
+  });
+  // A resumed run: the in-progress ticket is a legal target.
+  writeEffort("ready-effort", {
+    "tickets/three/ticket.md": {
+      data: {
+        type: "ticket", subtype: "feature", title: "Three", status: "stable", workflow_state: "in-progress", blocked_by: [],
+      },
+    },
+  });
 });
 
 afterAll(() => {
@@ -102,6 +135,100 @@ interface ToolResult {
     disclosed?: string[];
   };
 }
+
+// ─── The implementation gate: the target ticket ──────────────────────────────
+
+describe("the implementation gate: the target ticket", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => {
+    tools = createTools();
+  });
+
+  test("a legal target activates the toolset and returns opened true", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "ready-effort", target: "one" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(true);
+    expect(result.details).toMatchObject({ skill: "implement-ticket", effort: "ready-effort", target: "one" });
+    for (const tool of ["tw_write_changelog", "tw_mark_done", "tw_frontier", "tw_close"]) {
+      expect(active, `${tool} must be declared once the ticket phase is open`).toContain(tool);
+    }
+  });
+
+  test("an in-progress target is legal: a resumed run opens", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "ready-effort", target: "three" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(true);
+  });
+
+  test("refuses a done target and names the remaining ready tickets", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "ready-effort", target: "two" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(false);
+    expect(result.details.reason).toContain("'two' is done");
+    // The ready frontier is the legal next: the untouched ticket and the
+    // in-progress one a resumed run would pick up.
+    expect(result.details.legal_next).toEqual(["implement-ticket: one", "implement-ticket: three"]);
+    expect(active).toEqual([...ALWAYS_DECLARED]);
+  });
+
+  test("refuses a blocked target and names the blocker", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "gated-effort", target: "blocked-by-item" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(false);
+    expect(result.details.reason).toContain("blocked");
+    expect(result.details.reason).toContain("stuck");
+    expect(result.details.legal_next).toEqual(["implement-ticket: stuck"]);
+    expect(active).toEqual([...ALWAYS_DECLARED]);
+  });
+
+  test("refuses a target marked blocked with no unfinished blocker", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "gated-effort", target: "marked-blocked" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(false);
+    expect(result.details.reason).toContain("marked blocked");
+    expect(active).toEqual([...ALWAYS_DECLARED]);
+  });
+
+  test("refuses a not-ready target whose blockers are unfinished, naming them", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "gated-effort", target: "gated" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(false);
+    expect(result.details.reason).toContain("not ready");
+    expect(result.details.reason).toContain("stuck");
+    expect(result.details.legal_next).toEqual(["implement-ticket: stuck"]);
+    expect(active).toEqual([...ALWAYS_DECLARED]);
+  });
+
+  test("refuses a target that is no ticket of the effort", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "ready-effort", target: "no-such-ticket" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(false);
+    expect(result.details.reason).toContain("no ticket 'no-such-ticket'");
+    expect(active).toEqual([...ALWAYS_DECLARED]);
+  });
+});
 
 // ─── The implementation gate: the effort's work state ────────────────────────
 
