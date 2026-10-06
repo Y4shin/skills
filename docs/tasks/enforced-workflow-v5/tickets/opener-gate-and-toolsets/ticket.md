@@ -59,3 +59,34 @@ one. `finalize-effort` refuses while a finding is undispositioned.
   ticket state and the architecture document).
 - disclosure-open-close-core (the opener, the toolset activation, and the
   refusal shape must exist first).
+
+## Implementation notes
+
+- Landed on `task/opener-gate-and-toolsets` (merge commit 5708af4) from
+  `ticket/opener-gate-and-toolsets` at eb4925a. Full suite: 953 tests green,
+  typecheck clean.
+- The registry (`src/disclosure.ts`) is the single table: skill to toolset,
+  skill to gate kind (`none`, `effort`, `spec-ready`, `implementation`), plus
+  the symmetric conflicts table. Gate evaluation lives only in `phaseGate`
+  (`src/pi.ts`), computed from the real tree through `scanMemo` and the
+  `art.ts`/`graph.ts` seams; no gate prose remains in the skills.
+- All seven listed refusals return with `opened: false`, a reason, and
+  `legal_next`, leaving the toolset closed; duplicate and conflict refusals
+  carry `legal_next` too. A legal open activates the phase toolset and returns
+  `details.opened === true`.
+- `to-spec` opens only on `ready_for_spec: true`, otherwise pointing back to
+  Wayfinder. `implement-ticket` refuses a missing or unstable
+  `architecture.md` (legacy `arch-spec.md` accepted, rename named in the
+  refusal) and never drafts one. The undispositioned-findings gate lives in
+  `tw_archive_effort` per the arch spec's location contract (Divergence 1 of
+  the TDD report): an opener-level check would deadlock recovery because the
+  dispositioning tools are gated or guard-blocked while the toolset is closed.
+- Deviations recorded by the TDD worker: missing target moved from a thrown
+  validation error to a returned refusal; the `dispositioned` frontmatter flag
+  is the interface ticket 18's review writer sets; to-tickets' signature tool
+  stays `tw_map_finalizable` until its architecture writer lands.
+- Host `gate:` commands unchanged; the opener is the only gate at skill entry.
+  The verifier's gate corroborated diff scope, gate placement, and 953/953
+  tests; residual risks (dispositioned-flag interface, schema-layer rejection
+  of targetless opens, best-effort unknown-effort hint list) do not block
+  landing.
