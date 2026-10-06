@@ -1449,18 +1449,6 @@ describe("task-workflow tools: tw_mark_done, the planning half", () => {
     rmSync(t2, { recursive: true, force: true });
   });
 
-  test("refuses a ticket selector: the planning half marks planning tasks only", async () => {
-    const t = mkTmp(); seedPlanningTree(t);
-    writeMd(
-      join(t, "docs/tasks/specgate/tickets/land-it/ticket.md"),
-      "type: ticket\nsubtype: feature\ntitle: Land it\nstatus: stable\nworkflow_state: todo\nblocked_by: []\n",
-    );
-    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t))).rejects.toThrow(
-      /has type 'ticket', not 'task'/,
-    );
-    rmSync(t, { recursive: true, force: true });
-  });
-
   test("refuses a v3-shape task", async () => {
     const t = mkTmp();
     writeMd(
@@ -1896,5 +1884,92 @@ describe("task-workflow tools: tw_split_ticket, the escape-hatch split", () => {
       tools.tw_split_ticket.execute({ selector: "big", subtickets: [{ slug: "x", title: "X" }] }, ctx(t)),
     ).rejects.toThrow(/schema-5 migration/);
     rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("task-workflow tools: tw_mark_done, the ticket half", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  /** The fixture: a landed ticket whose changelog entry may or may not exist. */
+  function seedTicketDoneTree(t: string, changelogBody?: string): void {
+    seedPlanningTree(t);
+    writeMd(
+      join(t, "docs/tasks/specgate/tickets/land-it/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Land it\nstatus: stable\nworkflow_state: in-progress\nsize: m\nblocked_by: []\n",
+    );
+    writeMd(
+      join(t, "docs/tasks/CHANGELOG.md"),
+      "type: changelog\ntitle: Task Changelog\n",
+      changelogBody ?? "\n# Task Changelog\n",
+    );
+  }
+
+  function ticketPath(t: string): string {
+    return join(t, "docs/tasks/specgate/tickets/land-it/ticket.md");
+  }
+
+  test("marks a ticket done when the changelog references it: the entry lands before the done-marking", async () => {
+    const t = mkTmp();
+    seedTicketDoneTree(
+      t,
+      "\n# Task Changelog\n\n## 2026-10-01, Land it (land-it)\n\nThe ticket landed.\n",
+    );
+    const out = await tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t));
+    expect(out).toMatch(/done/);
+    const doc = parse(readFileSync(ticketPath(t), "utf-8"));
+    expect(doc.data.workflow_state).toBe("done");
+    // The status is not the done-ness field; it stays as it was.
+    expect(doc.data.status).toBe("stable");
+    // A ticket done-marking is not a plan change: no ready_for_spec on the ticket.
+    expect(doc.data).not.toHaveProperty("ready_for_spec");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses when the changelog has no entry for the ticket, naming the changelog writer", async () => {
+    const t = mkTmp(); seedTicketDoneTree(t);
+    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t))).rejects.toThrow(
+      /tw_write_changelog/,
+    );
+    // The refusal leaves the ticket untouched.
+    expect(parse(readFileSync(ticketPath(t), "utf-8")).data.workflow_state).toBe("in-progress");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("does not count a longer hyphenated slug as the changelog reference", async () => {
+    const t = mkTmp();
+    seedTicketDoneTree(
+      t,
+      "\n# Task Changelog\n\n## 2026-10-01, Other (land-it-v2)\n\nAnother ticket landed.\n",
+    );
+    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t))).rejects.toThrow(
+      /tw_write_changelog/,
+    );
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses when the changelog does not exist yet", async () => {
+    const t = mkTmp(); seedTicketDoneTree(t);
+    rmSync(join(t, "docs/tasks/CHANGELOG.md"));
+    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t))).rejects.toThrow(
+      /changelog/,
+    );
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an already-done or deprecated ticket", async () => {
+    const t = mkTmp();
+    seedTicketDoneTree(t, "\n# Task Changelog\n\n## 2026-10-01, Land it (land-it)\n\nLanded.\n");
+    writeFileSync(ticketPath(t), readFileSync(ticketPath(t), "utf-8").replace("in-progress", "done"), "utf-8");
+    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t))).rejects.toThrow(/already done/);
+    rmSync(t, { recursive: true, force: true });
+
+    const t2 = mkTmp();
+    seedTicketDoneTree(t2, "\n# Task Changelog\n\n## 2026-10-01, Land it (land-it)\n\nLanded.\n");
+    const p = ticketPath(t2);
+    writeFileSync(p, readFileSync(p, "utf-8").replace("status: stable", "status: deprecated"), "utf-8");
+    await expect(tools.tw_mark_done.execute({ selector: "land-it" }, ctx(t2))).rejects.toThrow(/deprecated/);
+    rmSync(t2, { recursive: true, force: true });
   });
 });

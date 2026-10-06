@@ -654,6 +654,34 @@ function clearReadyForSpec(doc: Document): boolean {
 }
 
 /**
+ * The ticket half of the done-marking: the changelog entry lands before the
+ * done-marking (the per-ticket close-out order), so the changelog must
+ * reference the ticket as a stand-alone token, the same pointer convention
+ * the planning half enforces against the map. A ticket done-marking is not a
+ * plan change: ready_for_spec stays untouched.
+ */
+function markTicketDone(root: string, path: string, art: Artifact, doc: Document): string {
+  const changelogPath = join(taskRoot(root), "CHANGELOG.md");
+  if (!isFile(changelogPath)) {
+    throw new Error(
+      `'${art.slug}' cannot be marked done: the changelog (${relative(root, changelogPath)}) does not exist; ` +
+        `write the ticket's changelog entry with tw_write_changelog first`,
+    );
+  }
+  const changelogDoc = parse(readFileSync(changelogPath, "utf-8"));
+  if (!referencesSlug(changelogDoc.body, art.slug)) {
+    throw new Error(
+      `'${art.slug}' cannot be marked done: the changelog has no entry for it yet; the changelog entry lands ` +
+        `before the done-marking, so write it with tw_write_changelog (the entry must reference '${art.slug}') ` +
+        `and mark the ticket done after`,
+    );
+  }
+  doc.data.workflow_state = "done";
+  writeFileSync(path, dump(doc), "utf-8");
+  return `marked '${art.slug}' done (workflow_state: done)`;
+}
+
+/**
  * True when a body references the slug as a stand-alone token: the write-back
  * pointer convention (a short statement plus the task slug). A longer
  * hyphenated slug that merely contains this one is not a reference.
@@ -1312,20 +1340,38 @@ export function createTools(): Record<string, Tool> {
     ),
 
     tw_mark_done: def(
-      "Mark a planning task done (workflow_state: done). Refuses a task that is already done or deprecated, " +
-        "and refuses when the task's recorded results were not written back to its effort's map first: the map " +
-        "must reference the task, which a tw_write_section write-back does. The planning done-marking clears " +
-        "ready_for_spec, so the next Wayfinder pass re-runs the reconcile.",
-      { selector: Str("Planning task slug or path") },
+      "Mark a planning task or an implementation ticket done (workflow_state: done). Both refuse items that " +
+        "are already done or deprecated (deprecated counts as done). A planning task refuses when its recorded " +
+        "results were not written back to its effort's map first: the map must reference the task, which a " +
+        "tw_write_section write-back does; the planning done-marking clears ready_for_spec, so the next " +
+        "Wayfinder pass re-runs the reconcile. An implementation ticket refuses when the changelog has no entry " +
+        "referencing it yet: the changelog entry lands before the done-marking (write it with tw_write_changelog), " +
+        "and a ticket done-marking is not a plan change, so it leaves ready_for_spec alone.",
+      { selector: Str("Planning task or ticket slug or path") },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
-        const { path, art, doc } = resolveArt(root, p.selector, "task");
+        // Tasks take precedence when a slug could name either kind, so the
+        // planning half's resolution behavior is unchanged.
+        let hit: ScanHit;
+        try {
+          hit = resolveArt(root, p.selector, "task");
+        } catch (taskError) {
+          try {
+            hit = resolveArt(root, p.selector, "ticket");
+          } catch {
+            throw taskError;
+          }
+        }
+        const { path, art, doc } = hit;
         requireV4Shape(art);
         if (art.status === "deprecated") {
           throw new Error(`'${art.slug}' is deprecated; deprecated counts as done`);
         }
         if (art.workflow_state === "done") {
           throw new Error(`'${art.slug}' is already done`);
+        }
+        if (art.type === "ticket") {
+          return markTicketDone(root, path, art, doc);
         }
         const mapArt = graphForPath(effortGraphs(scanMemo(root)()), path)?.map ?? null;
         if (mapArt === null || !mapArt.path) {
