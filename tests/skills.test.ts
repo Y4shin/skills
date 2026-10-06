@@ -1424,6 +1424,25 @@ describe("wayfinder v5 (wayfinder-reconcile-and-passes)", () => {
   test("tw_finalize_map refuses naming every missing item", () => {
     expect(content).toMatch(/naming\s+every\s+missing\s+item/i);
   });
+
+  test("every planning task writes its results back before marking itself done", () => {
+    expect(content).toMatch(/writes its own results back to the map through\s+`tw_write_section` as its final step/i);
+    expect(content).toMatch(/before it marks itself done with\s+`tw_mark_done`/i);
+  });
+
+  test("the write-back pointer convention: the map must reference the task slug", () => {
+    expect(content).toMatch(/referencing the task's slug as a stand-alone token/i);
+    expect(content).toMatch(/`tw_mark_done` refuses the\s+done-marking while the map does not reference the task/i);
+  });
+
+  test("wayfinder never re-synthesizes decisions from task bodies", () => {
+    expect(content).toMatch(/never re-synthesizes decisions from task bodies/i);
+  });
+
+  test("a done-marking clears the flag, so post-reconcile plan changes force one more pass", () => {
+    expect(content).toMatch(/A done-marking clears\s+a set ready flag/i);
+    expect(content).toMatch(/forces one more\s+pass/i);
+  });
 });
 
 // ─── Conformance seam: fixture efforts built from the prose templates ──
