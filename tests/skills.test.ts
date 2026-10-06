@@ -919,6 +919,39 @@ describe("setup-workflow v5", () => {
       expect(content).toMatch(new RegExp(`## Step ${i}`));
     }
   });
+
+  test("upgrade-4-to-5 resource exists with the established shape", () => {
+    const content = readFile("skills/engineering/setup-workflow/resources/upgrade-4-to-5.md");
+    expect(content).toMatch(/scripts\/migrate\.mjs/);
+    expect(content).toMatch(/## Before you start/);
+    expect(content).toMatch(/## After the run/);
+    expect(content).toMatch(/## Step 1/);
+    expect(content).toMatch(/## Step 2/);
+  });
+
+  test("upgrade-4-to-5 covers every v4-to-5 rewrite the migration performs", () => {
+    const content = readFile("skills/engineering/setup-workflow/resources/upgrade-4-to-5.md");
+    // The type and filename rename, live and archived.
+    expect(content).toMatch(/arch-spec\.md/);
+    expect(content).toMatch(/architecture\.md/);
+    expect(content).toMatch(/arch spec/);
+    // The multi-architecture-doc corner: renamed in place, not hoisted.
+    expect(content).toMatch(/in place/);
+    // The map body reshape.
+    expect(content).toMatch(/## Out of scope/);
+    expect(content).toMatch(/Non-goals/);
+    expect(content).toMatch(/Non-negotiable facts/);
+    // The state stamp and what the hop never touches.
+    expect(content).toMatch(/schema_version: 5/);
+    expect(content).toMatch(/docs\/bugs\//);
+  });
+
+  test("upgrade-4-to-5's transcript matches what the CLI actually prints", () => {
+    const content = readFile("skills/engineering/setup-workflow/resources/upgrade-4-to-5.md");
+    expect(content).toMatch(/migrated from schema_version 4 to 5/);
+    expect(content).toMatch(/already on schema_version 5, nothing to do\./);
+    expect(content).toMatch(/rebuilt state\.yaml at schema_version 5/);
+  });
 });
 // ─── Skill-review wiring ─────────────────────────────────────────────
 
