@@ -585,7 +585,16 @@ exports to the tickets that depend on it.
     post-reconcile reopen forces one more pass.
 11. **`to-tickets-architecture`** exports the architecture-plus-tickets
     phase. Contract: `arch-spec.md`/`architecture.md` is produced from the
-    spec's architecture content plus exports, seams, and contracts.
+    spec's architecture content plus exports, seams, and contracts. As
+    landed upstream: tickets are created through `tw_add_ticket`, which
+    validates `blocked_by` at creation (kind-scoped, same effort, no
+    dangling), so the prose teaches creation-order wiring; the settled
+    to-tickets "second wiring pass" (editing frontmatter after all slugs
+    exist) is retired, because the write guard refuses hand edits and the
+    second pass has no legal mechanism. Splits go through
+    `tw_split_ticket`. The `architecture.md` writer is deliberately absent
+    from the landed transition tools; this ticket owns it, and until it
+    lands those writes fail closed under the guard.
 12. **`grilling-delegation-fix`** exports the single grilling-method home.
     Contract: every pointer resolves to the `grilling` skill; no resource
     restates the method.
@@ -602,9 +611,19 @@ exports to the tickets that depend on it.
 17. **`implement-ticket-skill`** exports the implementation phase. Contract:
     reads the architecture, owns the ticket frontier and levels, dispatches
     chains, closes each ticket out inline; retires `implement-task` and
-    `finalize-task`.
+    `finalize-task`. As landed upstream: ticket writes go through the named
+    tools (`tw_add_ticket` with creation-order wiring as in entry 11,
+    `tw_split_ticket`, ticket `tw_mark_done`, `tw_mark_blocked`); the
+    close-out's changelog write goes through `tw_write_changelog`, and
+    `docs/tasks/CHANGELOG.md` is refused to the built-in `write`/`edit`, so
+    the changelog writer is provably the only writer of it. The prose must
+    not describe a by-hand second wiring pass.
 18. **`finalize-effort-skill`** exports the effort close. Contract: holistic
     review, finding triage, follow-up only after a human yes, archive gate.
+    As landed upstream: the `review.md` writer is deliberately absent from
+    the landed transition tools; this ticket owns it, and until it lands
+    review writes fail closed under the guard. The archive move is
+    `tw_archive_effort` (a `renameSync`, no shell).
 19. **`overview-doctor-rescope`** exports the explainer and the narrowed
     doctor. Contract: overview points at `tw_next`; doctor owns only what the
     tools cannot self-diagnose.
@@ -637,9 +656,12 @@ assert the internal shape of a helper.
   the disclosure ticket.
 - **The write guard is best-effort against a determined shell.** The residual
   risk is accepted and documented; no ticket attempts a sound shell gate.
-- **`ready_for_spec` auto-clear must cover every plan writer.** Planning
-  `tw_mark_done` already clears the flag; `implementation-transition-tools`
-  owns the remaining writers; a missed writer is a stale flag.
+- **`ready_for_spec` auto-clear covered every writer.** Planning
+  `tw_mark_done` clears the flag, and the landed ticket-half writers
+  (`tw_write_spec`, `tw_add_ticket`, `tw_split_ticket`, ticket
+  `tw_mark_done`, `tw_mark_blocked`, `tw_write_changelog`,
+  `tw_archive_effort`) all leave `ready_for_spec` untouched, so the
+  auto-clear surface is fully landed for this effort.
 - **The open-set derivation keys on signature tools.** Two skills whose
   toolsets overlap fully cannot both be modeled; tickets 9 and 14 must keep
   one private tool per skill or revisit the derivation (the throw makes the
@@ -647,3 +669,11 @@ assert the internal shape of a helper.
 - **This effort runs in v4 mode.** The v5 openers and gates do not exist
   during implementation, so the ticket pipeline and the current skills run
   against the v4 tree until the relevant tickets land.
+- **The onboard branch still scaffolds `docs/bugs/` directories while the
+  landed schema-5 target makes `docs/bugs/` a static archive.** The
+  migration-target-and-upgrade-resource report records this as
+  coherence-pass input, not a contract change; it belongs to
+  `docs-resync`.
+- **`CONTEXT.md` and the doctor/overview prose still speak v4.**
+  `overview-doctor-rescope` and `docs-resync` own that rescope and it is
+  already in their remit; no other ticket needs to absorb it.
