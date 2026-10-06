@@ -55,3 +55,17 @@ seams. No gate logic lives in skill prose.
 
 - schema5-artifact-model (the model must read `ready_for_spec` and the
   section names before the writing tool can set them).
+
+## Implementation notes
+
+- Landed `ticket/planning-transition-tools` into `task/planning-transition-tools`
+  (no-ff) at `e6ea48c`, five wip commits on top of the `migrate-v4-to-v5`
+  landing. `tw_set` is removed from the registered surface; `tw_write_section`,
+  `tw_finalize_map`, and planning `tw_mark_done` (with the write-back
+  precondition and `ready_for_spec` auto-clear) are in. Full suite after the
+  merge: 866 passed, 0 failed, 17 files; typecheck clean.
+- Divergences recorded in the deviation report
+  (`deviation-reports/planning-transition-tools.md`), notably: the section
+  writer accepts any named `##` section so wayfinder write-backs work, the
+  write-back precondition is a slug-token reference in the map body, and
+  planning done-marking also clears `ready_for_spec`.
