@@ -57,6 +57,23 @@ beforeAll(() => {
   writeEffort("unreconciled", {
     "map.md": { data: { type: "map", title: "Unreconciled effort" } },
   });
+  // Ticket generation has not run: a spec, no tickets.
+  writeEffort("spec-only", {
+    "map.md": { data: { type: "map", title: "Spec only", ready_for_spec: true } },
+    "spec.md": { data: { type: "spec", title: "Spec only spec", status: "stable" } },
+  });
+  // Every ticket done: the effort is ready to finalize, not to implement.
+  writeEffort("all-done", {
+    "map.md": { data: { type: "map", title: "All done", ready_for_spec: true } },
+    "spec.md": { data: { type: "spec", title: "All done spec", status: "stable" } },
+    "arch-spec.md": { data: { type: "arch spec", title: "All done architecture", status: "stable" } },
+    "tickets/first/ticket.md": {
+      data: { type: "ticket", subtype: "feature", title: "First", status: "stable", workflow_state: "done", blocked_by: [] },
+    },
+    "tickets/second/ticket.md": {
+      data: { type: "ticket", subtype: "feature", title: "Second", status: "stable", workflow_state: "done", blocked_by: ["first"] },
+    },
+  });
 });
 
 afterAll(() => {
@@ -85,6 +102,52 @@ interface ToolResult {
     disclosed?: string[];
   };
 }
+
+// ─── The implementation gate: the effort's work state ────────────────────────
+
+describe("the implementation gate: the effort's work state", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => {
+    tools = createTools();
+  });
+
+  test("a targetless ticket open is a refusal that names the retry, not a throw", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "ready-effort" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(false);
+    expect(result.details.reason).toContain("target");
+    expect(result.details.legal_next?.length).toBeGreaterThan(0);
+    expect(active).toEqual([...ALWAYS_DECLARED]);
+  });
+
+  test("refuses an effort with a spec and no tickets, pointing at to-tickets", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "spec-only", target: "one" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(false);
+    expect(result.details.reason).toContain("spec but no tickets");
+    expect(result.details.legal_next).toEqual(["run to-tickets"]);
+    expect(active).toEqual([...ALWAYS_DECLARED]);
+  });
+
+  test("refuses an effort with every ticket done, pointing at finalize-effort", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "all-done", target: "first" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(false);
+    expect(result.details.reason).toContain("done");
+    expect(result.details.legal_next).toEqual(["run finalize-effort"]);
+    expect(active).toEqual([...ALWAYS_DECLARED]);
+  });
+});
 
 // ─── The to-spec flag gate ────────────────────────────────────────────────────────
 

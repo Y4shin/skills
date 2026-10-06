@@ -122,7 +122,10 @@ export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "implement-ticket",
     takesTarget: true,
-    gate: "effort",
+    // The implementation gate: the effort's work state (ticket generation ran,
+    // work remains), the architecture document, and the target ticket's
+    // readiness.
+    gate: "implementation",
     // The implementation phase: owns the ticket frontier and levels, creates
     // and splits tickets, marks tickets done (after the changelog entry),
     // resolves uncertainties, and writes the per-ticket changelog entry.
@@ -252,9 +255,10 @@ export function validateOpenArgs(args: { skill?: unknown; effort?: unknown; targ
   if (typeof args.effort !== "string" || args.effort.trim() === "") {
     throw new Error(`opening '${entry.name}' requires a non-empty effort`);
   }
-  if (entry.takesTarget && (typeof args.target !== "string" || args.target.trim() === "")) {
-    throw new Error(`opening '${entry.name}' requires a non-empty target`);
-  }
+  // A missing target is the implementation gate's refusal (it returns the
+  // reason plus the legal next calls and leaves the toolset closed), not a
+  // thrown validation error; only the stray-target case is argument-shape
+  // validation here.
   if (!entry.takesTarget && args.target !== undefined) {
     throw new Error(`'${entry.name}' takes no target: an open there carries only the effort`);
   }

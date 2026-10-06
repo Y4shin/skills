@@ -927,7 +927,39 @@ function phaseGate(
       return null;
     }
     case "implementation": {
-      return requireLiveEffort(root, effort);
+      const missing = requireLiveEffort(root, effort);
+      if (missing !== null) return missing;
+      const graph = graphForEffortDir(effortGraphs(scanMemo(root)()), liveEffortDir(root, effort)!);
+      // The work-state checks come first: they diagnose the effort itself,
+      // whether or not a target was named.
+      if (graph?.spec != null) {
+        const ticketCount = graph.tickets.length + graph.deprecated.filter((a) => a.type === "ticket").length;
+        if (ticketCount === 0) {
+          return {
+            reason: `effort '${graph.slug}' has a spec but no tickets: ticket generation has not run`,
+            legalNext: ["run to-tickets"],
+          };
+        }
+      }
+      if (graph !== null) {
+        const deprecatedTickets = graph.deprecated.filter((a) => a.type === "ticket").length;
+        const hasTickets = graph.tickets.length + deprecatedTickets > 0;
+        const unfinished = graph.tickets.filter((t) => t.workflow_state !== "done");
+        if (hasTickets && unfinished.length === 0) {
+          return {
+            reason: `every ticket of '${graph.slug}' is done: there is no implementation work left`,
+            legalNext: ["run finalize-effort"],
+          };
+        }
+      }
+      // A ticket open carries the effort and the target.
+      if (typeof args.target !== "string" || args.target.trim() === "") {
+        return {
+          reason: `opening '${entry.name}' requires a target: the ticket to implement`,
+          legalNext: ["retry tw_open with the target ticket slug"],
+        };
+      }
+      return null;
     }
   }
 }
@@ -941,6 +973,16 @@ function requireLiveEffort(root: string, effort: string): GateRefusal | null {
     reason: `no live effort '${effort}'${hint}`,
     legalNext: ["run intake"],
   };
+}
+
+/** The effort graph a live effort directory belongs to, or null. */
+function graphForEffortDir(graphs: Map<string, EffortGraph>, dir: string): EffortGraph | null {
+  for (const g of graphs.values()) {
+    for (const a of [g.map, g.spec, ...g.tasks, ...g.tickets, ...g.deprecated]) {
+      if (a?.path && isInside(dir, a.path)) return g;
+    }
+  }
+  return null;
 }
 
 /**

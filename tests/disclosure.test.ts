@@ -163,10 +163,16 @@ describe("disclosure core: tw_open", () => {
 
   test("runtime validation backs the discriminated union up", async () => {
     const ctx = disclosureCtx([...IDLE]);
-    // A ticket open carries the effort and the target: omitting the target throws.
-    await expect(
-      tools.tw_open.execute({ skill: "implement-ticket", effort: "e" }, ctx),
-    ).rejects.toThrow(/target/);
+    // A ticket open carries the effort and the target: omitting the target is
+    // the implementation gate's refusal (it returns the reason plus the legal
+    // next calls and discloses nothing), not a thrown validation error.
+    const missingTarget = (await tools.tw_open.execute(
+      { skill: "implement-ticket", effort: "e" },
+      ctx,
+    )) as ToolResult;
+    expect(missingTarget.details.opened).toBe(false);
+    expect(missingTarget.details.reason).toContain("target");
+    expect(missingTarget.details.legal_next?.length).toBeGreaterThan(0);
     // An effort-only open carries no target: a provider that flattens the
     // union and always sends one is refused with the reason.
     await expect(
