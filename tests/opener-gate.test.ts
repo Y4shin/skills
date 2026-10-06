@@ -81,6 +81,81 @@ interface ToolResult {
   };
 }
 
+// ─── The opener gate ──────────────────────────────────────────────────────────
+
+describe("the opener gate", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => {
+    tools = createTools();
+  });
+
+  test("refuses a phase open on an effort that does not exist, naming the live efforts", async () => {
+    const active = [...ALWAYS_DECLARED];
+    const result = (await tools.tw_open.execute(
+      { skill: "wayfinder", effort: "no-such-effort" },
+      disclosureCtx(active),
+    )) as ToolResult;
+    expect(result.details.opened).toBe(false);
+    expect(result.details.reason).toContain("no live effort 'no-such-effort'");
+    expect(result.details.reason).toContain("ready-effort");
+    expect(result.details.legal_next).toEqual(["run intake"]);
+    // A refused open activates nothing.
+    expect(active).toEqual([...ALWAYS_DECLARED]);
+  });
+
+  test("refuses each effort-taking phase the same way", async () => {
+    for (const skill of ["wayfinder", "to-spec", "to-tickets", "implement-ticket", "finalize-effort"]) {
+      const active = [...ALWAYS_DECLARED];
+      const args: Record<string, unknown> = { skill, effort: "no-such-effort" };
+      if (skill === "implement-ticket") args.target = "one";
+      const result = (await tools.tw_open.execute(args, disclosureCtx(active))) as ToolResult;
+      expect(result.details.opened, `${skill} refuses the unknown effort`).toBe(false);
+      expect(result.details.reason).toContain("no live effort");
+      expect(active).toEqual([...ALWAYS_DECLARED]);
+    }
+  });
+
+  test("opens the phases that carry no effort precondition", async () => {
+    // Intake creates the effort it is opened for, so the slug need not exist;
+    // setup-workflow and skill-creator are not effort-scoped at all.
+    for (const skill of ["intake", "setup-workflow", "skill-creator"]) {
+      const active = [...ALWAYS_DECLARED];
+      const result = (await tools.tw_open.execute(
+        { skill, effort: "brand-new-effort" },
+        disclosureCtx(active),
+      )) as ToolResult;
+      expect(result.details.opened, `${skill} opens without an existing effort`).toBe(true);
+      await tools.tw_close.execute({ skill }, disclosureCtx(active));
+    }
+  });
+
+  test("refusals name the legal next calls", async () => {
+    // A duplicate open: the work is already open, nothing further is legal
+    // through the opener.
+    const first = [...ALWAYS_DECLARED];
+    const firstCtx = disclosureCtx(first);
+    await tools.tw_open.execute({ skill: "wayfinder", effort: "ready-effort" }, firstCtx);
+    const duplicate = (await tools.tw_open.execute(
+      { skill: "wayfinder", effort: "ready-effort" },
+      firstCtx,
+    )) as ToolResult;
+    expect(duplicate.details.legal_next).toEqual([]);
+
+    // A conflicting open: the legal next call is closing the open skill.
+    const second = [...ALWAYS_DECLARED];
+    const secondCtx = disclosureCtx(second);
+    await tools.tw_open.execute({ skill: "wayfinder", effort: "ready-effort" }, secondCtx);
+    const conflict = (await tools.tw_open.execute(
+      { skill: "to-tickets", effort: "ready-effort" },
+      secondCtx,
+    )) as ToolResult;
+    expect(conflict.details.opened).toBe(false);
+    expect(conflict.details.legal_next).toEqual(["tw_close wayfinder"]);
+    expect(second).toEqual([...ALWAYS_DECLARED, "tw_close", ...SKILL_REGISTRY.find((e) => e.name === "wayfinder")!.toolset].sort());
+  });
+});
+
 // ─── The phase-to-toolset registry ─────────────────────────────────────────────
 
 describe("the phase-to-toolset registry", () => {

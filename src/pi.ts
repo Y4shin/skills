@@ -851,6 +851,74 @@ function indexNames(body: string, section: string): string[] {
     .map((line) => line.trim().replace(/^- /, ""));
 }
 
+// ─── Opener gate: the phase preconditions ────────────────────────────────────────
+
+/** Why an open is refused, and the calls that are legal next. */
+interface GateRefusal {
+  reason: string;
+  legalNext: string[];
+}
+
+/**
+ * The live effort slugs, for the refusal hint list: directories under the
+ * task tree (non-effort scopes excluded) that hold a map or a spec, plus the
+ * legacy maps scope. Best effort: the list only helps a caller that mistyped
+ * a slug.
+ */
+function liveEffortSlugs(root: string): string[] {
+  const base = taskRoot(root);
+  const skip = new Set(["archive", "maps", "out-of-scope"]);
+  const slugs = listSubdirs(base, skip).filter((n) =>
+    ["map.md", "spec.md"].some((leaf) => isFile(join(base, n, leaf))),
+  );
+  if (isDir(join(base, "maps"))) {
+    slugs.push(...listSubdirs(join(base, "maps")).map((n) => `maps/${n}`));
+  }
+  return slugs.sort();
+}
+
+/**
+ * The phase precondition behind tw_open: the gate and the disclosure are the
+ * same call, so a refused open activates nothing. Preconditions are computed
+ * from the real artifact tree through the scan seam and the pure
+ * art.ts/graph.ts layers; the registry's `gate` row decides which checks a
+ * phase gets, and this is their only implementation. No phase precondition is
+ * duplicated anywhere else, and none lives in skill prose.
+ */
+function phaseGate(
+  root: string,
+  entry: SkillEntry,
+  args: { effort?: unknown; target?: unknown },
+): GateRefusal | null {
+  switch (entry.gate) {
+    case "none":
+      return null;
+    case "effort":
+    case "spec-ready":
+    case "implementation": {
+      const effort = String(args.effort ?? "");
+      if (liveEffortDir(root, effort) !== null) return null;
+      const live = liveEffortSlugs(root);
+      const hint = live.length > 0 ? `; live efforts: ${live.join(", ")}` : "; no efforts exist yet";
+      return {
+        reason: `no live effort '${effort}'${hint}`,
+        legalNext: ["run intake"],
+      };
+    }
+  }
+}
+
+/**
+ * Render a refusal the way every tw_open refusal reads: the reason, then the
+ * legal next calls. A refusal with no legal next (a duplicate open: the work
+ * is already open) states the reason alone.
+ */
+function refusedOuttext(reason: string, legalNext: string[]): string {
+  return legalNext.length > 0
+    ? `Refused: ${reason}. Legal next: ${legalNext.join("; ")}.`
+    : `Refused: ${reason}.`;
+}
+
 export function createTools(): Record<string, Tool> {
   return {
     tw_show: def(
@@ -1688,9 +1756,11 @@ export function createTools(): Record<string, Tool> {
     // ── disclosure core: the opener, the closer, and the router ──
 
     tw_open: defStructured(
-      "Open a workflow skill: discloses the skill's toolset plus tw_close to the model. " +
+      "Open a workflow skill: the opener is the gate. It checks that phase's preconditions against the " +
+        "artifact tree, refuses and names the legal next calls when they fail, and activates the phase's " +
+        "toolset (plus tw_close) only when they pass; a refused open discloses nothing. " +
         "A wayfinder open carries only the effort; a ticket open carries the effort and the target. " +
-        "Refuses a skill that is already open or conflicts with an open skill; a refused open discloses nothing.",
+        "Also refuses a skill that is already open or conflicts with an open skill.",
       buildOpenParameters(),
       async (p, ctx) => {
         validateOpenArgs(p);
@@ -1700,7 +1770,9 @@ export function createTools(): Record<string, Tool> {
         const open = currentOpenSkills(ctx);
         if (open.has(entry.name)) {
           const reason = duplicateReason(entry.name);
-          return outcome(`Refused: ${reason}.`, { opened: false, reason });
+          // The work is already open: nothing further is legal through the
+          // opener, so the legal-next list is empty.
+          return outcome(refusedOuttext(reason, []), { opened: false, reason, legal_next: [] });
         }
         // Exclusivity is a symmetric data table, so the check is
         // order-independent; both directions are consulted for safety.
@@ -1710,7 +1782,22 @@ export function createTools(): Record<string, Tool> {
         );
         if (conflicting !== undefined) {
           const reason = conflictReason(entry.name, conflicting);
-          return outcome(`Refused: ${reason}.`, { opened: false, reason, open: [...open] });
+          return outcome(refusedOuttext(reason, [`tw_close ${conflicting}`]), {
+            opened: false,
+            reason,
+            legal_next: [`tw_close ${conflicting}`],
+            open: [...open],
+          });
+        }
+        // The opener is the gate: the phase precondition runs before anything
+        // is disclosed, so a refused open leaves the toolset closed.
+        const refusal = phaseGate(findRoot(ctx.directory), entry, p);
+        if (refusal !== null) {
+          return outcome(refusedOuttext(refusal.reason, refusal.legalNext), {
+            opened: false,
+            reason: refusal.reason,
+            legal_next: refusal.legalNext,
+          });
         }
         const next = [...new Set([...active, ...entry.toolset, CLOSER])].sort();
         activeSet.set(next);

@@ -167,7 +167,10 @@ describe("edge cases", () => {
   test("tw_list on tree without docs/tasks is graceful", async () => {
     const s = await createTaskSession({ extensions: ALL_EXTENSIONS, projectFiles: {} });
     sessions.push(s);
-    await openSkill(s, "wayfinder");
+    // The opener gates the phase skills on a live effort, so on a tree with
+    // no docs/tasks the disclosure vehicle is setup-workflow: it carries
+    // tw_list and has no effort precondition.
+    await openSkill(s, "setup-workflow");
     s.setResponses([
       reply([call("tw_list", {})]),
       (ctx: Context) => reply(latestToolResultText(ctx, "tw_list") ?? "?"),

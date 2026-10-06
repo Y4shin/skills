@@ -31,6 +31,15 @@ export interface SkillEntry {
   toolset: string[];
   /** Skills that cannot be open at the same time as this one. */
   conflicts: string[];
+  /**
+   * Which phase precondition the opener evaluates before activating the
+   * toolset. "none": no tree precondition (the front door, setup, and nested
+   * disciplines). "effort": the named effort must be a live effort.
+   * Phase-specific gates name their own kind ("spec-ready",
+   * "implementation"). The evaluation lives in src/pi.ts, computed from the
+   * artifact tree; this field is the registry's skill-to-precondition row.
+   */
+  gate: "none" | "effort" | "spec-ready" | "implementation";
 }
 
 /**
@@ -46,6 +55,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "intake",
     takesTarget: false,
+    gate: "none",
     // The front door: it surveys existing efforts for duplicates and links,
     // creates the effort, and adds the bug ticket a bug report becomes.
     // tw_state_set is its signature tool.
@@ -55,6 +65,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "setup-workflow",
     takesTarget: false,
+    gate: "none",
     // Bootstrap and migration: it reads the tree and the artifact schema and
     // runs the migration CLI through the shell. tw_context is its signature
     // tool.
@@ -64,6 +75,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "wayfinder",
     takesTarget: false,
+    gate: "effort",
     // The planning phase: works the planning frontier, writes results back
     // through the map-section writer, marks planning tasks done and blocked,
     // records deferred work in the out-of-scope KB, and runs the reconcile,
@@ -84,6 +96,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "to-spec",
     takesTarget: false,
+    gate: "effort",
     // The spec phase: synthesizes the specification from the settled record
     // and writes it through the spec writer. tw_write_spec is its signature
     // tool.
@@ -93,6 +106,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "to-tickets",
     takesTarget: false,
+    gate: "effort",
     // The ticket-graph phase: creates tickets, splits oversized ones, wires
     // and verifies the dependency levels, and reads the settled spec and map.
     // tw_map_finalizable rides as the entry's private tool (the open-set
@@ -105,6 +119,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "implement-ticket",
     takesTarget: true,
+    gate: "effort",
     // The implementation phase: owns the ticket frontier and levels, creates
     // and splits tickets, marks tickets done (after the changelog entry),
     // resolves uncertainties, and writes the per-ticket changelog entry.
@@ -126,6 +141,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "finalize-effort",
     takesTarget: false,
+    gate: "effort",
     // The effort close: runs the holistic review, triages findings into
     // tickets in the current effort, and performs the archive move.
     // tw_archive_effort is its signature tool.
@@ -135,6 +151,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "skill-creator",
     takesTarget: false,
+    gate: "none",
     // Provisional until skill-creator-nested-toolset registers the bundled
     // scripts and replaces this entry: tw_show keeps the private signature
     // tool the open-set derivation requires.
