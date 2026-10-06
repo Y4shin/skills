@@ -866,13 +866,21 @@ describe("setup-workflow / migration skill references", () => {
   });
 });
 
-// ─── setup-workflow v4 (schema_version 4) ────────────────────────────
+// ─── setup-workflow v5 (schema_version 5) ────────────────────────────
 
-describe("setup-workflow v4", () => {
+describe("setup-workflow v5", () => {
   const skill = readFile("skills/engineering/setup-workflow/SKILL.md");
 
-  test("keys detection on schema_version 4 as current", () => {
-    expect(skill).toMatch(/current schema version is \*\*4\*\*|schema_version 4|`4`/);
+  test("keys detection on schema_version 5 as current", () => {
+    expect(skill).toMatch(/current schema version is \*\*5\*\*/);
+  });
+
+  test("routes a v4 repo to the upgrade-4-to-5 resource", () => {
+    expect(skill).toMatch(/upgrade-4-to-5/);
+  });
+
+  test("the no-op message names schema_version 5", () => {
+    expect(skill).toMatch(/already on schema_version 5, nothing to do/);
   });
 
   test("names the three branches: fresh, migrate, no-op", () => {
@@ -889,8 +897,8 @@ describe("setup-workflow v4", () => {
     expect(skill).toMatch(/MigrateReport/);
   });
 
-  test("the onboard branch writes the v4 scaffold", () => {
-    expect(skill).toMatch(/schema_version: 4/);
+  test("the onboard branch writes the v5 scaffold", () => {
+    expect(skill).toMatch(/schema_version: 5/);
     expect(skill).toMatch(/okf_version/);
   });
 

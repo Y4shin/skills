@@ -20,12 +20,12 @@ Read `docs/tasks/state.yaml`:
 
 - **No `state.yaml`, or no `schema_version` field**: the repo is fresh. Run
   the **onboard** branch (below).
-- **`schema_version` is less than 4**: the repo is behind. Run the
+- **`schema_version` is less than 5**: the repo is behind. Run the
   **migrate** branch (below).
-- **`schema_version` equals 4**: the repo is already current. Stop and report
-  "already on schema_version 4, nothing to do." This is the no-op branch.
+- **`schema_version` equals 5**: the repo is already current. Stop and report
+  "already on schema_version 5, nothing to do." This is the no-op branch.
 
-The current schema version is **4**.
+The current schema version is **5**.
 
 ## Onboard (fresh repo)
 
@@ -42,10 +42,10 @@ Scaffold everything a repo needs to use the task-workflow:
    ```
    Empty directories get a `.gitkeep`.
 
-2. Write `docs/tasks/state.yaml` (the v4 shape: two real-null pointers plus
+2. Write `docs/tasks/state.yaml` (the v5 shape: two real-null pointers plus
    the stamp):
    ```yaml
-   schema_version: 4
+   schema_version: 5
    map: null
    task: null
    ```
@@ -88,7 +88,7 @@ Scaffold everything a repo needs to use the task-workflow:
 10. Write `docs/tasks/out-of-scope/index.md` (the rejected-requests KB;
     explains its purpose).
 
-11. Commit: `chore: initialize task-workflow (schema_version 4)`.
+11. Commit: `chore: initialize task-workflow (schema_version 5)`.
 
 12. Report: "Ready. Run `/skill:task-workflow-overview` to see the full flow,
     or `/skill:wayfinder` to start planning."
@@ -102,9 +102,9 @@ Scaffold everything a repo needs to use the task-workflow:
 > spec records the deviation as the truth.
 
 The repo is on an older schema. Create a backup branch, then run the
-migration CLI, which owns the whole any-vintage-to-4 transformation:
+migration CLI, which owns the whole any-vintage-to-5 transformation:
 
-1. Create a backup git branch: `git checkout -b migrate/schema-${from}-to-4`.
+1. Create a backup git branch: `git checkout -b migrate/schema-${from}-to-5`.
    This is the safety net; the migration is reversible by checking out the
    previous branch.
 
@@ -116,7 +116,11 @@ migration CLI, which owns the whole any-vintage-to-4 transformation:
    repo's own tree. It performs the effort-grouped layout reorganization,
    the frontmatter unification, the aux backfill, the archive reshape, the
    state rebuild, the legacy slice reporting, the vendored-tree relocation,
-   and the root index write, as one transformation.
+   the schema-5 renames (`arch-spec.md` to `architecture.md`,
+   `type: arch spec` to `type: architecture`), the map body reshape
+   (`## Out of scope` to `## Non-goals`, a `## Non-negotiable facts`
+   placeholder when missing), and the root index write, as one
+   transformation.
 
 3. Read the printed **MigrateReport**. It lists every change and every item
    needing human eyes: normalized status/workflow_state combinations, legacy
@@ -124,18 +128,23 @@ migration CLI, which owns the whole any-vintage-to-4 transformation:
    outside the bundle, and unresolvable `blocked_by` references. Surface
    every needs-human item to the user.
 
-4. For repos still on schema 2, also read and follow
-   `resources/upgrade-2-to-3.md` first: the CLI migrates the tree, but the
-   skill-bucket and repo-root-doc work of that jump is not a tree rewrite.
+4. Route the repo to its hop's resource, and read it before explaining the
+   run:
+   - A repo still on schema 2 reads `resources/upgrade-2-to-3.md` first: the
+     skill-bucket and repo-root-doc work of that jump is not a tree rewrite.
+   - A repo on schema 3 reads `resources/upgrade-3-to-4.md`, which encodes
+     the bulk reshape the CLI performs over a v3 tree.
+   - A repo on schema_version 4 reads `resources/upgrade-4-to-5.md`, the
+     schema-5 hop this run performs.
 
 5. After the migration completes, run the full test suite (`npm test` +
    `npm run typecheck`) and verify it is green.
 
-6. Commit: `chore: migrate task-workflow schema ${from} to 4`.
+6. Commit: `chore: migrate task-workflow schema ${from} to 5`.
 
-The ordered step list the CLI executes is encoded in
-`resources/upgrade-3-to-4.md`, tracing each step to the effort spec's
-Migration section.
+The ordered step lists the CLI executes are encoded in
+`resources/upgrade-3-to-4.md` and `resources/upgrade-4-to-5.md`, tracing each
+step to the owning effort's spec.
 
 ### Dry-run mode
 
@@ -145,8 +154,8 @@ writing anything. Report the full plan, then stop.
 
 ### Idempotence
 
-Re-running on a repo whose `schema_version` is already 4 is a no-op: report
-"already on schema_version 4, nothing to do." Re-running mid-migration (after
+Re-running on a repo whose `schema_version` is already 5 is a no-op: report
+"already on schema_version 5, nothing to do." Re-running mid-migration (after
 a backup branch exists but before all steps complete) resumes from the last
 uncompleted step. The CLI tracks per-step completion via a
 `.migration-progress` marker file (a checklist of completed step numbers) in
@@ -161,6 +170,9 @@ byte lands. A failure mid-migration leaves the tree untouched.
 
 ## Available upgrade resources
 
+- [upgrade-4-to-5](resources/upgrade-4-to-5.md): the v5 hop (the
+  `architecture` type and filename rename, the map body sections, the
+  schema-5 state stamp), executed by the migration CLI.
 - [upgrade-3-to-4](resources/upgrade-3-to-4.md): the v4 hop (effort-grouped
   layout, OKF frontmatter, state rebuild, slice reporting, vendored-tree
   relocation, root index), executed by the migration CLI.
