@@ -183,6 +183,12 @@ graph verified, close the phase with `tw_close to-tickets` and hand the
 effort to the implementation phase, which implements the tickets in
 dependency order, one ticket at a time.
 
+## Report
+
+End the phase with the completion report in
+[resources/report.md](resources/report.md): the fixed five-part shape,
+tuned for this skill. A refusal, failure, or escalation is the same shape.
+
 > **Feedback:** if the phase hits a snag (an edge that would not validate, a
 > breakdown the tools could not express, or something that worked notably
 > well), call `submit_feedback({ kind, data })` autonomously to record it.

@@ -97,10 +97,11 @@ Read `review/result.md` and surface the findings to the user.
 
 ## Step 2  --  Report
 
-Report the landed ticket, the regression test added, and any user interventions.
-
-"If the ticket is done: run `/skill:finalize-task <ticket-slug>`" (finalize
-marks the ticket's `workflow_state`).
+Report with the skill's completion report resource,
+[resources/report.md](../report.md): the fixed five-part shape, tuned for
+this skill, which includes the next step when the ticket is done
+(`/skill:finalize-task <ticket-slug>`; finalize marks the ticket's
+`workflow_state`). A refusal, failure, or escalation is the same shape.
 
 ## Failure toolbelt (parent never implements)
 

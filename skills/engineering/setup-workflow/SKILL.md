@@ -180,6 +180,12 @@ byte lands. A failure mid-migration leaves the tree untouched.
   adoption (v2.x bucket layout, two-phase planning, 12 new skills, repo-root
   docs, changesets, no-em-dashes). Repos still on 2 run this first.
 
+## Report
+
+End the run with the completion report in
+[resources/report.md](resources/report.md): the fixed five-part shape,
+tuned for this skill. A refusal, failure, or escalation is the same shape.
+
 > **Feedback:** if setup or migration hits a snag, a step that didn't fit the
 > repo, a resource that was wrong, or something that worked notably well, call
 > `submit_feedback({ kind, data })` autonomously to record it. `kind` is a

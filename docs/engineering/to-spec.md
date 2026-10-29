@@ -61,3 +61,6 @@ effort slug or spec reference, it reads that too.
   without pinning file paths.
 - The status reads `stable` only after your explicit approval, flipped via
   the set tool.
+- The run ends with the completion report from the skill's
+  `resources/report.md`: the spec's state, your approval ask, the next
+  command, and one pointer to the spec.

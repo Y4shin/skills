@@ -178,8 +178,9 @@ If it returns ready:
 
 ## Step 8, Report
 
-"Ticket finalized, CHANGELOG updated, main branch updated. Map status:
-<finalized / still open>."
+Report using the completion report resource,
+[resources/report.md](resources/report.md): the fixed five-part shape,
+tuned for this skill. A refusal, failure, or escalation is the same shape.
 
 > **Feedback:** if finalizing hits a snag, a CI gate that's misconfigured, a
 > knowledge-harvest step with nowhere to fold findings, a bug-closure path

@@ -92,3 +92,6 @@ the final contract ticket deletes it.
   ready tickets and `tw_dependency_levels <effort-slug>` layers the whole set.
 - You approved the breakdown before any ticket was created, and the map was
   not modified (done-ness is derived by scanning the tree).
+- The phase ends with the completion report from the skill's
+  `resources/report.md`: the architecture and ticket graph, the next step,
+  and one pointer; refusal, failure, and escalation follow the same shape.

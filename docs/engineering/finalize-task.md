@@ -67,3 +67,6 @@ ready, the skill stops and reports the remaining work.
   `docs/tasks/archive/<effort>/`, marked items deprecated, and left
   `docs/tasks/index.md` with sorted `## Live` and `## Archived` lists.
 - Both state pointers (`map`, `task`) read null afterwards.
+- The close-out ends with the completion report from the skill's
+  `resources/report.md` instead of a canned line, with failure and
+  escalation following the same shape.

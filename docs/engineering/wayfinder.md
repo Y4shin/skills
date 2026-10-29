@@ -84,3 +84,6 @@ a designed-for escape hatch, and it is recorded when it fires.
   reference their task, and `tw_mark_done` accepts them.
 - An empty frontier ends in `tw_finalize_map` setting the ready flag, and
   `/skill:to-spec` opens on that flag alone.
+- The pass ends with the completion report from the skill's
+  `resources/report.md`: what the pass changed, what needs you, the next
+  command, and one pointer to the map.

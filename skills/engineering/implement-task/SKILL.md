@@ -114,6 +114,12 @@ After the current frontier has been completed, call
 work, update dependencies, and add any newly precise tickets before declaring
 the effort complete.
 
+## Report
+
+End the run with the completion report in
+[resources/report.md](resources/report.md): the fixed five-part shape,
+tuned for this skill. A refusal, failure, or escalation is the same shape.
+
 > **Feedback:** if execution hits a snag -- a chain that kept failing, a
 > ticket that wouldn't split, a worker that needed a tool it lacked, a
 > dependency level that blocked unnecessarily, or something that worked
