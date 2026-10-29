@@ -283,7 +283,8 @@ describe("improve-codebase-architecture skill references", () => {
     expect(content).toMatch(/absolute path/i);
     expect(content).toMatch(/Which of these would you like to explore\?/);
     expect(content).toMatch(/candidate.*pick|pick.*candidate/i);
-    expect(content).toMatch(/one question at a time/i);
+    expect(content).toMatch(/`grilling` skill/);
+    expect(content).not.toMatch(/one question at a time/i);
     expect(content).toMatch(/frontier/i);
     expect(content).toMatch(/ADR|docs\/adr/i);
     expect(content).toMatch(/decision.*wayfinder|wayfinder.*decision/i);

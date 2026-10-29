@@ -35,7 +35,7 @@ describe("seam 2e - improve-codebase-architecture delegates grilling to the skil
   });
 
   test("does not invent a new grilling variant", () => {
-    expect(content).toMatch(/Do not invent a new grilling variant/);
+    expect(content).toMatch(/not.*invent a new grilling variant/i);
   });
 
   test("still routes the picked candidate to wayfinder", () => {
