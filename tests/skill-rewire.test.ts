@@ -112,3 +112,51 @@ describe("seam 2d - wayfinder grilling.md delegates the method to the grilling s
     expect(content).toMatch(/downstream work/i);
   });
 });
+
+// ─── Seam 4: per-skill completion reports (skill-report-resources) ────
+
+// The workflow skills: the skills that end a run with the human waiting
+// (the phase skills and the workflow routers). The discipline and
+// vocabulary skills are not run-ending workflow skills. The list is the
+// test seam's coverage set; a skill added to (or retired from) the package
+// joins (or leaves) this contract by editing the list.
+const WORKFLOW_SKILLS = [
+  "wayfinder",
+  "to-spec",
+  "to-tickets",
+  "implement-task",
+  "finalize-task",
+  "triage",
+  "setup-workflow",
+  "task-workflow-overview",
+  "task-workflow-doctor",
+];
+
+// The fixed, ordered report shape from the effort's report contract:
+// (1) what is now true, (2) what needs the human, (3) what to run next,
+// (4) what is broken or blocked, (5) one pointer to the detail.
+const REPORT_PARTS = [
+  "1. What is now true",
+  "2. What needs the human",
+  "3. What to run next",
+  "4. What is broken or blocked",
+  "5. One pointer to the detail",
+];
+
+function reportPath(skill: string): string {
+  return `skills/engineering/${skill}/resources/report.md`;
+}
+
+describe("seam 4 - each workflow skill ships its report resource", () => {
+  test.each(WORKFLOW_SKILLS)("%s has a report resource with the fixed five-part order", (skill) => {
+    const report = readFile(reportPath(skill));
+    // The five parts carry the exact names, in the fixed order, and they
+    // are the only sections: no reordering, no added sections.
+    const positions = REPORT_PARTS.map((part) => report.indexOf(`## ${part}`));
+    expect(positions.every((p) => p >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    const sections = [...report.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
+    expect(sections).toEqual(REPORT_PARTS);
+  });
+});
+
