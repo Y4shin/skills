@@ -71,9 +71,8 @@ reason, each exists to prevent a specific failure mode.
    description will be vague; concrete examples anchor the scope and the
    description's trigger phrases.
 
-2. **Discover existing skills, update over create.** Run
-   `discover_skill` (or skim the skills directory by hand) before creating
-   a new skill. If an existing skill covers the same capability, **update it
+2. **Discover existing skills, update over create.** Run `skill_discover`
+   (or skim the skills directory by hand) before creating a new skill. If an existing skill covers the same capability, **update it
    in place** and broaden its description so the merged skill still triggers
    on everything its parts did. If the capability is merely adjacent (not
    the same), create a new skill. *Why:* duplicate skills fragment trigger
@@ -87,7 +86,7 @@ reason, each exists to prevent a specific failure mode.
    *Why:* planning the content shape before writing prevents a bloated body
    and ensures progressive disclosure.
 
-4. **Scaffold (new skills only).** Run `scaffold_skill` or create the folder
+4. **Scaffold (new skills only).** Run `skill_scaffold` or create the folder
    + `SKILL.md` by hand. *Why:* a normalized name and standard directory
    layout from the start avoids rename churn and validation failures.
 
@@ -98,7 +97,7 @@ reason, each exists to prevent a specific failure mode.
    resource. *Why:* resources built first can be tested independently; the
    body then references tested, working components.
 
-6. **Validate.** Run `validate_skill` (or `skills-ref` if available)
+6. **Validate.** Run `skill_validate` (or `skills-ref` if available)
    against the skill directory; fix every error. Then do a manual semantic
    pass: does the description actually match what the body teaches? Are
    references resolvable? *Why:* structural validation catches format
@@ -303,32 +302,35 @@ chosen language: `references/support-scripts-python.md`,
   runs destructive commands, sends network requests, or mutates state, say
   so in the `description` so the agent and the user know before activation.
 
-## Helper scripts
+## Bundled script tools
 
-Three Node scripts in `scripts/` automate the repetitive parts of skill
-authoring. Each has a by-hand fallback if you can't run Node.
+The three bundled scripts (`scripts/validate_skill.mjs`,
+`scaffold_skill.mjs`, `discover_skill.mjs`) are registered tools, disclosed
+when this skill is opened nested inside a phase (`tw_open`): the skill calls
+the tools directly, it never shells out to the scripts. Each keeps a by-hand
+fallback for the minimal capability ceiling.
 
-- **`validate_skill.mjs`**, `node scripts/validate_skill.mjs <skill-dir>`.
-  Run it **before finishing** a skill. Checks frontmatter (`name` hyphen-case
-  ≤64 == folder, `description` ≤1024 no angle brackets, only allowed keys:
-  `name`, `description`, `license`, `compatibility`, `allowed-tools`,
-  `metadata`). Exits 0 + `OK` on pass, 1 + first-error on fail.
+- **`skill_validate`** (runs `scripts/validate_skill.mjs`). Call it **before
+  finishing** a skill, with the skill directory. Checks frontmatter (`name`
+  hyphen-case ≤64 == folder, `description` ≤1024 no angle brackets, only
+  allowed keys: `name`, `description`, `license`, `compatibility`,
+  `allowed-tools`, `metadata`). Answers `OK` on pass; fails with the first
+  error otherwise.
   *By-hand fallback:* open `SKILL.md` and confirm the frontmatter opens with
   `---`, has a `name` in hyphen-case ≤64 == folder, a `description` ≤1024
   with no angle brackets, and no keys outside the allowed set.
 
-- **`scaffold_skill.mjs`**, `node scripts/scaffold_skill.mjs <name>
-  [--path <dir>] [--resources scripts,references,assets]`. Run it **for new
-  skills only**. Normalizes the name, creates the folder + `SKILL.md`
-  template. Refuses to overwrite, to UPDATE, edit in place.
+- **`skill_scaffold`** (runs `scripts/scaffold_skill.mjs`). Call it **for
+  new skills only**, with the name, an optional target directory, and the
+  resource subdirectories to create. Normalizes the name, creates the folder
+  + `SKILL.md` template. Refuses to overwrite, to UPDATE, edit in place.
   *By-hand fallback:* create the directory, write a `SKILL.md` with
   `name: <normalized-name>` and `description: TODO`, then add resource dirs.
 
-- **`discover_skill.mjs`**, `node scripts/discover_skill.mjs "<intent>"
-  --skills-dir <dir> [--threshold 0.4] [--json]`. Run it **before creating**
-  a new skill to avoid near-duplicates. Ranks existing skills by name +
-  description token overlap; candidates ≥ threshold get an "UPDATE over
-  create" hint.
+- **`skill_discover`** (runs `scripts/discover_skill.mjs`). Call it **before
+  creating** a new skill to avoid near-duplicates, with the intent and the
+  skills directory. Ranks existing skills by name + description token
+  overlap; candidates ≥ threshold get an "UPDATE over create" hint.
   *By-hand fallback:* list the skills directory, read each `SKILL.md`
   frontmatter, and judge by name + description relevance to your intent.
   Prefer updating over creating a duplicate.

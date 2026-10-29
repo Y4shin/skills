@@ -259,6 +259,43 @@ describe("seam 5 - chain and end-of-effort return shapes unchanged", () => {
   });
 });
 
+// ─── Seam 7: skill-creator calls its bundled scripts as tools, not through the shell ────
+
+// skill-creator-nested-toolset: the discipline's bundled scripts are wrapped
+// in registered tools (skill_validate, skill_scaffold, skill_discover),
+// disclosed when the skill opens nested inside a phase. The prose teaches the
+// tools, never a shell command for the scripts, and keeps the by-hand
+// fallbacks that the minimal capability ceiling needs.
+describe("seam 7 - skill-creator invokes its bundled scripts through the registered tools", () => {
+  const SKILL_PROSE = "skills/engineering/skill-creator/SKILL.md";
+  const doc = readFile(SKILL_PROSE);
+
+  test("the skill names its three registered script tools", () => {
+    for (const tool of ["skill_validate", "skill_scaffold", "skill_discover"]) {
+      expect(doc, SKILL_PROSE).toContain(tool);
+    }
+  });
+
+  test("no shell invocation of the bundled scripts remains in the prose", () => {
+    // The retired shape: a runnable `node .../scripts/<name>.mjs` command.
+    expect(doc).not.toMatch(/node\s+[^\n]*scripts\/\w+\.mjs/);
+  });
+
+  test("the tool disclosure is tied to the nested open", () => {
+    expect(doc).toMatch(/tw_open\b/);
+  });
+
+  test("the by-hand fallbacks survive for the minimal capability ceiling", () => {
+    expect(doc.match(/By-hand fallback/gi)?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  test("the docs page matches the rewired prose", () => {
+    const page = readFile("docs/engineering/skill-creator.md");
+    expect(page).toContain("skill_validate");
+    expect(page).not.toMatch(/node\s+[^\n]*scripts\/\w+\.mjs/);
+  });
+});
+
 // ─── Seam 6: no shared report skill or file (skill-report-resources) ──
 
 // All files under a directory, depth-first (a tiny local walker keeps this

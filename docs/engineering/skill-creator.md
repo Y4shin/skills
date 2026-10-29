@@ -12,6 +12,12 @@ adversarial self-review (trigger test, execution dry-run, context review,
 generalization, meta-noise pruning) and then invoke `/skill-review` for a
 fresh-context multi-axis review, and finally iterate on real usage.
 
+Its bundled scripts are the workflow's one tool-owning surface: opening
+`skill-creator` nested inside a phase (`tw_open`) discloses the registered
+tools `skill_validate`, `skill_scaffold`, and `skill_discover` (each runs
+its bundled script directly, no shell) alongside the phase's own tools, and
+closing it leaves the phase untouched.
+
 The load-bearing ideas:
 
 - **The description is the only trigger mechanism.** The agent never sees
@@ -67,7 +73,7 @@ reading agent's context and hides the actual instructions.
 
 - The produced skill triggers on the requests you actually type and stays
   quiet on near-misses that mean something else.
-- `validate_skill` passes (name equals the folder, description within
+- `skill_validate` passes (name equals the folder, description within
   limits, only allowed frontmatter keys), and the semantic pass finds
   description and body telling the same story.
 - The body is lean, references resolve and stay one level deep, and every
