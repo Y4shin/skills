@@ -44,6 +44,9 @@ const trackedRepos: string[] = [];
 let globalSettings: { dir: string; cleanup: () => void } | undefined;
 
 const GATED_NAMES = [
+  "skill_discover",
+  "skill_scaffold",
+  "skill_validate",
   "tw_open",
   "tw_next",
   "tw_close",

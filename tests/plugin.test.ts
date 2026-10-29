@@ -193,6 +193,9 @@ describe("task-workflow tools", () => {
     test("registers exactly the disclosed surface: the gated workflow tools plus the dispatcher trio", () => {
       const names = Object.keys(tools).sort();
       expect(names).toEqual([
+        "skill_discover",
+        "skill_scaffold",
+        "skill_validate",
         "tw_add_ticket",
         "tw_archive_effort",
         "tw_close",
