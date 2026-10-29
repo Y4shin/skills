@@ -225,3 +225,37 @@ describe("seam 4 - each workflow skill ships its report resource", () => {
   });
 });
 
+// ─── Seam 5: the machine contracts are untouched (skill-report-resources) ──
+
+// The report contract lives in prose only. The shipped chain scripts keep
+// their return shapes (ok, failed, error, step, refs), because the failure
+// toolbelt needs step and refs for diagnosis and the retry pointer; the
+// report resource is what keeps them out of the human-facing message.
+describe("seam 5 - chain and end-of-effort return shapes unchanged", () => {
+  test("the shipped chain scripts still return the settled machine shape", () => {
+    const chain = readFile("skills/engineering/implement-task/scripts/ticket-chain.js");
+    expect(chain).toMatch(/ok: false/);
+    expect(chain).toMatch(/failed: "args"/);
+    expect(chain).toMatch(/error: "ticket-chain\.js missing required args/);
+    expect(chain).toMatch(/step: gate/);
+    expect(chain).toMatch(/refs/);
+
+    const end = readFile("skills/engineering/implement-task/scripts/end-of-effort.js");
+    expect(end).toMatch(/ok: false/);
+    expect(end).toMatch(/failed: "args"/);
+    expect(end).toMatch(/step: spec/);
+    expect(end).toMatch(/reviewOk/);
+    expect(end).toMatch(/refs/);
+  });
+
+  test("the reporting prose names the machine result but never mirrors it", () => {
+    // The implement-task report resource is the one tuned to the chain: it
+    // tells the model where the machine receipt belongs and where it does
+    // not.
+    const report = readFile(reportPath("implement-task")).replace(/\s+/g, " ");
+    expect(report).toMatch(/machine result/);
+    expect(report).toMatch(/failure toolbelt/);
+    expect(report).not.toMatch(/refs\s*:|step\s*:\s*\{/);
+  });
+});
+
