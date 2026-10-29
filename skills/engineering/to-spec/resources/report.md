@@ -28,3 +28,11 @@ an open decision, one or two sentences. Offer more on request.
 ## 5. One pointer to the detail
 
 The specification: `docs/tasks/<effort>/spec.md`.
+
+Never inline in the message: subagent run ids, per-step receipts, output
+references, harness counts, tool-call detail, raw chain JSON, and
+workflow-internal terms the human did not introduce; all of it is reachable
+behind the one pointer. The spelling is simplified technical English,
+compact, written for someone who did not watch the run, with the qualified
+nouns (planning task, implementation ticket, the specification, the
+architecture).

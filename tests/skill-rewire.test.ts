@@ -179,5 +179,35 @@ describe("seam 4 - each workflow skill ships its report resource", () => {
       expect(lowered).not.toContain(phrase);
     }
   });
+
+  test.each(WORKFLOW_SKILLS)("%s report resource names the never-inline categories and carries no machine receipt", (skill) => {
+    // Prose wraps; squeeze whitespace before matching.
+    const report = readFile(reportPath(skill)).replace(/\s+/g, " ");
+    // The template names every category of run noise that must never be
+    // inlined (the shared rules, duplicated per skill by design).
+    for (const category of [
+      /run ids?/i,
+      /receipts?/i,
+      /output references?/i,
+      /harness counts?/i,
+      /tool-call detail/i,
+      /chain JSON/i,
+      /workflow-internal terms/i,
+    ]) {
+      expect(report).toMatch(category);
+    }
+    // And the template itself must not embed a machine receipt, a sample
+    // report, or any chain machine shape.
+    for (const shape of [
+      /outputReference/,
+      /\brefs\s*:/,
+      /\bstep\s*:\s*\{/,
+      /\brunId\s*[:=]/,
+      /\.chain\.json/,
+      /runs\.run\(/,
+    ]) {
+      expect(report).not.toMatch(shape);
+    }
+  });
 });
 

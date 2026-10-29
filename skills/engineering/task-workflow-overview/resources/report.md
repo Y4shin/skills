@@ -27,3 +27,11 @@ missing skill, one or two sentences, or the word nothing.
 
 The picked skill's `SKILL.md`, or the phase-boundaries reference when the
 question was about where one phase ends and the next starts.
+
+Never inline in the message: subagent run ids, per-step receipts, output
+references, harness counts, tool-call detail, raw chain JSON, and
+workflow-internal terms the human did not introduce; all of it is reachable
+behind the one pointer. The spelling is simplified technical English,
+compact, written for someone who did not watch the run, with the qualified
+nouns (planning task, implementation ticket, the specification, the
+architecture).

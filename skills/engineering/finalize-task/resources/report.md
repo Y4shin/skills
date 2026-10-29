@@ -28,3 +28,11 @@ request.
 
 The changelog entry in `docs/tasks/CHANGELOG.md`; it names the landed
 ticket and the commit.
+
+Never inline in the message: subagent run ids, per-step receipts, output
+references, harness counts, tool-call detail, raw chain JSON, and
+workflow-internal terms the human did not introduce. The landing's machine
+result stays in the failure toolbelt, never in the message. The spelling is
+simplified technical English, compact, written for someone who did not
+watch the run, with the qualified nouns (implementation ticket, planning
+task, the specification, the architecture).
