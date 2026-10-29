@@ -55,3 +55,33 @@ message.
   to-spec-rescope, implement-ticket-skill, finalize-effort-skill, and
   overview-doctor-rescope: the report resources land on the final skill set,
   so the skills must exist in their v5 shape first.
+
+## Implementation notes
+
+- Landed by the tdd-worker on `ticket/skill-report-resources` (seven wip
+  commits merged with `--no-ff`); the deviation report sits at
+  `deviation-reports/skill-report-resources.md` in this ticket directory.
+- Nine per-skill report resources at
+  `skills/engineering/{wayfinder,to-spec,to-tickets,implement-task,finalize-task,triage,setup-workflow,task-workflow-overview,task-workflow-doctor}/resources/report.md`,
+  each carrying the fixed five-part order (what is now true, what needs the
+  human, what to run next, what is broken or blocked, one pointer to the
+  detail) as its only sections, tuned per skill, with the failure and
+  escalation variant stated in each intro and the never-inline plus
+  simplified-technical-English rules stated at the end.
+- A `## Report` pointer section in each of the nine SKILL.md files, so no
+  SKILL.md restates the shape inline; implement-task's feature/bug
+  autonomous resources replaced their thin inline report steps with the
+  pointer.
+- Prose seams 4, 5, and 6 in `tests/skill-rewire.test.ts` pin the contract:
+  five-part order per skill, pointer-not-restate, never-inline categories
+  with no machine receipt shapes, failure and escalation variants in the
+  same shape, the chain and end-of-effort return shapes (`ok`, `failed`,
+  `error`, `step`, `refs`, `reviewOk`) unchanged, and the negative-existence
+  pins (no shared report skill, no shared report file, no cross-skill
+  report pointer, no runtime report gate).
+- Docs pages re-synced with one tight bullet per page for all nine skills.
+- Coverage note: dispatch ran this ticket before five of its `blocked_by`
+  tickets landed, so "each workflow skill" covers the nine run-ending skills
+  present at dispatch; the pending skill tickets join the contract by
+  extending the seam's `WORKFLOW_SKILLS` list and adding their own report
+  resource (full detail in the deviation report).
