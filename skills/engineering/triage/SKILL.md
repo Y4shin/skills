@@ -178,6 +178,12 @@ Capture everything resolved during grilling under "established so far" so the
 work isn't lost. Questions must be specific and actionable, not "please
 provide more info".
 
+## Report
+
+End the session with the completion report in
+[resources/report.md](resources/report.md): the fixed five-part shape,
+tuned for this skill. A refusal, failure, or escalation is the same shape.
+
 ## Resuming a previous session
 
 If prior triage notes exist on the bug doc or task doc, read them, check

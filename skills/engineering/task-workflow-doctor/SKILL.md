@@ -38,3 +38,9 @@ When something feels wrong with the task workflow, tasks are not showing up, a r
 - For every issue that involves the core task/bug directory tree, state file, or standard docs, run `/skill:setup-workflow`. Do not duplicate its setup logic.
 - For `CONTEXT.md` and `docs/adr/`, the relevant skill creates them lazily when adopted. Until then, create them manually or adopt the relevant skill.
 - For manifest misconfiguration, edit `package.json` directly and consult the manifest documentation.
+
+## Report
+
+End the diagnosis with the completion report in
+[resources/report.md](resources/report.md): the fixed five-part shape,
+tuned for this skill. A refusal, failure, or escalation is the same shape.

@@ -143,6 +143,16 @@ const REPORT_PARTS = [
   "5. One pointer to the detail",
 ];
 
+// The part names in plain form: a skill points at its report resource but
+// never restates the shape inline, so these phrases must not appear in a
+// SKILL.md.
+const ReportShapePhrases = [
+  "what is now true",
+  "what needs the human",
+  "what to run next",
+  "what is broken or blocked",
+];
+
 function reportPath(skill: string): string {
   return `skills/engineering/${skill}/resources/report.md`;
 }
@@ -157,6 +167,17 @@ describe("seam 4 - each workflow skill ships its report resource", () => {
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
     const sections = [...report.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
     expect(sections).toEqual(REPORT_PARTS);
+  });
+
+  test.each(WORKFLOW_SKILLS)("%s points at its report resource instead of restating the shape", (skill) => {
+    const skillDoc = readFile(`skills/engineering/${skill}/SKILL.md`);
+    // The skill carries a pointer to its own report resource, not a copy
+    // of the shape: the part names live only in the resource.
+    expect(skillDoc).toMatch(/resources\/report\.md/);
+    const lowered = skillDoc.toLowerCase();
+    for (const phrase of [...ReportShapePhrases, "one pointer to the detail"]) {
+      expect(lowered).not.toContain(phrase);
+    }
   });
 });
 

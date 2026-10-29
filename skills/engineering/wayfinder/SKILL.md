@@ -264,6 +264,12 @@ normal bounded pass:
 Never mark an implementation ticket complete from Wayfinder. Never resolve an
 unclear question by pretending it is a feature ticket.
 
+## Report
+
+End the pass with the completion report in
+[resources/report.md](resources/report.md): the fixed five-part shape,
+tuned for this skill. A refusal, failure, or escalation is the same shape.
+
 > **Feedback:** if planning hits a snag (a grilling loop that circled, a
 > dependency that wouldn't wire, a task type that didn't fit, a frontier that
 > stalled, or something that worked notably well), call

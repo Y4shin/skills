@@ -101,3 +101,9 @@ A description of the things that are out of scope for this spec.
 Any further notes about the feature.
 
 </spec-template>
+
+## Report
+
+End the run with the completion report in
+[resources/report.md](resources/report.md): the fixed five-part shape,
+tuned for this skill. A refusal, failure, or escalation is the same shape.

@@ -241,10 +241,11 @@ result = <the workflow's return: { ok, failed?, step?, reviewOk?, refs }>
 
 ## Step 4 -- Report
 
-Report completed tickets, any deviations found and resolved, user interventions.
-
-"If all tickets done: run `/skill:finalize-task <ticket-slug>`" (per ticket;
-finalize marks each ticket's `workflow_state`).
+Report with the skill's completion report resource,
+[resources/report.md](../report.md): the fixed five-part shape, tuned
+for this skill, which includes the next step (`/skill:finalize-task
+<ticket-slug>` per landed ticket; finalize marks each ticket's
+`workflow_state`). A refusal, failure, or escalation is the same shape.
 
 ## Failure toolbelt (parent never implements)
 

@@ -151,6 +151,12 @@ Off the main flow entirely.
 | Diagnose a broken workflow | `/skill:task-workflow-doctor` |
 | Diagnose a hard bug | `/skill:diagnosing-bugs` |
 
+## Report
+
+End the turn with the completion report in
+[resources/report.md](resources/report.md): the fixed five-part shape,
+tuned for this skill. A refusal, failure, or escalation is the same shape.
+
 > **Feedback:** any of these skills can hit a snag. When that happens, call
 > `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
 > short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
