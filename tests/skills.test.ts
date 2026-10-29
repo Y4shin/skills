@@ -556,6 +556,15 @@ describe("skill cross-references", () => {
     expect(content).toContain("setup-workflow");
   });
 
+  test("implement-task router does not deny the grilling skill exists", () => {
+    // Ticket grilling-delegation-fix: the router that claimed grilling has
+    // "no standalone skill" was corrected; grilling delegates like research
+    // and prototype.
+    const content = readFile("skills/engineering/implement-task/SKILL.md");
+    expect(content).toMatch(/delegate to the `grilling` skill/);
+    expect(content).not.toMatch(/grilling[^\n]*no standalone skill/i);
+  });
+
   test("implement-task wrapper reads subtype (type fallback) and dispatches to resources", () => {
     const content = readFile("skills/engineering/implement-task/SKILL.md");
     expect(content).toContain("tw_get");
