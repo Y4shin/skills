@@ -72,3 +72,6 @@ stops the moment the fix is deeper than it looked.
 - `wontfix` closures match their reason: implemented ones cite the code,
   rejected ones cite (or join) the out-of-scope KB.
 - Every AI-written note carries the triage disclaimer.
+- The session ends with the completion report from the skill's
+  `resources/report.md`: the outcome in the same shape as every other
+  workflow skill.

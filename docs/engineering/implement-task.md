@@ -103,3 +103,7 @@ the last one's conversation.
   landing is a separate land-worker step.
 - After the frontier empties, wayfinder is reassessed instead of the effort
   being declared done on the spot.
+- The run ends with the completion report from the skill's
+  `resources/report.md`: landed tickets, a compact cause for failures, the
+  next step, and one pointer; the chain's step receipt and refs stay behind
+  it.

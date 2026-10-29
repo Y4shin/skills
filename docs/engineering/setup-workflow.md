@@ -70,3 +70,5 @@ again after a partial migration resumes from the last completed step.
   full test suite is green, and the migration commit exists.
 - A second run on a current repo is a no-op.
 - An existing `docs/dev-env.md` survived onboarding untouched.
+- The run ends with the completion report from the skill's
+  `resources/report.md`; a failed migration reports the untouched tree.

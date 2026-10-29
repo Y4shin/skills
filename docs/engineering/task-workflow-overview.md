@@ -64,3 +64,6 @@ ticket document.
   left?" to `tw_frontier <effort>` / `tw_dependency_levels <effort>`.
 - Context hygiene is respected: planning stays in one window, execution
   gets a fresh one per ticket.
+- The routing turn ends with the completion report from the skill's
+  `resources/report.md`: the route found, the invocation to run, and one
+  pointer.
