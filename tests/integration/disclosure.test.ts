@@ -193,6 +193,39 @@ describe("disclosure core: nested opens", () => {
     }
   });
 
+  test("nesting skill-creator discloses its script tools and closing keeps the phase intact", async () => {
+    const s = await disclosureSession();
+    sessions.push(s);
+
+    // Open a phase.
+    s.setResponses([reply([call("tw_open", { skill: "wayfinder", effort: "some-effort" })])]);
+    await s.session.prompt("Open wayfinder.");
+    const phaseSet = new Set(s.session.getActiveToolNames());
+
+    // Nest skill-creator: the declared set is the union of both toolsets, so
+    // the discipline's own script tools join the phase's tools.
+    s.setResponses([reply([call("tw_open", { skill: "skill-creator", effort: "some-effort" })])]);
+    await s.session.prompt("Nest skill-creator.");
+
+    const nested = new Set(s.session.getActiveToolNames());
+    for (const tool of ["skill_validate", "skill_scaffold", "skill_discover"]) {
+      expect(nested.has(tool), `the script tool ${tool} joins the declared set`).toBe(true);
+    }
+
+    // Close the nested skill: the phase is still open with its own tools,
+    // and the script tools leave the declared set.
+    s.setResponses([reply([call("tw_close", { skill: "skill-creator" })])]);
+    await s.session.prompt("Close skill-creator.");
+
+    const afterClose = new Set(s.session.getActiveToolNames());
+    for (const tool of ["skill_validate", "skill_scaffold", "skill_discover", "tw_show"]) {
+      expect(afterClose.has(tool), `${tool} leaves with skill-creator`).toBe(false);
+    }
+    for (const tool of phaseSet) {
+      expect(afterClose.has(tool), `${tool} keeps the phase open with its own tools intact`).toBe(true);
+    }
+  });
+
   test("the opener refuses a duplicate and a conflicting skill without disturbing the set", async () => {
     const s = await disclosureSession();
     sessions.push(s);

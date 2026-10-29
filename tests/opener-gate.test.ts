@@ -605,7 +605,7 @@ describe("the phase-to-toolset registry", () => {
         "tw_write_changelog",
       ],
       "finalize-effort": ["tw_add_ticket", "tw_archive_effort", "tw_finalizable", "tw_get", "tw_list"],
-      "skill-creator": ["tw_show"],
+      "skill-creator": ["skill_discover", "skill_scaffold", "skill_validate", "tw_show"],
     });
   });
 

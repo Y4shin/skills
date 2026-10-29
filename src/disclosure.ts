@@ -171,10 +171,14 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     name: "skill-creator",
     takesTarget: false,
     gate: "none",
-    // Provisional until skill-creator-nested-toolset registers the bundled
-    // scripts and replaces this entry: tw_show keeps the private signature
-    // tool the open-set derivation requires.
-    toolset: ["tw_show"],
+    // The skill-authoring discipline, the one tool-owning discipline: it
+    // nests inside any open phase and discloses its bundled scripts wrapped
+    // as registered tools (skill_validate, skill_scaffold, skill_discover in
+    // src/pi.ts, each running its bundled script directly, no shell), plus
+    // the tree read parked here. tw_show keeps the private signature tool
+    // the open-set derivation keys on; the script tools are private to this
+    // entry too.
+    toolset: ["tw_show", "skill_validate", "skill_scaffold", "skill_discover"],
     conflicts: [],
   },
 ];
