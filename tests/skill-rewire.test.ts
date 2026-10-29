@@ -11,7 +11,7 @@
  *    method has one home).
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
@@ -256,6 +256,53 @@ describe("seam 5 - chain and end-of-effort return shapes unchanged", () => {
     expect(report).toMatch(/machine result/);
     expect(report).toMatch(/failure toolbelt/);
     expect(report).not.toMatch(/refs\s*:|step\s*:\s*\{/);
+  });
+});
+
+// ─── Seam 6: no shared report skill or file (skill-report-resources) ──
+
+// All files under a directory, depth-first (a tiny local walker keeps this
+// seam independent of skills.test.ts's helpers).
+function filesUnder(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) filesUnder(path, out);
+    else if (entry.isFile()) out.push(path);
+  }
+  return out;
+}
+
+describe("seam 6 - no shared report skill, file, or gate", () => {
+  test("no reporting skill is registered or shipped", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills.filter((s: string) => /report/.test(s))).toEqual([]);
+    expect(existsSync(join(PROJECT, "skills/engineering/reporting"))).toBe(false);
+    // The registry has no report entry: opening one is not a phase.
+    expect(readFile("src/disclosure.ts")).not.toMatch(/name: "report/);
+  });
+
+  test("no shared report file exists; every report.md is per-skill", () => {
+    // Every report.md under skills/ sits at <skill>/resources/report.md:
+    // a shared contract file would live anywhere else.
+    const offenders: string[] = [];
+    for (const bucket of ["engineering", "productivity", "misc", "in-progress", "deprecated"]) {
+      for (const file of filesUnder(join(PROJECT, "skills", bucket))) {
+        if (file.endsWith("report.md") && !/skills\/[^/]+\/[\w-]+\/resources\/report\.md$/.test(file)) {
+          offenders.push(file);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("no skill points at another skill's report resource", () => {
+    for (const skill of WORKFLOW_SKILLS) {
+      const skillDoc = readFile(`skills/engineering/${skill}/SKILL.md`);
+      const pointers = [...skillDoc.matchAll(/\]\(([^)]*report\.md)\)/g)].map((m) => m[1]);
+      for (const pointer of pointers) {
+        expect(pointer).toBe("resources/report.md");
+      }
+    }
   });
 });
 
