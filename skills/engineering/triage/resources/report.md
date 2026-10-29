@@ -2,7 +2,10 @@
 
 How triage ends a session with the maintainer. One shape, five parts, in
 this order: the parts do not move, and nothing is added to them. The
-template is tuned to what a triage session actually changes.
+template is tuned to what a triage session actually changes. The shape
+covers completion, refusal, failure, and escalation alike: in a failure,
+part 1 becomes "nothing was triaged and the doc is unchanged", and part 2
+carries the escalation question.
 
 ## 1. What is now true
 

@@ -2,7 +2,10 @@
 
 How Wayfinder ends a pass with the human. One shape, five parts, in this
 order: the parts do not move, and nothing is added to them. The template is
-tuned to what a bounded pass actually changes.
+tuned to what a bounded pass actually changes. The shape covers completion,
+refusal, failure, and escalation alike: in a failure, part 1 becomes "the
+pass released with nothing written and the map is unchanged", and part 2
+carries the escalation question.
 
 ## 1. What is now true
 

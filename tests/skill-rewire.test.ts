@@ -180,6 +180,20 @@ describe("seam 4 - each workflow skill ships its report resource", () => {
     }
   });
 
+  test.each(WORKFLOW_SKILLS)("%s report resource keeps failure, refusal, and escalation in the same shape", (skill) => {
+    const report = readFile(reportPath(skill)).replace(/\s+/g, " ");
+    const intro = report.slice(0, report.indexOf("1. What is now true"));
+    // The shape applies to completion, refusal, failure, and escalation alike.
+    for (const word of [/completion/i, /refusal/i, /failure/i, /escalation/i]) {
+      expect(intro).toMatch(word);
+    }
+    // In a failure, part 1 becomes the not-done line and part 2 carries the
+    // escalation question: same five parts, no variant sections.
+    expect(intro).toMatch(/part 1/i);
+    expect(intro).toMatch(/part 2/i);
+    expect(intro).toMatch(/escalation question/i);
+  });
+
   test.each(WORKFLOW_SKILLS)("%s report resource names the never-inline categories and carries no machine receipt", (skill) => {
     // Prose wraps; squeeze whitespace before matching.
     const report = readFile(reportPath(skill)).replace(/\s+/g, " ");

@@ -2,7 +2,10 @@
 
 How the overview ends a routing turn with the human. One shape, five parts,
 in this order: the parts do not move, and nothing is added to them. The
-template is tuned to what a routing answer actually is.
+template is tuned to what a routing answer actually is. The shape covers
+completion, refusal, failure, and escalation alike: in a failure, part 1
+becomes "no route was found and nothing changed", and part 2 carries the
+escalation question.
 
 ## 1. What is now true
 

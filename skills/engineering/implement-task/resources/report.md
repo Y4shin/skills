@@ -2,7 +2,10 @@
 
 How the implementation phase ends a chain run with the human. One shape,
 five parts, in this order: the parts do not move, and nothing is added to
-them. The template is tuned to what ticket execution actually changes.
+them. The template is tuned to what ticket execution actually changes. The
+shape covers completion, refusal, failure, and escalation alike: in a
+failure, part 1 becomes "the ticket did not land and the tree is
+unchanged", and part 2 carries the escalation question.
 
 ## 1. What is now true
 
