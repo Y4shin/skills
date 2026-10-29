@@ -21,6 +21,38 @@ function readFile(relativePath: string): string {
   return readFileSync(join(PROJECT, relativePath), "utf-8");
 }
 
+// ─── Seam 2e: improve-codebase-architecture delegates, does not restate ──
+
+describe("seam 2e - improve-codebase-architecture delegates grilling to the skill", () => {
+  const content = readFile("skills/engineering/improve-codebase-architecture/SKILL.md");
+
+  test("delegates the session to the grilling skill by name", () => {
+    expect(content).toMatch(/`grilling` skill/);
+  });
+
+  test("does not restate the one-question-at-a-time method", () => {
+    expect(content).not.toMatch(/one question at a time/i);
+  });
+
+  test("does not invent a new grilling variant", () => {
+    expect(content).toMatch(/Do not invent a new grilling variant/);
+  });
+
+  test("still routes the picked candidate to wayfinder", () => {
+    expect(content).toMatch(/wayfinder/i);
+  });
+});
+
+// ─── Seam 2f: no router denies the standalone grilling skill ────────
+
+describe("seam 2f - no router denies the standalone grilling skill", () => {
+  test("implement-task does not claim grilling lacks a standalone skill", () => {
+    const router = readFile("skills/engineering/implement-task/SKILL.md");
+    expect(router).toMatch(/delegate to the `grilling` skill/);
+    expect(router).not.toMatch(/grilling[^\n]*no standalone skill/i);
+  });
+});
+
 // ─── Seam 2c: text-based grilling skill uses plain-text rounds ────────
 
 describe("seam 2c - text-based grilling skill uses plain-text rounds, not the CLI", () => {
