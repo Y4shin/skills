@@ -64,8 +64,9 @@ README, and the docs page tree.
 
 ## Implementation notes
 
-- Landed on `ticket/intake-skill` (7 wip commits on top of 5c20a70); full
-  suite 1091 green, typecheck clean.
+- Landed on `task/intake-skill` (7 wip commits plus one docs commit on top of
+  5c20a70, plus the merge from `main` carrying the run-watchdog changeset);
+  full suite 1091 green, typecheck clean.
 - Two creation tools landed as part of this ticket (the carried constraint
   names this ticket as their owner, keeping one private signature tool per
   registry entry):
