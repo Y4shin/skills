@@ -13,8 +13,6 @@ substrate):
   that convention.
 - `domain.md`: domain doc layout (single-context vs multi-context) and
   consumer rules for reading `CONTEXT.md` and `docs/adr/`.
-- `triage-labels.md`: the label strings mapped to the canonical triage
-  roles, when `triage` is configured.
 
 These are created lazily: `setup-workflow` writes them when it runs, and
 they are extended as the adoption lands.

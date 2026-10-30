@@ -51,7 +51,7 @@ legitimate path needs the shell on the tree, not that the shell is blocked.
 
 ## Known limitation
 
-pi 0.80.10 exposes **no** extension hook to suppress skills from the `/help` /
+pi exposes **no** extension hook to suppress skills from the `/help` /
 skill-list surface (that surface reads from the loaded skill set, and
 `resources_discover` is additive-only). So the package's skills **still
 appear on `/help` in a work repo**. The gate covers the system prompt only.

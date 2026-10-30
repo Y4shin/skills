@@ -3354,12 +3354,14 @@ describe("documentation re-sync (docs-resync)", () => {
     expect(readme).not.toMatch(/\bslices?\b/i);
   });
 
-  test("task-workflow-overview names every user-invoked skill", () => {
-    // AGENTS.md: the router must not have a user-reachable skill it never
-    // mentions. Derived, so a newly user-invoked skill fails here until the
-    // router names it.
+  test("task-workflow-overview names every user-reachable skill", () => {
+    // AGENTS.md: a user-reachable skill is one the model reaches by
+    // auto-invocation or the human reaches by typing it, so the router has to
+    // name the promoted set, not only the front doors the human must type. It
+    // never names itself. Derived, so a newly promoted or re-scoped skill
+    // fails here until the router mentions it.
     const overview = readFile("skills/engineering/task-workflow-overview/SKILL.md");
-    for (const skill of promoted.filter((s) => s.userInvoked)) {
+    for (const skill of promoted.filter((s) => s.name !== "task-workflow-overview")) {
       expect(overview, `the overview never names /skill:${skill.name}`).toContain(`/skill:${skill.name}`);
     }
   });

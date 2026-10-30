@@ -88,10 +88,10 @@ A starting situation that generates work, then merges onto the main flow.
   **`/skill:setup-workflow`**. It detects fresh, behind, or current from
   `docs/tasks/state.yaml` and runs the onboard or migrate branch.
 
-## Vocabulary underneath
+## References underneath
 
-Two model-invoked references that run *beneath* the other skills, each the
-single source of truth for its vocabulary.
+Four model-invoked references that run *beneath* the other skills, each the
+single source of truth for its vocabulary or its discipline.
 
 - **`/skill:domain-modeling`**: sharpen the project's *domain* language:
   challenge a fuzzy term, resolve an overloaded word, record a hard-to-reverse
@@ -99,6 +99,11 @@ single source of truth for its vocabulary.
 - **`/skill:codebase-design`** is the deep-module vocabulary (module,
   interface, depth, seam, adapter, leverage, locality) for designing a
   module's *shape*.
+- **`/skill:tdd`** is the red-green-refactor discipline and the seams worth
+  testing at: the loop the implementation chain runs, and the reference to
+  reach for when test quality or a seam is in question.
+- **`/skill:code-review`** reviews changes since a fixed point along two axes,
+  Standards and Spec, and reports what it finds rather than fixing it.
 
 ## Standalone
 
@@ -123,6 +128,8 @@ Off the main flow entirely.
 - **`/skill:teach`**: learn a concept over multiple sessions.
 - **`/skill:writing-for-agents`** is the reference for writing documents
   agents consume.
+- **`/skill:skill-creator`** scaffolds, builds, or fixes an Agent Skill, and is
+  the one discipline that nests its own tools inside an open phase.
 
 ## Read-only queries
 
