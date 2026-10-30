@@ -57,6 +57,10 @@ const timeoutMs = (budgetMinutes[size] || budgetMinutes.m) * 60 * 1000
 runId = subagent({
     async: true,
     timeoutMs,
+    // The chain holds quiet while its workers run, so the run watchdog's
+    // idle needs_attention pings are pure noise. Completion, failure,
+    // and the active_long_running notice still notify.
+    control: { notifyOn: ["active_long_running"] },
     workflow: "<skill-dir>/scripts/ticket-chain.js",
     args: {
         effort: effortSlug,

@@ -121,6 +121,11 @@ for each level in levels:
         runId = subagent({
             async: true,
             timeoutMs,
+            // The chain holds quiet while its workers run (a size-l ticket
+            // is up to 45 minutes), so the run watchdog's idle
+            // needs_attention pings are pure noise. Completion, failure,
+            // and the active_long_running notice still notify.
+            control: { notifyOn: ["active_long_running"] },
             workflow: "<skill-dir>/scripts/ticket-chain.js",
             args: {
                 effort: effortSlug,
@@ -211,6 +216,10 @@ inconsistencies = <from the deviation reports>
 
 runId = subagent({
     async: true,
+    // The wrap-up workflow holds quiet while its steps run, so the run
+    // watchdog's idle needs_attention pings are pure noise. Completion,
+    // failure, and the active_long_running notice still notify.
+    control: { notifyOn: ["active_long_running"] },
     workflow: "<skill-dir>/scripts/end-of-effort.js",
     args: {
         effort: effortSlug,
