@@ -15,19 +15,23 @@ land it, then run the last three tickets, then the end-of-effort pass.
 
 ## Live state (verified, not assumed)
 
-- Repo: `/home/pplattner/Projects/skills-stricter-workflow` — a git
-  **worktree** of `/home/pplattner/.pi/agent/git/github.com/Y4shin/skills`,
-  branch `stricter-workflow` at `4693059` (`docs(ticket): land
-  to-spec-rescope`), pushed. Working tree clean; HEAD in the worktree is on
-  `ticket/implement-ticket-skill`.
+- Repo: `/home/patric/Projects/skills-stricter-workflow`, a git **worktree**
+  of `/home/patric/.pi/agent/git/github.com/Y4shin/skills`. The
+  `stricter-workflow` branch sits at `4693059` (`docs(ticket): land
+  to-spec-rescope`) and is pushed. Working tree clean; HEAD in the worktree is
+  on the local `ticket/implement-ticket-skill` branch (created from
+  `origin/ticket/implement-ticket-skill`).
+- Paths in this document are for this machine. An earlier copy was written on
+  `/home/pplattner`; if you are reading that copy, substitute your own clone
+  path everywhere.
 - Landed today (each on its own `task/<slug>` branch, `stricter-workflow`
   fast-forwarded and pushed after each): `intake-skill` (tip `9eed462`;
   includes a clean merge of main's `d75332b`), `to-spec-rescope`
   (tip `4693059`). Last full-suite green: **1099/1099 across 18 files**,
   typecheck clean (the to-spec-rescope verify step). No linter exists in the
   repo; that is normal, not a defect.
-- In flight: `ticket/implement-ticket-skill` at `ab38efd`, two wip commits
-  on top of `4693059`:
+- In flight: `ticket/implement-ticket-skill` at `5c388aa`, five commits on
+  top of `4693059` (two wip commits plus three handoff-doc commits):
   - `75d4f1f` (criterion 1+2): `implement-ticket` exists as a model-invoked
     skill opening through `tw_open`; missing/unstable architecture refused,
     never drafted. This commit is big — it also folds in the killed first
@@ -62,8 +66,9 @@ see "why not the chain script" below):
 ```
 subagent({
   async: true,
-  cwd: "/home/pplattner/Projects/skills-stricter-workflow",
-  model: "requesty/sference/glm-5.3-flash",   // user-chosen worker override
+  cwd: "/home/patric/Projects/skills-stricter-workflow",
+  // no model override on this machine: omit `model` to inherit the
+  // default (deepseek/deepseek-flash per ~/.pi/agent/settings.json)
   agent: "tdd-worker",
   options: {
     skill: "tdd",
@@ -80,11 +85,12 @@ plus the ticket doc path, the arch spec pointer
 `docs/tasks/enforced-workflow-v5/arch-spec.md` (**not** `architecture.md` —
 this effort is v4-mode and its real file is `arch-spec.md`; the moved script's
 composed pointer says `architecture.md`, which does not exist in this tree),
-the uncertainty anchor, and the carried constraints + a PRIOR ATTEMPT pointer
-(the last dispatch's full text is durable in
-`/home/pplattner/.pi/agent/sessions/--home-pplattner--/subagent-artifacts/`
-under `4f77a8ea-59d1-4c01-b23f-37628f1a4770_*`, or recompose from the ticket
-doc plus arch-spec entry 17).
+the uncertainty anchor, and the carried constraints + a PRIOR ATTEMPT pointer.
+The original session's artifact ids (`4f77a8ea-*`) do not exist on this
+machine, so recompose the pointer from the ticket doc plus arch-spec entry 17:
+name the existing `ticket/implement-ticket-skill` branch, say criteria 1-3 are
+committed, and tell the worker not to `git checkout -b` but to build on the
+checked-out tree.
 
 Remaining acceptance criteria to implement (from the ticket doc):
 inline close-out (CI gate, knowledge harvest, changelog through
@@ -122,11 +128,12 @@ The worked alternative (used successfully for `intake-skill` and
 `to-spec-rescope`): **dispatch the chain's steps directly**, using the
 script's own task compositions (`featureTddTask`, `verifyTask`,
 `deviationTask`, `landTask` — identity + pointers only, never author worker
-procedure) and its host gates via `options.gate`. On 0.76 (the version in the
-repo's `node_modules`, which yesterday's session loaded because it ran with
-cwd inside the worktree) the chain runs clean end-to-end with top-level
-`timeoutMs`; on 0.84 `timeoutMs` must go inside `options` (milliseconds), and
-async workflows have **no default parent deadline** — always set one.
+procedure) and its host gates via `options.gate`. Put `timeoutMs` inside
+`options` (milliseconds): async workflows have **no default parent deadline**,
+so always set one. Version facts as verified on this machine: the globally
+installed pi-subagents is `0.84.0`, and the repo's `node_modules` holds
+`0.34.0` (the earlier "0.76 runs clean end-to-end" note is stale; do not count
+on that path, use the direct dispatch).
 
 ## The other failure modes this session hit (all real)
 
@@ -159,18 +166,14 @@ async workflows have **no default parent deadline** — always set one.
 
 ## Operational rules the user set (this effort)
 
-- Clock rule: when a NEW ticket would start after 19:00 local, ask the user
-  first instead of dispatching (re-confirm on pickup; it was an evening
-  rule).
 - Push discipline: push after milestones and at minimum when pausing; the
   per-ticket `task/*` landing branches stay local unless asked.
 - The user reads compact status summaries; per-ticket detail is durable in
   the child outputs and ticket docs, not in chat.
-- Model override: the user chose `requesty/sference/glm-5.3-flash` for
-  workers after a requesty rate limit killed a chain once (limit reset long
-  ago). If rate limits recur on `tensorx`, this is the working override.
-  Note: a child running the parent session's virtual router
-  `requesty-routed/glm-5.3` produced good work too.
+- Model override: none is in force on this machine. `requesty/sference/glm-5.3-flash`
+  was a one-session choice on another host and is not configured here, so
+  workers inherit the session default (`deepseek/deepseek-flash`). Re-introduce
+  an override only if rate limits actually bite.
 
 ## After the remaining tickets
 
@@ -212,7 +215,7 @@ implement-task prose fixes too.
   once resolved a `git branch -d` failure with `git worktree remove --force`
   and deleted the project directory (twice, per the prior handoff).
   Recovery: from the main repo, `git worktree add
-  /home/pplattner/Projects/skills-stricter-workflow stricter-workflow`, then
+  /home/patric/Projects/skills-stricter-workflow stricter-workflow`, then
   `npm ci` (node_modules do not survive). All refs survive; only the stale
   `docs/tasks/state.yaml` working-tree edit is lost.
 - After worktree recreation, a first `npx vitest run` may fail on missing
@@ -224,7 +227,7 @@ implement-task prose fixes too.
 - `tw_*` tools resolve the tree from the session cwd; a session started
   outside the repo cannot use them against this repo (they would create a
   bogus `docs/tasks` at the session cwd). Dispatch repo-bound work from
-  `cwd: /home/pplattner/Projects/skills-stricter-workflow`, and for
+  `cwd: /home/patric/Projects/skills-stricter-workflow`, and for
   one-line `state.yaml` pointer edits fall back to a direct edit (no
   write-guard is active while the repo runs v4 mode).
 - `ticket/disclosure-open-close-core` is a stale leftover branch from before
