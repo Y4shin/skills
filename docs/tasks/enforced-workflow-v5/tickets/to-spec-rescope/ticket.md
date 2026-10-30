@@ -41,3 +41,23 @@ writes them through `tw_write_spec`.
 - planning-transition-tools (`ready_for_spec` and the map sections).
 - disclosure-open-close-core (the skill opens through `tw_open`).
 - opener-gate-and-toolsets (the to-spec gate).
+
+## Implementation notes
+
+- Landed on `task/to-spec-rescope` from `ticket/to-spec-rescope` (commit
+  13aac06, one commit: the SKILL.md rewrite, the docs-page re-sync, and the
+  8-test describe block in `tests/skills.test.ts`).
+- Divergence: `docs/engineering/to-spec.md` was re-synced in the same commit
+  per the AGENTS.md docs-page mandate; the rescope of the docs page is a
+  consequence of the same criterion (no seam interview anywhere a human
+  reads).
+- The `ready_for_spec` gate itself lives in the opener (`src/pi.ts`) and was
+  already landed upstream by `opener-gate-and-toolsets`; this ticket's
+  surface was the prose rescope, the `tw_write_spec` writer contract, and
+  the full section set.
+- The dispatcher's `docs/tasks/state.yaml` task-pointer edit and the
+  deviation report at
+  `deviation-reports/to-spec-rescope.md` are folded into the landing docs
+  commit.
+- Full suite green at landing: 18 files, 1099 tests; typecheck clean. No
+  linter is configured in this repo (typecheck is the static gate).
