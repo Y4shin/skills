@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: intake, the single front door
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [planning-transition-tools, implementation-transition-tools, disclosure-open-close-core, opener-gate-and-toolsets]
 size: l
 ---

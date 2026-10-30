@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Schema-5 artifact model, readers, and map sections
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: m
 ---

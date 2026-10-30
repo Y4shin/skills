@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Planning transition tools and the ready_for_spec checking tool
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [schema5-artifact-model]
 size: l
 ---

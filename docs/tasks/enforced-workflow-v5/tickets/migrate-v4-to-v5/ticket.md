@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Migration v4 to v5, one idempotent hop
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [schema5-artifact-model]
 size: l
 ---

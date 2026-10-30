@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: to-tickets produces the architecture document and the ticket graph
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [implementation-transition-tools, disclosure-open-close-core, opener-gate-and-toolsets]
 size: m
 ---

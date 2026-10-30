@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Schema-5 migration target and the upgrade-4-to-5 resource
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [migrate-v4-to-v5]
 size: s
 ---

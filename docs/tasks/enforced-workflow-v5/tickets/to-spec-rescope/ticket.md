@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: to-spec drops the seam interview and gates on ready_for_spec
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [planning-transition-tools, disclosure-open-close-core, opener-gate-and-toolsets]
 size: m
 ---

@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Write lockdown on docs/tasks and the dropped bash scan
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: m
 ---

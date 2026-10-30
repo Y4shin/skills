@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Opener-as-gate preconditions and the per-skill toolset registry
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [planning-transition-tools, implementation-transition-tools, disclosure-open-close-core]
 size: l
 ---

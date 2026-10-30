@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Wayfinder absorbs planning, bounded passes, and the reconcile
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [planning-transition-tools, disclosure-open-close-core, opener-gate-and-toolsets]
 size: l
 ---

@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: implement-ticket owns the ticket phase and the inline close-out
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [implementation-transition-tools, disclosure-open-close-core, opener-gate-and-toolsets]
 size: xl
 ---

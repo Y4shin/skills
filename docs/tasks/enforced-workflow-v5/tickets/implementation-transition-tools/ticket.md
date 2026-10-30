@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Implementation transition tools, escapes, changelog, and archive
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [schema5-artifact-model, planning-transition-tools]
 size: l
 ---

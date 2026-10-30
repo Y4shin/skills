@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Progressive disclosure core, the three-way flip, and nested opens
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [bump-dependencies]
 size: l
 ---

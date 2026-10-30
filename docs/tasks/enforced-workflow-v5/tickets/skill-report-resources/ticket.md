@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Per-skill report resources and the shared completion-report shape
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [wayfinder-reconcile-and-passes, to-tickets-architecture, intake-skill, to-spec-rescope, implement-ticket-skill, finalize-effort-skill, overview-doctor-rescope]
 size: m
 ---

@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Full dependency update pass, including pi-coding-agent 1.0.0
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: m
 ---

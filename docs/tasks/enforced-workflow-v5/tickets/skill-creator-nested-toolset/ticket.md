@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: skill-creator bundles its scripts as a disclosed nested toolset
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [disclosure-open-close-core, opener-gate-and-toolsets]
 size: m
 ---
