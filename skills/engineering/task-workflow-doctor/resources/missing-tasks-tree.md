@@ -10,12 +10,13 @@
 ## Missing artifact
 
 The `docs/tasks/` directory tree: one directory per effort holding `map.md`,
-an optional `spec.md`, a `tasks/` subdirectory of decision tasks, and a
-`tickets/` subdirectory of implementation tickets; plus `archive/`,
-`out-of-scope/`, `state.yaml`, `index.md`, and `CHANGELOG.md` at the root.
+an optional `spec.md`, an optional `architecture.md`, a `tasks/`
+subdirectory of decision tasks, and a `tickets/` subdirectory of
+implementation tickets; plus `archive/`, `out-of-scope/`, `state.yaml`,
+`index.md`, and `CHANGELOG.md` at the root.
 
 ## Route
 
 Run `/skill:setup-workflow` to create the task directory structure. A fresh
-repo takes the onboard branch (it writes the v4 scaffold); an existing pre-v4
-tree takes the migrate branch.
+repo takes the onboard branch (it writes the current schema-5 scaffold); a
+repo on an older schema takes the migrate branch.
