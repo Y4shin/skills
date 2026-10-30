@@ -717,6 +717,13 @@ describe("the phase-to-toolset registry", () => {
     }
   });
 
+  test("finalize-effort's private signature tool stays the archive move", () => {
+    // The open-set derivation keys on the signature tool: the review writer
+    // joining the toolset must not rotate it away from tw_archive_effort.
+    const entry = SKILL_REGISTRY.find((e) => e.name === "finalize-effort")!;
+    expect(signatureToolOf(entry)).toBe("tw_archive_effort");
+  });
+
   test("keeps one private signature tool per skill, so the open-set derivation stays exact", () => {
     for (const entry of SKILL_REGISTRY) {
       expect(() => signatureToolOf(entry)).not.toThrow();
