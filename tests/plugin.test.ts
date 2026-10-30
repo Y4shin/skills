@@ -2735,9 +2735,11 @@ describe("task-workflow tools: tw_write_review, the review artifact writer", () 
     expect(body).toContain("One: informational");
     expect(body).toContain("Two: not yet triaged");
 
+    // The writer also accepts the review's own path once it exists: the
+    // triage rewrites the artifact it just wrote.
     const second = await tools.tw_write_review.execute(
       {
-        selector: "review-effort",
+        selector: reviewPath(t),
         content: "## Findings\n\n1. One.\n2. Two.",
         findings: [
           { finding: "One", disposition: "informational" },
