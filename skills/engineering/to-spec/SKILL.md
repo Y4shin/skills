@@ -1,32 +1,42 @@
 ---
 name: to-spec
-description: "Turn the current conversation or map into a spec at docs/tasks/<effort>/spec.md: no interview, just synthesis of what you've already discussed."
+description: "Synthesize the effort's spec at docs/tasks/<effort>/spec.md from the settled record (the map and the planning tasks); nothing is asked that planning already settled. The opener is the gate."
 disable-model-invocation: true
 ---
 
 # To Spec
 
-This skill takes the current conversation context and codebase understanding
-and produces a spec. Do NOT interview the user; just synthesize what you
-already know.
+`to-spec` synthesizes the effort's specification from the settled record: the
+map and the planning tasks' recorded results. No phase-owned question round
+runs here, and nothing new is asked that planning already settled. The
+architecture is `to-tickets`' output, not written here; the spec's
+architecture content is what planning already settled, recorded in
+`## Implementation Decisions`.
 
-## Process
+## Open first
 
-1. Explore the repo to understand the current state of the codebase, if you
-   haven't already. Use the project's domain glossary vocabulary throughout
-   the spec (read `CONTEXT.md` if it exists), and respect any ADRs in the area
-   you are touching.
+Every run starts by opening the skill: call `tw_open` with
+`{ skill: "to-spec", effort: "<effort-slug>" }` (the effort slug is the
+directory name under `docs/tasks/`). The opener is the gate: it checks the
+phase preconditions against the artifact tree, refuses with the legal next
+calls when they fail, and activates the toolset only when they pass. Work only
+through the tools the opener discloses, and close the phase with
+`tw_close to-spec` when it releases.
 
-2. Sketch out the seams at which you're going to test the feature. Existing
-   seams should be preferred to new ones. Use the highest seam possible. If
-   new seams are needed, propose them at the highest point you can. The fewer
-   seams across the codebase, the better. The ideal number is one.
+## Synthesize from the settled record
 
-   Check with the user that these seams match their expectations.
+1. Load the map at `docs/tasks/<effort>/map.md` and the done planning tasks
+   whose results it records. Use the project's domain glossary vocabulary
+   throughout the spec (read `CONTEXT.md` if it exists), and respect any ADRs
+   in the area you are touching.
+2. Write the spec through `tw_write_spec`, the only writer of the spec, at
+   `docs/tasks/<effort>/spec.md` (the effort root). The write is draft while
+   it is being synthesized; a publish write (`publish: true`) flips the
+   status to `stable` once the user approves the spec.
 
-3. Write the spec using the template below. The file carries frontmatter and
-   saves at `docs/tasks/<effort>/spec.md` (the effort root; the effort comes
-   from the invocation's map slug or the conversation):
+## The spec
+
+The file carries frontmatter and the full section set:
 
 ```yaml
 ---
@@ -36,7 +46,6 @@ status: draft   # stable once the user approves the spec
 ---
 ```
 
-4. When the user approves the spec, flip its `status` to `stable`.
 <spec-template>
 
 ## Problem Statement
@@ -64,15 +73,12 @@ of the feature.
 
 ## Implementation Decisions
 
-A list of implementation decisions that were made. This can include:
-
-- The modules that will be built/modified
-- The interfaces of those modules that will be modified
-- Technical clarifications from the developer
-- Architectural decisions
-- Schema changes
-- API contracts
-- Specific interactions
+The settled implementation decisions, from the map and the planning tasks:
+the modules that will be built or modified, the interfaces of those modules
+that will be modified, technical clarifications, architectural decisions,
+schema changes, API contracts, and specific interactions. Nothing new is
+settled here; what planning already settled is what this section records. If
+a decision is missing, return to Wayfinder rather than settling it here.
 
 Do NOT include specific file paths or code snippets. They may end up being
 outdated very quickly.
@@ -94,7 +100,8 @@ A list of testing decisions that were made. Include:
 
 ## Out of Scope
 
-A description of the things that are out of scope for this spec.
+The things that are out of scope for this spec, consistent with the map's
+`## Non-goals`.
 
 ## Further Notes
 
@@ -102,8 +109,21 @@ Any further notes about the feature.
 
 </spec-template>
 
+The architecture content is what planning already settled and recorded in
+`## Implementation Decisions`. When `to-tickets` later produces the living
+architecture document, its write adds a note to this spec marking that
+content as archival; nothing is deleted from the spec.
+
 ## Report
 
 End the run with the completion report in
 [resources/report.md](resources/report.md): the fixed five-part shape,
 tuned for this skill. A refusal, failure, or escalation is the same shape.
+
+> **Feedback:** if the phase hits a snag (a spec write the tools could not
+> express, or something that worked notably well), call
+> `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
+> short category (`good`, `bad`, `friction`, `architecture`); `data` is one
+> or two specific, actionable sentences about the *workflow*, not the
+> project work. Requires the `pi-telemetry` extension (`submit_feedback`
+> tool).

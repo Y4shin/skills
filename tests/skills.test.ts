@@ -1959,6 +1959,67 @@ describe("to-tickets v5 (to-tickets-architecture)", () => {
   });
 });
 
+// ─── to-spec v5 (to-spec-rescope) ─────────────────────────────────────
+
+describe("to-spec v5 (to-spec-rescope)", () => {
+  const content = readFile("skills/engineering/to-spec/SKILL.md");
+  const docsPage = readFile("docs/engineering/to-spec.md");
+
+  test("the skill opens through tw_open and releases the phase through tw_close", () => {
+    expect(content).toMatch(/tw_open/);
+    expect(content).toMatch(/tw_close to-spec/);
+  });
+
+  test("no seam or architecture interview remains in the prose", () => {
+    // The seam interview is gone: the architecture is to-tickets' output and
+    // the spec's architecture content is what planning already settled.
+    expect(content).not.toMatch(/seam/i);
+    expect(content).not.toMatch(/interview/i);
+    expect(content).not.toMatch(/Check with the user/i);
+    // The docs page carries the same rescope.
+    expect(docsPage).not.toMatch(/seams were confirmed/i);
+  });
+
+  test("the spec is written through tw_write_spec, the only writer of the spec", () => {
+    expect(content).toMatch(/tw_write_spec/);
+    expect(content).toMatch(/only writer of the spec/i);
+  });
+
+  test("the spec keeps its full section set", () => {
+    for (const section of [
+      "## Problem Statement",
+      "## Solution",
+      "## User Stories",
+      "## Implementation Decisions",
+      "## Testing Decisions",
+      "## Out of Scope",
+      "## Further Notes",
+    ]) {
+      expect(content).toContain(section);
+    }
+  });
+
+  test("the prose does not restate the opener preconditions or the literal ready_for_spec token", () => {
+    expect(content).not.toMatch(/ready_for_spec/);
+  });
+
+  test("the spec's architecture content is what planning settled, and the archival note comes from the architecture writer", () => {
+    expect(content).toMatch(/what planning already settled|the settled record/i);
+    expect(content).toMatch(/to-tickets/);
+  });
+
+  test("references only surviving tools", () => {
+    expectOnlySurvivingTools(content);
+    expectOnlySurvivingTools(docsPage);
+  });
+
+  test("every frontmatter template conforms by construction", () => {
+    const templates = extractFrontmatterTemplates(content);
+    expect(templates.length).toBeGreaterThan(0);
+    for (const template of templates) assertTemplateConforms(template);
+  });
+});
+
 // ─── task-workflow-doctor v4 (overhaul-planning-skills) ──────────────
 
 describe("task-workflow-doctor v4 (overhaul-planning-skills)", () => {
