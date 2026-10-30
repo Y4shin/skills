@@ -129,6 +129,7 @@ const WORKFLOW_SKILLS = [
   "to-spec",
   "to-tickets",
   "implement-ticket",
+  "finalize-effort",
   "setup-workflow",
   "task-workflow-overview",
   "task-workflow-doctor",

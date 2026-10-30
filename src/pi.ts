@@ -845,6 +845,28 @@ function reviewDispositionLine(finding: ReviewFinding): string {
 }
 
 /**
+ * The live effort directory a selector names, accepting the effort's existing
+ * artifact path as well as its slug. `liveEffortDir` handles the slug and a
+ * map path; the review writer also promises the review's own path, which only
+ * exists after the first write.
+ */
+function liveEffortDirOfArtifact(root: string, selector: string, want: string): string | null {
+  const direct = liveEffortDir(root, selector);
+  if (direct !== null) return direct;
+  let hit: ScanHit;
+  try {
+    hit = resolveArt(root, selector, want);
+  } catch {
+    return null;
+  }
+  const candidate = dirname(hit.path);
+  const rel = relative(taskRoot(root), candidate);
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return null;
+  if (rel.split(/[\\/]/)[0] === "archive") return null;
+  return isDir(candidate) ? candidate : null;
+}
+
+/**
  * Require that a named follow-up effort exists and is linked to the origin by
  * `origin_effort` on its own map. The link is what makes the trail read in both
  * directions: the origin records the child's slug, the child records the
@@ -1791,7 +1813,7 @@ export function createTools(): Record<string, Tool> {
         if (content === "") {
           throw new Error("content is empty: a review write needs the findings body");
         }
-        const effortDir = liveEffortDir(root, String(p.selector ?? ""));
+        const effortDir = liveEffortDirOfArtifact(root, String(p.selector ?? ""), "review");
         if (effortDir === null) {
           throw new Error(
             `no live effort '${p.selector}': run finalize-effort on an existing effort's review`,

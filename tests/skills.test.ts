@@ -89,6 +89,7 @@ const SKILL_FILES = [
   "skills/engineering/setup-workflow/SKILL.md",
   "skills/engineering/wayfinder/SKILL.md",
   "skills/engineering/implement-ticket/SKILL.md",
+  "skills/engineering/finalize-effort/SKILL.md",
   "skills/engineering/tdd/SKILL.md",
   "skills/engineering/code-review/SKILL.md",
   "skills/engineering/task-workflow-doctor/SKILL.md",
@@ -156,7 +157,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(28);
+    expect(pkg.pi.skills.length).toBe(29);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
@@ -468,7 +469,7 @@ describe("triage is retired (intake-skill)", () => {
     const pkg = JSON.parse(readFile("package.json"));
     expect(pkg.pi.skills).toContain("./skills/engineering/intake");
     expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
-    expect(pkg.pi.skills.length).toBe(28);
+    expect(pkg.pi.skills.length).toBe(29);
     expect(pkg.pi.skills.filter((s: string) => s.includes("intake") || s.includes("triage"))).toEqual([
       "./skills/engineering/intake",
     ]);
@@ -1452,6 +1453,10 @@ const SURVIVING_TOOLS = new Set([
   "tw_write_architecture",
   "tw_write_changelog",
   "tw_archive_effort",
+  // finalize-effort-skill: the review writer and the origin_effort
+  // argument of the effort creator.
+  "tw_write_review",
+  "tw_create_effort",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -3063,6 +3068,87 @@ describe("task-workflow-doctor v5 (overview-doctor-rescope)", () => {
     for (const text of [content, page]) {
       expect(text).not.toMatch(/docs\/bugs/);
       expect(text).not.toMatch(/cannot create.*bugs|bugs cannot be created/i);
+    }
+  });
+});
+
+// ─── finalize-effort: the effort close (finalize-effort-skill) ──────
+
+// The effort close is a model-invoked phase skill: it opens through tw_open,
+// runs one read-only holistic review, triages every finding, creates a
+// follow-up only after a human yes (linked by origin_effort), moves the
+// findings into it, and archives through the named tool.
+describe("finalize-effort skill (finalize-effort-skill)", () => {
+  const content = readFile("skills/engineering/finalize-effort/SKILL.md");
+  const fm = parseFrontmatter(content);
+  const page = readFile("docs/engineering/finalize-effort.md");
+  const report = readFile("skills/engineering/finalize-effort/resources/report.md");
+  const pkg = JSON.parse(readFile("package.json"));
+
+  test("is a model-invoked skill registered in pi.skills and both READMEs", () => {
+    expect(pkg.pi.skills).toContain("./skills/engineering/finalize-effort");
+    expect(fm["name"]).toBe("finalize-effort");
+    // Model-invoked: the frontmatter carries no disable-model-invocation.
+    expect(fm["disable-model-invocation"]).toBeUndefined();
+    expect(readFile("skills/engineering/README.md")).toContain(
+      "[finalize-effort](./finalize-effort/SKILL.md)",
+    );
+    expect(readFile("README.md")).toContain(
+      "[finalize-effort](./skills/engineering/finalize-effort/SKILL.md)",
+    );
+  });
+
+  test("opens through tw_open with the effort and closes through tw_close", () => {
+    expect(content).toMatch(/skill: "finalize-effort", effort: "<effort-slug>"/);
+    expect(content).toContain("tw_close finalize-effort");
+  });
+
+  test("runs one holistic review pass and is read-only toward the code", () => {
+    expect(content).toMatch(/one holistic review/i);
+    expect(content).toMatch(/read-only/i);
+    expect(content).toMatch(/never\s+edits, refactors, or lands/i);
+    expect(content).toMatch(/does not implement/i);
+  });
+
+  test("triages every finding into a ticket, an accepted follow-up, or an informational acceptance", () => {
+    expect(content).toMatch(/every finding gets exactly one disposition/i);
+    expect(content).toMatch(/in scope/i);
+    expect(content).toMatch(/out of scope or too large/i);
+    expect(content).toMatch(/informational/i);
+    expect(content).toContain("tw_write_review");
+    expect(content).toContain("tw_add_ticket");
+  });
+
+  test("a follow-up exists only after a human yes, linked by origin_effort, with the review moved", () => {
+    expect(content).toMatch(/only after an explicit yes|after the human says yes/i);
+    expect(content).toContain("tw_create_effort");
+    expect(content).toContain("origin_effort");
+    expect(content).toContain("follow_up");
+    expect(content).toMatch(/one copy, not two|moved, not copied/i);
+  });
+
+  test("archives through the named tool, never the shell", () => {
+    expect(content).toContain("tw_archive_effort");
+    // The only mention of git mv is the prohibition itself.
+    expect(content).toMatch(/never use[\s\S]{0,20}git mv/);
+    expect(content).not.toMatch(/^\s*git mv/m);
+  });
+
+  test("ships its report resource and a docs page with the four sections", () => {
+    expect(report).toContain("## 1. What is now true");
+    for (const section of DOC_PAGE_SECTIONS) {
+      expect(page, `docs/engineering/finalize-effort.md is missing ${section}`).toContain(section);
+    }
+  });
+
+  test("references only surviving tools", () => {
+    expectOnlySurvivingTools(content);
+    expectOnlySurvivingTools(page);
+  });
+
+  test("no em-dash in the new prose", () => {
+    for (const text of [content, page, report]) {
+      expect(text).not.toContain("\u2014");
     }
   });
 });

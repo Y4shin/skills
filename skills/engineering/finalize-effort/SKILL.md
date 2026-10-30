@@ -1,0 +1,120 @@
+---
+name: finalize-effort
+description: "The effort close: one holistic whole-effort review, a triage of every finding into an implementation ticket, an accepted follow-up effort, or an explicit informational acceptance, and the archive through the named archive tool. Read-only toward the code it reviews; a follow-up exists only after a human yes."
+---
+
+# Finalize Effort
+
+`finalize-effort` is the effort close. It runs one holistic review of the
+whole effort, triages every finding, and archives the effort once nothing is
+left to resolve. The review is read-only toward the code: this phase never
+edits, refactors, or lands a change. Any work the review finds belongs to a
+later ticket or a follow-up effort.
+
+It is model-invoked, so the model reaches for it when an effort has nothing
+left to build; the human can also run `/skill:finalize-effort
+<effort-slug>`.
+
+## Open first
+
+Every run starts by opening the skill: call `tw_open` with
+`{ skill: "finalize-effort", effort: "<effort-slug>" }` (the effort slug is
+the directory name under `docs/tasks/`). The opener is the gate: it checks
+the effort is live, refuses with the legal next calls when it is not, and
+activates the toolset only when the check passes. Work only through the
+tools the opener discloses, and close the phase with
+`tw_close finalize-effort` when the run releases.
+
+## One holistic review pass
+
+Read the effort as a whole, not one ticket at a time: the map, the
+specification, the architecture document, the tickets and their
+implementation notes, the changelog, and the diff of everything the effort
+changed.
+
+Review two levels:
+
+- **the effort's claim:** do the map's success test and non-goals still
+  describe what the effort delivered?
+- **the delivered code:** correctness, fit with the architecture document,
+  duplicated or drifted helpers, missing tests, and anything a later reader
+  would trip over.
+
+Write the findings through `tw_write_review`, the only writer of
+`docs/tasks/<effort>/review.md`. It writes `type: review` and the flag the
+archive reads. The first pass carries the findings without dispositions, so
+the flag stays closed; the triage rewrites the artifact as dispositions are
+recorded.
+
+The review never fixes what it finds. An in-scope finding becomes an
+implementation ticket, and this phase does not implement it.
+
+## Triage every finding
+
+Every finding gets exactly one disposition, and the triage rewrites the
+review artifact each pass with `tw_write_review` and its `findings`
+argument:
+
+1. **In scope** becomes an implementation ticket in the current effort,
+   created with `tw_add_ticket`. The effort stays live and returns to the
+   implementation frontier; it is not archived.
+2. **Out of scope or too large** becomes a proposed follow-up effort. Stop
+   and ask the human; the follow-up exists only after an explicit yes. When
+   the human says yes, create it with `tw_create_effort` and pass
+   `origin_effort: "<this-effort-slug>"`, so the child's map records where
+   it came from. The link is a field on the child, never a graph edge: it
+   does not enter the frontier or `blocked_by`.
+3. **Purely informational** stays in the review artifact, recorded as
+   accepted by the human.
+
+The writer sets the archive flag only when every finding in the `findings`
+list carries a disposition. Until then the effort stays live, which is the
+point: a review finding is never stranded in an archive nobody reads again.
+
+## The accepted follow-up
+
+When the human accepts a follow-up and the child effort exists, call
+`tw_write_review` again with `follow_up: "<follow-up-slug>"`. The findings
+move into the child's `review.md` (one copy, not two), so they live where
+the skills that act on them look. This effort's review artifact keeps the
+disposition record naming the follow-up slug, so the trail reads in both
+directions. The write marks this effort's review triaged, which releases
+the archive.
+
+A follow-up is never created on the model's own initiative, and never
+before the human says yes.
+
+## Archive
+
+Archive through `tw_archive_effort`, the named archive move; never use
+`git mv` or a shell command for it. The tool refuses while any finding in
+the review artifact still lacks a disposition, naming the artifact, so
+complete the triage instead of working around the refusal. Once the
+dispositions are recorded, it deprecates the finished items, moves
+`docs/tasks/<effort>/` to `docs/tasks/archive/<effort>/` as a unit, and
+updates the root index.
+
+## Step order
+
+1. Open the phase with `tw_open`.
+2. Run the holistic review and write it with `tw_write_review`.
+3. Triage every finding; ask the human about anything out of scope or too
+   large.
+4. Create accepted follow-ups with `origin_effort`, then move the findings
+   with `tw_write_review` and `follow_up`.
+5. Archive with `tw_archive_effort`.
+6. Close the phase with `tw_close finalize-effort` and write the report.
+
+## Report
+
+End the run with the completion report in
+[resources/report.md](resources/report.md): the fixed five-part shape,
+tuned for this skill. A refusal, failure, or escalation is the same shape.
+
+> **Feedback:** if the phase hits a snag (an archive refusal the triage
+> could not clear, a review write the tool could not express, or something
+> that worked notably well), call `submit_feedback({ kind, data })`
+> autonomously to record it. `kind` is a short category (`good`, `bad`,
+> `friction`, `architecture`); `data` is one or two specific, actionable
+> sentences about the *workflow*, not the project work. Requires the
+> `pi-telemetry` extension (`submit_feedback` tool).

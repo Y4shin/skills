@@ -40,6 +40,7 @@
       "./skills/engineering/intake",
       "./skills/engineering/wayfinder",
       "./skills/engineering/implement-ticket",
+      "./skills/engineering/finalize-effort",
       "./skills/engineering/tdd",
       "./skills/engineering/code-review",
       "./skills/engineering/task-workflow-doctor",
