@@ -1,9 +1,9 @@
 /**
- * The version 4 migration.
+ * The migration to schema 5.
  *
  * One transformation takes any repo from any current state (fresh,
- * unversioned, v1 nested state, v2, v3, flat or maps-subtree layouts, and
- * archived trees) to the version 4 tree.
+ * unversioned, v1 nested state, v2, v3, v4, flat or maps-subtree layouts, and
+ * archived trees) to the schema-5 tree in a single idempotent hop.
  *
  * Pure over a TreePort: the transformation never touches node:fs directly.
  * All I/O goes through the port, which is what makes failure injection and
@@ -28,6 +28,8 @@ import {
   TYPE_LEAF,
   TASK_SUBTYPES,
   KNOWN_TYPES,
+  MAP_SECTION_NON_GOALS,
+  MAP_SECTION_NON_NEGOTIABLE_FACTS,
 } from "./art.js";
 import { fromObject, toObject, freshState } from "./state.js";
 
@@ -86,7 +88,7 @@ export interface HumanItem {
 export interface MigrateReport {
   /** Detected schema_version (0 = unversioned). */
   from: number;
-  to: 4;
+  to: 5;
   changes: Change[];
   needsHuman: HumanItem[];
   /** True when the tree is already v4 (idempotence). */
@@ -170,7 +172,7 @@ function dumpVerified(path: string, data: FrontmatterData, body: string): string
     fromFrontmatter(reparsed, slugFromPath(path));
   } catch (e) {
     throw new Error(
-      `staged write to '${path}' is not a conformant v4 artifact: ${(e as Error).message}`,
+      `staged write to '${path}' is not a conformant artifact: ${(e as Error).message}`,
     );
   }
   return content;
@@ -266,17 +268,28 @@ function typeOf(data: FrontmatterData): string | null {
 }
 
 /**
- * The v4 OKF type for a v3 artifact.
+ * The schema-5 name for a legacy type name.
+ *
+ * `arch spec` became `architecture` in schema 5, and its filename was renamed
+ * with it (arch-spec.md -> architecture.md). Every other name is unchanged.
+ */
+function v5TypeName(type: string): string {
+  return type === "arch spec" ? "architecture" : type;
+}
+
+/**
+ * The target-shape OKF type for an artifact.
  *
  * v3 wrote every workflow item as `kind: task` and carried the workflow
  * category in `type:`; v4 splits them. A planning category (research,
  * prototype, grilling, manual) stays a `task`; an implementation category
- * (feature, bug) becomes a `ticket`.
+ * (feature, bug) becomes a `ticket`. Legacy type names are rewritten to
+ * their schema-5 names, so a v4 `arch spec` lands as an `architecture`.
  */
 function effectiveType(data: FrontmatterData): string | null {
   const kind = typeOf(data);
   if (kind === null) return null;
-  if (kind !== "task") return kind;
+  if (kind !== "task") return v5TypeName(kind);
   const subtype = subtypeOf(data, kind);
   if (subtype !== null && !TASK_CATEGORIES.has(subtype)) return "ticket";
   return "task";
@@ -487,6 +500,43 @@ function titleFromBody(body: string): string | null {
   return m ? m[1].trim() : null;
 }
 
+// ─── Schema-5 map body reshape ────────────────────────────────────────────────
+
+/**
+ * The schema-5 map body reshape.
+ *
+ * `## Out of scope` becomes `## Non-goals` (the canonical name the schema-5
+ * reader resolves through the same alias; the section's content is kept
+ * verbatim), and `## Non-negotiable facts` is appended as an empty
+ * placeholder when missing, so a gate refusal names missing content, not a
+ * missing section. The success test line inside that section is authored
+ * later, never invented here.
+ *
+ * A body that already carries both sections is returned unchanged, byte for
+ * byte: the second-run guarantee rests on this.
+ */
+function reshapeMapBody(body: string): string {
+  const lines = body.split("\n");
+  const out: string[] = [];
+  let hasFacts = false;
+  for (const line of lines) {
+    const heading = /^##\s+(.+?)\s*$/.exec(line);
+    if (heading !== null) {
+      if (heading[1] === "Out of scope") {
+        out.push(`## ${MAP_SECTION_NON_GOALS}`);
+        continue;
+      }
+      if (heading[1] === MAP_SECTION_NON_NEGOTIABLE_FACTS) hasFacts = true;
+    }
+    out.push(line);
+  }
+  if (hasFacts) return out.join("\n");
+  // Append the placeholder: one blank line, then the bare heading.
+  let end = out.length;
+  while (end > 0 && out[end - 1].trim() === "") end--;
+  return [...out.slice(0, end), "", `## ${MAP_SECTION_NON_NEGOTIABLE_FACTS}`].join("\n") + "\n";
+}
+
 // ─── Layout classification ────────────────────────────────────────────────────
 
 /**
@@ -499,10 +549,16 @@ const TASK_CATEGORIES = new Set<string>(TASK_SUBTYPES);
 /**
  * The OKF types that are auxiliary files beside a primary artifact, derived
  * structurally from the model: every known type that is not itself a primary
- * artifact (a task, ticket, map, spec, or arch spec). A new aux type in
- * `art.ts` is therefore picked up automatically instead of drifting.
+ * artifact (a task, ticket, map, spec, the schema-5 architecture and review
+ * documents, and the legacy arch spec). A new aux type in `art.ts` is
+ * therefore picked up automatically instead of drifting.
  */
-const PRIMARY_TYPES = new Set<string>(["task", "ticket", "map", "spec", "arch spec"]);
+const PRIMARY_TYPES = new Set<string>([
+  "task", "ticket", "map", "spec",
+  // The effort-root documents: the schema-5 architecture and review types,
+  // plus the legacy arch spec the v5 reshape renames to architecture.
+  "arch spec", "architecture", "review",
+]);
 const AUX_TYPES = new Set<string>(KNOWN_TYPES.filter((t) => !PRIMARY_TYPES.has(t)));
 
 /**
@@ -587,7 +643,7 @@ interface Plan {
 }
 
 /**
- * Migrate a tree to schema_version 4.
+ * Migrate a tree to schema_version 5.
  *
  * Every step is independently idempotent: it detects its own already-applied
  * state and skips. The progress marker is an optimization, not the
@@ -598,7 +654,7 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
   const progressPath = opts.progressPath ?? DEFAULT_PROGRESS_PATH;
   const allPaths = tree.list().map(posix);
 
-  // Idempotence: an already-v4 tree needs no plan, and every step below
+  // Idempotence: an already-migrated tree needs no plan, and every step below
   // detects its own already-applied state and stages nothing. The marker is
   // an optimization, not the correctness mechanism.
   const plan: Plan = {
@@ -668,10 +724,10 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
   if (opts.dryRun) {
     return {
       from,
-      to: 4,
+      to: 5,
       changes: plan.changes,
       needsHuman: plan.needsHuman,
-      noop: from === 4 && plan.changes.length === 0,
+      noop: from === 5 && plan.changes.length === 0,
     };
   }
 
@@ -703,13 +759,13 @@ export function migrate(tree: TreePort, opts: MigrateOptions = {}): MigrateRepor
 
   return {
     from,
-    to: 4,
+    to: 5,
     changes: plan.changes,
     needsHuman: plan.needsHuman,
-    // "No-op" means the tree was already v4 and nothing was staged. A run
-    // that staged nothing on a non-v4 tree (a marker claiming steps that
+    // "No-op" means the tree was already schema 5 and nothing was staged. A
+    // run that staged nothing on an older tree (a marker claiming steps that
     // never landed) is not a no-op: the tree is still unmigrated.
-    noop: from === 4 && plan.changes.length === 0,
+    noop: from === 5 && plan.changes.length === 0,
   };
 }
 
@@ -753,7 +809,7 @@ function reorganize(
   // First pass: classify every primary artifact, so an aux file can be
   // placed beside the artifact it belongs to.
   const placement = new Map<string, { effort: string; container: string; archived: boolean }>();
-  const archSpecCount = new Map<string, number>();
+  const archDocCount = new Map<string, number>();
   // Effort roots that a map or spec anchors, for map-level aux files.
   const effortRoots = new Map<string, { effort: string; archived: boolean }>();
   for (const path of markdown) {
@@ -779,15 +835,17 @@ function reorganize(
       archived: loc.archived,
     });
   }
-  // How many arch specs each effort root would receive: an effort with one
-  // may hoist it to the root, an effort with several must keep each in its
-  // own directory or all but one would be silently lost.
+  // How many architecture documents each effort root would receive: an
+  // effort with one may hoist it to the root, an effort with several must
+  // keep each in its own directory or all but one would be silently lost.
+  // Both the legacy and the schema-5 filename count.
   for (const path of markdown) {
-    if (basenameOf(path) !== "arch-spec.md") continue;
+    const file = basenameOf(path);
+    if (file !== "arch-spec.md" && file !== "architecture.md") continue;
     const place = placement.get(placeKey(vintageLocation(path)));
     if (place === undefined) continue;
     const rootKey = `${place.archived ? "archive" : "live"}/${place.effort}`;
-    archSpecCount.set(rootKey, (archSpecCount.get(rootKey) ?? 0) + 1);
+    archDocCount.set(rootKey, (archDocCount.get(rootKey) ?? 0) + 1);
   }
 
   for (const path of markdown) {
@@ -851,7 +909,7 @@ function reorganize(
         }
         continue;
       }
-      const dest = auxHome(path, loc, placement, archSpecCount);
+      const dest = auxHome(path, loc, placement, archDocCount);
       const data: FrontmatterData = {
         type,
         title: titleFromBody(doc0(tree, path).body) ?? basenameOf(path).replace(/\.md$/, ""),
@@ -859,7 +917,9 @@ function reorganize(
       };
       if (claimDest(plan, dest, path)) {
         stageMoveIfNeeded(path, dest, plan);
-        plan.writes.set(dest, dumpVerified(dest, data, doc0(tree, path).body));
+        const rawBody = doc0(tree, path).body;
+        const body = type === "map" ? reshapeMapBody(rawBody) : rawBody;
+        plan.writes.set(dest, dumpVerified(dest, data, body));
         plan.changes.push({
           action: dest === path ? "rewrite" : "move",
           path: dest,
@@ -873,12 +933,13 @@ function reorganize(
     const type = effectiveType(doc.data);
     if (type === null) continue;
 
-    const dest = v4Home(path, type, doc.data, loc, placement, archSpecCount, plan.needsHuman);
+    const dest = v4Home(path, type, doc.data, loc, placement, archDocCount, plan.needsHuman);
     if (dest === null) continue;
     if (!claimDest(plan, dest, path)) continue;
 
     const shaped = shapeFrontmatter(doc.data, type, plan.needsHuman, dest);
-    const content = dumpVerified(dest, shaped, doc.body);
+    const body = type === "map" ? reshapeMapBody(doc.body) : doc.body;
+    const content = dumpVerified(dest, shaped, body);
     stageMoveIfNeeded(path, dest, plan);
     if (content !== safeRead(tree, path) || dest !== path) {
       plan.writes.set(dest, content);
@@ -888,8 +949,8 @@ function reorganize(
         from: dest === path ? undefined : path,
         detail:
           dest === path
-            ? `unified frontmatter on '${dest}'`
-            : `moved '${path}' to '${dest}' and unified its frontmatter`,
+            ? `applied the schema-5 reshape to '${dest}'`
+            : `moved '${path}' to '${dest}' and applied the schema-5 reshape`,
       });
     }
   }
@@ -925,31 +986,36 @@ function placeKey(loc: { archived: boolean; slug: string | null }): string {
 }
 
 /**
- * The v4 home for an aux file (spec, arch spec, findings, deviation report).
+ * The home for an aux file (architecture, review, findings, deviation report).
  *
- * An aux file sits beside the artifact it belongs to. `arch-spec.md` is the
- * exception: it is shared by an effort's whole ticket chain, so it lives at
- * the effort root. That move is only safe when the effort has exactly one
- * arch spec; when several exist (a v3 archive can hold several tasks per
+ * An aux file sits beside the artifact it belongs to. The architecture
+ * document is the exception: it is shared by an effort's whole ticket chain,
+ * so it lives at the effort root. That move is only safe when the effort has
+ * exactly one; when several exist (a v3 archive can hold several tasks per
  * effort, each with its own), collapsing them would silently lose all but
- * one, so each keeps its own directory instead.
+ * one, so each keeps its own directory instead. The schema-5 rename applies
+ * in both cases: an architecture document always lands as architecture.md.
  */
 function auxDest(
   path: string,
   file: string,
   loc: { archived: boolean; effort: string | null; slug: string | null },
   place: { effort: string; container: string; archived: boolean },
-  archSpecCount: Map<string, number>,
+  archDocCount: Map<string, number>,
 ): string {
   const base = place.archived ? ARCHIVE : TASK_ROOT;
   const rootKey = `${place.archived ? "archive" : "live"}/${place.effort}`;
-  if (file === "arch-spec.md" && (archSpecCount.get(rootKey) ?? 0) === 1) {
-    return `${base}/${place.effort}/arch-spec.md`;
+  if (
+    (file === "arch-spec.md" || file === "architecture.md") &&
+    (archDocCount.get(rootKey) ?? 0) === 1
+  ) {
+    return `${base}/${place.effort}/architecture.md`;
   }
+  const leaf = file === "arch-spec.md" ? "architecture.md" : file;
   const containerDir = segments(path).includes("deviation-reports")
     ? "deviation-reports/"
     : "";
-  return `${base}/${place.effort}/${place.container}/${loc.slug ?? ""}/${containerDir}${file}`;
+  return `${base}/${place.effort}/${place.container}/${loc.slug ?? ""}/${containerDir}${leaf}`;
 }
 
 /** The aux-file destination for a frontmatter-less markdown file. */
@@ -957,11 +1023,11 @@ function auxHome(
   path: string,
   loc: { archived: boolean; effort: string | null; slug: string | null },
   placement: Map<string, { effort: string; container: string; archived: boolean }>,
-  archSpecCount: Map<string, number>,
+  archDocCount: Map<string, number>,
 ): string {
   const place = placement.get(placeKey(loc));
   if (place !== undefined) {
-    return auxDest(path, basenameOf(path), loc, place, archSpecCount);
+    return auxDest(path, basenameOf(path), loc, place, archDocCount);
   }
   // No primary artifact to sit beside: keep the file where it is.
   return path;
@@ -976,6 +1042,9 @@ function auxHome(
  * does not name, so they are listed here.
  */
 function auxTypeForFilename(file: string): string | null {
+  // The schema-5 rename: a legacy arch-spec.md backfills as its schema-5
+  // type, so a re-run never sees the legacy type this run just wrote.
+  if (file === "arch-spec.md") return "architecture";
   for (const [type, name] of TYPE_LEAVES) {
     if (name === file) return type;
   }
@@ -1002,7 +1071,7 @@ function v4Home(
   data: FrontmatterData,
   loc: { archived: boolean; effort: string | null; slug: string | null },
   placement: Map<string, { effort: string; container: string; archived: boolean }>,
-  archSpecCount: Map<string, number>,
+  archDocCount: Map<string, number>,
   needsHuman: HumanItem[],
 ): string | null {
   const base = loc.archived ? ARCHIVE : TASK_ROOT;
@@ -1018,17 +1087,19 @@ function v4Home(
     if (effort === "") return null;
     return `${base}/${effort}/spec.md`;
   }
-  if (type === "arch spec") {
+  if (type === "architecture" || type === "review") {
     const effort = loc.effort ?? effortFromFrontmatter(data) ?? (slug ?? "");
     if (effort === "") return null;
-    // Shared by the effort's whole chain, so it lives at the effort root,
-    // unless several arch specs share that effort (then each keeps its own
-    // directory so none is lost).
+    // Schema-5 effort-root primaries (architecture.md succeeds the legacy
+    // arch-spec.md). An architecture document is shared by the effort's whole
+    // chain, so it lives at the effort root, unless several share that effort
+    // (then each keeps its own directory so none is silently lost).
+    const file = TYPE_LEAF[type] ?? `${type}.md`;
     const place = placement.get(placeKey(loc));
     if (place !== undefined) {
-      return auxDest(path, "arch-spec.md", loc, place, archSpecCount);
+      return auxDest(path, file, loc, place, archDocCount);
     }
-    return `${base}/${effort}/arch-spec.md`;
+    return `${base}/${effort}/${file}`;
   }
   if (type === "task" || type === "ticket") {
     const effort = loc.effort ?? effortFromFrontmatter(data) ?? (slug ?? "");
@@ -1051,7 +1122,7 @@ function v4Home(
   }
   if (AUX_TYPES.has(type)) {
     // An aux file sits beside the artifact it belongs to.
-    return auxHome(path, loc, placement, archSpecCount);
+    return auxHome(path, loc, placement, archDocCount);
   }
   return null;
 }
@@ -1087,11 +1158,11 @@ function claimDest(plan: Plan, dest: string, source: string): boolean {
 // ─── Step 2: rebuild state.yaml ───────────────────────────────────────────────
 
 /**
- * Rebuild `state.yaml` as `{schema_version: 4, map, task}` with real nulls.
+ * Rebuild `state.yaml` as `{schema_version: 5, map, task}` with real nulls.
  *
  * The `map` pointer is seeded from the old `map` pointer (or the v1 `active`
  * block), and the legacy `slice` key is dropped. Unknown keys the state module
- * does not model are dropped too: v4 owns the shape.
+ * does not model are dropped too: the current schema owns the shape.
  */
 function rebuildState(tree: TreePort, paths: string[], plan: Plan, from: number): void {
   const state = freshState();
@@ -1105,8 +1176,9 @@ function rebuildState(tree: TreePort, paths: string[], plan: Plan, from: number)
     }
   }
   // The state module owns the shape: `toObject` puts the modeled pointers in
-  // place, and the migration is the only writer of the stamp.
-  const obj: Record<string, unknown> = { schema_version: 4, ...toObject(state) };
+  // place, and the migration is the only writer of the stamp. The stamp is
+  // always the current target: schema 5.
+  const obj: Record<string, unknown> = { schema_version: 5, ...toObject(state) };
   const content = stringifyYaml(obj);
   if (safeRead(tree, STATE_PATH) !== content) {
     if (claimDest(plan, STATE_PATH, STATE_PATH)) {
@@ -1114,7 +1186,7 @@ function rebuildState(tree: TreePort, paths: string[], plan: Plan, from: number)
       plan.changes.push({
         action: "rewrite",
         path: STATE_PATH,
-        detail: `rebuilt state.yaml at schema_version 4 (from vintage ${from})`,
+        detail: `rebuilt state.yaml at schema_version 5 (from vintage ${from})`,
       });
     }
   }

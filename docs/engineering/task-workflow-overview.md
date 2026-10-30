@@ -9,17 +9,19 @@ specific next move.
 It describes the task tree as an OKF bundle: one directory per effort under
 `docs/tasks/<effort>/` holding `map.md`, an optional `spec.md`, a `tasks/`
 subdirectory of decision tasks, and a `tickets/` subdirectory of
-implementation tickets. The `tw_*` tools make that graph queryable. Bugs
-live under `docs/bugs/`. No external issue tracker, everything in git.
+implementation tickets. The `tw_*` tools make that graph queryable. Every
+request, bugs included, enters as an effort through `/skill:intake`; there
+is no parallel bug substrate (the retired bug directory survives only as
+an archive). No external issue tracker, everything in git.
 
 The main flow runs: `/skill:grilling` (sharpen the idea), then
 `/skill:to-spec` and `/skill:to-tickets` (spec, then tracer-bullet tickets),
 then `/skill:implement-task` per ticket (per-ticket agent chains), an
 advisory two-axis code review, and `/skill:finalize-task` (close out, merge,
-archive). On-ramps merge onto it: `/skill:triage` for piled-up bugs and
-requests, `/skill:diagnosing-bugs` for something broken, `/skill:wayfinder`
-for a huge foggy effort. Reference tables map read-only questions to tools
-(`tw_finalizable`, `tw_list`, `tw_show`, `tw_state`,
+archive). On-ramps merge onto it: `/skill:intake` for a new request (idea,
+feature, or bug), `/skill:diagnosing-bugs` for something broken,
+`/skill:wayfinder` for a huge foggy effort. Reference tables map read-only
+questions to tools (`tw_finalizable`, `tw_list`, `tw_show`, `tw_state`,
 `tw_dependency_levels` / `tw_frontier`) and actions to skills.
 
 ## When to reach for it
@@ -32,9 +34,10 @@ does it.
 ## Common questions
 
 **I have a bug report piling up with others. Where do I start?**
-`/skill:triage`. It moves reports through triage roles and writes
-agent-ready briefs that `/skill:implement-task` picks up later. Tickets
-that `to-tickets` produced are already agent-ready and skip triage.
+`/skill:intake`. It is the single front door: every request, bugs included,
+becomes an effort (a map plus exactly one non-negotiables grilling task,
+and for a bug the `subtype: bug` implementation ticket inside that effort).
+There is no triage queue and no rejection path.
 
 **What is the difference between a decision task and an implementation
 ticket?**
@@ -59,8 +62,13 @@ ticket document.
   shrug, and it names the right on-ramp for your starting situation.
 - The flow it describes matches the tree on disk: efforts grouped under
   `docs/tasks/<effort>/`, decision tasks under `tasks/`, tickets under
-  `tickets/`, bugs under `docs/bugs/`.
+  `tickets/`, and every request entering through `/skill:intake`. There is
+  no parallel bug substrate: the retired bug directory survives only as an
+  archive.
 - Its query table routes "is this ready?" to `tw_finalizable` and "what's
   left?" to `tw_frontier <effort>` / `tw_dependency_levels <effort>`.
 - Context hygiene is respected: planning stays in one window, execution
   gets a fresh one per ticket.
+- The routing turn ends with the completion report from the skill's
+  `resources/report.md`: the route found, the invocation to run, and one
+  pointer.

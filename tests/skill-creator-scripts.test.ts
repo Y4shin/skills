@@ -10,6 +10,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, test, afterAll, beforeAll } from "vitest";
 
+import { createTools } from "../src/pi.js";
+
 const PROJECT = process.cwd();
 const SCRIPTS_DIR = join(PROJECT, "skills", "engineering", "skill-creator", "scripts");
 
@@ -365,6 +367,153 @@ describe("discover_skill.mjs", () => {
       expect(Array.isArray(parsed)).toBe(true);
       expect(parsed.length).toBeGreaterThan(0);
       expect(parsed[0].name).toBe("code-review");
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── The disclosed nested toolset: the scripts registered as tools ────────────
+//
+// The skill-creator discipline calls the bundled scripts through registered
+// tools (skill-creator-nested-toolset), not through the shell. The tools run
+// the same bundled scripts the CLI tests above pin, so one seam proves the
+// registration and the other proves the scripts themselves.
+
+describe("the registered script tools", () => {
+  const ctx = (directory: string) => ({ directory });
+
+  test("the three bundled scripts are registered as tools", () => {
+    const tools = createTools();
+    for (const name of ["skill_validate", "skill_scaffold", "skill_discover"]) {
+      expect(tools[name], `${name} must be registered`).toBeDefined();
+      expect(typeof tools[name].description).toBe("string");
+      expect(typeof tools[name].execute).toBe("function");
+    }
+  });
+
+  test("skill_validate passes a valid skill and fails an invalid one with the script's reason", async () => {
+    const tools = createTools();
+    const dir = makeTempSkillDir("tool-good", `name: tool-good\ndescription: A valid tool-tested skill.`);
+    try {
+      await expect(
+        tools.skill_validate.execute({ skillDir: join(dir, "tool-good") }, ctx(dir)),
+      ).resolves.toBe("OK");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+
+    const bad = makeTempSkillDir("tool-bad", `name: other-skill\ndescription: A valid skill.`);
+    try {
+      await expect(
+        tools.skill_validate.execute({ skillDir: join(bad, "tool-bad") }, ctx(bad)),
+      ).rejects.toThrow(/does not match folder name/);
+    } finally {
+      rmSync(bad, { recursive: true, force: true });
+    }
+  });
+
+  test("skill_validate resolves relative skill dirs against the session directory", async () => {
+    const tools = createTools();
+    const dir = makeTempSkillDir("tool-rel", `name: tool-rel\ndescription: A valid tool-tested skill.`);
+    try {
+      await expect(
+        tools.skill_validate.execute({ skillDir: "tool-rel" }, ctx(dir)),
+      ).resolves.toBe("OK");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("skill_validate validates a real repo skill through the bundled script", async () => {
+    const tools = createTools();
+    // Dogfood: the bundled validator validates the repo's own skills.
+    await expect(
+      tools.skill_validate.execute({ skillDir: "skills/engineering/skill-creator" }, ctx(PROJECT)),
+    ).resolves.toBe("OK");
+  });
+
+  test("skill_scaffold scaffolds a new skill and refuses an existing one", async () => {
+    const tools = createTools();
+    const tmpRoot = mkdtempSync(join(tmpdir(), "scaffold-tool-"));
+    try {
+      const created = (await tools.skill_scaffold.execute(
+        { name: "My Tool Skill", path: tmpRoot },
+        ctx(PROJECT),
+      )) as string;
+      expect(created).toContain(`Created skill "my-tool-skill"`);
+      const content = readFileSync(join(tmpRoot, "my-tool-skill", "SKILL.md"), "utf-8");
+      expect(content).toContain("name: my-tool-skill");
+
+      await expect(
+        tools.skill_scaffold.execute({ name: "my-tool-skill", path: tmpRoot }, ctx(PROJECT)),
+      ).rejects.toThrow(/already exists/);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("skill_scaffold creates the requested resource directories", async () => {
+    const tools = createTools();
+    const tmpRoot = mkdtempSync(join(tmpdir(), "scaffold-tool-"));
+    try {
+      await tools.skill_scaffold.execute(
+        { name: "resourced", path: tmpRoot, resources: ["scripts", "references"] },
+        ctx(PROJECT),
+      );
+      expect(existsSync(join(tmpRoot, "resourced", "scripts"))).toBe(true);
+      expect(existsSync(join(tmpRoot, "resourced", "references"))).toBe(true);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("skill_discover ranks candidates and carries the JSON output", async () => {
+    const tools = createTools();
+    const tmpRoot = mkdtempSync(join(tmpdir(), "discover-tool-"));
+    try {
+      const relevantDir = join(tmpRoot, "code-review");
+      mkdirSync(relevantDir, { recursive: true });
+      writeFileSync(
+        join(relevantDir, "SKILL.md"),
+        "---\nname: code-review\ndescription: Review code for quality, bugs, and style issues.\n---\n# Code Review\n",
+      );
+
+      const text = (await tools.skill_discover.execute(
+        { intent: "review code quality", skillsDir: tmpRoot, threshold: 0.1 },
+        ctx(PROJECT),
+      )) as { text: string };
+      expect(text.text).toContain("code-review");
+      expect(text.text).toContain("UPDATE over create");
+
+      const json = (await tools.skill_discover.execute(
+        { intent: "review code quality", skillsDir: tmpRoot, threshold: 0.1, json: true },
+        ctx(PROJECT),
+      )) as { text: string };
+      const parsed = JSON.parse(json.text);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed[0].name).toBe("code-review");
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("skill_discover defaults the skills dir to the session's skills directory", async () => {
+    const tools = createTools();
+    const tmpRoot = mkdtempSync(join(tmpdir(), "discover-tool-"));
+    try {
+      const relevantDir = join(tmpRoot, "skills", "code-review");
+      mkdirSync(relevantDir, { recursive: true });
+      writeFileSync(
+        join(relevantDir, "SKILL.md"),
+        "---\nname: code-review\ndescription: Review code for quality, bugs, and style issues.\n---\n# Code Review\n",
+      );
+
+      const result = (await tools.skill_discover.execute(
+        { intent: "review code quality", threshold: 0.1 },
+        ctx(tmpRoot),
+      )) as { text: string };
+      expect(result.text).toContain("code-review");
     } finally {
       rmSync(tmpRoot, { recursive: true, force: true });
     }

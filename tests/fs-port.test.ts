@@ -230,7 +230,7 @@ describe("FsPort: the tree walk tolerates symlink hazards", () => {
       expect(report.noop).toBe(false);
       expect(
         readFileSync(join(root, "docs/tasks/state.yaml"), "utf-8"),
-      ).toContain("schema_version: 4");
+      ).toContain("schema_version: 5");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -254,13 +254,13 @@ describe("FsPort: the real migration is idempotent on disk", () => {
     }
   });
 
-  test("the migrated tree is v4 on disk", () => {
+  test("the migrated tree is schema 5 on disk", () => {
     const root = mkTmp();
     try {
       seedV3(root);
       migrate(new FsPort(root));
       const state = readFileSync(join(root, "docs/tasks/state.yaml"), "utf-8");
-      expect(state).toContain("schema_version: 4");
+      expect(state).toContain("schema_version: 5");
       expect(existsSync(join(root, "docs/tasks/index.md"))).toBe(true);
       // The task landed under the effort's tickets/ subtree.
       expect(existsSync(join(root, "docs/tasks/effort/tickets/my-task/ticket.md"))).toBe(true);

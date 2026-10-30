@@ -30,8 +30,8 @@ resolved, an `adr/` directory when the first ADR is earned.
 The model reaches for it when the discussion is changing the domain
 language: a term is being challenged, a word is overloaded, a
 hard-to-reverse decision needs recording, or `CONTEXT.md` / an ADR needs
-writing. It runs underneath the other skills (grilling and triage call it
-inline as decisions land).
+writing. It runs underneath the other skills (grilling and the planning
+phases call it inline as decisions land).
 
 ## Common questions
 

@@ -9,9 +9,15 @@ import {
   dependencyLevels,
   validateArtifact,
   validateCombination,
+  KNOWN_TYPES,
+  TYPE_LEAF,
+  MAP_SECTION_NON_GOALS,
+  MAP_SECTION_NON_NEGOTIABLE_FACTS,
+  readMapSection,
   type Artifact,
   type WorkItemInfo,
 } from "../src/core/art.js";
+import { parse, dump } from "../src/core/frontmatter.js";
 
 describe("fromFrontmatter v4 shape", () => {
   test("parses a task artifact", () => {
@@ -72,6 +78,195 @@ describe("fromFrontmatter v4 shape", () => {
     // In v4 `subtype` is its own key, so an equal value is real data, not the
     // v3 `kind`/`type` collision.
     expect(fromFrontmatter({ type: "task", subtype: "task" }).subtype).toBe("task");
+  });
+});
+
+describe("schema 5 types", () => {
+  test("architecture and review are known types with their effort-root filenames", () => {
+    expect(KNOWN_TYPES).toContain("architecture");
+    expect(KNOWN_TYPES).toContain("review");
+    expect(TYPE_LEAF["architecture"]).toBe("architecture.md");
+    expect(TYPE_LEAF["review"]).toBe("review.md");
+  });
+
+  test("an architecture.md at the effort root parses and is not an orphan", () => {
+    const map = fromFrontmatter({ type: "map", status: "stable" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    const arch = fromFrontmatter(
+      { type: "architecture", title: "Effort architecture", status: "stable" },
+      "eff",
+    );
+    arch.path = "/repo/docs/tasks/eff/architecture.md";
+    expect(arch.type).toBe("architecture");
+    expect(findAnomalies([map, arch])).toEqual([]);
+  });
+
+  test("a review.md at the effort root parses and is not an orphan", () => {
+    const map = fromFrontmatter({ type: "map", status: "stable" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    const review = fromFrontmatter(
+      { type: "review", title: "Effort review", status: "stable" },
+      "eff",
+    );
+    review.path = "/repo/docs/tasks/eff/review.md";
+    expect(review.type).toBe("review");
+    expect(findAnomalies([map, review])).toEqual([]);
+  });
+
+  test("a file in the new names claiming another type is still an orphan", () => {
+    // The filename implies the type, so a mismatch is caught exactly as for
+    // the older leaves.
+    const map = fromFrontmatter({ type: "map", status: "stable" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    const wrong = fromFrontmatter({ type: "spec", status: "stable" }, "eff");
+    wrong.path = "/repo/docs/tasks/eff/architecture.md";
+    const anomalies = findAnomalies([map, wrong]);
+    expect(anomalies.map((a) => a.kind)).toContain("orphan");
+    expect(anomalies.find((a) => a.kind === "orphan")!.detail).toMatch(/not 'architecture'/);
+  });
+});
+
+describe("legacy arch spec shape", () => {
+  test("type: arch spec still parses as its own type", () => {
+    const arch = fromFrontmatter(
+      { type: "arch spec", title: "Architecture", status: "stable" },
+      "eff",
+    );
+    expect(arch.type).toBe("arch spec");
+    expect(arch.workflow_state).toBeNull();
+  });
+
+  test("an arch-spec.md at the effort root is not an orphan", () => {
+    // The v4 shape stays readable until the migration runs, so a v4 tree
+    // keeps parsing with no anomaly raised against its arch spec.
+    const map = fromFrontmatter({ type: "map", status: "stable" }, "eff");
+    map.path = "/repo/docs/tasks/eff/map.md";
+    const arch = fromFrontmatter({ type: "arch spec", status: "stable" }, "eff");
+    arch.path = "/repo/docs/tasks/eff/arch-spec.md";
+    expect(findAnomalies([map, arch])).toEqual([]);
+  });
+
+  test("a v4 tree with both the legacy and the schema-5 shape parses cleanly", () => {
+    // The migration renames arch-spec.md to architecture.md; before it runs,
+    // a tree can hold either (or, mid-effort, both in different efforts).
+    const legacyMap = fromFrontmatter({ type: "map", status: "stable" }, "old-eff");
+    legacyMap.path = "/repo/docs/tasks/old-eff/map.md";
+    const legacy = fromFrontmatter({ type: "arch spec", status: "stable" }, "old-eff");
+    legacy.path = "/repo/docs/tasks/old-eff/arch-spec.md";
+    const newMap = fromFrontmatter({ type: "map", status: "stable" }, "new-eff");
+    newMap.path = "/repo/docs/tasks/new-eff/map.md";
+    const modern = fromFrontmatter({ type: "architecture", status: "stable" }, "new-eff");
+    modern.path = "/repo/docs/tasks/new-eff/architecture.md";
+    expect(findAnomalies([legacyMap, legacy, newMap, modern])).toEqual([]);
+  });
+});
+
+describe("map frontmatter, schema 5", () => {
+  test("ready_for_spec reads as false when absent", () => {
+    expect(fromFrontmatter({ type: "map" }).ready_for_spec).toBe(false);
+  });
+
+  test("ready_for_spec reads as false when explicitly false", () => {
+    // The user amendment: an explicit false is allowed, and absent and false
+    // are treated identically by every consumer.
+    expect(fromFrontmatter({ type: "map", ready_for_spec: false }).ready_for_spec).toBe(false);
+  });
+
+  test("ready_for_spec reads as true only when the boolean is set", () => {
+    expect(fromFrontmatter({ type: "map", ready_for_spec: true }).ready_for_spec).toBe(true);
+  });
+
+  test("a non-boolean ready_for_spec reads as false, never truthy", () => {
+    expect(fromFrontmatter({ type: "map", ready_for_spec: "true" }).ready_for_spec).toBe(false);
+  });
+
+  test("origin_effort round-trips when present and is null when absent", () => {
+    expect(fromFrontmatter({ type: "map", origin_effort: "auth" }).origin_effort).toBe("auth");
+    expect(fromFrontmatter({ type: "map" }).origin_effort).toBeNull();
+    expect(fromFrontmatter({ type: "map", origin_effort: "  " }).origin_effort).toBeNull();
+  });
+
+  test("the schema-5 map fields survive a full frontmatter round-trip", () => {
+    const text = dump({
+      data: { type: "map", title: "Follow-up", ready_for_spec: true, origin_effort: "auth" },
+      body: "# Follow-up\n",
+    });
+    const doc = parse(text);
+    const art = fromFrontmatter(doc.data);
+    expect(art.ready_for_spec).toBe(true);
+    expect(art.origin_effort).toBe("auth");
+  });
+});
+
+describe("map sections", () => {
+  const body = [
+    "# Effort",
+    "",
+    "## Destination",
+    "Ship it.",
+    "",
+    "## Non-goals",
+    "- Nothing about billing.",
+    "",
+    "## Non-negotiable facts",
+    "**Success test:** the fresh effort reaches archive.",
+    "- The schema delta stays additive.",
+    "",
+    "### A sub-heading stays inside",
+    "still facts",
+    "",
+    "## Decisions so far",
+    "- Settled.",
+  ].join("\n");
+
+  test("the section names are exported as the vocabulary", () => {
+    expect(MAP_SECTION_NON_GOALS).toBe("Non-goals");
+    expect(MAP_SECTION_NON_NEGOTIABLE_FACTS).toBe("Non-negotiable facts");
+  });
+
+  test("reads ## Non-goals and ## Non-negotiable facts", () => {
+    expect(readMapSection(body, MAP_SECTION_NON_GOALS)).toEqual(["- Nothing about billing."]);
+    expect(readMapSection(body, MAP_SECTION_NON_NEGOTIABLE_FACTS)).toEqual([
+      "**Success test:** the fresh effort reaches archive.",
+      "- The schema delta stays additive.",
+      "",
+      "### A sub-heading stays inside",
+      "still facts",
+    ]);
+  });
+
+  test("## Out of scope is tolerated as Non-goals", () => {
+    // The v4 name stays readable until the migration rewrites it.
+    const legacy = ["# Effort", "", "## Out of scope", "- Nothing about billing."].join("\n");
+    expect(readMapSection(legacy, MAP_SECTION_NON_GOALS)).toEqual(["- Nothing about billing."]);
+    expect(readMapSection(legacy, "Out of scope")).toEqual(["- Nothing about billing."]);
+  });
+
+  test("an absent section reads as null and an empty placeholder as empty", () => {
+    // Intake seeds the sections as empty placeholders, so a gate refusal
+    // names missing content, not a missing section.
+    expect(readMapSection(body, "Fog")).toBeNull();
+    const placeholder = ["# Effort", "", "## Non-goals", "", "## Fog", ""].join("\n");
+    expect(readMapSection(placeholder, MAP_SECTION_NON_GOALS)).toEqual([]);
+  });
+
+  test("a section ends at the next ## heading, not at # or ###", () => {
+    expect(readMapSection(body, "Destination")).toEqual(["Ship it."]);
+    expect(readMapSection(body, "Decisions so far")).toEqual(["- Settled."]);
+  });
+
+  test("the effort-level success test is the first line of ## Non-negotiable facts", () => {
+    const lines = readMapSection(body, MAP_SECTION_NON_NEGOTIABLE_FACTS)!;
+    expect(lines[0]).toMatch(/^\*\*Success test:\*\*/);
+  });
+
+  test("when both names appear, the first section wins", () => {
+    const both = [
+      "# Effort", "",
+      "## Out of scope", "- Legacy list.", "",
+      "## Non-goals", "- Modern list.",
+    ].join("\n");
+    expect(readMapSection(both, MAP_SECTION_NON_GOALS)).toEqual(["- Legacy list."]);
   });
 });
 

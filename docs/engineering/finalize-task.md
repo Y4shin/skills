@@ -10,8 +10,8 @@ ticket resolves through the resolver
 The per-ticket close-out: a **CI gate** on the landing branch (a red branch
 is never merged; fix forward instead), a **knowledge harvest** that folds
 durable findings into `docs/testing.md` and other docs, a CHANGELOG entry in
-`docs/tasks/CHANGELOG.md`, and the ticket marked done via the set tool
-(`tw_set <ticket-path> workflow_state done`, the one owner of the marking),
+`docs/tasks/CHANGELOG.md`, and the ticket marked done
+(`workflow_state: done`, the one owner of the marking),
 verified with `tw_finalizable <ticket-slug>` (which also surfaces the effort
 graph's anomalies). The state pointer clears with
 `tw_state_set task null`, then the landing branch merges into main with
@@ -67,3 +67,6 @@ ready, the skill stops and reports the remaining work.
   `docs/tasks/archive/<effort>/`, marked items deprecated, and left
   `docs/tasks/index.md` with sorted `## Live` and `## Archived` lists.
 - Both state pointers (`map`, `task`) read null afterwards.
+- The close-out ends with the completion report from the skill's
+  `resources/report.md` instead of a canned line, with failure and
+  escalation following the same shape.

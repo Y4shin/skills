@@ -35,21 +35,22 @@ Run this periodic, user-invoked survey without changing application code.
 ## Decision and handoff
 
 Only after the user explicitly picks a candidate, offer the no-grill branch or
-run the existing `/grilling` skill/resource. Grilling uses its established
-one question at a time using the design-tree and frontier discipline: ask a focused
-question with a recommended answer, record the response, and recompute the
-frontier before continuing. Do not invent a new grilling variant. If grilling
-reveals a durable rejection, offer to record the decision as an ADR under
-`docs/adr/`. Update `CONTEXT.md` lazily during grilling only when it is absent
-and the user agrees; never create context during the survey itself.
+run the existing `/grilling` skill/resource. Delegate the grilling session to
+the `grilling` skill: it owns the interview method (rounds over a design-tree
+frontier), and this skill does not restate it or invent a new grilling variant.
+If grilling reveals a durable rejection, offer to record the decision as an
+ADR under `docs/adr/`. Update `CONTEXT.md` lazily during grilling only when it
+is absent and the user agrees; never create context during the survey itself.
 
 If the user says “don't grill me, just show the report” (or invokes this skill
 with the no-grill flag), skip the grilling loop; the report is the whole survey
 output and no design decision is inferred from it. After a candidate is picked,
-pass that picked candidate directly to `/skill:wayfinder` in no-grill mode. In
+pass that picked candidate directly to `/skill:intake`, which creates the
+effort and hands the planning to `/skill:wayfinder` in no-grill mode. In
 normal mode, pass the settled grilling decision (including constraints,
-rejections, and downstream consequences) to `/skill:wayfinder`; hand this
-settled decision to wayfinder. Wayfinder owns
+rejections, and downstream consequences) to `/skill:intake`, which creates
+the effort and hands it to wayfinder, so the settled wayfinder decision
+carries; wayfinder owns
 creating the deepening task and wiring the frontier; this skill never creates
 implementation tasks or auto-fixes application code.
 

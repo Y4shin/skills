@@ -11,8 +11,8 @@ while it reads.
 ## Name distinction
 
 This skill shares its name with the `research` **task type** (a Wayfinder
-planning type whose execution resource lives at
-`skills/engineering/implement-task/resources/research.md`). They are
+planning type whose resource lives at
+`skills/engineering/wayfinder/resources/research.md`). They are
 different layers:
 
 - The **task type** (`type: research`) is a planning routing: Wayfinder

@@ -58,3 +58,6 @@ producer skills for fresh drift.
   (`map.md`, `tasks/`, `tickets/`, `state.yaml`, `index.md`) and reports
   nothing when it is intact.
 - It never edits the tree itself.
+- The diagnosis ends with the completion report from the skill's
+  `resources/report.md`: the cause, the route, and one pointer; the doctor
+  still edits nothing.

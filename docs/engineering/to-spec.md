@@ -2,31 +2,35 @@
 
 ## What it does
 
-`to-spec` turns the current conversation (or a wayfinder map) into a spec. It
-does not interview you; it synthesizes what has already been discussed and
-writes it to `docs/tasks/<effort>/spec.md`, at the effort root.
+`to-spec` synthesizes the effort's spec from the settled record: the map and
+the planning tasks' recorded results. It writes the specification to
+`docs/tasks/<effort>/spec.md`, at the effort root. Nothing is asked that
+planning already settled, and the phase runs no question round of its own;
+when a decision is missing, the run returns to `wayfinder` rather than
+settling it in the spec.
 
-Before writing, it sketches the **seams** at which the feature will be
-tested: the existing seams are preferred, the highest seam wins, and the
-ideal number of new seams is one. It checks those seams with you before
-proceeding. The spec itself follows a fixed template: Problem Statement,
-Solution, an extensive numbered list of User Stories, Implementation
-Decisions, Testing Decisions, Out of Scope, and Further Notes.
+The spec carries `type: spec` frontmatter and the full section set: Problem
+Statement, Solution, an extensive numbered list of User Stories,
+Implementation Decisions (the settled implementation decisions), Testing
+Decisions, Out of Scope, and Further Notes. The spec is written through
+`tw_write_spec`, the only writer of the spec, and starts as `status: draft`.
+When you approve it, a publish write flips the status to `stable`.
 
-The spec file carries frontmatter (`type: spec`) and starts as
-`status: draft`. When you approve it, the status flips to `stable` with
-`tw_set docs/tasks/<effort>/spec.md status stable`.
+The architecture is not written here: `to-tickets` produces the living
+architecture document, and the spec's architecture content is what planning
+already settled. Once that document exists, a note is added to this spec
+marking its architecture content as archival; nothing is deleted.
 
 ## When to reach for it
 
-Type `/skill:to-spec` when a multi-session build has been discussed and the
-decisions are settled: it freezes the shared understanding into an artifact
-`to-tickets` can break apart. It is the second step of the main flow, after
-`/skill:wayfinder`'s map has cleared or after a long design conversation.
+Type `/skill:to-spec <effort-slug>` after `wayfinder` has reconciled the
+effort's map: it collapses the map's linked decisions into the buildable
+plan `to-tickets` breaks apart. The opener refuses the phase until planning
+is reconciled, and the refusal points back to Wayfinder.
 
-Skip it for single-session work that goes straight to
-`/skill:implement-task`, and for work still too foggy to spec (that is
-wayfinder's job first).
+Skip it when there is nothing to plan and nothing to build (wayfinder
+records that in the map), not when the plan is still foggy: that is
+wayfinder's job first.
 
 ## Common questions
 
@@ -47,18 +51,25 @@ decisions, and testing decisions at high resolution. The spec is written
 after the decisions are made, not instead of making them.
 
 **Do I have to re-explain everything to the skill?**
-No. It works from the conversation context and the repo. If you pass an
-effort slug or spec reference, it reads that too.
+No. It synthesizes from the settled record: the map and the planning tasks'
+recorded results. If you pass an effort slug, it reads those.
+
+**Where does the architecture live?**
+Not in this phase. `to-tickets` produces `architecture.md` and the spec's
+architecture content becomes archival; the spec itself is never trimmed.
 
 ## It's working if
 
 - The spec lands at `docs/tasks/<effort>/spec.md` with `type: spec`
-  frontmatter, not a bare pre-v4 path.
+  frontmatter, written through `tw_write_spec`.
+- The spec carries the full section set, including the settled
+  implementation and testing decisions from planning.
 - The user stories are long and concrete, one per aspect of the feature, in
   "As a &lt;actor&gt;, I want &lt;feature&gt;, so that &lt;benefit&gt;" form.
-- Testing decisions name the seams and existing prior art before any ticket
-  exists, and the seams were confirmed with you.
-- Implementation decisions describe modules, interfaces, and contracts
-  without pinning file paths.
-- The status reads `stable` only after your explicit approval, flipped via
-  the set tool.
+- No new decision was settled during the write: a missing one sent the run
+  back to Wayfinder instead.
+- The spec is `stable` only after your approval.
+
+The report at the end follows the shape in
+`resources/report.md`: the spec's state, your approval ask, the next step,
+what is blocked, and one pointer to the spec.

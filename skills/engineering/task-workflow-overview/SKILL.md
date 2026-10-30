@@ -9,8 +9,10 @@ You don't remember every skill, so ask. This is the router that maps user
 intent to the right skill or flow. `docs/tasks/` is an OKF bundle: one
 directory per effort holding `map.md`, an optional `spec.md`, a `tasks/`
 subdirectory of decision tasks, and a `tickets/` subdirectory of
-implementation tickets. The `tw_*` tools make that graph queryable. Bugs live
-under `docs/bugs/`. No external issue tracker, everything in git.
+implementation tickets. The `tw_*` tools make that graph queryable. Every
+request, bugs included, enters as an effort through `/skill:intake`; there
+is no parallel bug substrate (the retired bug directory survives only as
+an archive). No external issue tracker, everything in git.
 
 A **flow** is a path through the skills. Most paths run along one **main
 flow**, and several **on-ramps** merge onto it. Everything else is standalone,
@@ -62,11 +64,12 @@ context-management decisions at each phase boundary.
 
 A starting situation that generates work, then merges onto the main flow.
 
-- **Bugs and requests piling up** to **`/skill:triage`**. It moves issues
-  through triage roles and produces agent-ready tasks, which
-  **`/skill:implement-task`** later picks up. Triage is only for issues you
-  didn't create: tickets that `/skill:to-tickets` produced are already
-  agent-ready, so don't triage them.
+- **A new request: idea, feature, or bug** to **`/skill:intake`**. It is the
+  single front door and always creates an effort (a map plus exactly one
+  non-negotiables grilling task); for a bug report it adds the
+  `subtype: bug` implementation ticket inside that effort. Every request
+  becomes an effort, so there is no triage queue and no rejection path;
+  intake hands off to **`/skill:wayfinder`**, which runs the grilling.
 
 - **Something's broken** to **`/skill:diagnosing-bugs`**. For the hard ones:
   the bug that resists a first glance, the intermittent flake, the regression
@@ -87,8 +90,8 @@ A starting situation that generates work, then merges onto the main flow.
 
 - **`/skill:improve-codebase-architecture`** runs whenever you have a spare
   moment to keep the codebase good for agents to operate in. It surfaces
-  **deepening opportunities**; picking one generates an idea you can take into
-  the main flow at `grilling`.
+  **deepening opportunities**; picking one generates an idea you can take
+  into the main flow at `/skill:intake`.
 
 ## Vocabulary underneath
 
@@ -133,7 +136,6 @@ Off the main flow entirely.
 | "List efforts / tasks / tickets" | `tw_list` |
 | "Show artifact X" | `tw_show <slug>` |
 | "Where am I?" | `tw_state` (both pointers) |
-| "What's in the bug triage queue?" | `grep -l "status: reported" docs/bugs/*.md` |
 
 ## Actions
 
@@ -147,9 +149,15 @@ Off the main flow entirely.
 | Review an Agent Skill | `/skill:skill-review` |
 | Finalize / archive | `/skill:finalize-task` |
 | Initialize repo | `/skill:setup-workflow` |
-| Triage incoming issues | `/skill:triage` |
+| Start a new effort from a request (bug included) | `/skill:intake` |
 | Diagnose a broken workflow | `/skill:task-workflow-doctor` |
 | Diagnose a hard bug | `/skill:diagnosing-bugs` |
+
+## Report
+
+End the turn with the completion report in
+[resources/report.md](resources/report.md): the fixed five-part shape,
+tuned for this skill. A refusal, failure, or escalation is the same shape.
 
 > **Feedback:** any of these skills can hit a snag. When that happens, call
 > `submit_feedback({ kind, data })` autonomously to record it. `kind` is a

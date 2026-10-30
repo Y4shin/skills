@@ -21,7 +21,7 @@ import {
   fauxText,
   fauxToolCall,
   registerFauxProvider,
-} from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/compat.js";
+} from "@earendil-works/pi-ai/compat";
 
 import {
   type AgentSession,
@@ -35,7 +35,7 @@ import {
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import { InMemoryCredentialStore } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/index.js";
+import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 
 export type { AssistantMessage, Context, FauxContentBlock };
 
@@ -87,10 +87,17 @@ export interface TaskSessionOptions {
     ? O extends { customTools?: infer C } ? C : never
     : never;
   projectFiles?: Record<string, string>;
+  /** Use a file-backed session instead of the default in-memory one. */
+  persisted?: boolean;
+  /** A prebuilt session manager, e.g. SessionManager.open(path) for a resume. */
+  sessionManager?: SessionManager;
+  /** The session_start reason to emit. The CLI sets "resume"/"fork" when reopening a session file. */
+  sessionStartReason?: "startup" | "reload" | "new" | "resume" | "fork";
 }
 
 export interface TaskSession {
   session: AgentSession;
+  sessionManager: SessionManager;
   cwd: string;
   faux: ReturnType<typeof registerFauxProvider>;
   model: Model<string>;
@@ -158,16 +165,22 @@ export async function createTaskSession(options: TaskSessionOptions = {}): Promi
     }],
   });
 
+  const sessionManager = options.sessionManager
+    ?? (options.persisted ? SessionManager.create(cwd, join(cwd, "sessions")) : SessionManager.inMemory(cwd));
+
   const { session } = await createAgentSession({
     cwd,
     agentDir: cwd,
     model,
     modelRuntime,
     resourceLoader: loader,
-    sessionManager: SessionManager.inMemory(cwd),
+    sessionManager,
     settingsManager,
     customTools: options.customTools,
     noTools: "builtin",
+    ...(options.sessionStartReason
+      ? { sessionStartEvent: { type: "session_start", reason: options.sessionStartReason } as const }
+      : {}),
   });
 
   const events: AgentSessionEvent[] = [];
@@ -175,7 +188,7 @@ export async function createTaskSession(options: TaskSessionOptions = {}): Promi
   await session.bindExtensions({ uiContext: recording.ui });
 
   return {
-    session, cwd, faux, model, events, notifies: recording.notifies,
+    session, sessionManager, cwd, faux, model, events, notifies: recording.notifies,
     dispose: () => {
       try { session.dispose(); } catch { /* ignore */ }
       faux.unregister();
@@ -187,6 +200,12 @@ export async function createTaskSession(options: TaskSessionOptions = {}): Promi
 
 
 export function seedTaskTree(cwd: string): void {
+  // A v4 effort the opener's gate resolves: the phase opens carry this slug.
+  mkdirSync(join(cwd, "docs/tasks/test-effort"), { recursive: true });
+  writeFileSync(
+    join(cwd, "docs/tasks/test-effort/map.md"),
+    "---\ntype: map\ntitle: Test effort\nstatus: stable\n---\n",
+  );
   mkdirSync(join(cwd, "docs/tasks/login/slices"), { recursive: true });
   writeFileSync(
     join(cwd, "docs/tasks/login/task.md"),

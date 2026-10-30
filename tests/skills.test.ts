@@ -104,7 +104,7 @@ const SKILL_FILES = [
   "skills/engineering/research/SKILL.md",
   "skills/engineering/resolving-merge-conflicts/SKILL.md",
   "skills/engineering/wizard/SKILL.md",
-  "skills/engineering/triage/SKILL.md",
+  "skills/engineering/intake/SKILL.md",
   "skills/productivity/handoff/SKILL.md",
   "skills/productivity/to-questionnaire/SKILL.md",
   "skills/productivity/teach/SKILL.md",
@@ -283,7 +283,8 @@ describe("improve-codebase-architecture skill references", () => {
     expect(content).toMatch(/absolute path/i);
     expect(content).toMatch(/Which of these would you like to explore\?/);
     expect(content).toMatch(/candidate.*pick|pick.*candidate/i);
-    expect(content).toMatch(/one question at a time/i);
+    expect(content).toMatch(/`grilling` skill/);
+    expect(content).not.toMatch(/one question at a time/i);
     expect(content).toMatch(/frontier/i);
     expect(content).toMatch(/ADR|docs\/adr/i);
     expect(content).toMatch(/decision.*wayfinder|wayfinder.*decision/i);
@@ -369,6 +370,136 @@ describe("all referenced agents exist", () => {
 });
 
 // ─── Skill references in skills ──────────────────────────────────────
+
+// ─── The intake skill (intake-skill) ─────────────────────────────────
+
+// The front door: intake replaces triage as the single entry to the
+// workflow. It is user-invoked (starting an effort is a deliberate human
+// act), opens through tw_open, and always creates an effort: a map plus
+// exactly one non-negotiables grilling task.
+describe("intake skill (intake-skill)", () => {
+  const content = readFile("skills/engineering/intake/SKILL.md");
+  const fm = parseFrontmatter(content);
+
+  test("is registered in pi.skills and exists as a user-invoked skill", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).toContain("./skills/engineering/intake");
+    expect(fm["name"]).toBe("intake");
+    expect(fm["disable-model-invocation"]).toBe("true");
+  });
+
+  test("opens through tw_open and names the tools it works through", () => {
+    expect(content).toMatch(/tw_open/);
+    expect(content).toMatch(/tw_create_effort/);
+    expect(content).toMatch(/tw_add_task/);
+  });
+
+  test("always creates an effort: a map plus exactly one non-negotiables grilling task", () => {
+    expect(content).toMatch(/exactly one/i);
+    expect(content).toMatch(/non-negotiables grilling task/i);
+    expect(content).toMatch(/tw_add_ticket/);
+  });
+
+  test("records the intake facts", () => {
+    expect(content).toMatch(/raw request/i);
+    expect(content).toMatch(/destination/i);
+    expect(content).toMatch(/actor/i);
+    expect(content).toMatch(/classification/i);
+    expect(content).toMatch(/three to five/i);
+    expect(content).toMatch(/steps, expected versus actual, and impact|expected versus actual/i);
+    expect(content).toMatch(/constraints/i);
+  });
+
+  test("the duplicate and link checks are bounded and time-boxed", () => {
+    expect(content).toMatch(/bounded/i);
+    expect(content).toMatch(/time-boxed/i);
+    expect(content).toMatch(/archived/i);
+  });
+
+  test("every bug report becomes an effort; intake decides no simple-versus-full split", () => {
+    expect(content).toMatch(/every bug report becomes an effort/i);
+    expect(content).toMatch(/subtype: bug/);
+    expect(content).toMatch(/no simple-versus-full split|does not decide.*simple/i);
+    expect(content).toMatch(/wayfinder/i);
+  });
+
+  test("seeds the canonical map sections as empty placeholders", () => {
+    expect(content).toMatch(/Non-goals/);
+    expect(content).toMatch(/Non-negotiable facts/);
+    expect(content).toMatch(/empty placeholder/i);
+  });
+
+  test("does not restate opener preconditions or the literal ready_for_spec token", () => {
+    expect(content).not.toMatch(/ready_for_spec/);
+  });
+
+  test("ships its report resource", () => {
+    const report = readFile("skills/engineering/intake/resources/report.md");
+    expect(report).toMatch(/## 1\. What is now true/);
+  });
+});
+
+describe("triage is retired (intake-skill)", () => {
+  test("moves to skills/deprecated/triage with its replacement named", () => {
+    const deprecated = readFile("skills/deprecated/triage/SKILL.md");
+    expect(deprecated).toMatch(/intake/);
+    expect(existsSync(join(PROJECT, "skills/engineering/triage"))).toBe(false);
+  });
+
+  test("is absent from pi.skills and the docs page tree", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
+    expect(existsSync(join(PROJECT, "docs/engineering/triage.md"))).toBe(false);
+  });
+
+  test("the deprecated bucket README lists it with its replacement", () => {
+    const readme = readFile("skills/deprecated/README.md");
+    expect(readme).toContain("[triage](./triage/SKILL.md)");
+    expect(readme).toMatch(/Replaced by `intake`/);
+  });
+
+  test("the workflow-skills report seam drops triage and carries intake", () => {
+    // Seam 4's coverage set is edited when a skill joins or leaves the
+    // package; this pins the intake-skill reshuffle.
+    const source = readFile("tests/skill-rewire.test.ts");
+    expect(source).toContain('"intake"');
+  });
+
+  test("the skill surface stays the promoted set: intake in, triage out, count unchanged", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).toContain("./skills/engineering/intake");
+    expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
+    expect(pkg.pi.skills.length).toBe(29);
+    expect(pkg.pi.skills.filter((s: string) => s.includes("intake") || s.includes("triage"))).toEqual([
+      "./skills/engineering/intake",
+    ]);
+  });
+
+  test("intake has a docs page and triage has none", () => {
+    expect(existsSync(join(PROJECT, "docs/engineering/intake.md"))).toBe(true);
+    expect(existsSync(join(PROJECT, "docs/engineering/triage.md"))).toBe(false);
+    const page = readFile("docs/engineering/intake.md");
+    for (const section of ["## What it does", "## When to reach for it", "## Common questions", "## It's working if"]) {
+      expect(page).toContain(section);
+    }
+  });
+
+  test("the no-rejection path: intake never routes a request to a wontfix", () => {
+    const intake = readFile("skills/engineering/intake/SKILL.md");
+    expect(intake).toMatch(/no rejection path|never reject|no rejection/i);
+    expect(intake).not.toMatch(/wontfix/);
+  });
+  test("the repo-root docs keep the retired bug queue out of the routing tables", () => {
+    // The overview's on-ramp and query table reflect the v5 front door: the
+    // triage queue and the docs/bugs grep are gone with triage.
+    const overview = readFile("skills/engineering/task-workflow-overview/SKILL.md");
+    expect(overview).toContain("/skill:intake");
+    expect(overview).not.toContain("/skill:triage");
+    expect(overview).not.toContain('grep -l "status: reported" docs/bugs/*.md');
+    // The effort's own carried constraint: docs/bugs/ survives only as a
+    // static archive, so the overview no longer names it as the bug list.
+    expect(overview).not.toContain("docs/bugs/");
+  });});
 
 describe("human-mode resource routing", () => {
   const routers = ["feature", "bug"];
@@ -555,6 +686,15 @@ describe("skill cross-references", () => {
     expect(content).toContain("setup-workflow");
   });
 
+  test("implement-task router does not deny the grilling skill exists", () => {
+    // Ticket grilling-delegation-fix: the router that claimed grilling has
+    // "no standalone skill" was corrected; grilling delegates like research
+    // and prototype.
+    const content = readFile("skills/engineering/implement-task/SKILL.md");
+    expect(content).toMatch(/delegate to the `grilling` skill/);
+    expect(content).not.toMatch(/grilling[^\n]*no standalone skill/i);
+  });
+
   test("implement-task wrapper reads subtype (type fallback) and dispatches to resources", () => {
     const content = readFile("skills/engineering/implement-task/SKILL.md");
     expect(content).toContain("tw_get");
@@ -563,10 +703,14 @@ describe("skill cross-references", () => {
     expect(content).toContain("type");
     expect(content).toContain("resources/feature.md");
     expect(content).toContain("resources/bug.md");
-    expect(content).toContain("resources/research.md");
-    expect(content).toContain("resources/prototype.md");
-    expect(content).toContain("resources/grilling.md");
-    expect(content).toContain("resources/manual.md");
+    // The planning resources consolidate under wayfinder/resources (ticket
+    // wayfinder-reconcile-and-passes); the planning subtypes delegate to
+    // their standalone skills.
+    expect(content).toContain("wayfinder/resources/");
+    expect(content).not.toContain("implement-task/resources/research.md");
+    expect(content).not.toContain("implement-task/resources/prototype.md");
+    expect(content).not.toContain("implement-task/resources/grilling.md");
+    expect(content).not.toContain("implement-task/resources/manual.md");
     expect(content).toMatch(/absent.*feature|feature.*default|\btype:\s*feature\b/i);
   });
 
@@ -642,9 +786,9 @@ describe("skill cross-references", () => {
   });
 
   for (const resource of ["research", "prototype", "grilling", "manual"]) {
-    test(`implement-task ${resource} resource exists and is non-coding`, () => {
-      const content = readFile(`skills/engineering/implement-task/resources/${resource}.md`);
-      expect(content).toContain("Implement Task");
+    test(`the ${resource} planning resource lives under wayfinder and is non-coding`, () => {
+      const content = readFile(`skills/engineering/wayfinder/resources/${resource}.md`);
+      expect(content).toContain("Wayfinder Planning Resource");
       expect(content).toContain("Completion evidence");
     });
   }
@@ -712,7 +856,7 @@ describe("skill cross-references", () => {
         // Wrapping a Pi tool call in a set -e shell block fails with
         // command not found and aborts the archive mid-sequence (see
         // docs/bugs/finalize-task-set-e-tool-confusion.md).
-        expect(m[1]).not.toMatch(/tw_state_set|tw_set|tw_finalizable|tw_map_finalizable/);
+        expect(m[1]).not.toMatch(/tw_state_set|tw_finalizable|tw_map_finalizable/);
       }
     }
     expect(shellBlocks).toBeGreaterThan(0);
@@ -773,16 +917,6 @@ describe("skill cross-references", () => {
     const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
     expect(content).toContain("/skill:wayfinder");
     expect(content).toContain("tw_frontier");
-  });
-
-  test("task-overview lists triage queue query", () => {
-    const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
-    expect(content).toContain('grep -l "status: reported" docs/bugs/*.md');
-  });
-
-  test("task-overview mentions docs/bugs as bug list location", () => {
-    const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
-    expect(content).toContain("docs/bugs/");
   });
 
   test("task-workflow-doctor references setup-workflow", () => {
@@ -866,13 +1000,21 @@ describe("setup-workflow / migration skill references", () => {
   });
 });
 
-// ─── setup-workflow v4 (schema_version 4) ────────────────────────────
+// ─── setup-workflow v5 (schema_version 5) ────────────────────────────
 
-describe("setup-workflow v4", () => {
+describe("setup-workflow v5", () => {
   const skill = readFile("skills/engineering/setup-workflow/SKILL.md");
 
-  test("keys detection on schema_version 4 as current", () => {
-    expect(skill).toMatch(/current schema version is \*\*4\*\*|schema_version 4|`4`/);
+  test("keys detection on schema_version 5 as current", () => {
+    expect(skill).toMatch(/current schema version is \*\*5\*\*/);
+  });
+
+  test("routes a v4 repo to the upgrade-4-to-5 resource", () => {
+    expect(skill).toMatch(/upgrade-4-to-5/);
+  });
+
+  test("the no-op message names schema_version 5", () => {
+    expect(skill).toMatch(/already on schema_version 5, nothing to do/);
   });
 
   test("names the three branches: fresh, migrate, no-op", () => {
@@ -889,8 +1031,8 @@ describe("setup-workflow v4", () => {
     expect(skill).toMatch(/MigrateReport/);
   });
 
-  test("the onboard branch writes the v4 scaffold", () => {
-    expect(skill).toMatch(/schema_version: 4/);
+  test("the onboard branch writes the v5 scaffold", () => {
+    expect(skill).toMatch(/schema_version: 5/);
     expect(skill).toMatch(/okf_version/);
   });
 
@@ -910,6 +1052,39 @@ describe("setup-workflow v4", () => {
     for (let i = 1; i <= 9; i++) {
       expect(content).toMatch(new RegExp(`## Step ${i}`));
     }
+  });
+
+  test("upgrade-4-to-5 resource exists with the established shape", () => {
+    const content = readFile("skills/engineering/setup-workflow/resources/upgrade-4-to-5.md");
+    expect(content).toMatch(/scripts\/migrate\.mjs/);
+    expect(content).toMatch(/## Before you start/);
+    expect(content).toMatch(/## After the run/);
+    expect(content).toMatch(/## Step 1/);
+    expect(content).toMatch(/## Step 2/);
+  });
+
+  test("upgrade-4-to-5 covers every v4-to-5 rewrite the migration performs", () => {
+    const content = readFile("skills/engineering/setup-workflow/resources/upgrade-4-to-5.md");
+    // The type and filename rename, live and archived.
+    expect(content).toMatch(/arch-spec\.md/);
+    expect(content).toMatch(/architecture\.md/);
+    expect(content).toMatch(/arch spec/);
+    // The multi-architecture-doc corner: renamed in place, not hoisted.
+    expect(content).toMatch(/in place/);
+    // The map body reshape.
+    expect(content).toMatch(/## Out of scope/);
+    expect(content).toMatch(/Non-goals/);
+    expect(content).toMatch(/Non-negotiable facts/);
+    // The state stamp and what the hop never touches.
+    expect(content).toMatch(/schema_version: 5/);
+    expect(content).toMatch(/docs\/bugs\//);
+  });
+
+  test("upgrade-4-to-5's transcript matches what the CLI actually prints", () => {
+    const content = readFile("skills/engineering/setup-workflow/resources/upgrade-4-to-5.md");
+    expect(content).toMatch(/migrated from schema_version 4 to 5/);
+    expect(content).toMatch(/already on schema_version 5, nothing to do\./);
+    expect(content).toMatch(/rebuilt state\.yaml at schema_version 5/);
   });
 });
 // ─── Skill-review wiring ─────────────────────────────────────────────
@@ -1164,9 +1339,12 @@ describe("dead surface deletion (corpus check)", () => {
 // The tool names the new planning prose may reference: the surviving surface
 // after the overhaul rename.
 const SURVIVING_TOOLS = new Set([
+  // v4 surface.
   "tw_show",
   "tw_get",
-  "tw_set",
+  "tw_mark_done",
+  "tw_write_section",
+  "tw_finalize_map",
   "tw_list",
   "tw_frontier",
   "tw_dependency_levels",
@@ -1176,6 +1354,23 @@ const SURVIVING_TOOLS = new Set([
   "tw_state",
   "tw_state_set",
   "tw_context",
+  // The v5 named-transition and disclosure tools as they landed:
+  // disclosure-open-close-core (tw_open, tw_close, tw_next),
+  // implementation-transition-tools (tw_mark_blocked,
+  // tw_record_out_of_scope, tw_add_ticket, tw_split_ticket,
+  // tw_write_spec, tw_finalize_map, tw_write_section), and
+  // to-tickets-architecture (tw_write_architecture).
+  "tw_open",
+  "tw_close",
+  "tw_next",
+  "tw_mark_blocked",
+  "tw_record_out_of_scope",
+  "tw_add_ticket",
+  "tw_split_ticket",
+  "tw_write_spec",
+  "tw_finalize_map",
+  "tw_write_section",
+  "tw_write_architecture",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -1312,12 +1507,108 @@ describe("wayfinder planning resources v4", () => {
       const content = wayfinderFile(join("resources", `${subtype}.md`));
       const templates = extractFrontmatterTemplates(content);
       expect(templates.length).toBeGreaterThan(0);
-      for (const template of templates) {
-        expect(frontmatterKeys(template)).toContain("subtype");
-        expect(template).toMatch(new RegExp(`^subtype: ${subtype}$`, "m"));
-        assertTemplateConforms(template);
-      }
+      // The merged resources may carry other templates (findings); the task
+      // template is the one pinned to the subtype.
+      const taskTemplate = templates.find((t) => /^type: task$/m.test(t));
+      expect(taskTemplate, `${subtype} resource carries a type: task template`).toBeDefined();
+      expect(frontmatterKeys(taskTemplate!)).toContain("subtype");
+      expect(taskTemplate).toMatch(new RegExp(`^subtype: ${subtype}$`, "m"));
+      assertTemplateConforms(taskTemplate!);
     }
+  });
+});
+
+// ─── wayfinder v5: the absorbed planning phase (wayfinder-reconcile-and-passes) ──
+
+describe("wayfinder v5 (wayfinder-reconcile-and-passes)", () => {
+  const content = readFile("skills/engineering/wayfinder/SKILL.md");
+
+  test("wayfinder is user-invoked with the correct frontmatter", () => {
+    const fm = parseFrontmatter(content);
+    expect(fm["name"]).toBe("wayfinder");
+    expect(fm["disable-model-invocation"]).toBe("true");
+  });
+
+  test("the skill opens through tw_open and releases the pass through tw_close", () => {
+    expect(content).toMatch(/tw_open/);
+    expect(content).toMatch(/tw_close wayfinder/);
+  });
+
+  test("a pass is bounded to one frontier snapshot and at most one grilling", () => {
+    expect(content).toMatch(/one frontier snapshot/i);
+    expect(content).toMatch(/at most one grilling/i);
+  });
+
+  test("a pass works the non-grilling ready tasks, then runs exactly one grilling", () => {
+    expect(content).toMatch(/non-grilling ready tasks/i);
+    expect(content).toMatch(/exactly one grilling/i);
+  });
+
+  test("planning work is serialized per kind", () => {
+    expect(content).toMatch(/never two grillings at once/i);
+    expect(content).toMatch(/research and prototype\s+may run concurrently/i);
+  });
+
+  test("a pass releases and never rolls into the next frontier", () => {
+    expect(content).toMatch(/never rolls into the next frontier/i);
+    expect(content).toMatch(/releases?/i);
+  });
+
+  test("an empty ready frontier triggers the reconcile step", () => {
+    expect(content).toMatch(/when the snapshot's ready frontier is empty/i);
+    expect(content).toMatch(/the pass runs the reconcile step/i);
+  });
+
+  test("the reconcile sets the ready flag only through tw_finalize_map", () => {
+    expect(content).toMatch(/tw_finalize_map/);
+    expect(content).toMatch(/only setter of/i);
+    expect(content).toMatch(/Never set the flag any other way/i);
+  });
+
+  test("tw_finalize_map refuses naming every missing item", () => {
+    expect(content).toMatch(/naming\s+every\s+missing\s+item/i);
+  });
+
+  test("every planning task writes its results back before marking itself done", () => {
+    expect(content).toMatch(/writes its own results back to the map through\s+`tw_write_section` as its final step/i);
+    expect(content).toMatch(/before it marks itself done with\s+`tw_mark_done`/i);
+  });
+
+  test("the write-back pointer convention: the map must reference the task slug", () => {
+    expect(content).toMatch(/referencing the task's slug as a stand-alone token/i);
+    expect(content).toMatch(/`tw_mark_done` refuses the\s+done-marking while the map does not reference the task/i);
+  });
+
+  test("wayfinder never re-synthesizes decisions from task bodies", () => {
+    expect(content).toMatch(/never re-synthesizes decisions from task bodies/i);
+  });
+
+  test("a done-marking clears the flag, so post-reconcile plan changes force one more pass", () => {
+    expect(content).toMatch(/A done-marking clears\s+a set ready flag/i);
+    expect(content).toMatch(/forces one more\s+pass/i);
+  });
+
+  test("planning resources consolidate under wayfinder/resources; the implement-task duplicates are gone", () => {
+    for (const subtype of ["research", "prototype", "grilling", "manual"]) {
+      expect(existsSync(join(PROJECT, `skills/engineering/wayfinder/resources/${subtype}.md`))).toBe(true);
+      expect(existsSync(join(PROJECT, `skills/engineering/implement-task/resources/${subtype}.md`))).toBe(false);
+    }
+  });
+
+  test("each planning resource carries the write-back pointer convention and the done-marking order", () => {
+    for (const subtype of ["research", "prototype", "grilling", "manual"]) {
+      const content = readFile(`skills/engineering/wayfinder/resources/${subtype}.md`);
+      expect(content).toMatch(/tw_write_section/);
+      expect(content).toMatch(/tw_mark_done\b/);
+      expect(content).toMatch(/stand-alone token/i);
+    }
+  });
+
+  test("the grilling resource creates the task document and delegates the method to the grilling skill", () => {
+    const content = readFile("skills/engineering/wayfinder/resources/grilling.md");
+    expect(content).toMatch(/`grilling` skill/);
+    expect(content).not.toMatch(/one question at a time/i);
+    expect(content).not.toMatch(/answer on[\s\S]*behalf/i);
   });
 });
 
@@ -1522,7 +1813,6 @@ describe("to-tickets v4 (overhaul-planning-skills)", () => {
 
   test("tickets live under the effort's tickets/ subtree", () => {
     expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<ticket-slug>\/ticket\.md/);
-    expect(content).toMatch(/directory is the registration/i);
   });
 
   test("no map-array registration language", () => {
@@ -1531,11 +1821,14 @@ describe("to-tickets v4 (overhaul-planning-skills)", () => {
     expect(content).not.toMatch(/entry to the map frontmatter/i);
   });
 
-  test("the honest contract: files written by hand, the graph queryable", () => {
-    expect(content).toMatch(/written by hand/i);
-    expect(content).toMatch(/graph queryable/i);
-    // No claim of tool support for creation.
-    expect(content).not.toMatch(/tools? (write|create|generate) (the )?tickets/i);
+  test("the honest contract: the tools write the tickets and the graph", () => {
+    // The v5 transition tools own every write: tw_add_ticket creates the
+    // tickets, tw_write_architecture writes the living architecture. The
+    // v4 by-hand contract is retired (the write guard refuses hand edits).
+    expect(content).toMatch(/tw_add_ticket/);
+    expect(content).toMatch(/tw_write_architecture/);
+    expect(content).not.toMatch(/written by hand/i);
+    expect(content).not.toMatch(/No tw_\* tool (writes|creates)/i);
   });
 
   test("queries the graph via the surviving tools", () => {
@@ -1565,6 +1858,165 @@ describe("to-tickets v4 (overhaul-planning-skills)", () => {
     } finally {
       rmSync(t, { recursive: true, force: true });
     }
+  });
+});
+
+// ─── to-tickets v5 (to-tickets-architecture) ─────────────────────
+
+describe("to-tickets v5 (to-tickets-architecture)", () => {
+  const content = readFile("skills/engineering/to-tickets/SKILL.md");
+  const docsPage = readFile("docs/engineering/to-tickets.md");
+
+  test("to-tickets is user-invoked with the correct frontmatter", () => {
+    const fm = parseFrontmatter(content);
+    expect(fm["name"]).toBe("to-tickets");
+    expect(fm["disable-model-invocation"]).toBe("true");
+  });
+
+  test("the skill opens through tw_open and releases the phase through tw_close", () => {
+    expect(content).toMatch(/tw_open/);
+    expect(content).toMatch(/tw_close to-tickets/);
+  });
+
+  test("produces the architecture document plus the ticket graph from a spec", () => {
+    expect(content).toMatch(/architecture document/i);
+    expect(content).toMatch(/ticket graph/i);
+    expect(content).toMatch(/from the spec|from a spec|produced from the spec/i);
+  });
+
+  test("the architecture inlines the spec's architecture content in full", () => {
+    expect(content).toMatch(/inlines? the spec's architecture content in full/i);
+  });
+
+  test("the architecture adds exports, existing abstractions, do-not-reimplement, seams, and per-ticket interface contracts", () => {
+    expect(content).toMatch(/per-ticket exports/i);
+    expect(content).toMatch(/existing abstractions/i);
+    expect(content).toMatch(/do-not-reimplement/i);
+    expect(content).toMatch(/seams/i);
+    expect(content).toMatch(/interface contracts/i);
+  });
+
+  test("the architecture is the living document and the spec's architecture content becomes archival", () => {
+    expect(content).toMatch(/living architecture/i);
+    expect(content).toMatch(/archival/i);
+  });
+
+  test("the writer is tw_write_architecture, the only writer of the architecture document", () => {
+    expect(content).toMatch(/tw_write_architecture/);
+    expect(content).toMatch(/only writer of the architecture document/i);
+  });
+
+  test("a note pointing at the architecture is added to spec.md, and nothing is deleted", () => {
+    expect(content).toMatch(/note to `spec\.md` pointing at the architecture/);
+    expect(content).toMatch(/nothing is deleted|deletes nothing/i);
+  });
+
+  test("a bug-only effort produces tickets with no architecture document", () => {
+    expect(content).toMatch(/bug-only/i);
+    expect(content).toMatch(/no architecture document/i);
+    expect(content).toMatch(/skip the architecture/i);
+  });
+
+  test("tickets are created through tw_add_ticket in dependency order: creation-order wiring", () => {
+    expect(content).toMatch(/tw_add_ticket/);
+    expect(content).toMatch(/validates `blocked_by` at creation/i);
+    expect(content).toMatch(/dependency order/i);
+    // The retired second wiring pass has no mechanism: the write guard
+    // refuses hand edits, so the prose must not teach one.
+    expect(content).not.toMatch(/second pass/);
+    expect(content).not.toMatch(/editing the frontmatter/i);
+  });
+
+  test("splits go through tw_split_ticket, not hand edits", () => {
+    expect(content).toMatch(/tw_split_ticket/);
+  });
+
+  test("the phase ends with a publish write, so the document is stable for implementation", () => {
+    expect(content).toMatch(/publish write \(`publish: true`\)/);
+    expect(content).toMatch(/stable/);
+  });
+
+  test("the prose does not restate the opener preconditions", () => {
+    expect(content).not.toMatch(/ready_for_spec/);
+  });
+
+  test("references only surviving tools", () => {
+    expectOnlySurvivingTools(content);
+    expectOnlySurvivingTools(docsPage);
+  });
+
+  test("the docs page describes the architecture output and the tool-written tickets", () => {
+    expect(docsPage).toMatch(/tw_write_architecture/);
+    expect(docsPage).toMatch(/tw_add_ticket/);
+    expect(docsPage).toMatch(/architecture document/i);
+    expect(docsPage).toMatch(/no architecture document|bug-only/i);
+  });
+
+  test("every frontmatter template conforms by construction", () => {
+    const templates = extractFrontmatterTemplates(content);
+    expect(templates.length).toBeGreaterThan(0);
+    for (const template of templates) assertTemplateConforms(template);
+  });
+});
+
+// ─── to-spec v5 (to-spec-rescope) ─────────────────────────────────────
+
+describe("to-spec v5 (to-spec-rescope)", () => {
+  const content = readFile("skills/engineering/to-spec/SKILL.md");
+  const docsPage = readFile("docs/engineering/to-spec.md");
+
+  test("the skill opens through tw_open and releases the phase through tw_close", () => {
+    expect(content).toMatch(/tw_open/);
+    expect(content).toMatch(/tw_close to-spec/);
+  });
+
+  test("no seam or architecture interview remains in the prose", () => {
+    // The seam interview is gone: the architecture is to-tickets' output and
+    // the spec's architecture content is what planning already settled.
+    expect(content).not.toMatch(/seam/i);
+    expect(content).not.toMatch(/interview/i);
+    expect(content).not.toMatch(/Check with the user/i);
+    // The docs page carries the same rescope.
+    expect(docsPage).not.toMatch(/seams were confirmed/i);
+  });
+
+  test("the spec is written through tw_write_spec, the only writer of the spec", () => {
+    expect(content).toMatch(/tw_write_spec/);
+    expect(content).toMatch(/only writer of the spec/i);
+  });
+
+  test("the spec keeps its full section set", () => {
+    for (const section of [
+      "## Problem Statement",
+      "## Solution",
+      "## User Stories",
+      "## Implementation Decisions",
+      "## Testing Decisions",
+      "## Out of Scope",
+      "## Further Notes",
+    ]) {
+      expect(content).toContain(section);
+    }
+  });
+
+  test("the prose does not restate the opener preconditions or the literal ready_for_spec token", () => {
+    expect(content).not.toMatch(/ready_for_spec/);
+  });
+
+  test("the spec's architecture content is what planning settled, and the archival note comes from the architecture writer", () => {
+    expect(content).toMatch(/what planning already settled|the settled record/i);
+    expect(content).toMatch(/to-tickets/);
+  });
+
+  test("references only surviving tools", () => {
+    expectOnlySurvivingTools(content);
+    expectOnlySurvivingTools(docsPage);
+  });
+
+  test("every frontmatter template conforms by construction", () => {
+    const templates = extractFrontmatterTemplates(content);
+    expect(templates.length).toBeGreaterThan(0);
+    for (const template of templates) assertTemplateConforms(template);
   });
 });
 
@@ -1715,10 +2167,16 @@ describe("implement-task v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/legacy artifacts keep today's behavior|absent subtype defaults/i);
   });
 
-  test("dispatch names all six subtypes and routes each to its resource", () => {
-    for (const subtype of ["research", "prototype", "grilling", "manual", "feature", "bug"]) {
+  test("dispatch routes feature and bug to their resources and delegates the planning subtypes", () => {
+    for (const subtype of ["feature", "bug"]) {
       expect(content).toContain(`resources/${subtype}.md`);
     }
+    // Planning subtypes delegate to their standalone skills; manual runs the
+    // consolidated wayfinder resource (no standalone skill).
+    expect(content).toMatch(/`research` skill/i);
+    expect(content).toMatch(/`prototype` skill/i);
+    expect(content).toMatch(/`grilling` skill/i);
+    expect(content).toContain("wayfinder/resources/manual.md");
   });
 
   test("resolves artifacts through the resolver, with no hardcoded task-path template", () => {
@@ -1828,7 +2286,7 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
   test("the chain never marks the ticket done; finalize owns the marking", () => {
     const beforeToolbelt = content.split("## Failure toolbelt")[0];
     // No chain step sets the field: the marking has one owner, finalize.
-    expect(beforeToolbelt).not.toMatch(/tw_set[^)]*workflow_state/);
+    expect(beforeToolbelt).not.toMatch(/tw_mark_done|tw_set[^)]*workflow_state/);
     expect(beforeToolbelt).not.toMatch(/workflow_state.{0,20}done/);
     expect(content).toMatch(/\/skill:finalize-task/);
   });
@@ -2230,16 +2688,18 @@ describe("standards direct reads (overhaul-execution-skills)", () => {
 
 describe("planning resources v4 touch (overhaul-execution-skills)", () => {
   test.each(["research", "prototype", "grilling", "manual"])(
-    "%s marks the task done via the set tool, workflow_state done",
+    "%s marks the task done via the named done tool after the map write-back",
     (subtype) => {
-      const content = readFile(`skills/engineering/implement-task/resources/${subtype}.md`);
-      expect(content).toMatch(/tw_set[^`]*workflow_state done/);
+      const content = readFile(`skills/engineering/wayfinder/resources/${subtype}.md`);
+      expect(content).toMatch(/tw_write_section/);
+      expect(content).toMatch(/tw_mark_done\b/);
+      expect(content).not.toContain("tw_set");
       expectOnlySurvivingTools(content);
     },
   );
 
   test("research captures findings in the task directory with frontmatter", () => {
-    const content = readFile("skills/engineering/implement-task/resources/research.md");
+    const content = readFile("skills/engineering/wayfinder/resources/research.md");
     expect(content).toMatch(/docs\/tasks\/<effort>\/tasks\/<task-slug>\/findings\.md/);
     const templates = extractFrontmatterTemplates(content);
     const findings = templates.find((t) => /^type: findings$/m.test(t));
@@ -2263,8 +2723,9 @@ describe("finalize-task v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/implement-task reported its chains landed|chains landed/i);
   });
 
-  test("the per-ticket close-out marks workflow_state done via the set tool, then verifies", () => {
-    expect(content).toMatch(/tw_set[^`]*workflow_state done|tw_set <ticket-path> workflow_state done/);
+  test("the per-ticket close-out marks the ticket done without the set tool, then verifies", () => {
+    expect(content).not.toContain("tw_set");
+    expect(content).toMatch(/workflow_state:? done/);
     expect(content).toContain("tw_finalizable <ticket-slug>");
     // The finalizable check also surfaces the effort graph's anomalies.
     expect(content).toMatch(/anomal/i);

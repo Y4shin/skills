@@ -1,21 +1,22 @@
-# Target-state spec for the task-workflow migration (schema_version 3)
+# Target-state spec for the task-workflow migration (schema_version 5)
 #
-# This file is the durable, machine-readable distillation of grilling #1's
-# 20 adoption decisions (Q1-Q20), verified against what the adoption ACTUALLY
-# did on disk (the proven 9-step run on this repo, v2.10.0 -> v3.0.0).
-# The grilling #1 decision table (docs/tasks/map-mp-skills-onto-this-repo/
-# task.md) is the SOURCE; this spec is the DISTILLATION.
+# This file is the durable, machine-readable distillation of the
+# enforced-workflow-v5 effort's settled architecture
+# (docs/tasks/enforced-workflow-v5/arch-spec.md), verified against what the
+# landed migration ACTUALLY does (the migrate-v4-to-v5 ticket; the CLI prints
+# a MigrateReport whose `to` is 5).
 #
 # The setup-workflow skill reads this spec as its target-state source.
-# Versioned with the package: corresponds to schema_version 3.
+# Versioned with the package: corresponds to schema_version 5.
 #
-# Where this spec disagrees with grilling #1 (a deviation from the designed
-# steps that the actual run surfaced), the deviation is recorded here as the
-# truth, with a `deviation:` note.
+# Where this spec disagrees with a hop's designed steps (a deviation the
+# actual run surfaced), the deviation is recorded in `deviations` as the
+# truth, with a `deviation:` note. The `Q*` decision references trace to the
+# original adoption grilling and are retained as provenance.
 
-schema_version: 3
-package_version: "2.10.0"
-title: "Largely adopt Matt Pocock's skills repo way"
+schema_version: 5
+package_version: "4.0.0"
+title: "Enforced workflow v5"
 
 # ── Skill buckets ──────────────────────────────────────────────────────
 
@@ -43,51 +44,55 @@ promotion_rules:
   - "A retired skill is kept in deprecated/ (content preserved, not
     deleted) with a note naming its replacement."
 
-# ── Promoted skills (verified from package.json pi.skills) ────────────
+# ── Promoted skills (the schema-5 surface) ─────────────────────────────
 
 promoted_skills:
   engineering:
     # Router + workflow spine
-    - task-overview      # ask-matt-style intent router (Q7, name kept)
-    - setup-workflow     # replaces onboard-workflow (Q6 superseded by R1Q1)
-    - wayfinder          # decisions-only (Q1)
-    - implement-task     # borrows implement-spec graph/concurrency (Q11.7)
-    - finalize-task      # keep, drop CI gate, add human changelog (Q11.3)
-    - to-spec            # two-phase handoff: spec (Q5)
-    - to-tickets         # two-phase handoff: tickets (Q5)
-    # Discipline skills
-    - tdd                # re-aligned: refactor-out-of-loop (Q13)
-    - code-review        # re-aligned: 12-smell baseline (Q13)
-    - task-workflow-doctor
+    - task-workflow-overview  # progressively disclosed explainer + tw_next fast track
+    - setup-workflow          # onboard / migrate / no-op, keyed on the schema stamp
+    - intake                  # the single front door; replaces triage
+    - wayfinder               # the single planning-phase skill (bounded passes)
+    - to-spec                 # gated on ready_for_spec; no interview
+    - to-tickets              # produces architecture.md plus the ticket graph
+    - implement-ticket        # the implementation phase; retires implement-task
+    - finalize-effort         # effort close, review triage, archive gate
+    - task-workflow-doctor    # only what the tools cannot self-diagnose
+    # Discipline and vocabulary skills (unchanged in scope)
+    - tdd
+    - code-review
     - diagnosing-bugs
     - codebase-design
-    - grilling           # re-aligned: terser, plain text (Q13, consult-first)
-    - domain-modeling    # re-aligned: companion docs + 3-criteria ADR (Q16)
+    - grilling
+    - domain-modeling
     - improve-codebase-architecture
-    - skill-creator      # kept; coexists with writing-for-agents (Q4)
-    # Utility skills added (Q8)
+    - skill-creator
+    - skill-review
+    - eval-review
+    # Utility skills
     - prototype
     - research
     - resolving-merge-conflicts
     - wizard
-    - triage             # subsumes report-bug intake (Q12)
   productivity:
-    - wait-what          # pre-existing
-    # Utility skills added (Q8)
-    - handoff            # borrows claude-handoff bg-agent pattern (Q18)
+    - wait-what
+    - handoff
     - to-questionnaire
     - teach
-    - writing-for-agents # + SKILL-MECHANICS.md (Q4)
-    - grill-me           # thin wrapper around grilling (Q15)
+    - writing-for-agents
+    - grill-me
 
 # ── Deprecated skills (kept, not shipped) ──────────────────────────────
 
 deprecated_skills:
   - create-task         # replaced by wayfinder
-  - onboard-workflow    # replaced by setup-workflow (grilling #2 R1Q1)
-  - report-bug          # retired in favor of triage (Q12)
+  - onboard-workflow    # replaced by setup-workflow
+  - report-bug          # retired in favor of triage (which v5 then retires)
+  - triage              # replaced by intake (the single front door)
+  - implement-task      # replaced by implement-ticket
+  - finalize-task       # per-ticket close-out runs inline in implement-ticket
 
-# ── Repo-root docs (Q2 + Q17) ──────────────────────────────────────────
+# ── Repo-root docs ─────────────────────────────────────────────────────
 
 repo_root_docs:
   AGENTS.md:
@@ -95,110 +100,156 @@ repo_root_docs:
       invocation split, no-em-dashes, skill-tool invocation convention."
     decision: "Q2"
   CONTEXT.md:
-    purpose: "This repo's workflow ubiquitous language (map, task, slice,
-      frontier, blocked_by, schema_version, the 6 task types, buckets,
-      decision ticket, triage role, etc.). This repo IS the workflow
-      package, so its vocabulary is the domain."
+    purpose: "This repo's workflow ubiquitous language. This repo IS the
+      workflow package, so its vocabulary is the domain."
     decision: "Q2"
-    deviation: "Scope expanded from domain-only to full workflow glossary
-      (user clarified mid-run: this repo's CONTEXT.md holds the workflow
-      vocabulary since the repo is the workflow package; downstream repos'
-      CONTEXT.md holds their project domain terms instead)."
   docs/adr/:
-    purpose: "Repo-level ADRs (seeded with 0001-largely-adopt-mp-skills.md)."
+    purpose: "Repo-level ADRs; an ADR is written when a living-architecture
+      change is ADR-worthy under domain-modeling's rules."
     decision: "Q2"
   docs/agents/:
     purpose: "Per-repo config the skills read (seeded minimal; setup-workflow
       populates it on onboarding)."
     decision: "Q2"
+  docs/bugs/:
+    purpose: "Static archive only. Every bug report enters as an effort
+      (subtype: bug implementation ticket), so docs/bugs/ retires as a live
+      substrate, drops out of the write-guard scope, and is never moved by
+      the migration."
   docs/tasks/out-of-scope/:
-    purpose: "Rejected-requests KB; triage checks it for prior rejection."
-    decision: "Q17"
-    location: "docs/tasks/out-of-scope/ (not repo root, per user)"
+    purpose: "Rejected-requests KB. Its producers are wayfinder and the
+      skills that defer work, through tw_record_out_of_scope."
 
-# ── Planning flow (Q1 + Q5 + Q7) ───────────────────────────────────────
+# ── Phase flow ─────────────────────────────────────────────────────────
 
 planning_flow:
-  model: "strict two-phase (Q1)"
+  model: "gated phases; the opener is the gate"
   phases:
+    - step: "intake"
+      role: "the single front door; always creates an effort with a map and
+        a non-negotiables grilling task; every bug report becomes an effort."
     - step: "wayfinder"
-      role: "produces decisions only (research/prototype/grilling/manual
-        tasks); no feature/bug task creation; hand off, don't build."
+      role: "the single planning-phase skill; creates the map and the
+        planning tasks, works bounded passes (one frontier snapshot, at most
+        one grilling), writes results back, runs the reconcile pass."
     - step: "to-spec"
-      role: "synthesizes the conversation/map into docs/tasks/<slug>/spec.md;
-        no interview."
+      role: "synthesizes the specification from the settled record; checks
+        only ready_for_spec; no seam or architecture interview."
     - step: "to-tickets"
-      role: "breaks spec into tracer-bullet feature/bug tasks with
-        blocked_by edges using tw_* tools + the map's tasks array;
-        includes wide-refactor expand-contract exception."
-    - step: "implement-task"
-      role: "executes the frontier by type; borrows implement-spec's
-        task-graph/concurrent-implementer language."
-  router: "task-overview (ask-matt-style intent router + PHASE-BOUNDARIES.md;
-    name kept per Q7)"
-  escape_hatch: "removed (replaced by Matt's 'hand off, don't build' boundary)"
-  deviation: "Router entry point uses grilling (grill-with-docs is not yet a
-    separate skill; references grilling + domain-modeling together for now)."
+      role: "produces architecture.md alongside the ticket graph; the
+        architecture is the living document."
+    - step: "implement-ticket"
+      role: "owns the implementation phase: the ticket frontier, per-ticket
+        chain dispatch, and the inline per-ticket close-out."
+    - step: "finalize-effort"
+      role: "the effort close: one holistic review, finding triage,
+        follow-up efforts only after a human yes, the archive gate."
+  router: "task-workflow-overview (progressively disclosed explainer plus
+    the tw_next fast track for the live answer)"
+  user_invoked: [intake, wayfinder, to-spec, to-tickets, setup-workflow]
+  model_invoked: [implement-ticket, finalize-effort, task-workflow-overview,
+    task-workflow-doctor]
 
-# ── Task type system (Q11.1) ───────────────────────────────────────────
+# ── Artifact model (schema 5) ──────────────────────────────────────────
+
+artifact_model:
+  types:
+    - map
+    - spec
+    - architecture   # renames the legacy "arch spec"; arch-spec.md becomes
+                     # architecture.md at the effort root
+    - review         # review.md at the effort root, no workflow_state
+    - task
+    - ticket
+    - findings
+    - deviation report
+    - changelog
+    - index
+    - out-of-scope note
+  rename_rule: "type: arch spec becomes type: architecture and
+    arch-spec.md becomes architecture.md, live and archived alike. An
+    effort with exactly one architecture document has it hoisted to the
+    effort root; an effort holding several has each renamed to
+    architecture.md in place, so none is silently lost. The reader stays
+    tolerant of the legacy filename and type as a safety net."
+  map_frontmatter:
+    # boolean, absent reads as false; set only by the reconcile checking
+    # tool; auto-clears when a planning task is added, reopened, or moved
+    # out of done, or when the map is edited
+    - ready_for_spec
+    # optional; links a follow-up effort to its origin; a field on the
+    # child, never a graph edge
+    - origin_effort
+  map_body_sections:
+    # absorbs the legacy ## Out of scope
+    - "## Non-goals"
+    # opens with a single bolded effort-level success test line, then the
+    # facts
+    - "## Non-negotiable facts"
+  state: "docs/tasks/state.yaml carries schema_version: 5 plus the two
+    real-null pointers (map, task); the migration stamps it."
+
+# ── Graph kinds and subtypes ───────────────────────────────────────────
 
 task_types:
-  total: 6
-  scoped_by_phase: true
-  planning_types:  # from wayfinder
-    - research
-    - prototype
-    - grilling
-    - manual
-  implementation_types:  # from to-tickets
-    - feature
-    - bug
-  note: "A feature/bug task from to-tickets is not re-typed as research.
-    Task type and standalone skill COEXIST for research/prototype (task type
-    is the planning artifact with acceptance criteria; skill is the reusable
-    discipline; delegating to the skill does not replace the task doc).
-    Grilling/manual have no standalone skill; run inline."
+  graph_kinds:
+    - kind: "task"
+      path: "docs/tasks/<effort>/tasks/<slug>/task.md"
+      subtypes: [research, prototype, grilling, manual]
+      label: "planning tasks"
+    - kind: "ticket"
+      path: "docs/tasks/<effort>/tickets/<slug>/ticket.md"
+      subtypes: [feature, bug]
+      label: "implementation tickets"
+  blocked_by: "kind-scoped and effort-scoped: a planning task blocks only
+    planning tasks, and an implementation ticket blocks only tickets. The
+    frontier is computed per kind."
+  vocabulary: "Canonical long forms are 'planning task' and 'implementation
+    ticket'; the short forms are allowed only where the context already
+    makes the kind unambiguous."
+  note: "A task type and a standalone skill COEXIST for research/prototype
+    (the task type is the planning artifact; the skill is the reusable
+    discipline). Grilling/manual have no standalone skill; every grilling
+    session delegates to the grilling skill."
 
-# ── Conventions (Q10, Q14, telemetry) ─────────────────────────────────
+# ── Conventions ────────────────────────────────────────────────────────
 
 conventions:
-  no_em_dashes: true  # Q10, repo-wide prose
+  no_em_dashes: true
   invocation_split:
     mechanism: "frontmatter only (name, description, disable-model-invocation)"
-    no_openai_yaml: true  # Q14: concept yes, file no
+    no_openai_yaml: true
     skill_tool_wording: "adapt 'Call the Skill tool with <name>' to Pi's
       invocation convention where operative; user-invoked skills phrased as
       human instructions."
   telemetry:
-    maintained: true  # map constraint: maintain or extend, never remove
-    tools: ["telemetry_skill_context", "submit_feedback"]
+    maintained: true
+    tools: ["submit_feedback"]
+    note: "The opener absorbs telemetry_skill_context: it records the skill,
+      effort, and target automatically, so the model no longer calls that
+      tool. submit_feedback stays model-available for anomalies."
 
 # ── Keep-as-ours (no Matt equivalent; concrete reason recorded) ────────
 
 keep_as_ours:
-  - item: "dependency graph + tw_* tools (tw_dependency_levels,
-      tw_frontier, tw_map_tick)"
-    reason: "no Matt equivalent; we use docs/tasks/ files, not a tracker"
+  - item: "dependency graph + tw_* named transition tools"
+    reason: "no Matt equivalent; we use docs/tasks/ files, not a tracker;
+      the named tools are the only writers of docs/tasks/**"
     decision: "Q11.2"
   - item: "finalization pipeline"
     reason: "no Matt equivalent; our automation depth"
     decision: "Q11.3"
-    modifications:
-      - "DROP the CI gate (Step 1)"
-      - "ADD human changelog (incorporate alongside the automated one)"
-      - "KEEP knowledge harvest, bug closure, archive, map finalization"
+    v5_shape: "the per-ticket close-out runs inline in implement-ticket; the
+      whole-effort review, finding triage, and the archive gate live in
+      finalize-effort"
   - item: "failure toolbelt (diagnose, split, retry +50%, escalate) +
       parent-never-implements rule"
     reason: "no Matt equivalent; load-bearing automation safety"
     decision: "Q11.4"
-  - item: "sub-agents (tdd-worker, slice-verifier, deviation-reporter,
-      land-worker, architecture-scout, code-reviewer)"
+  - item: "sub-agents (the 11 agent definitions)"
     reason: "no Matt equivalent; formalized with YAML frontmatter, tool
       allowlists, context isolation"
     decision: "Q11.5"
-    deviation: "No new agent definitions were needed in practice (the adopted
-      utility skills don't use subagents; the ones that do, like code-review,
-      already had their agents defined)."
   - item: "telemetry instrumentation"
     reason: "map constraint; no Matt equivalent"
     decision: "Q11.6"
@@ -206,7 +257,7 @@ keep_as_ours:
     reason: "foundational; no Matt equivalent"
     decision: "map constraint"
 
-# ── Changesets (Q20) ──────────────────────────────────────────────────
+# ── Changesets ─────────────────────────────────────────────────────────
 
 changesets:
   adopted: true
@@ -216,42 +267,53 @@ changesets:
   description: "release.sh runs changeset versioning/generation then publishes;
     .changeset/ added with config.json + seed changeset."
 
-# ── Deviations from grilling #1 (recorded as truth) ────────────────────
+# ── Deviations (recorded as truth) ─────────────────────────────────────
+
+# Ids 1-6 are the schema-3 adoption hop's record (the run this file's v3
+# edition distilled); upgrade-2-to-3.md still traces to them. Id 7 records
+# the landed schema-5 hop.
 
 deviations:
   - id: 1
+    hop: "schema 2 to 3"
     description: "Eval harness (scripts/eval/) dropped with grilling-with-ui"
-    reason: "not in grilling #1 design; surfaced as a real dependency during
-      slice 2 (the eval harness drove grilling-with-ui's CLI; with
-      grilling-with-ui gone, it had no driver)"
-    source: "slice 2 step-summary"
+    reason: "not in the original design; surfaced as a real dependency during
+      the adoption (with grilling-with-ui gone, it had no driver)"
   - id: 2
+    hop: "schema 2 to 3"
     description: "validate_skill.mjs fix: allow disable-model-invocation +
       argument-hint frontmatter keys"
     reason: "the validator was too strict; every user-invoked skill uses
-      disable-model-invocation; the test codifying the bug was flipped to
-      assert acceptance"
-    source: "slice 3 step-summary"
+      disable-model-invocation"
   - id: 3
+    hop: "schema 2 to 3"
     description: "CONTEXT.md scope = full workflow glossary (not domain-only)"
-    reason: "user clarified mid-run: this repo IS the workflow package, so
-      its vocabulary is the domain"
-    source: "slice 6 step-summary"
+    reason: "this repo IS the workflow package, so its vocabulary is the
+      domain"
   - id: 4
-    description: "Router entry point uses grilling (grill-with-docs not yet a
-      separate skill)"
-    reason: "grill-with-docs was not added as a skill in this adoption; the
-      router references grilling + domain-modeling together for now"
-    source: "slice 7 step-summary"
+    hop: "schema 2 to 3"
+    description: "Router entry point used grilling (grill-with-docs never
+      became a separate skill)"
+    reason: "the router referenced grilling + domain-modeling together"
   - id: 5
+    hop: "schema 2 to 3"
     description: "Grilling re-aligned with plain text, not ask_user_question"
-    reason: "user decision (Q13 consult-first): drop ask_user_question
-      specificity, use plain text from the user; keep completion gate +
+    reason: "consult-first user decision; kept completion gate +
       decision-recording"
-    source: "slice 8 step-summary"
   - id: 6
-    description: "No new agent definitions needed (Q11.5 extend did not
-      produce new agents)"
+    hop: "schema 2 to 3"
+    description: "No new agent definitions were needed"
     reason: "the adopted utility skills don't use subagents; the ones that
-      do (code-review) already had their agents defined"
-    source: "slice 9 step-summary"
+      do already had their agents defined"
+  - id: 7
+    hop: "schema 4 to 5"
+    description: "The landed v5 output: MigrateReport.to is 5 (the report
+      field's literal type changed from 4), the CLI no-op message reads
+      'already on schema_version 5, nothing to do.', and the
+      multi-architecture-doc corner renames each arch-spec.md to
+      architecture.md in place rather than hoisting (the single-doc case
+      still lands at the effort root)"
+    reason: "hoisting all of an effort's architecture documents to one root
+      filename would silently lose all but one; the in-place rename is the
+      established no-loss rule. Recorded here because the upgrade resource
+      (resources/upgrade-4-to-5.md) documents this landed behavior."
