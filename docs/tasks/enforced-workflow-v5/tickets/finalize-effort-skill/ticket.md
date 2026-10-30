@@ -3,8 +3,11 @@ type: ticket
 subtype: feature
 title: finalize-effort runs the holistic review, triages findings, and archives
 status: stable
-workflow_state: ready
-blocked_by: [implementation-transition-tools, disclosure-open-close-core, opener-gate-and-toolsets]
+workflow_state: done
+blocked_by:
+- implementation-transition-tools
+- disclosure-open-close-core
+- opener-gate-and-toolsets
 size: l
 ---
 
