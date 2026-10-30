@@ -498,7 +498,53 @@ describe("triage is retired (intake-skill)", () => {
     // The effort's own carried constraint: docs/bugs/ survives only as a
     // static archive, so the overview no longer names it as the bug list.
     expect(overview).not.toContain("docs/bugs/");
-  });});
+  });
+});
+
+// ─── implement-ticket: the implementation phase ──────────────────────
+
+// The phase is a model-invoked skill in the promoted set: it opens through
+// tw_open (the gate) and closes through tw_close. Its chain scripts live
+// under the skill directory; the retired implementation router and close-out
+// skill sit in skills/deprecated/ with their replacements named and are gone
+// from pi.skills and the docs page tree.
+describe("implement-ticket skill (implement-ticket-skill)", () => {
+  const content = readFile("skills/engineering/implement-ticket/SKILL.md");
+  const fm = parseFrontmatter(content);
+  const pkg = JSON.parse(readFile("package.json"));
+
+  test("is a model-invoked skill registered in pi.skills", () => {
+    expect(pkg.pi.skills).toContain("./skills/engineering/implement-ticket");
+    expect(fm["name"]).toBe("implement-ticket");
+    // Model-invoked: the frontmatter carries no disable-model-invocation.
+    expect(fm["disable-model-invocation"]).toBeUndefined();
+  });
+
+  test("opens through tw_open with the effort and target, and closes through tw_close", () => {
+    expect(content).toMatch(/tw_open/);
+    expect(content).toMatch(/skill: "implement-ticket", effort: "<effort-slug>", target: "<ticket-slug>"/);
+    expect(content).toContain("tw_close implement-ticket");
+  });
+
+  test("the chain scripts live under the skill; the retired router paths are gone", () => {
+    expect(existsSync(join(PROJECT, "skills/engineering/implement-ticket/scripts/ticket-chain.js"))).toBe(true);
+    expect(existsSync(join(PROJECT, "skills/engineering/implement-ticket/scripts/end-of-effort.js"))).toBe(true);
+    expect(existsSync(join(PROJECT, "skills/engineering/implement-task"))).toBe(false);
+    expect(existsSync(join(PROJECT, "skills/engineering/finalize-task"))).toBe(false);
+  });
+
+  test("implement-task and finalize-task are retired with their replacements named", () => {
+    for (const retired of ["implement-task", "finalize-task"]) {
+      expect(pkg.pi.skills).not.toContain(`./skills/engineering/${retired}`);
+      expect(existsSync(join(PROJECT, `docs/engineering/${retired}.md`))).toBe(false);
+      const deprecated = readFile(`skills/deprecated/${retired}/SKILL.md`);
+      expect(deprecated).toMatch(/implement-ticket/);
+    }
+    const readme = readFile("skills/deprecated/README.md");
+    expect(readme).toContain("[implement-task](./implement-task/SKILL.md)");
+    expect(readme).toContain("[finalize-task](./finalize-task/SKILL.md)");
+  });
+});
 
 describe("human-mode resource routing", () => {
   const routers = ["feature", "bug"];
