@@ -107,6 +107,8 @@ Off the main flow entirely.
 - **`/skill:grill-me`**: the same relentless interview as `grilling`, but
   **stateless**: it saves nothing locally and builds no `CONTEXT.md`. Reach
   for it when you are not working in a working directory.
+- **`/skill:handoff`**: compact the conversation into a handoff document when
+  the work has to travel to another session, harness, or colleague.
 - **`/skill:grilling`** is the interview primitive itself.
 - **`/skill:resolving-merge-conflicts`** works an in-progress merge or rebase
   conflict hunk by hunk, resolving by intent, never `--abort`.

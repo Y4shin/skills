@@ -34,7 +34,7 @@ subtype of research, prototype, grilling, or manual. Wayfinder creates it and
 works it; its result is a decision written back to the map, not a deliverable.
 The long form is canonical, and the short form is allowed only where the kind
 is already unambiguous.
-_Avoid_: decision task, decision ticket, chore
+_Avoid_: decision ticket, chore
 
 **Implementation ticket**:
 An implementation unit of work at `docs/tasks/<effort>/tickets/<slug>/ticket.md`,
@@ -245,6 +245,9 @@ _Avoid_: submodule (that is a git mechanism; this is a directory of foreign file
 - "Task" (the generic word). Resolved: in this vocabulary it is the short form
   of **planning task** and nothing else. A bare "task" never names an
   implementation ticket.
+- "Decision task" (the term older workflow prose uses for the planning
+  artifact). Resolved: the canonical long form is **planning task**. Where a
+  shipped page still says decision task, read the planning task.
 - "Spec" (used loosely for both the specification and the architecture
   document). Resolved: **specification** is `spec.md` and **architecture** is
   `architecture.md`; the shorthand "spec" means the specification only.
