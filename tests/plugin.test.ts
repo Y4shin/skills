@@ -221,6 +221,7 @@ describe("task-workflow tools", () => {
         "tw_state_set",
         "tw_write_architecture",
         "tw_write_changelog",
+        "tw_write_review",
         "tw_write_section",
         "tw_write_spec",
       ]);
@@ -2642,6 +2643,279 @@ describe("task-workflow tools: tw_archive_effort, the archive move", () => {
     await expect(tools.tw_archive_effort.execute({ selector: "legacy" }, ctx(t))).rejects.toThrow(
       /schema-5 migration/,
     );
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+// ─── tw_write_review: the review artifact writer (finalize-effort-skill) ────
+
+describe("task-workflow tools: tw_write_review, the review artifact writer", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  /** A live effort whose one ticket has landed: nothing left to build. */
+  function seedReviewTree(t: string): void {
+    const base = join(t, "docs/tasks");
+    writeMd(join(base, "review-effort/map.md"), "type: map\ntitle: Review effort\nstatus: stable\n");
+    writeMd(
+      join(base, "review-effort/tickets/landed/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Landed\nstatus: stable\nworkflow_state: done\nblocked_by: []\n",
+    );
+  }
+
+  function reviewPath(t: string, effort = "review-effort"): string {
+    return join(t, "docs/tasks", effort, "review.md");
+  }
+
+  function readReview(t: string, effort = "review-effort") {
+    return parse(readFileSync(reviewPath(t, effort), "utf-8"));
+  }
+
+  test("writes review.md at the effort root as type: review, undispositioned on the first pass", async () => {
+    const t = mkTmp(); seedReviewTree(t);
+    const out = await tools.tw_write_review.execute(
+      {
+        selector: "review-effort",
+        title: "Effort review",
+        content: "## Findings\n\n1. The cache helper duplicates `parse()`.",
+      },
+      ctx(t),
+    );
+    expect(out.text).toContain("review.md");
+    expect(out.details.dispositioned).toBe(false);
+    const doc = readReview(t);
+    expect(doc.data.type).toBe("review");
+    expect(doc.data.title).toBe("Effort review");
+    // The flag the archive gate reads is explicit, and the artifact carries no
+    // workflow_state (a review is not a work item).
+    expect(doc.data.dispositioned).toBe(false);
+    expect(doc.data).not.toHaveProperty("workflow_state");
+    expect(doc.body).toContain("The cache helper duplicates `parse()`.");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("sets dispositioned only when every finding carries one, and records each disposition", async () => {
+    const t = mkTmp(); seedReviewTree(t);
+    const out = await tools.tw_write_review.execute(
+      {
+        selector: "review-effort",
+        content: "## Findings\n\n1. A duplicated helper.\n2. A docs gap.",
+        findings: [
+          { finding: "A duplicated helper", disposition: "ticket", target: "landed" },
+          { finding: "A docs gap", disposition: "informational" },
+        ],
+      },
+      ctx(t),
+    );
+    expect(out.details.dispositioned).toBe(true);
+    const doc = readReview(t);
+    expect(doc.data.dispositioned).toBe(true);
+    // The artifact records the disposition of every finding.
+    expect(doc.body).toContain("A duplicated helper: ticket `landed`");
+    expect(doc.body).toContain("A docs gap: informational");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("a partially triaged review stays undispositioned, and a rewrite replaces the disposition record", async () => {
+    const t = mkTmp(); seedReviewTree(t);
+    const first = await tools.tw_write_review.execute(
+      {
+        selector: "review-effort",
+        content: "## Findings\n\n1. One.\n2. Two.",
+        findings: [
+          { finding: "One", disposition: "informational" },
+          { finding: "Two" },
+        ],
+      },
+      ctx(t),
+    );
+    expect(first.details.dispositioned).toBe(false);
+    let body = readReview(t).body;
+    expect(body).toContain("One: informational");
+    expect(body).toContain("Two: not yet triaged");
+
+    // The writer also accepts the review's own path once it exists: the
+    // triage rewrites the artifact it just wrote.
+    const second = await tools.tw_write_review.execute(
+      {
+        selector: reviewPath(t),
+        content: "## Findings\n\n1. One.\n2. Two.",
+        findings: [
+          { finding: "One", disposition: "informational" },
+          { finding: "Two", disposition: "ticket", target: "landed" },
+        ],
+      },
+      ctx(t),
+    );
+    expect(second.details.dispositioned).toBe(true);
+    body = readReview(t).body;
+    // The triage rewrites the artifact each pass: the record is replaced, not
+    // accumulated.
+    expect(body.match(/^## Dispositions$/gm)?.length).toBe(1);
+    expect(body).toContain("Two: ticket `landed`");
+    expect(body).not.toContain("not yet triaged");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("a review with no findings is dispositioned: there is nothing to triage", async () => {
+    const t = mkTmp(); seedReviewTree(t);
+    const out = await tools.tw_write_review.execute(
+      { selector: "review-effort", content: "## Findings\n\nNone.", findings: [] },
+      ctx(t),
+    );
+    expect(out.details.dispositioned).toBe(true);
+    expect(readReview(t).data.dispositioned).toBe(true);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty body, a selector naming no live effort, and an unknown disposition", async () => {
+    const t = mkTmp(); seedReviewTree(t);
+    await expect(
+      tools.tw_write_review.execute({ selector: "review-effort", content: "   " }, ctx(t)),
+    ).rejects.toThrow(/content is empty/);
+    await expect(
+      tools.tw_write_review.execute({ selector: "no-such-effort", content: "## Findings\n\nNone." }, ctx(t)),
+    ).rejects.toThrow(/no live effort/);
+    await expect(
+      tools.tw_write_review.execute(
+        {
+          selector: "review-effort",
+          content: "## Findings\n\n1. One.",
+          findings: [{ finding: "One", disposition: "wontfix" }],
+        },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/disposition/);
+    await expect(
+      tools.tw_write_review.execute(
+        { selector: "review-effort", content: "## Findings\n\n1. One.", findings: [{ finding: "  " }] },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/finding/);
+    // No artifact was written by a refused call.
+    expect(existsSync(reviewPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a ticket disposition that names no existing ticket in the effort", async () => {
+    const t = mkTmp(); seedReviewTree(t);
+    await expect(
+      tools.tw_write_review.execute(
+        {
+          selector: "review-effort",
+          content: "## Findings\n\n1. One.",
+          findings: [{ finding: "One", disposition: "ticket", target: "ghost-ticket" }],
+        },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/ghost-ticket/);
+    expect(existsSync(reviewPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("a follow-up disposition requires a child effort linked by origin_effort", async () => {
+    const t = mkTmp(); seedReviewTree(t);
+    const base = join(t, "docs/tasks");
+    // An unlinked effort is not a legal follow-up: the trail reads both ways.
+    writeMd(join(base, "unlinked-effort/map.md"), "type: map\ntitle: Unlinked\nstatus: stable\n");
+    await expect(
+      tools.tw_write_review.execute(
+        {
+          selector: "review-effort",
+          content: "## Findings\n\n1. Too large.",
+          findings: [{ finding: "Too large", disposition: "follow-up", target: "unlinked-effort" }],
+          follow_up: "unlinked-effort",
+        },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/origin_effort/);
+    await expect(
+      tools.tw_write_review.execute(
+        {
+          selector: "review-effort",
+          content: "## Findings\n\n1. Too large.",
+          findings: [{ finding: "Too large", disposition: "follow-up", target: "missing-effort" }],
+          follow_up: "missing-effort",
+        },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/no live effort/);
+    expect(existsSync(reviewPath(t))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("moves the findings into the accepted follow-up and leaves the disposition record at the origin", async () => {
+    const t = mkTmp(); seedReviewTree(t);
+    const base = join(t, "docs/tasks");
+    writeMd(
+      join(base, "follow-up-effort/map.md"),
+      "type: map\ntitle: Follow-up\ntitle_x: keep\nstatus: stable\norigin_effort: review-effort\n",
+    );
+    const out = await tools.tw_write_review.execute(
+      {
+        selector: "review-effort",
+        title: "Effort review",
+        content: "## Findings\n\n1. Too large for this effort.\n\nFull detail: the parser rewrite.",
+        findings: [
+          { finding: "The parser rewrite is too large", disposition: "follow-up", target: "follow-up-effort" },
+        ],
+        follow_up: "follow-up-effort",
+      },
+      ctx(t),
+    );
+    expect(out.text).toContain("follow-up-effort");
+    expect(out.details.dispositioned).toBe(true);
+
+    // The findings moved: the child's review.md holds the one copy.
+    const child = readReview(t, "follow-up-effort");
+    expect(child.data.type).toBe("review");
+    expect(child.body).toContain("Full detail: the parser rewrite.");
+    expect(child.body).toContain("Moved from the effort `review-effort`");
+
+    // The origin keeps a disposition record naming the follow-up slug, and the
+    // findings body did not stay beside it.
+    const origin = readReview(t, "review-effort");
+    expect(origin.data.type).toBe("review");
+    expect(origin.data.dispositioned).toBe(true);
+    expect(origin.body).toContain("The parser rewrite is too large: follow-up effort `follow-up-effort`");
+    expect(origin.body).not.toContain("Full detail: the parser rewrite.");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a move while a finding lacks a disposition, and a follow_up with no follow-up finding", async () => {
+    const t = mkTmp(); seedReviewTree(t);
+    writeMd(
+      join(t, "docs/tasks/follow-up-effort/map.md"),
+      "type: map\ntitle: Follow-up\nstatus: stable\norigin_effort: review-effort\n",
+    );
+    await expect(
+      tools.tw_write_review.execute(
+        {
+          selector: "review-effort",
+          content: "## Findings\n\n1. One.\n2. Two.",
+          findings: [
+            { finding: "One", disposition: "follow-up", target: "follow-up-effort" },
+            { finding: "Two" },
+          ],
+          follow_up: "follow-up-effort",
+        },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/dispositioned/);
+    await expect(
+      tools.tw_write_review.execute(
+        {
+          selector: "review-effort",
+          content: "## Findings\n\n1. One.",
+          findings: [{ finding: "One", disposition: "informational" }],
+          follow_up: "follow-up-effort",
+        },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/follow-up/);
+    expect(existsSync(reviewPath(t))).toBe(false);
+    expect(existsSync(reviewPath(t, "follow-up-effort"))).toBe(false);
     rmSync(t, { recursive: true, force: true });
   });
 });

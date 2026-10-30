@@ -25,6 +25,9 @@ Model- or user-reachable.
   phase: works the ticket frontier in dependency levels, dispatches the
   per-ticket chain per ticket, and closes each landed ticket out inline
   (CI gate, knowledge harvest, changelog, done-marking, merge to main).
+- **[finalize-effort](./finalize-effort/SKILL.md)**: The effort close: one
+  holistic review, finding triage into a ticket or an accepted follow-up,
+  and the archive move.
 - **[report-bug](./report-bug/SKILL.md)**: Capture, reproduce, and triage a
   bug.
 - **[tdd](./tdd/SKILL.md)**: Test-driven development reference.

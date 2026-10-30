@@ -784,6 +784,116 @@ function ensureArchivalNote(specPath: string): boolean {
   return true;
 }
 
+// ─── Review artifact helpers (finalize-effort) ─────────────────────────────
+
+/** The tool-owned body section the review writer replaces on every pass. */
+const REVIEW_DISPOSITIONS_SECTION = "Dispositions";
+
+/** The three dispositions a finding can carry; absent means untriaged. */
+const REVIEW_DISPOSITIONS = ["ticket", "follow-up", "informational"] as const;
+type ReviewDisposition = (typeof REVIEW_DISPOSITIONS)[number];
+
+interface ReviewFinding {
+  finding: string;
+  disposition?: ReviewDisposition;
+  target?: string;
+}
+
+/**
+ * Validate the writer's structured finding list. Runtime validation backs the
+ * tool schema up, because a provider that flattens the parameters can hand a
+ * call here that never passed through TypeBox.
+ */
+function parseReviewFindings(raw: unknown): ReviewFinding[] | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) {
+    throw new Error("findings must be a list of { finding, disposition, target } entries");
+  }
+  return raw.map((entry, i) => {
+    const e = (entry ?? {}) as Record<string, unknown>;
+    const finding = typeof e.finding === "string" ? e.finding.trim() : "";
+    if (finding === "") {
+      throw new Error(`finding ${i + 1} is empty: every finding needs a one-line description`);
+    }
+    const disposition = e.disposition === undefined ? undefined : String(e.disposition);
+    if (disposition !== undefined && !(REVIEW_DISPOSITIONS as readonly string[]).includes(disposition)) {
+      throw new Error(
+        `invalid disposition '${disposition}' for '${finding}': use ${REVIEW_DISPOSITIONS.join(", ")}, ` +
+          `or omit it while the finding is untriaged`,
+      );
+    }
+    const target = typeof e.target === "string" && e.target.trim() !== "" ? e.target.trim() : undefined;
+    if ((disposition === "ticket" || disposition === "follow-up") && target === undefined) {
+      throw new Error(`disposition '${disposition}' for '${finding}' needs a target slug`);
+    }
+    return { finding, disposition: disposition as ReviewDisposition | undefined, target };
+  });
+}
+
+/** One finding's line in the tool-owned `## Dispositions` record. */
+function reviewDispositionLine(finding: ReviewFinding): string {
+  switch (finding.disposition) {
+    case "ticket":
+      return `- ${finding.finding}: ticket \`${finding.target}\``;
+    case "follow-up":
+      return `- ${finding.finding}: follow-up effort \`${finding.target}\``;
+    case "informational":
+      return `- ${finding.finding}: informational (accepted)`;
+    default:
+      return `- ${finding.finding}: not yet triaged`;
+  }
+}
+
+/**
+ * The live effort directory a selector names, accepting the effort's existing
+ * artifact path as well as its slug. `liveEffortDir` handles the slug and a
+ * map path; the review writer also promises the review's own path, which only
+ * exists after the first write.
+ */
+function liveEffortDirOfArtifact(root: string, selector: string, want: string): string | null {
+  const direct = liveEffortDir(root, selector);
+  if (direct !== null) return direct;
+  let hit: ScanHit;
+  try {
+    hit = resolveArt(root, selector, want);
+  } catch {
+    return null;
+  }
+  const candidate = dirname(hit.path);
+  const rel = relative(taskRoot(root), candidate);
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return null;
+  if (rel.split(/[\\/]/)[0] === "archive") return null;
+  return isDir(candidate) ? candidate : null;
+}
+
+/**
+ * Require that a named follow-up effort exists and is linked to the origin by
+ * `origin_effort` on its own map. The link is what makes the trail read in both
+ * directions: the origin records the child's slug, the child records the
+ * origin.
+ */
+function requireLinkedFollowUp(root: string, origin: string, target: string, subject: string): void {
+  const childDir = liveEffortDir(root, target);
+  if (childDir === null) {
+    throw new Error(
+      `no live effort '${target}' for ${subject}: a follow-up is another existing effort, created only after a human yes`,
+    );
+  }
+  const childName = basename(childDir);
+  const mapPath = join(childDir, "map.md");
+  if (!isFile(mapPath)) {
+    throw new Error(
+      `follow-up effort '${childName}' has no map: a follow-up is linked by origin_effort on its map`,
+    );
+  }
+  if (parseArtifactFile(mapPath).art.origin_effort !== origin) {
+    throw new Error(
+      `'${childName}' is not linked to '${origin}' by origin_effort on its map: create the follow-up with ` +
+        `tw_create_effort and origin_effort '${origin}'`,
+    );
+  }
+}
+
 /**
  * The slug shape every created artifact must carry: it becomes a directory
  * name under docs/tasks/, so anything else (spaces, slashes, traversal,
@@ -803,12 +913,16 @@ const TICKET_SIZES = ["s", "m", "l", "xl"] as const;
 /**
  * The map document intake creates: v4 shape, stable, with the two canonical
  * sections present as empty placeholders and the standard body skeleton.
+ * `originEffort`, when present, is the additive schema-5 link a follow-up
+ * effort carries on its own map: a field on the child, never a graph edge.
  */
-function createEffortDocument(title: string): Document {
+function createEffortDocument(title: string, originEffort?: string): Document {
   let body = `# ${title}\n\n## Destination\n\n<what done looks like>\n\n## Constraints\n\n- (none yet)\n`;
   body = writeMapSection(body, MAP_SECTION_NON_GOALS, "");
   body = writeMapSection(body, MAP_SECTION_NON_NEGOTIABLE_FACTS, "");
-  return { data: { type: "map", title, status: "stable" }, body };
+  const data: FrontmatterData = { type: "map", title, status: "stable" };
+  if (originEffort !== undefined) data.origin_effort = originEffort;
+  return { data, body };
 }
 
 /**
@@ -1655,6 +1769,163 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
+    tw_write_review: defStructured(
+      "Write an effort's review artifact (review.md at the effort root): the only writer of the whole-effort " +
+        "review. Writes type: review and a tool-owned '## Dispositions' section, and sets the dispositioned flag " +
+        "the archive gate reads: true when the findings list is supplied and every finding carries a " +
+        "disposition (in-scope: an implementation ticket already in the effort; out-of-scope: a follow-up " +
+        "effort after a human yes; informational: explicitly accepted), false while any finding is untriaged. " +
+        "With follow_up, the accepted follow-up receives the findings body in its own review.md (one copy, " +
+        "moved, not copied) and the origin keeps the disposition record naming the follow-up slug, so the " +
+        "trail reads in both directions. Refuses an empty body, a selector naming no live effort, an unknown " +
+        "disposition, a ticket target that is not an existing ticket in the effort, a follow-up target that " +
+        "is not a live effort stamped origin_effort, a move while a finding is untriaged, and a review that " +
+        "names more than one follow-up effort.",
+      Type.Object({
+        selector: Type.String({ description: "Effort slug, or the effort's review or map path" }),
+        content: Type.String({ description: "The review body: the holistic review findings (markdown)" }),
+        title: Type.Optional(
+          Type.String({ description: "The review title; the existing title, else 'Review of <effort>'" }),
+        ),
+        findings: Type.Optional(
+          Type.Array(
+            Type.Object({
+              finding: Type.String({ description: "One finding, in one line" }),
+              disposition: Type.Optional(
+                Type.Union(
+                  [Type.Literal("ticket"), Type.Literal("follow-up"), Type.Literal("informational")],
+                  { description: "How the finding was dispositioned; omit while it is untriaged" },
+                ),
+              ),
+              target: Type.Optional(
+                Type.String({ description: "The ticket slug (ticket) or follow-up effort slug (follow-up)" }),
+              ),
+            }),
+          ),
+        ),
+        follow_up: Type.Optional(
+          Type.String({ description: "The accepted follow-up effort the findings move into" }),
+        ),
+      }),
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const content = typeof p.content === "string" ? p.content.trim() : "";
+        if (content === "") {
+          throw new Error("content is empty: a review write needs the findings body");
+        }
+        const effortDir = liveEffortDirOfArtifact(root, String(p.selector ?? ""), "review");
+        if (effortDir === null) {
+          throw new Error(
+            `no live effort '${p.selector}': run finalize-effort on an existing effort's review`,
+          );
+        }
+        const effortName = basename(effortDir);
+        const findings = parseReviewFindings(p.findings);
+        const followUp =
+          typeof p.follow_up === "string" && p.follow_up.trim() !== "" ? p.follow_up.trim() : undefined;
+
+        // Every disposition's target is validated against the tree: a ticket
+        // disposition names a ticket this effort already has, and a follow-up
+        // names an effort linked back by origin_effort.
+        const index = scanMemo(root)();
+        for (const finding of findings ?? []) {
+          if (finding.disposition === "ticket") {
+            const known = index.hits.find(
+              (h) =>
+                h.art.type === "ticket" &&
+                h.art.slug === finding.target &&
+                isInside(effortDir, h.path),
+            );
+            if (known === undefined) {
+              throw new Error(
+                `ticket disposition for '${finding.finding}' names '${finding.target}', which is not an ` +
+                  `existing ticket in '${effortName}'`,
+              );
+            }
+            continue;
+          }
+          if (finding.disposition === "follow-up") {
+            requireLinkedFollowUp(root, effortName, finding.target!, `finding '${finding.finding}'`);
+          }
+        }
+
+        const dispositioned = findings !== undefined && findings.every((f) => f.disposition !== undefined);
+        const followUpFindings = (findings ?? []).filter((f) => f.disposition === "follow-up");
+        if (followUp !== undefined) {
+          if (followUpFindings.length === 0) {
+            throw new Error(
+              `follow_up '${followUp}' was named but no finding is dispositioned into a follow-up effort`,
+            );
+          }
+          if (!dispositioned) {
+            throw new Error(
+              `cannot move the review to '${followUp}': every finding must be dispositioned first`,
+            );
+          }
+          const other = followUpFindings.find((f) => f.target !== followUp);
+          if (other !== undefined) {
+            throw new Error(
+              `the review moves to one follow-up effort: '${other.finding}' names '${other.target}', ` +
+                `not '${followUp}'`,
+            );
+          }
+          requireLinkedFollowUp(root, effortName, followUp, "the follow-up effort");
+        } else if (followUpFindings.length > 0) {
+          throw new Error(
+            `finding '${followUpFindings[0].finding}' is dispositioned into follow-up effort ` +
+              `'${followUpFindings[0].target}': name it with follow_up so the findings move with the accepted effort`,
+          );
+        }
+
+        const reviewPath = join(effortDir, "review.md");
+        const existing = isFile(reviewPath) ? parseArtifactFile(reviewPath).doc : undefined;
+        const givenTitle = typeof p.title === "string" && p.title.trim() !== "" ? p.title.trim() : undefined;
+        const existingTitle = typeof existing?.data.title === "string" ? existing.data.title : undefined;
+        const title = givenTitle ?? existingTitle ?? `Review of ${effortName}`;
+        const record =
+          findings === undefined
+            ? "(not yet triaged)"
+            : findings.length === 0
+              ? "(no findings)"
+              : findings.map(reviewDispositionLine).join("\n");
+
+        // The origin keeps the disposition record. When the findings move, the
+        // origin's body is that record plus the pointer to the child; the full
+        // findings body lives only in the child (moved, not copied).
+        let originBody: string;
+        if (followUp !== undefined) {
+          const moved =
+            `The findings in this review moved to the follow-up effort \`${followUp}\`: the review ` +
+            `artifact is at \`docs/tasks/${followUp}/review.md\`.`;
+          originBody = writeMapSection(`\n${moved}\n`, REVIEW_DISPOSITIONS_SECTION, record);
+        } else {
+          originBody = writeMapSection(`\n${content}\n`, REVIEW_DISPOSITIONS_SECTION, record);
+        }
+
+        if (followUp !== undefined) {
+          const childPath = join(taskRoot(root), followUp, "review.md");
+          const childDoc: Document = {
+            data: { type: "review", title, dispositioned: false },
+            body:
+              `\n> Moved from the effort \`${effortName}\`: these findings are the follow-up's work.\n\n` +
+              `${content}\n`,
+          };
+          writeFileSync(childPath, dump(childDoc), "utf-8");
+        }
+
+        const doc: Document = {
+          data: { ...(existing?.data ?? {}), type: "review", title, dispositioned },
+          body: originBody,
+        };
+        writeFileSync(reviewPath, dump(doc), "utf-8");
+        const movedNote = followUp !== undefined ? `; findings moved to ${followUp}` : "";
+        return outcome(
+          `wrote ${relative(root, reviewPath)} (dispositioned: ${dispositioned}${movedNote})`,
+          { path: relative(root, reviewPath), dispositioned, movedTo: followUp },
+        );
+      },
+    ),
+
     tw_add_ticket: def(
       "Create an implementation ticket at docs/tasks/<effort>/tickets/<slug>/ticket.md: the only ticket " +
         "creator, writing through the frontmatter seam. Writes type: ticket with the given subtype (feature " +
@@ -1736,10 +2007,16 @@ export function createTools(): Record<string, Tool> {
         "the frontmatter seam (type: map, status: stable) with '## Non-goals' and '## Non-negotiable facts' " +
         "seeded as empty placeholders, so a later gate refusal names missing content rather than a missing " +
         "section, and registers the effort in the root index's Live list (sorted; creating docs/tasks/index.md " +
-        "when the tree has none). Refuses an unsafe slug, an effort that already exists, and a missing title.",
+        "when the tree has none). 'origin_effort' links a follow-up effort to the effort it spun out of: an " +
+        "additive field on the child map, never a graph edge, so it never enters the frontier or blocked_by. " +
+        "Refuses an unsafe slug, an effort that already exists, a missing title, and an origin that is not a " +
+        "live effort.",
       {
         effort: Str("The effort slug (lowercase letters, digits, hyphens)"),
         title: Str("The effort title"),
+        origin_effort: OptStr(
+          "The live effort this one is a follow-up of; written as origin_effort on the child map",
+        ),
       },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
@@ -1751,6 +2028,18 @@ export function createTools(): Record<string, Tool> {
           );
         }
         if (title === "") throw new Error("title is empty: an effort needs a title");
+        const originEffort =
+          typeof p.origin_effort === "string" && p.origin_effort.trim() !== "" ? p.origin_effort.trim() : undefined;
+        if (originEffort !== undefined) {
+          if (!SAFE_SLUG.test(originEffort)) {
+            throw new Error(`invalid origin effort slug '${originEffort}': use lowercase letters, digits, and hyphens`);
+          }
+          if (liveEffortDir(root, originEffort) === null) {
+            throw new Error(
+              `origin effort '${originEffort}' is not a live effort: a follow-up links only to an existing effort`,
+            );
+          }
+        }
         const effortDir = join(taskRoot(root), effort);
         if (liveEffortDir(root, effort) !== null) {
           throw new Error(
@@ -1764,9 +2053,10 @@ export function createTools(): Record<string, Tool> {
         }
         mkdirSync(effortDir, { recursive: true });
         const mapPath = join(effortDir, "map.md");
-        writeFileSync(mapPath, dump(createEffortDocument(title)), "utf-8");
+        writeFileSync(mapPath, dump(createEffortDocument(title, originEffort)), "utf-8");
         registerLiveEffort(root, effort);
-        return `created ${relative(root, mapPath)} (both canonical sections seeded empty); registered '${effort}' in the root index`;
+        const linkNote = originEffort !== undefined ? `; linked to origin effort '${originEffort}'` : "";
+        return `created ${relative(root, mapPath)} (both canonical sections seeded empty); registered '${effort}' in the root index${linkNote}`;
       },
     ),
 

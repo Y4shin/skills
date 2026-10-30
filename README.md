@@ -38,6 +38,47 @@ tickets: one per-ticket chain per ticket over the dependency levels, with the
 per-ticket close-out inline. The feature and bug pipelines remain the TDD
 pipelines.
 
+## Skills
+
+The package ships exactly the promoted set in `package.json`'s `pi.skills`.
+A user-invoked skill is reachable only when you type `/skill:<name>`; a
+model-invoked skill is model- or user-reachable.
+
+### User-invoked
+
+- [improve-codebase-architecture](./skills/engineering/improve-codebase-architecture/SKILL.md)
+- [intake](./skills/engineering/intake/SKILL.md)
+- [setup-workflow](./skills/engineering/setup-workflow/SKILL.md)
+- [to-spec](./skills/engineering/to-spec/SKILL.md)
+- [to-tickets](./skills/engineering/to-tickets/SKILL.md)
+- [wayfinder](./skills/engineering/wayfinder/SKILL.md)
+- [grill-me](./skills/productivity/grill-me/SKILL.md)
+- [handoff](./skills/productivity/handoff/SKILL.md)
+- [teach](./skills/productivity/teach/SKILL.md)
+- [wait-what](./skills/productivity/wait-what/SKILL.md)
+
+### Model-invoked
+
+- [codebase-design](./skills/engineering/codebase-design/SKILL.md)
+- [code-review](./skills/engineering/code-review/SKILL.md)
+- [diagnosing-bugs](./skills/engineering/diagnosing-bugs/SKILL.md)
+- [domain-modeling](./skills/engineering/domain-modeling/SKILL.md)
+- [eval-review](./skills/engineering/eval-review/SKILL.md)
+- [finalize-effort](./skills/engineering/finalize-effort/SKILL.md)
+- [grilling](./skills/engineering/grilling/SKILL.md)
+- [implement-ticket](./skills/engineering/implement-ticket/SKILL.md)
+- [prototype](./skills/engineering/prototype/SKILL.md)
+- [research](./skills/engineering/research/SKILL.md)
+- [resolving-merge-conflicts](./skills/engineering/resolving-merge-conflicts/SKILL.md)
+- [skill-creator](./skills/engineering/skill-creator/SKILL.md)
+- [skill-review](./skills/engineering/skill-review/SKILL.md)
+- [task-workflow-doctor](./skills/engineering/task-workflow-doctor/SKILL.md)
+- [task-workflow-overview](./skills/engineering/task-workflow-overview/SKILL.md)
+- [tdd](./skills/engineering/tdd/SKILL.md)
+- [wizard](./skills/engineering/wizard/SKILL.md)
+- [to-questionnaire](./skills/productivity/to-questionnaire/SKILL.md)
+- [writing-for-agents](./skills/productivity/writing-for-agents/SKILL.md)
+
 ## Development
 
 ```bash

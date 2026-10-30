@@ -282,6 +282,75 @@ describe("the finalize-effort archive gate", () => {
     )) as unknown as string;
     expect(out).toContain("archived");
   });
+
+  test("a review written through the writer blocks the archive until its findings are dispositioned", async () => {
+    const doneTicket = {
+      data: {
+        type: "ticket", subtype: "feature", title: "Done a", status: "stable",
+        workflow_state: "done", blocked_by: [],
+      },
+    };
+    writeEffort("writer-pending", {
+      "map.md": { data: { type: "map", title: "Writer pending" } },
+      "tickets/done-a/ticket.md": doneTicket,
+    });
+    await tools.tw_write_review.execute(
+      { selector: "writer-pending", content: "## Findings\n\n1. Something to triage." },
+      { directory: repo },
+    );
+    // The first pass carries no dispositions: the flag is closed and the gate
+    // reads it.
+    await expect(
+      tools.tw_archive_effort.execute({ selector: "writer-pending" }, { directory: repo }),
+    ).rejects.toThrow(/review\.md/);
+
+    await tools.tw_write_review.execute(
+      {
+        selector: "writer-pending",
+        content: "## Findings\n\n1. Something to triage.",
+        findings: [{ finding: "Something to triage", disposition: "informational" }],
+      },
+      { directory: repo },
+    );
+    const out = (await tools.tw_archive_effort.execute(
+      { selector: "writer-pending" },
+      { directory: repo },
+    )) as unknown as string;
+    expect(out).toContain("archived");
+  });
+
+  test("an accepted follow-up's moved findings unblock the origin's archive", async () => {
+    const doneTicket = {
+      data: {
+        type: "ticket", subtype: "feature", title: "Done a", status: "stable",
+        workflow_state: "done", blocked_by: [],
+      },
+    };
+    writeEffort("writer-origin", {
+      "map.md": { data: { type: "map", title: "Writer origin" } },
+      "tickets/done-a/ticket.md": doneTicket,
+    });
+    writeEffort("writer-child", {
+      "map.md": { data: { type: "map", title: "Writer child", origin_effort: "writer-origin" } },
+    });
+    await tools.tw_write_review.execute(
+      {
+        selector: "writer-origin",
+        content: "## Findings\n\n1. Too large for this effort.",
+        findings: [
+          { finding: "Too large for this effort", disposition: "follow-up", target: "writer-child" },
+        ],
+        follow_up: "writer-child",
+      },
+      { directory: repo },
+    );
+    expect(existsSync(join(repo, "docs", "tasks", "writer-child", "review.md"))).toBe(true);
+    const out = (await tools.tw_archive_effort.execute(
+      { selector: "writer-origin" },
+      { directory: repo },
+    )) as unknown as string;
+    expect(out).toContain("archived");
+  });
 });
 
 // ─── The implementation gate: the architecture document ──────────────────────
@@ -623,7 +692,16 @@ describe("the phase-to-toolset registry", () => {
         "tw_split_ticket",
         "tw_write_changelog",
       ],
-      "finalize-effort": ["tw_add_ticket", "tw_archive_effort", "tw_finalizable", "tw_get", "tw_list"],
+      // tw_archive_effort stays the private signature tool; the review writer
+      // joined the toolset when finalize-effort-skill landed.
+      "finalize-effort": [
+        "tw_add_ticket",
+        "tw_archive_effort",
+        "tw_finalizable",
+        "tw_get",
+        "tw_list",
+        "tw_write_review",
+      ],
       "skill-creator": ["skill_discover", "skill_scaffold", "skill_validate", "tw_show"],
     });
   });
@@ -637,6 +715,13 @@ describe("the phase-to-toolset registry", () => {
     for (const name of registered) {
       expect(disclosed.has(name), `${name} must be disclosed by some phase toolset`).toBe(true);
     }
+  });
+
+  test("finalize-effort's private signature tool stays the archive move", () => {
+    // The open-set derivation keys on the signature tool: the review writer
+    // joining the toolset must not rotate it away from tw_archive_effort.
+    const entry = SKILL_REGISTRY.find((e) => e.name === "finalize-effort")!;
+    expect(signatureToolOf(entry)).toBe("tw_archive_effort");
   });
 
   test("keeps one private signature tool per skill, so the open-set derivation stays exact", () => {
@@ -737,6 +822,48 @@ describe("the intake creation tools", () => {
     expect(after).toContain("another-request");
     expect(after).toEqual([...after].sort());
     expect(before).not.toContain("another-request");
+  });
+
+  test("tw_create_effort links a follow-up by origin_effort, and omits the field by default", async () => {
+    await tools.tw_create_effort.execute(
+      { effort: "linked-follow-up", title: "Linked follow-up", origin_effort: "ready-effort" },
+      { directory: repo },
+    );
+    const linked = parseArtifactFile(join(repo, "docs", "tasks", "linked-follow-up", "map.md"));
+    expect(linked.art.origin_effort).toBe("ready-effort");
+    expect(linked.doc.data.origin_effort).toBe("ready-effort");
+
+    await tools.tw_create_effort.execute({ effort: "plain-request", title: "Plain request" }, { directory: repo });
+    const plain = parseArtifactFile(join(repo, "docs", "tasks", "plain-request", "map.md"));
+    // The field is additive: an ordinary effort's map does not carry it.
+    expect(plain.art.origin_effort).toBeNull();
+    expect(plain.doc.data).not.toHaveProperty("origin_effort");
+  });
+
+  test("tw_create_effort refuses an origin that is not a live effort", async () => {
+    await expect(
+      tools.tw_create_effort.execute(
+        { effort: "floating-follow-up", title: "Floating", origin_effort: "no-such-effort" },
+        { directory: repo },
+      ),
+    ).rejects.toThrow(/origin effort 'no-such-effort'/);
+    // An archived effort is not live: a follow-up links forward, not back into
+    // the archive.
+    const archivedDir = join(repo, "docs", "tasks", "archive", "archived-origin");
+    mkdirSync(archivedDir, { recursive: true });
+    writeFileSync(
+      join(archivedDir, "map.md"),
+      dump({ data: { type: "map", title: "Archived origin", status: "deprecated" }, body: "\n" }),
+      "utf-8",
+    );
+    await expect(
+      tools.tw_create_effort.execute(
+        { effort: "archived-follow-up", title: "Archived follow-up", origin_effort: "archived-origin" },
+        { directory: repo },
+      ),
+    ).rejects.toThrow(/live effort/);
+    expect(existsSync(join(repo, "docs", "tasks", "floating-follow-up"))).toBe(false);
+    expect(existsSync(join(repo, "docs", "tasks", "archived-follow-up"))).toBe(false);
   });
 
   test("tw_add_task creates exactly one grilling task with the given body", async () => {

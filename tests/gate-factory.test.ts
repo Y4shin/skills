@@ -74,6 +74,7 @@ const GATED_NAMES = [
   "tw_record_out_of_scope",
   "tw_write_architecture",
   "tw_write_changelog",
+  "tw_write_review",
   "notify_user",
 ];
 
@@ -88,12 +89,13 @@ interface StubExtensionAPI extends ExtensionAPI {
 
 // The gated names the package currently ships: the runtime derives the list
 // from package.json pi.skills, so the fixture matches the shipped surface.
-// finalize-effort joins when finalize-effort-skill lands (ticket 18).
+// finalize-effort joined when finalize-effort-skill landed (ticket 18).
 const GATED_SKILL_NAMES = [
   "task-workflow-overview",
   "setup-workflow",
   "wayfinder",
   "implement-ticket",
+  "finalize-effort",
 ];
 
 function buildSkillsXml(skillNames: string[]): string {
