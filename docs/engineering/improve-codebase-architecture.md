@@ -23,7 +23,8 @@ to explore?** It does not silently choose.
 
 After your explicit pick: the normal branch delegates the grilling session to
 the `grilling` skill; the no-grill branch ("don't grill me, just show the
-report") hands the picked candidate straight to `/skill:wayfinder` in no-grill
+report") hands the picked candidate straight to `/skill:intake`, which
+creates the effort and hands the planning to `/skill:wayfinder` in no-grill
 mode. Either way, wayfinder owns creating the deepening task and wiring the
 frontier.
 

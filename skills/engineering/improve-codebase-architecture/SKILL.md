@@ -45,10 +45,12 @@ is absent and the user agrees; never create context during the survey itself.
 If the user says “don't grill me, just show the report” (or invokes this skill
 with the no-grill flag), skip the grilling loop; the report is the whole survey
 output and no design decision is inferred from it. After a candidate is picked,
-pass that picked candidate directly to `/skill:wayfinder` in no-grill mode. In
+pass that picked candidate directly to `/skill:intake`, which creates the
+effort and hands the planning to `/skill:wayfinder` in no-grill mode. In
 normal mode, pass the settled grilling decision (including constraints,
-rejections, and downstream consequences) to `/skill:wayfinder`; hand this
-settled decision to wayfinder. Wayfinder owns
+rejections, and downstream consequences) to `/skill:intake`, which creates
+the effort and hands it to wayfinder, so the settled wayfinder decision
+carries; wayfinder owns
 creating the deepening task and wiring the frontier; this skill never creates
 implementation tasks or auto-fixes application code.
 
