@@ -5,8 +5,9 @@
 `grilling` is the interview primitive: it stress-tests a plan, decision, or
 idea through relentless, focused questioning until **shared understanding**
 is reached. The model reaches for it automatically when a decision needs a
-human, in wayfinder's mandatory opening grilling, in triage, and anywhere a
-plan is about to be built on unexamined assumptions.
+human, in wayfinder's mandatory opening grilling, in intake's planning
+hand-off, and anywhere a plan is about to be built on unexamined
+assumptions.
 
 The mechanics:
 
@@ -30,8 +31,8 @@ the plan or mark work complete before that confirmation.
 ## When to reach for it
 
 The model invokes it when a decision must be resolved through conversation:
-before a map is created, before a spec hardens, before triage writes a
-brief. You never need to type anything; when *you* want an interview with no
+before a map is created, before a spec hardens, before an effort's
+non-negotiables are settled. You never need to type anything; when *you* want an interview with no
 repo to write into, that is `/skill:grill-me`.
 
 ## Common questions
