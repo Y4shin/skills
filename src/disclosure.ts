@@ -168,13 +168,22 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     name: "finalize-effort",
     takesTarget: false,
     gate: "effort",
-    // The effort close: runs the holistic review, triages findings into
-    // tickets in the current effort, and performs the archive move. The
-    // archive precondition (no undispositioned findings) lives in the archive
-    // tool, not here: a refused archive still has the triage tools declared,
-    // so the triage can complete inside the open phase.
-    // tw_archive_effort is its signature tool.
-    toolset: ["tw_add_ticket", "tw_finalizable", "tw_archive_effort", "tw_get", "tw_list"],
+    // The effort close: runs the holistic review and writes it through
+    // tw_write_review, triages findings into tickets in the current effort or
+    // an accepted follow-up, and performs the archive move. The archive
+    // precondition (no undispositioned findings) lives in the archive tool,
+    // not here: a refused archive still has the triage tools declared, so the
+    // triage can complete inside the open phase.
+    // tw_archive_effort is its signature tool; tw_write_review is the review
+    // artifact's only writer.
+    toolset: [
+      "tw_archive_effort",
+      "tw_finalizable",
+      "tw_write_review",
+      "tw_add_ticket",
+      "tw_get",
+      "tw_list",
+    ],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-spec", "to-tickets", "implement-ticket"],
   },
   {
