@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: task-workflow-overview and task-workflow-doctor re-scoped
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: [opener-gate-and-toolsets]
 size: m
 ---
