@@ -1,4 +1,4 @@
-// Ticket chain workflow for the implement-task skill.
+// Ticket chain workflow for the implement-ticket skill.
 //
 // One launch runs ONE ticket's chain over the shared repo cwd:
 //   step 0: implement-preconditions gate (read-only; refuses to launch any
@@ -10,7 +10,7 @@
 //   bug:     tdd-worker, then slice-verifier, then land-worker, with an
 //            ok-gate on verify before landing
 //
-// The caller (the model running implement-task) launches it as:
+// The caller (the model running implement-ticket) launches it as:
 //
 //   subagent({
 //     async: true,
@@ -99,7 +99,7 @@ function featureTddTask() {
     'Implement ticket "' + args.ticket + '" for effort "' + args.effort + '".',
     "",
     "Ticket doc: " + args.ticketPath,
-    "Arch spec: docs/tasks/" + args.effort + "/arch-spec.md",
+    "Architecture: docs/tasks/" + args.effort + "/architecture.md",
     "",
     "If uncertain, write docs/tasks/" + args.effort + "/tickets/" + args.ticket + "/.work/uncertainty.md and stop."
   ];
@@ -132,7 +132,7 @@ function deviationTask(tddRef) {
     'Report deviations for ticket "' + args.ticket + '" of effort "' + args.effort + '".',
     "",
     "Ticket doc: " + args.ticketPath,
-    "Arch spec: docs/tasks/" + args.effort + "/arch-spec.md",
+    "Architecture: docs/tasks/" + args.effort + "/architecture.md",
     "Implementation: " + tddRef
   ].join("\n");
 }
@@ -228,7 +228,7 @@ if (subtype === "feature") {
 // Step 3: land-worker merges the working branch into the landing branch and
 // appends the implementation note. The host gate enforces the deliverable:
 // task/<ticket-slug> must exist after landing. The ticket is NOT marked done
-// here: finalize-task owns that marking, one owner.
+// here: implement-ticket's inlined close-out owns that marking, one owner.
 const land = await runs.run("land", {
   agent: "land-worker",
   label: "Land " + args.ticket,

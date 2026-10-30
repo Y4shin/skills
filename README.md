@@ -33,9 +33,10 @@ Then in any repo:
 
 Wayfinder begins every map with one grilling session, then replaces the former
 refine/create-task/spec/ticket handoff. It creates and grows a map's
-dependency graph directly. `/skill:implement-task` dispatches
-tasks by `type:`: research, prototype, grilling, manual, feature, or bug. The
-existing feature and bug implementation resources remain the TDD pipelines.
+dependency graph directly. `/skill:implement-ticket` implements the effort's
+tickets: one per-ticket chain per ticket over the dependency levels, with the
+per-ticket close-out inline. The feature and bug pipelines remain the TDD
+pipelines.
 
 ## Development
 

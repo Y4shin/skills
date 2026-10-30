@@ -1,9 +1,11 @@
-# Implement Task (bug path)
+# Implement Ticket (bug path)
 
-Implements one bug ticket through a lean chain: no architecture spec
-conversation, no dependency levels, no coherence refactor, no deviation
-reporting step. The spec fed to the chain is the bug doc and its
-reproduction, both referenced from the ticket body, plus the ticket doc.
+Implements one bug ticket through a lean chain: no architecture conversation,
+no deviation reporting step (a bug-only effort has no architecture document
+by design). The opener's gate checked the effort's work state and, for a
+bug-only effort, the architecture check is exempt. The spec fed to the chain
+is the bug doc and its reproduction, both referenced from the ticket body,
+plus the ticket doc.
 
 ## Step 0  --  Prerequisites
 
@@ -77,8 +79,64 @@ runId = subagent({
 result = <the chain's return: { ok, failed?, step?, refs }>
 ```
 
-The ticket's `workflow_state` is NOT marked here: finalize-task owns the
-marking, one owner.
+The ticket's `workflow_state` is NOT marked by the chain: this phase's
+inline close-out owns the marking, one owner.
+
+## Step 2 -- The inlined per-ticket close-out
+
+After the chain returns ok, run the close-out in this same run. The steps
+interleave **Pi tool calls** with shell commands: the tw_* tools are tools
+you invoke as functions, **not** shell binaries; wrapping them in a
+`set -e` block makes them fail with `command not found` (exit 127) and
+aborts the sequence. Call them as tools, and run the shell steps in a
+separate bash block.
+
+1. **CI gate**: checkout `task/<ticket-slug>`, `git merge main 2>/dev/null
+   || true`, run the project's CI command (from the `tw_context` profile or
+   detected from repo tooling; ask the user when ambiguous). A red branch
+   is never merged: fix forward on the landing branch, and record that
+   fix-forward fired with `submit_feedback({ kind: "expected", data })`.
+2. **Knowledge harvest**: read the ticket doc and the combined diff; fold
+   durable knowledge into `docs/testing.md` and other relevant docs, and
+   append root-cause lessons to the ticket doc's `## Implementation notes`.
+   Commit:
+   `git add -A && git commit -m "docs(ticket): harvest knowledge for {ticketSlug}"`
+3. **Changelog**: write the entry through `tw_write_changelog`, the only
+   writer of `docs/tasks/CHANGELOG.md` (the built-in write and edit are
+   refused there): the slug, the ticket title, and a 3-5 line body. Commit
+   through the shell afterwards (the commit is git, not a tree mutation):
+   `git add docs/tasks/CHANGELOG.md && git commit -m "docs: changelog {ticketSlug}"`
+4. **Bug closure**: read the ticket body for the bug doc reference; if the
+   body names no bug doc, ask the user which bug doc to close and do not
+   proceed until answered. Read `docs/bugs/<slug>.md`, set `status: fixed`,
+   fill `fix_commit` with the landing branch's SHA
+   (`git rev-parse task/<ticket-slug>`), fill the Root cause and Fix
+   summary sections from the ticket's `## Implementation notes`, commit,
+   then archive the bug doc with
+   `git mv docs/bugs/<slug>.md docs/bugs/archive/<slug>.md` and commit.
+5. **Mark the ticket done through `tw_mark_done`** (the one owner of the
+   marking: this phase; the chain never marks it). The tool checks the
+   changelog entry references the ticket before it writes
+   `workflow_state: done`, so the changelog step must land first.
+6. **`tw_finalizable <ticket-slug>`** (Pi tool, not a shell command):
+   verifies the ticket is finalizable and surfaces the effort graph's
+   anomalies, which you should report if any appear.
+7. **`tw_state_set task null`** (Pi tool, not a shell command): clears the
+   current item pointer.
+8. **Merge the landing branch into main** (shell, safe under `set -e`):
+
+   ```bash
+   set -e
+   git checkout main
+   git merge --no-ff task/<ticket-slug> -m "ticket: finalize {ticketSlug}"
+   git branch -d task/<ticket-slug>
+   ```
+
+   If remote exists: `git push origin main`
+
+There is **no per-ticket move**: the ticket stays in the live effort.
+Moving one ticket out would split the effort's graph scope and trip the
+spec-plus-zero-tickets rule; the effort archives as a unit.
 
 ## Code review (advisory)
 
@@ -99,26 +157,29 @@ reviewId = subagent({
 
 Read `review/result.md` and surface the findings to the user.
 
-## Step 2  --  Report
+## Step 3  --  Report
 
 Report with the skill's completion report resource,
 [resources/report.md](../report.md): the fixed five-part shape, tuned for
-this skill, which includes the next step when the ticket is done
-(`/skill:finalize-task <ticket-slug>`; finalize marks the ticket's
-`workflow_state`). A refusal, failure, or escalation is the same shape.
+this skill, which names the next step (continue the frontier, or, when
+every ticket has landed and closed out, the end-of-effort pass and then
+`/skill:finalize-effort <effort-slug>`). A refusal, failure, or escalation
+is the same shape.
 
 ## Failure toolbelt (parent never implements)
 
 Hard rule: on subagent failure the parent never implements. Its only moves are re-dispatch strategies, applied in this order:
 
 1. **Diagnose first**  --  read worker outputs and any partial diff. A budget-exhausted tdd-worker attempt is the preferred diagnostic; its findings seed the sub-ticket breakdown. Never blindly redo.
-2. **First failure → split**  --  split the ticket into sub-tickets registered in the effort: write each to
-   `docs/tasks/<effort>/tickets/<sub-ticket-slug>/ticket.md` with v4
-   frontmatter (inherited subtype, size from the diagnosis, `blocked_by`
-   inheriting the original's edges and chained between the subs), and
-   supersede the original as `status: deprecated` plus `workflow_state: done`
-   with a body note naming its sub-tickets. The split rules in the feature
-   pipeline's failure toolbelt apply here in full. Exception: if the ticket is
+2. **First failure → split**  --  split the ticket into sub-tickets registered in the effort: go through
+   `tw_split_ticket`, which creates each sub-ticket at
+   `docs/tasks/<effort>/tickets/<sub-ticket-slug>/ticket.md` (inheriting the
+   original's subtype and `blocked_by`, with the new sub edges chained
+   between the subs and sizes taken from the diagnosis) and supersedes the
+   original as `status: deprecated` plus `workflow_state: done` with a body
+   note naming its sub-tickets. The split rules in the feature
+   pipeline's failure toolbelt apply here in full; hand edits to ticket
+   files are refused by the write guard. Exception: if the ticket is
    already atomic, skip to retry.
 3. **Second attempt → retry +50%**  --  re-run the chain with timeoutMs increased by 50% and args.extra pointing at the failed step's output reference (and any recorded resolution), so the worker re-reads its prior attempt. Never author prompt instructions for the worker; pass pointers.
 4. **Backstop → escalate**  --  after two consecutive retries still fail, ask the user: "Two retries for ticket {ticket} failed. Should I increase budgets further, relax constraints, or skip this ticket?"

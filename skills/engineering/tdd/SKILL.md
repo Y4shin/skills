@@ -55,9 +55,9 @@ where the seam belongs, what the interface should expose), delegate to the
 `codebase-design` skill for the vocabulary. It is the shared source of the
 module, interface, depth, seam, adapter, leverage and locality terms.
 
-- **Features:** the seam is agreed in the architecture spec during
-  `implement-task` Step 1. If a seam is not in the spec, confirm it before
-  writing a test at that boundary.
+- **Features:** the seam is agreed in the effort's architecture document,
+  which `to-tickets` produces. If a seam is not in the architecture, confirm
+  it before writing a test at that boundary.
 - **Bugs:** the reproducing exception or failure is the implicit seam. Write a
   regression test that reproduces the bug through the same public interface the
   user hit.

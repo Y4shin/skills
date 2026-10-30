@@ -16,9 +16,9 @@ an archive). No external issue tracker, everything in git.
 
 The main flow runs: `/skill:grilling` (sharpen the idea), then
 `/skill:to-spec` and `/skill:to-tickets` (spec, then tracer-bullet tickets),
-then `/skill:implement-task` per ticket (per-ticket agent chains), an
-advisory two-axis code review, and `/skill:finalize-task` (close out, merge,
-archive). On-ramps merge onto it: `/skill:intake` for a new request (idea,
+then `/skill:implement-ticket` (per-ticket agent chains plus the inlined
+per-ticket close-out: CI gate, changelog, done-marking, merge to main), and
+`/skill:finalize-effort` (the effort close and archive). On-ramps merge onto it: `/skill:intake` for a new request (idea,
 feature, or bug), `/skill:diagnosing-bugs` for something broken,
 `/skill:wayfinder` for a huge foggy effort. Reference tables map read-only
 questions to tools (`tw_finalizable`, `tw_list`, `tw_show`, `tw_state`,
@@ -53,7 +53,7 @@ finalization, and `docs/tasks/index.md` moves it from `## Live` to
 
 **Do I keep one context window through the whole flow?**
 Keep planning in one unbroken window (grilling, spec, tickets), then clear
-context per ticket: each `/skill:implement-task` starts fresh from the
+context per ticket: each `/skill:implement-ticket` run starts fresh from the
 ticket document.
 
 ## It's working if

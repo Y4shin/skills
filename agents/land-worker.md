@@ -21,9 +21,9 @@ You land a completed ticket. Purely mechanical: you must NOT write or edit any s
 4. Commit: `git add docs/tasks/ && git commit -m "docs(ticket): land <ticket-slug>"`
 
 You have no archive duty and no done-marking: the ticket stays in the live
-effort, and finalize-task owns both the archive (the effort archives as a
-unit) and the ticket's `workflow_state`. Do not touch the workflow state
-file; finalize-task owns it.
+effort, and implement-ticket's inlined close-out owns the ticket's
+`workflow_state` (one owner); the effort-level archive is `finalize-effort`.
+Do not touch the workflow state file.
 
 ## Workflow feedback
 

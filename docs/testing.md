@@ -131,7 +131,7 @@ suite normally; do not exclude this file.
 ## Skill prose testing
 
 - Skills are tested via **structure/cross-reference assertions** in
-  `tests/skills.test.ts` (e.g. "implement-task references
+  `tests/skills.test.ts` (e.g. "implement-ticket references
   tdd-worker"). When adding a skill: extend `SKILL_FILES` and bump the
   manifest count assertion.
 - **Producer prose is tested by running its templates through the engine.**

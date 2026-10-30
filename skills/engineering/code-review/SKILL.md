@@ -17,10 +17,10 @@ can pass one axis and fail the other, so there is **no single winner**.
 
 ## Where it fits
 
-The review is fired by `implement-task` at the end of the feature path and the
-bug path, immediately before finalize. It is **advisory**: it surfaces findings
-for the user and for the coherence refactor step, but it does **not** gate
-landing or finalize.
+The review is fired by `implement-ticket` at the end of the feature path and the
+bug path, immediately before the per-ticket close-out. It is **advisory**: it
+surfaces findings for the user and for the coherence refactor step, but it does
+**not** gate landing or the close-out.
 
 ## Process
 
@@ -46,12 +46,13 @@ A bad reference or empty diff stops here.
 The spec source depends on what the diff delivers:
 
 - **Feature ticket:** the ticket doc
-  (`docs/tasks/<effort>/tickets/<ticket-slug>/ticket.md`) plus the effort-root
-  architecture spec (`docs/tasks/<effort>/arch-spec.md`).
+  (`docs/tasks/<effort>/tickets/<ticket-slug>/ticket.md`) plus the effort's
+  architecture document (`docs/tasks/<effort>/architecture.md`; the legacy
+  `arch-spec.md` names the same document until the migration renames it).
 - **Bug ticket:** the bug doc (`docs/bugs/<slug>.md`) plus its reproduction,
   as referenced from the ticket body.
-- **Whole-effort review:** the effort's ticket docs plus the effort-root
-  architecture spec.
+- **Whole-effort review:** the effort's ticket docs plus the effort's
+  architecture document.
 
 If no spec is available, say so. Do not invent requirements.
 

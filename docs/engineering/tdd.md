@@ -15,7 +15,7 @@ The core claims:
 - **Tests live at seams.** A seam is the public boundary where behavior is
   observable without reaching inside. Test only at pre-agreed seams: for a
   feature, the seams are agreed in the effort's architecture spec
-  (`docs/tasks/<effort>/arch-spec.md`) during implement-task's planning
+  (`docs/tasks/<effort>/architecture.md`) which `to-tickets` produces
   step; for a bug, the reproducing failure is the implicit seam.
 - **Three anti-patterns**: implementation-coupled tests (break when you
   refactor though behavior did not change), tautological tests (the

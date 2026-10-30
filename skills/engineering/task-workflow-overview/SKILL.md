@@ -39,23 +39,24 @@ The route most work travels. You have an idea and want it built.
      **`/skill:to-tickets`** to split it into tracer-bullet feature/bug
      tickets, each declaring its **blocking edges** under
      `docs/tasks/<effort>/tickets/`, written by hand; the `tw_*` tools make
-     the resulting graph queryable. Kick off **`/skill:implement-task`** per
-     ticket, clearing context between each one.
-   - **No** to **`/skill:implement-task`** right here, in the same context
+     the resulting graph queryable. Then **`/skill:implement-ticket`**
+     dispatches the per-ticket chains.
+   - **No** to **`/skill:implement-ticket`** right here, in the same context
      window.
 
-   Either way, **`/skill:implement-task`** builds each ticket through a
+   Either way, **`/skill:implement-ticket`** builds each ticket through a
    per-ticket agent chain (a tdd-worker driving the red-green loop, then
-   verification, deviation reporting, and landing), and closes with an
-   advisory **two-axis review** (Standards + Spec) of the whole-effort diff
-   before you run **`/skill:finalize-task`**.
+   verification, deviation reporting, and landing) and closes each landed
+   ticket out inline (the CI gate, the changelog, the done-marking, the
+   merge to main), with an advisory **two-axis review** (Standards + Spec)
+   along the way; the end-of-effort pass wraps the whole effort up.
 
 ### Context hygiene
 
 Keep steps 1 to 3 in **one unbroken context window** (don't compact or clear
 until after `/skill:to-tickets`) so the grilling, spec, and tickets all build
-on the same thinking. Each `/skill:implement-task` then starts fresh, working
-from the ticket.
+on the same thinking. Each `/skill:implement-ticket` run then starts fresh,
+working from the ticket.
 
 Read [PHASE-BOUNDARIES.md](PHASE-BOUNDARIES.md) for the ordered tree of
 context-management decisions at each phase boundary.
@@ -83,7 +84,7 @@ A starting situation that generates work, then merges onto the main flow.
   deliverables**, until the fog is pushed back and the way is clear. When the
   map clears, **it hands off, it doesn't build**: merge onto the main flow at
   **`/skill:to-spec`**, which collapses the map's linked decisions into a
-  buildable plan, then `/skill:to-tickets` and `/skill:implement-task` as
+  buildable plan, then `/skill:to-tickets` and `/skill:implement-ticket` as
   usual.
 
 ## Codebase health
@@ -144,10 +145,10 @@ Off the main flow entirely.
 | Plan an idea or grow a decision-task graph (mandatory initial grilling) | `/skill:wayfinder` |
 | Turn a conversation/map into a spec | `/skill:to-spec` |
 | Break a spec into tracer-bullet feature/bug tickets | `/skill:to-tickets` |
-| Implement the ready frontier | `/skill:implement-task` |
+| Implement the ready frontier | `/skill:implement-ticket` |
 | Review an eval suite or triage a failed run | `/skill:eval-review` |
 | Review an Agent Skill | `/skill:skill-review` |
-| Finalize / archive | `/skill:finalize-task` |
+| Finalize / archive | `/skill:finalize-effort` |
 | Initialize repo | `/skill:setup-workflow` |
 | Start a new effort from a request (bug included) | `/skill:intake` |
 | Diagnose a broken workflow | `/skill:task-workflow-doctor` |

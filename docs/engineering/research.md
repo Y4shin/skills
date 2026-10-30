@@ -13,7 +13,7 @@ Two layers share the name, on purpose:
 
 - The **research task type** (`subtype: research`) is a wayfinder planning
   artifact: a precise question, trusted source boundaries, and
-  evidence-for-completion criteria, executed through implement-task's
+  evidence-for-completion criteria, executed through wayfinder's
   research pipeline with findings captured in the task directory.
 - This **skill** is the reusable delegation primitive: a background agent
   doing the legwork. The task-type resource (or any orchestrator) dispatches

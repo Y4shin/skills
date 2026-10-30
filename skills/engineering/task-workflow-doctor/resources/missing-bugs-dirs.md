@@ -4,7 +4,7 @@
 
 - Cannot create bugs.
 - Cannot archive fixed bugs.
-- `/skill:report-bug` or `/skill:finalize-task` fail because bug directories are missing.
+- `/skill:report-bug` or a bug ticket's close-out fails because bug directories are missing.
 
 ## Missing artifact
 
