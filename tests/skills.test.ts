@@ -7,6 +7,7 @@ import { readFileSync, existsSync, readdirSync, mkdirSync, mkdtempSync, rmSync, 
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, test } from "vitest";
+import { parse as parseYaml } from "yaml";
 import { parse } from "../src/core/frontmatter.js";
 import { findAnomalies, fromFrontmatter, validateArtifact, type Artifact } from "../src/core/art.js";
 import { createTools } from "../src/pi.js";
@@ -3149,6 +3150,219 @@ describe("finalize-effort skill (finalize-effort-skill)", () => {
   test("no em-dash in the new prose", () => {
     for (const text of [content, page, report]) {
       expect(text).not.toContain("\u2014");
+    }
+  });
+});
+
+// ─── docs-resync (enforced workflow v5) ──────────────────────────────
+
+// Arch spec entry 20: shipped prose matches shipped v5. Every pin below
+// derives the truth from `package.json` `pi.skills` plus each `SKILL.md`'s
+// `disable-model-invocation`, or from the migration target's promoted set, so
+// a hand-kept list that drifts from the manifest fails here instead of going
+// stale in silence.
+
+type PromotedSkill = { bucket: string; name: string; userInvoked: boolean };
+
+/** The promoted set with its invocation model, read from the manifest and the frontmatter. */
+function promotedWithInvocation(): PromotedSkill[] {
+  const pkg = JSON.parse(readFile("package.json"));
+  return (pkg.pi.skills as string[]).map((entry: string) => {
+    const { bucket, name } = promotedSkill(entry);
+    const fm = parseFrontmatter(readFile(join("skills", bucket, name, "SKILL.md")));
+    return { bucket, name, userInvoked: fm["disable-model-invocation"] === "true" };
+  });
+}
+
+/** The body under one heading, up to the next heading of level 1 to 3. */
+function sectionBody(content: string, heading: string): string {
+  const at = content.indexOf(heading);
+  if (at === -1) throw new Error(`missing heading: ${heading}`);
+  const rest = content.slice(at + heading.length);
+  const next = rest.search(/\n#{1,3} /);
+  return next === -1 ? rest : rest.slice(0, next);
+}
+
+/**
+ * The skills one section's bullets link to, as `<bucket>/<name>`.
+ *
+ * The top-level README links `./skills/<bucket>/<name>/SKILL.md`; a bucket
+ * README links `./<name>/SKILL.md`, so it passes its own bucket.
+ */
+function linkedSkills(body: string, bucket?: string): string[] {
+  const out: string[] = [];
+  for (const m of body.matchAll(/\[[^\]]+\]\(\.\/(?:skills\/)?([^)]+?)\/SKILL\.md\)/g)) {
+    out.push(m[1].includes("/") ? m[1] : `${bucket}/${m[1]}`);
+  }
+  return out;
+}
+
+/** One `**Term**:` entry of CONTEXT.md's `## Language` section. */
+function languageEntries(content: string): { term: string; body: string }[] {
+  return sectionBody(content, "## Language")
+    .split(/^(?=\*\*[^*]+\*\*:)/m)
+    .filter((block) => /^\*\*[^*]+\*\*:/.test(block))
+    .map((block) => ({ term: block.match(/^\*\*([^*]+)\*\*/)![1], body: block }));
+}
+
+describe("documentation re-sync (docs-resync)", () => {
+  const promoted = promotedWithInvocation();
+  const expected = (bucket: string | null, userInvoked: boolean): string[] =>
+    promoted
+      .filter((s) => s.userInvoked === userInvoked && (bucket === null || s.bucket === bucket))
+      .map((s) => `${s.bucket}/${s.name}`)
+      .sort();
+
+  test("the top-level README lists exactly the promoted set, grouped by invocation", () => {
+    const readme = readFile("README.md");
+    expect(linkedSkills(sectionBody(readme, "### User-invoked")).sort()).toEqual(expected(null, true));
+    expect(linkedSkills(sectionBody(readme, "### Model-invoked")).sort()).toEqual(expected(null, false));
+  });
+
+  for (const bucket of ["engineering", "productivity"]) {
+    test(`skills/${bucket}/README.md lists exactly that bucket's promoted set, grouped by invocation`, () => {
+      const readme = readFile(`skills/${bucket}/README.md`);
+      expect(linkedSkills(sectionBody(readme, "## User-invoked"), bucket).sort()).toEqual(
+        expected(bucket, true),
+      );
+      expect(linkedSkills(sectionBody(readme, "## Model-invoked"), bucket).sort()).toEqual(
+        expected(bucket, false),
+      );
+    });
+  }
+
+  test("package.json pi.skills is exactly the promoted set the migration target names", () => {
+    // docs/migration-target.yaml is the shipped schema-5 target; the manifest
+    // and the target agree, or one of them is lying about what ships.
+    const target = parseYaml(readFile("docs/migration-target.yaml")) as {
+      promoted_skills: Record<string, string[]>;
+    };
+    const declared: string[] = [];
+    for (const [bucket, names] of Object.entries(target.promoted_skills)) {
+      for (const name of names) declared.push(`${bucket}/${name}`);
+    }
+    expect(declared.sort()).toEqual(promoted.map((s) => `${s.bucket}/${s.name}`).sort());
+  });
+
+  const context = readFile("CONTEXT.md");
+
+  // The terms the v5 spec pins: the effort model and its phases, the two graph
+  // kinds and their edges, the artifacts each phase writes, and the schema and
+  // invocation vocabulary that carries them.
+  const CONTEXT_TERMS = [
+    "Effort",
+    "Front door",
+    "Map",
+    "Planning task",
+    "Implementation ticket",
+    "Graph kind",
+    "Blocked_by",
+    "Frontier",
+    "Dependency level",
+    "Specification",
+    "Architecture",
+    "Ready for spec",
+    "Review artifact",
+    "Disposition",
+    "Report",
+    "Origin effort",
+    "Archive",
+    "State pointers",
+    "schema_version",
+    "Migration",
+    "Invocation model",
+  ];
+
+  test("CONTEXT.md keeps the glossary shape: one entry per term, each with an _Avoid_ line", () => {
+    for (const heading of ["## Language", "## Relationships", "## Flagged ambiguities"]) {
+      expect(context, `CONTEXT.md is missing ${heading}`).toContain(heading);
+    }
+    const entries = languageEntries(context);
+    expect(entries.length).toBeGreaterThan(10);
+    for (const entry of entries) {
+      expect(entry.body, `CONTEXT.md entry '${entry.term}' has no _Avoid_ line`).toContain("_Avoid_:");
+    }
+  });
+
+  test("CONTEXT.md defines the v5 vocabulary the spec pins", () => {
+    const terms = languageEntries(context).map((e) => e.term);
+    for (const required of CONTEXT_TERMS) {
+      expect(terms, `CONTEXT.md is missing the term '${required}'`).toContain(required);
+    }
+    expect(context).toContain("schema_version: 5");
+  });
+
+  // A retired word may appear only in the compatibility layer: the upgrade
+  // resources, the migration prose, the migration module and its legacy
+  // tables, and any tool that reads an old shape. CONTEXT.md is the live
+  // glossary, so its one exemption is the Migration entry, which records what
+  // the reshape renames.
+  const RETIRED_WORDS: [string, RegExp][] = [
+    ["slice", /\bslices?\b/i],
+    ["triage", /\btriage\b/i],
+    ["implement-task", /implement-task/],
+    ["finalize-task", /finalize-task/],
+    ["docs/tasks/maps/", /docs\/tasks\/maps\//],
+    ["mode: hitl/afk", /mode:\s*(hitl|afk)\b/i],
+    ["arch spec", /arch[-\s]spec(?:\.md)?\b/i],
+    [
+      "the legacy type value set",
+      /\btype:\s*(research|prototype|grilling|manual|feature|bug|arch[-\s]spec)\b/i,
+    ],
+  ];
+
+  test("CONTEXT.md keeps the retired vocabulary out of the live language", () => {
+    const live = [
+      sectionBody(context, "## Language")
+        .split(/^(?=\*\*[^*]+\*\*:)/m)
+        .filter((block) => /^\*\*[^*]+\*\*:/.test(block) && !/^\*\*Migration\*\*:/.test(block))
+        .join("\n"),
+      sectionBody(context, "## Relationships"),
+      sectionBody(context, "## Flagged ambiguities"),
+    ].join("\n");
+    for (const [label, pattern] of RETIRED_WORDS) {
+      expect(live, `'${label}' is still live vocabulary in CONTEXT.md`).not.toMatch(pattern);
+    }
+  });
+
+  test("the re-synced prose carries no em-dash", () => {
+    for (const file of [
+      "README.md",
+      "CONTEXT.md",
+      "skills/engineering/README.md",
+      "skills/productivity/README.md",
+    ]) {
+      expect(readFile(file), `${file} carries an em-dash`).not.toContain("\u2014");
+    }
+  });
+
+  test("the top-level README describes the v5 arc", () => {
+    const readme = readFile("README.md");
+    for (const name of [
+      "intake",
+      "wayfinder",
+      "to-spec",
+      "to-tickets",
+      "implement-ticket",
+      "finalize-effort",
+      "setup-workflow",
+    ]) {
+      expect(readme, `the README never names /skill:${name}`).toContain(`/skill:${name}`);
+    }
+    // The pre-v5 framing is gone: no v2 title, no retired unit name.
+    expect(readme).not.toMatch(/task-workflow v2/i);
+    expect(readme).not.toMatch(/\bslices?\b/i);
+  });
+
+  test("task-workflow-overview names every user-reachable skill", () => {
+    // AGENTS.md: a user-reachable skill is one the model reaches by
+    // auto-invocation or the human reaches by typing it, so the router has to
+    // name the promoted set, not only the front doors the human must type. It
+    // never names itself. Derived, so a newly promoted or re-scoped skill
+    // fails here until the router mentions it.
+    const overview = readFile("skills/engineering/task-workflow-overview/SKILL.md");
+    for (const skill of promoted.filter((s) => s.name !== "task-workflow-overview")) {
+      expect(overview, `the overview never names /skill:${skill.name}`).toContain(`/skill:${skill.name}`);
     }
   });
 });

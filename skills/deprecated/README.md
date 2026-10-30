@@ -7,9 +7,9 @@ note naming what replaced it.
   retired task-creation workflow; use `wayfinder` to create and grow task
   graphs. Replaced by `wayfinder`.
 - **[report-bug](./report-bug/SKILL.md)**: Bug intake (capture,
-  reproduce, triage/promote). Retired in favor of `triage` (the
-  `adopt-mp-skills-way` map, grilling #1 Q12); the spot-fix path is being
-  folded into `triage`.
+  reproduce, triage/promote). Retired in favor of `intake`, which turns every
+  bug report into an effort whose defect is a `subtype: bug` implementation
+  ticket.
 - **[onboard-workflow](./onboard-workflow/SKILL.md)**: Initialize a
   repository for the task-workflow. Replaced by `setup-workflow` (the
   `adopt-mp-skills-way` map, grilling #2 R1Q1: one auto-detecting skill that
