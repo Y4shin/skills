@@ -1,20 +1,27 @@
-# task-workflow v2
+# task-workflow
 
-> Idea → Wayfinder → task frontier → type-specific execution → finalize, a planning workflow for `docs/tasks/`.
+> Intake → Wayfinder → specification → architecture and ticket graph → implementation → effort close, a gated planning workflow for `docs/tasks/`.
 > Pi package. One `pi install` away.
 
-## What changed from v1
+## What v5 enforces
 
-- **One extension file** instead of 5
-- **No chain JSON files**, orchestration lives in SKILL.md
-- **3 agents instead of 7**, tdd-worker, slice-verifier, land-worker, deviation-reporter
-- **6 skills instead of 10** (+ 9 archived removed)
-- **Parallel fan-out** with git worktrees instead of sequential loops
-- **`tw_dependency_levels` and `tw_frontier` tools**, BFS dependency resolution, not LLM pseudocode
-- **Verifier retry path**, re-dispatches TDD worker with error output
-- **Checkpoint commits**, TDD worker commits after each GREEN
-- **Size-based turn budgets**, S/M/L/XL from task frontmatter
-- **Legacy slice resolution preserved**, existing tw_* tools still accept slices
+- **One front door.** `/skill:intake` turns every request, bugs included,
+  into an effort with a map and exactly one non-negotiables grilling task.
+  There is no separate bug queue and no rejection path.
+- **The opener is the gate.** Every phase opens with `tw_open` and closes
+  with `tw_close`. A phase opened out of turn is refused by the tool with
+  the legal next call, not by prose.
+- **Two graph kinds.** Planning tasks under `tasks/` and implementation
+  tickets under `tickets/`, with kind-scoped `blocked_by` edges; the
+  frontier and the dependency levels are computed per kind.
+- **One living architecture document.** `/skill:to-tickets` produces
+  `architecture.md` alongside the ticket graph, and the specification's
+  architecture content becomes archival.
+- **Close-out is inlined.** Each landed ticket gets its CI gate, changelog,
+  done-marking, and merge in the same run; `/skill:finalize-effort` runs the
+  holistic review, the finding triage, and the archive.
+- **The tools own the rules.** The named `tw_*` tools are the only writers
+  of `docs/tasks/**`, and `write` and `edit` are refused on that tree.
 
 ## Install
 
@@ -22,21 +29,28 @@
 pi install /path/to/task-workflow
 ```
 
-Then in any repo:
+Then once per repo:
 
 ```
-/skill:setup-workflow    # creates docs/tasks/ + docs/bugs/
-/skill:wayfinder           # grill first, then grow a dependency-aware work graph from an idea
+/skill:setup-workflow    # scaffold docs/tasks/ at schema 5, or migrate an older tree
 ```
 
 ## Workflow
 
-Wayfinder begins every map with one grilling session, then replaces the former
-refine/create-task/spec/ticket handoff. It creates and grows a map's
-dependency graph directly. `/skill:implement-ticket` implements the effort's
-tickets: one per-ticket chain per ticket over the dependency levels, with the
-per-ticket close-out inline. The feature and bug pipelines remain the TDD
-pipelines.
+Every request enters as an effort through `/skill:intake`, the single front
+door, which creates the effort's map and its exactly one non-negotiables
+grilling task. `/skill:wayfinder` works the planning frontier in bounded passes
+and hands off when the effort is ready for the spec. `/skill:to-spec` writes the
+specification from the settled record, `/skill:to-tickets` produces
+`architecture.md` and the ticket graph, and `/skill:implement-ticket` implements
+the ready frontier in dependency levels with the per-ticket close-out inline.
+`/skill:finalize-effort` reviews the whole effort, dispositions every finding,
+and archives it.
+
+`docs/tasks/` is an OKF bundle: one directory per effort holding `map.md`, an
+optional `spec.md`, `architecture.md` when the ticket graph needs interface
+contracts, a `tasks/` directory of planning tasks, and a `tickets/` directory of
+implementation tickets. A finished effort moves to `docs/tasks/archive/`.
 
 ## Skills
 
@@ -93,7 +107,7 @@ This package is **global**, so it would load in every repo, including work
 repos where it doesn't belong. The gate auto-disables all of the package's
 resources in work repos based on the repo's `git origin`, with **zero
 per-repo config**. See [`docs/repo-gating.md`](docs/repo-gating.md) for the
-full truth table, detection rules, and the one known limitation (the six
-skills still appear on `/help` in a work repo, pi 0.80.10 has no hook to
+full truth table, detection rules, and the one known limitation (the package's
+skills still appear on `/help` in a work repo, because pi has no hook to
 suppress them there; explicit `/skill:<name>` is blocked via the `input`
 event instead).
