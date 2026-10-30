@@ -23,8 +23,10 @@ frontier and the reconcile), `/skill:to-spec` (the specification),
 per-ticket close-out: CI gate, changelog, done-marking, merge to main), and
 `/skill:finalize-effort` (the holistic review, finding triage, and archive).
 `/skill:setup-workflow` initializes or migrates a repo once. On-ramps merge
-onto it: `/skill:diagnosing-bugs` for something broken and
-`/skill:improve-codebase-architecture` for a survey. Reference tables map
+onto it: `/skill:diagnosing-bugs` for something broken,
+`/skill:improve-codebase-architecture` for a survey, `/skill:eval-review` for
+an eval suite or a failed run, and `/skill:skill-review` for an Agent Skill.
+Reference tables map
 read-only questions to tools (`tw_next`, `tw_finalizable`, `tw_list`,
 `tw_show`, `tw_state`, `tw_dependency_levels` / `tw_frontier`) and actions to
 skills.

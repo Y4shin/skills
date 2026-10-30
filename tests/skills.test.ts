@@ -2930,6 +2930,16 @@ describe("task-workflow-overview v5 (overview-doctor-rescope)", () => {
     }
   });
 
+  test("keeps the review on-ramps in the action table", () => {
+    // The rescope narrowed the router to the seven phase skills. The review
+    // skills are still user-reachable on-ramps, and they must not fall out of
+    // the table silently (deviation report, overview-doctor-rescope).
+    for (const name of ["eval-review", "skill-review"]) {
+      expect(content, name).toContain(`/skill:${name}`);
+      expect(page, name).toContain(`/skill:${name}`);
+    }
+  });
+
   test("the fast track is the first layer and points at tw_next for the live answer", () => {
     // The fast track answers "what do I run now?" with the live tool, not a
     // restatement of the flow.
@@ -3023,6 +3033,10 @@ describe("task-workflow-doctor v5 (overview-doctor-rescope)", () => {
     for (const shape of ["unknown effort", "missing target", "blocked", "done", "architecture"]) {
       expect(refusal.toLowerCase(), shape).toContain(shape);
     }
+    // The archive precondition is a thrown error from tw_archive_effort, not
+    // an opener refusal: it carries neither `opened: false` nor `legal_next`,
+    // so it does not belong in this resource's shapes.
+    expect(refusal).not.toContain("undispositioned");
   });
 
   test("no resource for a retired substrate remains", () => {

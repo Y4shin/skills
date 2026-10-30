@@ -146,6 +146,8 @@ Off the main flow entirely.
 | Initialize or migrate a repo | `/skill:setup-workflow` |
 | Diagnose a broken workflow | `/skill:task-workflow-doctor` |
 | Diagnose a hard bug | `/skill:diagnosing-bugs` |
+| Review an eval suite or triage a failed run | `/skill:eval-review` |
+| Review an Agent Skill | `/skill:skill-review` |
 
 ## Report
 

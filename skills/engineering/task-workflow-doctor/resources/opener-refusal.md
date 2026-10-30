@@ -25,7 +25,6 @@ workaround to find. The doctor's job ends at naming the route.
 | an effort with a spec but no tickets | `/skill:to-tickets` |
 | a missing or unstable architecture document | `/skill:to-tickets`: the architecture document is its output, never drafted here |
 | a conflicting open skill | `tw_close` the named skill, then reopen |
-| undispositioned findings on archive | disposition the review findings in `/skill:finalize-effort` |
 
 ## What not to do
 
