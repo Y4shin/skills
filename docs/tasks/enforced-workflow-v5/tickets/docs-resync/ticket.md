@@ -3,8 +3,27 @@ type: ticket
 subtype: feature
 title: Documentation re-sync against the implemented v5
 status: stable
-workflow_state: ready
-blocked_by: [bump-dependencies, schema5-artifact-model, planning-transition-tools, write-lockdown-guard, migrate-v4-to-v5, migration-target-and-upgrade-resource, implementation-transition-tools, disclosure-open-close-core, opener-gate-and-toolsets, wayfinder-reconcile-and-passes, to-tickets-architecture, grilling-delegation-fix, skill-report-resources, skill-creator-nested-toolset, intake-skill, to-spec-rescope, implement-ticket-skill, finalize-effort-skill, overview-doctor-rescope]
+workflow_state: done
+blocked_by:
+- bump-dependencies
+- schema5-artifact-model
+- planning-transition-tools
+- write-lockdown-guard
+- migrate-v4-to-v5
+- migration-target-and-upgrade-resource
+- implementation-transition-tools
+- disclosure-open-close-core
+- opener-gate-and-toolsets
+- wayfinder-reconcile-and-passes
+- to-tickets-architecture
+- grilling-delegation-fix
+- skill-report-resources
+- skill-creator-nested-toolset
+- intake-skill
+- to-spec-rescope
+- implement-ticket-skill
+- finalize-effort-skill
+- overview-doctor-rescope
 size: l
 ---
 
