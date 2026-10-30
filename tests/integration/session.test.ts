@@ -191,3 +191,68 @@ describe("edge cases", () => {
     expect(lastAssistantText(s.session)).toContain("(none)");
   });
 });
+
+// ─── 4. The intake flow: one run, one effort (intake-skill) ─────────────────
+
+describe("the intake flow: one run, one effort", () => {
+  test("a feature request creates a map with placeholder sections and exactly one grilling task", async () => {
+    const s = await session();
+    await openSkill(s, "intake");
+    s.setResponses([
+      reply([call("tw_create_effort", { effort: "fresh-request", title: "Fresh request" })]),
+      reply([
+        call("tw_add_task", {
+          effort: "fresh-request",
+          slug: "grill-non-negotiables",
+          subtype: "grilling",
+          title: "Grill the non-negotiables",
+        }),
+      ]),
+      reply([call("tw_state_set", { field: "map", value: "fresh-request" })]),
+      (ctx: Context) => reply(`Done: ${latestToolResultText(ctx, "tw_state_set") ?? "?"}`),
+    ]);
+    await s.session.prompt("Intake a new feature request.");
+    const map = readFileSync(join(s.cwd, "docs/tasks/fresh-request/map.md"), "utf-8");
+    expect(map).toContain("type: map");
+    expect(map).toContain("## Non-goals");
+    expect(map).toContain("## Non-negotiable facts");
+    const tasks = readFileSync(
+      join(s.cwd, "docs/tasks/fresh-request/tasks/grill-non-negotiables/task.md"),
+      "utf-8",
+    );
+    expect(tasks).toContain("subtype: grilling");
+    // Exactly one grilling task: no other task directory exists.
+    expect(readFileSync(join(s.cwd, "docs/tasks/state.yaml"), "utf-8")).toContain("map: fresh-request");
+  });
+
+  test("a bug report adds the subtype: bug implementation ticket inside the effort", async () => {
+    const s = await session();
+    await openSkill(s, "intake");
+    s.setResponses([
+      reply([call("tw_create_effort", { effort: "bug-report", title: "Bug report" })]),
+      reply([
+        call("tw_add_task", {
+          effort: "bug-report",
+          slug: "grill-non-negotiables",
+          subtype: "grilling",
+          title: "Grill the non-negotiables",
+        }),
+      ]),
+      reply([
+        call("tw_add_ticket", {
+          effort: "bug-report",
+          slug: "fix-defect",
+          title: "Fix the defect",
+          subtype: "bug",
+        }),
+      ]),
+      (ctx: Context) => reply(`Bug ticket: ${latestToolResultText(ctx, "tw_add_ticket") ?? "?"}`),
+    ]);
+    await s.session.prompt("Intake a bug report.");
+    const ticket = readFileSync(
+      join(s.cwd, "docs/tasks/bug-report/tickets/fix-defect/ticket.md"),
+      "utf-8",
+    );
+    expect(ticket).toContain("subtype: bug");
+  });
+});
