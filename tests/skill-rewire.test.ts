@@ -121,12 +121,12 @@ describe("seam 2d - wayfinder grilling.md delegates the method to the grilling s
 // test seam's coverage set; a skill added to (or retired from) the package
 // joins (or leaves) this contract by editing the list.
 const WORKFLOW_SKILLS = [
+  "intake",
   "wayfinder",
   "to-spec",
   "to-tickets",
   "implement-task",
   "finalize-task",
-  "triage",
   "setup-workflow",
   "task-workflow-overview",
   "task-workflow-doctor",

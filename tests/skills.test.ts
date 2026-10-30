@@ -104,7 +104,7 @@ const SKILL_FILES = [
   "skills/engineering/research/SKILL.md",
   "skills/engineering/resolving-merge-conflicts/SKILL.md",
   "skills/engineering/wizard/SKILL.md",
-  "skills/engineering/triage/SKILL.md",
+  "skills/engineering/intake/SKILL.md",
   "skills/productivity/handoff/SKILL.md",
   "skills/productivity/to-questionnaire/SKILL.md",
   "skills/productivity/teach/SKILL.md",
@@ -370,6 +370,136 @@ describe("all referenced agents exist", () => {
 });
 
 // ─── Skill references in skills ──────────────────────────────────────
+
+// ─── The intake skill (intake-skill) ─────────────────────────────────
+
+// The front door: intake replaces triage as the single entry to the
+// workflow. It is user-invoked (starting an effort is a deliberate human
+// act), opens through tw_open, and always creates an effort: a map plus
+// exactly one non-negotiables grilling task.
+describe("intake skill (intake-skill)", () => {
+  const content = readFile("skills/engineering/intake/SKILL.md");
+  const fm = parseFrontmatter(content);
+
+  test("is registered in pi.skills and exists as a user-invoked skill", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).toContain("./skills/engineering/intake");
+    expect(fm["name"]).toBe("intake");
+    expect(fm["disable-model-invocation"]).toBe("true");
+  });
+
+  test("opens through tw_open and names the tools it works through", () => {
+    expect(content).toMatch(/tw_open/);
+    expect(content).toMatch(/tw_create_effort/);
+    expect(content).toMatch(/tw_add_task/);
+  });
+
+  test("always creates an effort: a map plus exactly one non-negotiables grilling task", () => {
+    expect(content).toMatch(/exactly one/i);
+    expect(content).toMatch(/non-negotiables grilling task/i);
+    expect(content).toMatch(/tw_add_ticket/);
+  });
+
+  test("records the intake facts", () => {
+    expect(content).toMatch(/raw request/i);
+    expect(content).toMatch(/destination/i);
+    expect(content).toMatch(/actor/i);
+    expect(content).toMatch(/classification/i);
+    expect(content).toMatch(/three to five/i);
+    expect(content).toMatch(/steps, expected versus actual, and impact|expected versus actual/i);
+    expect(content).toMatch(/constraints/i);
+  });
+
+  test("the duplicate and link checks are bounded and time-boxed", () => {
+    expect(content).toMatch(/bounded/i);
+    expect(content).toMatch(/time-boxed/i);
+    expect(content).toMatch(/archived/i);
+  });
+
+  test("every bug report becomes an effort; intake decides no simple-versus-full split", () => {
+    expect(content).toMatch(/every bug report becomes an effort/i);
+    expect(content).toMatch(/subtype: bug/);
+    expect(content).toMatch(/no simple-versus-full split|does not decide.*simple/i);
+    expect(content).toMatch(/wayfinder/i);
+  });
+
+  test("seeds the canonical map sections as empty placeholders", () => {
+    expect(content).toMatch(/Non-goals/);
+    expect(content).toMatch(/Non-negotiable facts/);
+    expect(content).toMatch(/empty placeholder/i);
+  });
+
+  test("does not restate opener preconditions or the literal ready_for_spec token", () => {
+    expect(content).not.toMatch(/ready_for_spec/);
+  });
+
+  test("ships its report resource", () => {
+    const report = readFile("skills/engineering/intake/resources/report.md");
+    expect(report).toMatch(/## 1\. What is now true/);
+  });
+});
+
+describe("triage is retired (intake-skill)", () => {
+  test("moves to skills/deprecated/triage with its replacement named", () => {
+    const deprecated = readFile("skills/deprecated/triage/SKILL.md");
+    expect(deprecated).toMatch(/intake/);
+    expect(existsSync(join(PROJECT, "skills/engineering/triage"))).toBe(false);
+  });
+
+  test("is absent from pi.skills and the docs page tree", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
+    expect(existsSync(join(PROJECT, "docs/engineering/triage.md"))).toBe(false);
+  });
+
+  test("the deprecated bucket README lists it with its replacement", () => {
+    const readme = readFile("skills/deprecated/README.md");
+    expect(readme).toContain("[triage](./triage/SKILL.md)");
+    expect(readme).toMatch(/Replaced by `intake`/);
+  });
+
+  test("the workflow-skills report seam drops triage and carries intake", () => {
+    // Seam 4's coverage set is edited when a skill joins or leaves the
+    // package; this pins the intake-skill reshuffle.
+    const source = readFile("tests/skill-rewire.test.ts");
+    expect(source).toContain('"intake"');
+  });
+
+  test("the skill surface stays the promoted set: intake in, triage out, count unchanged", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).toContain("./skills/engineering/intake");
+    expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
+    expect(pkg.pi.skills.length).toBe(29);
+    expect(pkg.pi.skills.filter((s: string) => s.includes("intake") || s.includes("triage"))).toEqual([
+      "./skills/engineering/intake",
+    ]);
+  });
+
+  test("intake has a docs page and triage has none", () => {
+    expect(existsSync(join(PROJECT, "docs/engineering/intake.md"))).toBe(true);
+    expect(existsSync(join(PROJECT, "docs/engineering/triage.md"))).toBe(false);
+    const page = readFile("docs/engineering/intake.md");
+    for (const section of ["## What it does", "## When to reach for it", "## Common questions", "## It's working if"]) {
+      expect(page).toContain(section);
+    }
+  });
+
+  test("the no-rejection path: intake never routes a request to a wontfix", () => {
+    const intake = readFile("skills/engineering/intake/SKILL.md");
+    expect(intake).toMatch(/no rejection path|never reject|no rejection/i);
+    expect(intake).not.toMatch(/wontfix/);
+  });
+  test("the repo-root docs keep the retired bug queue out of the routing tables", () => {
+    // The overview's on-ramp and query table reflect the v5 front door: the
+    // triage queue and the docs/bugs grep are gone with triage.
+    const overview = readFile("skills/engineering/task-workflow-overview/SKILL.md");
+    expect(overview).toContain("/skill:intake");
+    expect(overview).not.toContain("/skill:triage");
+    expect(overview).not.toContain('grep -l "status: reported" docs/bugs/*.md');
+    // The effort's own carried constraint: docs/bugs/ survives only as a
+    // static archive, so the overview no longer names it as the bug list.
+    expect(overview).not.toContain("docs/bugs/");
+  });});
 
 describe("human-mode resource routing", () => {
   const routers = ["feature", "bug"];
@@ -787,16 +917,6 @@ describe("skill cross-references", () => {
     const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
     expect(content).toContain("/skill:wayfinder");
     expect(content).toContain("tw_frontier");
-  });
-
-  test("task-overview lists triage queue query", () => {
-    const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
-    expect(content).toContain('grep -l "status: reported" docs/bugs/*.md');
-  });
-
-  test("task-overview mentions docs/bugs as bug list location", () => {
-    const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
-    expect(content).toContain("docs/bugs/");
   });
 
   test("task-workflow-doctor references setup-workflow", () => {

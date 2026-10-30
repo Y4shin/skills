@@ -37,6 +37,7 @@
     "skills": [
       "./skills/engineering/task-workflow-overview",
       "./skills/engineering/setup-workflow",
+      "./skills/engineering/intake",
       "./skills/engineering/wayfinder",
       "./skills/engineering/implement-task",
       "./skills/engineering/finalize-task",
@@ -55,7 +56,6 @@
       "./skills/engineering/research",
       "./skills/engineering/resolving-merge-conflicts",
       "./skills/engineering/wizard",
-      "./skills/engineering/triage",
       "./skills/productivity/handoff",
       "./skills/productivity/to-questionnaire",
       "./skills/productivity/teach",
