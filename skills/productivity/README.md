@@ -12,8 +12,8 @@ Reachable only when you type them (`disable-model-invocation: true`).
   an idea without building a `CONTEXT.md` or saving anything locally.
 - **[handoff](./handoff/SKILL.md)**: Compact the conversation into a handoff
   document so a fresh agent can pick the work up.
-- **[teach](./teach/SKILL.md)**: Learn a concept over multiple sessions,
-  from where you are to where you want to be.
+- **[teach](./teach/SKILL.md)**: Learn a new skill or concept over multiple
+  sessions, using the current directory as a stateful teaching workspace.
 - **[wait-what](./wait-what/SKILL.md)**: Stop. That last message did not
   land: re-pitch it.
 
