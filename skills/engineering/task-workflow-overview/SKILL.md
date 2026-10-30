@@ -1,76 +1,78 @@
 ---
 name: task-workflow-overview
-description: Entry point. Ask which skill or flow fits your situation. A router over the skills in this repo.
+description: Entry point. Ask which skill or flow fits your situation, or which move comes next. A layered explainer of the v5 workflow with a fast track to tw_next.
 ---
 
 # Working with Tasks
 
-You don't remember every skill, so ask. This is the router that maps user
-intent to the right skill or flow. `docs/tasks/` is an OKF bundle: one
-directory per effort holding `map.md`, an optional `spec.md`, a `tasks/`
-subdirectory of decision tasks, and a `tickets/` subdirectory of
-implementation tickets. The `tw_*` tools make that graph queryable. Every
-request, bugs included, enters as an effort through `/skill:intake`; there
-is no parallel bug substrate (the retired bug directory survives only as
-an archive). No external issue tracker, everything in git.
+**Fast track.** Ask `tw_next` for the live answer. Outside a workflow skill
+it names the next phase to open through `tw_open`; inside one it tells you to
+finish the current work first and ask again after `tw_close`. The live answer
+is short on purpose; stop here when it is all you need.
 
-A **flow** is a path through the skills. Most paths run along one **main
-flow**, and several **on-ramps** merge onto it. Everything else is standalone,
-or a vocabulary layer that runs underneath.
+## The short version
+
+Every request, bugs included, enters as an effort through `/skill:intake`,
+the single front door. `/skill:wayfinder` settles the planning decisions,
+`/skill:to-spec` writes the specification, `/skill:to-tickets` produces the
+architecture document and the ticket graph, `/skill:implement-ticket` builds
+and closes each ticket, and `/skill:finalize-effort` runs the effort close
+and archive. `/skill:setup-workflow` initializes or migrates a repo once.
+`docs/tasks/` is an OKF bundle: one directory per effort holding `map.md`,
+an optional `spec.md`, a `tasks/` subdirectory of decision tasks, and a
+`tickets/` subdirectory of implementation tickets. The `tw_*` tools make
+that graph queryable. No external issue tracker, everything in git.
 
 ## The main flow: idea to ship
 
-The route most work travels. You have an idea and want it built.
+The route most work travels, one phase at a time. Every phase opens with
+`tw_open` (the gate that checks the tree before disclosing the phase tools)
+and closes with `tw_close`; each phase's own `SKILL.md` carries the detail.
 
-1. **`/skill:grilling`** sharpens the idea by interview. Start here whenever
-   you are working in a repo: it runs the grilling primitive (rounds,
-   frontier, facts are the agent's job, decisions are yours). (A stateful
-   `grill-with-docs` variant that also builds `CONTEXT.md` and ADRs inline is
-   planned; for now use `grilling` and `domain-modeling` together.)
-2. **Branch: can you settle every question in conversation?** If a question
-   needs a runnable answer (state, business logic, a UI you have to see),
-   detour through a prototype, bridged by **`/skill:handoff`** in both
-   directions:
-   - **`/skill:handoff`** out, then open a fresh session against that file,
-   - **`/skill:prototype`** to answer the question with throwaway code,
-   - **`/skill:handoff`** back what you learned.
-3. **Branch: is this a multi-session build?**
-   - **Yes** to **`/skill:to-spec`** (turn the thread into a spec), then
-     **`/skill:to-tickets`** to split it into tracer-bullet feature/bug
-     tickets, each declaring its **blocking edges** under
-     `docs/tasks/<effort>/tickets/`, written by hand; the `tw_*` tools make
-     the resulting graph queryable. Then **`/skill:implement-ticket`**
-     dispatches the per-ticket chains.
-   - **No** to **`/skill:implement-ticket`** right here, in the same context
-     window.
+1. **`/skill:intake`** is the front door. It records the request verbatim,
+   classifies it (feature or bug), and creates the effort: a map with its
+   non-goals and non-negotiable facts, plus exactly one non-negotiables
+   grilling task. A bug report becomes the effort's `subtype: bug`
+   implementation ticket. There is no triage queue and no rejection path.
 
-   Either way, **`/skill:implement-ticket`** builds each ticket through a
-   per-ticket agent chain (a tdd-worker driving the red-green loop, then
-   verification, deviation reporting, and landing) and closes each landed
-   ticket out inline (the CI gate, the changelog, the done-marking, the
-   merge to main), with an advisory **two-axis review** (Standards + Spec)
-   along the way; the end-of-effort pass wraps the whole effort up.
+2. **`/skill:wayfinder`** is the planning phase. It works the planning
+   frontier, delegating `research` and `prototype` and running `grilling`
+   itself, writes each result back to the map, and runs the reconcile pass.
+   When the reconcile sets the effort ready for the spec, wayfinder hands
+   off; it does not build.
+
+3. **`/skill:to-spec`** collapses the settled record into the specification
+   at the effort root. It asks nothing planning already settled.
+
+4. **`/skill:to-tickets`** turns the spec into the living architecture
+   document plus a tracer-bullet ticket graph. Each ticket declares its
+   blocking edges at creation.
+
+5. **`/skill:implement-ticket`** implements the ready frontier in dependency
+   levels: a per-ticket agent chain (a tdd-worker in the red-green loop, then
+   verification and landing), followed by the inlined per-ticket close-out
+   (the CI gate, the changelog, the done-marking, the merge). The end-of-
+   effort pass wraps the whole effort up.
+
+6. **`/skill:finalize-effort`** runs the holistic review, triages every
+   finding, and archives the effort through the archive tool.
 
 ### Context hygiene
 
-Keep steps 1 to 3 in **one unbroken context window** (don't compact or clear
-until after `/skill:to-tickets`) so the grilling, spec, and tickets all build
-on the same thinking. Each `/skill:implement-ticket` run then starts fresh,
-working from the ticket.
-
-Read [PHASE-BOUNDARIES.md](PHASE-BOUNDARIES.md) for the ordered tree of
-context-management decisions at each phase boundary.
+Keep the planning phases (intake through to-tickets) in **one unbroken
+context window** so the grilling, specification, and tickets build on the
+same thinking. Each `/skill:implement-ticket` run then starts fresh from the
+ticket. Read [PHASE-BOUNDARIES.md](PHASE-BOUNDARIES.md) for the ordered tree
+of context-management decisions at each phase boundary; that reference is
+the deep layer behind this section.
 
 ## On-ramps
 
 A starting situation that generates work, then merges onto the main flow.
 
 - **A new request: idea, feature, or bug** to **`/skill:intake`**. It is the
-  single front door and always creates an effort (a map plus exactly one
-  non-negotiables grilling task); for a bug report it adds the
-  `subtype: bug` implementation ticket inside that effort. Every request
-  becomes an effort, so there is no triage queue and no rejection path;
-  intake hands off to **`/skill:wayfinder`**, which runs the grilling.
+  single front door and always creates an effort, then hands off to
+  **`/skill:wayfinder`** for the grilling.
 
 - **Something's broken** to **`/skill:diagnosing-bugs`**. For the hard ones:
   the bug that resists a first glance, the intermittent flake, the regression
@@ -78,21 +80,13 @@ A starting situation that generates work, then merges onto the main flow.
   it has a **tight feedback loop** (one command that already goes red on this
   bug), then fixes with a regression test.
 
-- **A huge, foggy effort** to **`/skill:wayfinder`**. When the way from here
-  to the destination isn't visible yet, it charts a shared map of **decision
-  tasks** and resolves them one at a time, producing **decisions, not
-  deliverables**, until the fog is pushed back and the way is clear. When the
-  map clears, **it hands off, it doesn't build**: merge onto the main flow at
-  **`/skill:to-spec`**, which collapses the map's linked decisions into a
-  buildable plan, then `/skill:to-tickets` and `/skill:implement-ticket` as
-  usual.
+- **A foggy area of the codebase** to **`/skill:improve-codebase-architecture`**.
+  It surveys for deepening opportunities; picking one generates a request you
+  take to `/skill:intake`.
 
-## Codebase health
-
-- **`/skill:improve-codebase-architecture`** runs whenever you have a spare
-  moment to keep the codebase good for agents to operate in. It surfaces
-  **deepening opportunities**; picking one generates an idea you can take
-  into the main flow at `/skill:intake`.
+- **A repo that is not set up yet, or is on an older schema** to
+  **`/skill:setup-workflow`**. It detects fresh, behind, or current from
+  `docs/tasks/state.yaml` and runs the onboard or migrate branch.
 
 ## Vocabulary underneath
 
@@ -132,6 +126,7 @@ Off the main flow entirely.
 
 | Question | Tool |
 |---|---|
+| "What do I run next?" | `tw_next` |
 | "Is this task ready?" | `tw_finalizable <slug>` |
 | "What's left on effort X?" | `tw_dependency_levels <effort>` / `tw_frontier <effort>` |
 | "List efforts / tasks / tickets" | `tw_list` |
@@ -142,17 +137,17 @@ Off the main flow entirely.
 
 | Action | Skill |
 |---|---|
+| Start a new effort from a request (bug included) | `/skill:intake` |
 | Plan an idea or grow a decision-task graph (mandatory initial grilling) | `/skill:wayfinder` |
 | Turn a conversation/map into a spec | `/skill:to-spec` |
 | Break a spec into tracer-bullet feature/bug tickets | `/skill:to-tickets` |
 | Implement the ready frontier | `/skill:implement-ticket` |
-| Review an eval suite or triage a failed run | `/skill:eval-review` |
-| Review an Agent Skill | `/skill:skill-review` |
-| Finalize / archive | `/skill:finalize-effort` |
-| Initialize repo | `/skill:setup-workflow` |
-| Start a new effort from a request (bug included) | `/skill:intake` |
+| Finalize / archive an effort | `/skill:finalize-effort` |
+| Initialize or migrate a repo | `/skill:setup-workflow` |
 | Diagnose a broken workflow | `/skill:task-workflow-doctor` |
 | Diagnose a hard bug | `/skill:diagnosing-bugs` |
+| Review an eval suite or triage a failed run | `/skill:eval-review` |
+| Review an Agent Skill | `/skill:skill-review` |
 
 ## Report
 

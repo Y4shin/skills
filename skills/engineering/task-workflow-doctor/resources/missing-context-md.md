@@ -7,8 +7,11 @@
 
 ## Missing artifact
 
-Repo-root `CONTEXT.md`.
+Repo-root `CONTEXT.md`: the project's domain glossary.
 
 ## Route
 
-The relevant skill creates `CONTEXT.md` lazily when adopted. Until then, create it manually with project-wide context, or adopt the relevant skill.
+Run `/skill:setup-workflow` (onboard branch). It writes `CONTEXT.md` at the
+repo root with the project's ubiquitous language. If the file exists and is
+merely stale, that is `domain-modeling` work, not a missing-scaffolding
+diagnosis.

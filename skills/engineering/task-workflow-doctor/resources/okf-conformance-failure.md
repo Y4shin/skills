@@ -4,8 +4,7 @@
 
 - Files under `docs/tasks/` fail OKF conformance: a file has no frontmatter,
   a frontmatter with a missing or empty `type`, or an invalid
-  status/workflow_state pair (`draft` paired with anything but `todo`,
-  `deprecated` paired with anything but `done`).
+  status/workflow_state pair.
 - The graph tools report anomalies: `[invalid-combination]`, `[orphan]`,
   `[missing-blocked-by-target]`.
 - Artifacts are silently absent from listings and frontiers, with no error.
@@ -13,8 +12,8 @@
 ## Detection
 
 1. Read `docs/tasks/state.yaml`. A missing `schema_version`, or a
-   `schema_version` below 4, means the tree is pre-v4: stop here and use the
-   migration route below.
+   `schema_version` less than 5, means the tree is pre-v5: stop here and use
+   the migration route below.
 2. Run `tw_frontier docs/tasks` and read the `## Anomalies` block. It reports
    invalid status/workflow_state combinations, orphans (a `type` that
    disagrees with the file's location in the tree), and `blocked_by` targets
@@ -39,10 +38,11 @@ done
 
 ## Routing
 
-- A pre-v4 tree (no `schema_version`, or below 4): run
+- A pre-v5 tree (no `schema_version`, or less than 5): run
   `/skill:setup-workflow` (migrate branch). The migration reshapes the layout
   and backfills conformant frontmatter.
-- v4 drift goes to the responsible producer, by file:
+- Drift the migration did not cause goes to the responsible producer, by
+  file:
   - `map.md` or `tasks/<task>/task.md`: `/skill:wayfinder`
   - `tickets/<ticket>/ticket.md`: `/skill:to-tickets`
   - `spec.md`: `/skill:to-spec`

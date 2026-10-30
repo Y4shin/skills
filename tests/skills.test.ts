@@ -2896,3 +2896,173 @@ describe("human-facing docs pages (backfill-skill-docs-pages)", () => {
     }
   });
 });
+
+// ─── overview-doctor-rescope (enforced workflow v5) ──────────────────
+
+// Arch spec entry 19: the overview is the layered explainer with a `tw_next`
+// fast track, and the doctor is narrowed to what the tools cannot
+// self-diagnose (a legacy tree, missing scaffolding, a failed migration,
+// opener-refusal routing). Both stay model-invoked.
+
+// The user-reachable v5 surface: the seven names the ticket pins. The
+// overview is the router, so a missing name is a router that lies.
+const USER_REACHABLE_V5 = [
+  "intake",
+  "wayfinder",
+  "to-spec",
+  "to-tickets",
+  "implement-ticket",
+  "finalize-effort",
+  "setup-workflow",
+];
+
+describe("task-workflow-overview v5 (overview-doctor-rescope)", () => {
+  const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
+  const page = readFile("docs/engineering/task-workflow-overview.md");
+
+  test("names every user-reachable v5 skill by its invocation", () => {
+    for (const name of USER_REACHABLE_V5) {
+      expect(content, name).toContain(`/skill:${name}`);
+    }
+    // The retired routers never reappear in the map.
+    for (const retired of ["triage", "implement-task", "finalize-task"]) {
+      expect(content).not.toContain(`/skill:${retired}`);
+    }
+  });
+
+  test("keeps the review on-ramps in the action table", () => {
+    // The rescope narrowed the router to the seven phase skills. The review
+    // skills are still user-reachable on-ramps, and they must not fall out of
+    // the table silently (deviation report, overview-doctor-rescope).
+    for (const name of ["eval-review", "skill-review"]) {
+      expect(content, name).toContain(`/skill:${name}`);
+      expect(page, name).toContain(`/skill:${name}`);
+    }
+  });
+
+  test("the fast track is the first layer and points at tw_next for the live answer", () => {
+    // The fast track answers "what do I run now?" with the live tool, not a
+    // restatement of the flow.
+    const fastTrack = content.match(/fast track[\s\S]*?(?=\n## )/i)?.[0] ?? "";
+    expect(fastTrack).toMatch(/tw_next/);
+    expect(fastTrack).toMatch(/live answer/i);
+    // It is the first layer, above the story.
+    expect(content.indexOf("tw_next")).toBeLessThan(content.indexOf("## The short version"));
+  });
+
+  test("the explainer stays layered and progressively disclosed", () => {
+    // Layer 1: the fast track. Layer 2: the short story, a stop-anywhere
+    // paragraph. Layer 3: the main flow. Deeper still: the linked
+    // phase-boundaries reference, never inlined.
+    const fast = content.search(/fast track/i);
+    const short = content.indexOf("## The short version");
+    const main = content.indexOf("## The main flow");
+    const deeper = content.indexOf("PHASE-BOUNDARIES.md");
+    expect(fast).toBeGreaterThan(-1);
+    expect(short).toBeGreaterThan(fast);
+    expect(main).toBeGreaterThan(short);
+    expect(deeper).toBeGreaterThan(main);
+    // The short version is a stopping point, not the whole main flow again.
+    expect(main - short).toBeLessThan(1200);
+    // The deepest layer stays in the resource: the five context-management
+    // options are not restated here.
+    expect(content).not.toMatch(/### The five options/i);
+    expect(content).toMatch(/resources\/report\.md/);
+  });
+
+  test("the docs page carries the same fast track and names the v5 surface", () => {
+    expect(page).toContain("tw_next");
+    for (const name of USER_REACHABLE_V5) {
+      expect(page, name).toContain(`/skill:${name}`);
+    }
+    // The retired bug substrate is not part of the live surface.
+    expect(page).not.toMatch(/docs\/bugs/);
+  });
+});
+
+describe("task-workflow-doctor v5 (overview-doctor-rescope)", () => {
+  const DOCTOR_DIR = "skills/engineering/task-workflow-doctor";
+  const RESOURCES_DIR = `${DOCTOR_DIR}/resources`;
+  const content = readFile(`${DOCTOR_DIR}/SKILL.md`);
+  const page = readFile("docs/engineering/task-workflow-doctor.md");
+
+  test("covers exactly the four scopes the tools cannot self-diagnose", () => {
+    // The symptom table groups the diagnosis into the four scopes: a legacy
+    // or unversioned tree, missing scaffolding, a failed migration, and an
+    // opener refusal.
+    expect(content).toMatch(/legacy or unversioned/i);
+    expect(content).toMatch(/missing scaffolding/i);
+    expect(content).toMatch(/failed migration/i);
+    expect(content).toMatch(/opener refus/i);
+    for (const resource of [
+      "okf-conformance-failure.md",
+      "missing-tasks-tree.md",
+      "missing-context-md.md",
+      "failed-migration.md",
+      "opener-refusal.md",
+    ]) {
+      expect(content, resource).toContain(`resources/${resource}`);
+    }
+  });
+
+  test("routes legacy trees and failed migrations to the migrate branch", () => {
+    const legacy = readFile(`${RESOURCES_DIR}/okf-conformance-failure.md`);
+    expect(legacy).toMatch(/schema_version/);
+    expect(legacy).toMatch(/less than 5|below 5|pre-v5|not 5/);
+    expect(legacy).toContain("/skill:setup-workflow");
+    expect(legacy).not.toMatch(/below 4|pre-v4/i);
+
+    const failed = readFile(`${RESOURCES_DIR}/failed-migration.md`);
+    expect(failed).toMatch(/migrat/i);
+    expect(failed).toMatch(/backup branch/);
+    expect(failed).toContain("/skill:setup-workflow");
+  });
+
+  test("routes an opener refusal to its legal next call, never fixes it", () => {
+    const refusal = readFile(`${RESOURCES_DIR}/opener-refusal.md`);
+    // The opener's refusal carries a reason and the legal next calls; the
+    // doctor's job is to route to them.
+    expect(refusal).toContain("tw_open");
+    expect(refusal).toContain("tw_next");
+    expect(refusal).toContain("legal_next");
+    for (const route of ["intake", "to-tickets", "finalize-effort"]) {
+      expect(refusal, route).toContain(route);
+    }
+    // The refusals the opener returns: unknown effort, missing target,
+    // blocked, done, not-ready, and the missing architecture document.
+    for (const shape of ["unknown effort", "missing target", "blocked", "done", "architecture"]) {
+      expect(refusal.toLowerCase(), shape).toContain(shape);
+    }
+    // The archive precondition is a thrown error from tw_archive_effort, not
+    // an opener refusal: it carries neither `opened: false` nor `legal_next`,
+    // so it does not belong in this resource's shapes.
+    expect(refusal).not.toContain("undispositioned");
+  });
+
+  test("no resource for a retired substrate remains", () => {
+    // `docs/bugs/` retires as a live substrate (it survives only as an
+    // archive), and the retired routers and slice vocabulary are not part of
+    // the v5 language. A resource that named them is removed or repointed.
+    expect(existsSync(join(PROJECT, `${RESOURCES_DIR}/missing-bugs-dirs.md`))).toBe(false);
+    for (const entry of readdirSync(join(PROJECT, RESOURCES_DIR))) {
+      const text = readFile(`${RESOURCES_DIR}/${entry}`);
+      for (const retired of [
+        "/skill:triage",
+        "/skill:implement-task",
+        "/skill:finalize-task",
+        "docs/bugs",
+        "tw_slices",
+        "slices/",
+        "mode: hitl",
+      ]) {
+        expect(text, `${entry} names the retired '${retired}'`).not.toContain(retired);
+      }
+      expect(text, `${entry} uses the retired 'slice' vocabulary`).not.toMatch(/\bslices?\b/i);
+    }
+    // The skill and its docs page carry the same retirement.
+    for (const text of [content, page]) {
+      expect(text).not.toMatch(/docs\/bugs/);
+      expect(text).not.toMatch(/cannot create.*bugs|bugs cannot be created/i);
+    }
+  });
+});
