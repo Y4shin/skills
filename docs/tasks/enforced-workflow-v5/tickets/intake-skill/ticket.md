@@ -64,8 +64,8 @@ README, and the docs page tree.
 
 ## Implementation notes
 
-- Landed on `ticket/intake-skill` (4 wip commits on top of 5c20a70); full
-  suite 1087 green, typecheck clean.
+- Landed on `ticket/intake-skill` (7 wip commits on top of 5c20a70); full
+  suite 1091 green, typecheck clean.
 - Two creation tools landed as part of this ticket (the carried constraint
   names this ticket as their owner, keeping one private signature tool per
   registry entry):
@@ -80,10 +80,13 @@ README, and the docs page tree.
   - `tw_add_task`: the named planning-task creator (the counterpart of
     `tw_add_ticket`). Writes type: task with a planning subtype,
     status: stable, workflow_state: ready, and an empty `blocked_by` (a
-    task is created before its edges are known). Refuses an unsafe or
-    duplicate slug (a slug that collides with any artifact of the effort,
-    including tickets), a subtype outside the planning set, an invalid
-    mode, and an effort with no map. It is disclosed to intake only; ticket
+    task is created before its edges are known). An added task clears the
+    map's ready flag, the same auto-clear the landed planning writers
+    carry, so a post-reconcile addition forces one more Wayfinder pass.
+    Refuses an unsafe or duplicate slug (a slug that collides with any
+    artifact of the effort, including tickets), a subtype outside the
+    planning set, an invalid mode, and an effort with no map. It is
+    disclosed to intake only; ticket
     10 (`wayfinder-reconcile-and-passes`) has landed without it, so wayfinder's
     task-creation prose still describes by-hand creation that the write
     guard now blocks - the registry toolset for wayfinder gains

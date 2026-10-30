@@ -23,7 +23,8 @@ status: stable
   unsafe slug, existing live effort, and a stray un-mapped directory) and
   `tw_add_task` (the planning-task creator: planning subtype enum,
   stable/ready frontmatter, empty `blocked_by`, slug-collision refusals
-  against any artifact of the effort). `tw_add_ticket` was already landed
+  against any artifact of the effort, and the same ready-flag auto-clear
+  the landed planning writers carry). `tw_add_ticket` was already landed
   by implementation-transition-tools and is reused unchanged. The intake
   registry toolset is now `["tw_create_effort", "tw_add_task",
   "tw_add_ticket", "tw_state", "tw_state_set", "tw_list", "tw_get"]`;
