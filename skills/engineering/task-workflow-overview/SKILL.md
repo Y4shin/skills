@@ -90,8 +90,8 @@ A starting situation that generates work, then merges onto the main flow.
 
 - **`/skill:improve-codebase-architecture`** runs whenever you have a spare
   moment to keep the codebase good for agents to operate in. It surfaces
-  **deepening opportunities**; picking one generates an idea you can take into
-  the main flow at `grilling`.
+  **deepening opportunities**; picking one generates an idea you can take
+  into the main flow at `/skill:intake`.
 
 ## Vocabulary underneath
 
