@@ -59,8 +59,8 @@ _Avoid_: depends on (too prose-y; this is the field name), prerequisites
 **Frontier**:
 The ready edge of one graph: the artifacts of a kind whose `blocked_by`
 dependencies are all done. It is computed per kind, so an effort has a planning
-frontier and a ticket frontier, never one combined queue; `tw_frontier` answers
-for either.
+frontier and a ticket frontier, never one combined queue; `tw_frontier` reports
+each ready artifact with its kind.
 _Avoid_: queue, backlog (both imply FIFO, and the frontier is dependency-ordered)
 
 **Dependency level**:
@@ -89,8 +89,8 @@ _Avoid_: design doc, technical plan, spec (that is the specification)
 **Ready for spec**:
 The map's `ready_for_spec` field, which says the planning frontier is empty, the
 non-goals are non-empty, and the non-negotiable facts name the success test.
-Wayfinder's reconcile pass is the only setter and sets it last; any later plan
-change clears it. It is the only thing `to-spec` checks.
+Wayfinder's reconcile pass sets it last, through `tw_finalize_map`, the only
+setter; any later plan change clears it. It is the only thing `to-spec` checks.
 _Avoid_: planning complete, done planning
 
 **Ticket graph**:
@@ -100,11 +100,11 @@ document, and `implement-ticket` walks it level by level.
 _Avoid_: roadmap, backlog
 
 **Review artifact**:
-The whole-effort review at `docs/tasks/<effort>/review.md`, written by the review
-writer during `finalize-effort`: the findings a later reader would trip over,
-plus the disposition record for each one. It carries no workflow state; its
-`dispositioned` flag says every finding has been triaged, and the archive gate
-reads that flag.
+The whole-effort review at `docs/tasks/<effort>/review.md`, written by
+`tw_write_review` during `finalize-effort`: the findings a later reader would
+trip over, plus the disposition record for each one. It carries no workflow
+state; its `dispositioned` flag says every finding has been dispositioned, and
+the archive gate reads that flag.
 _Avoid_: audit, report card
 
 **Disposition**:
@@ -128,8 +128,9 @@ _Avoid_: parent (that implies a tree edge), depends on
 
 **Archive**:
 The end state of an effort: its directory moved as a unit to
-`docs/tasks/archive/<effort>/` by the archive tool, once every review finding is
-dispositioned. Archived efforts stay readable, because the tools read archives.
+`docs/tasks/archive/<effort>/` by `tw_archive_effort`, once every review finding
+is dispositioned. Archived efforts stay readable, because the tools read
+archives.
 _Avoid_: delete, close (too vague)
 
 **State pointers**:

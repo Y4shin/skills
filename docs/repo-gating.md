@@ -13,9 +13,9 @@ override them locally.
 
 - **No tools register:** none of the `tw_*` tools, and none of `notify_user`.
   The model never sees them.
-- **The six skills are stripped from the system prompt's `<available_skills>`**
+- **The package's skills are stripped from the system prompt's `<available_skills>`**
   block, so the model doesn't auto-invoke them.
-- **Explicit `/skill:<name>` is blocked** for the six: an `input` event handler
+- **Explicit `/skill:<name>` is blocked** for them: an `input` event handler
   returns `{action:"handled"}` and notifies "task-workflow is gated in this work
   repo; not loading <name>". (Non-task-workflow skills like `/skill:oracle` are
   unaffected.)
@@ -53,7 +53,7 @@ legitimate path needs the shell on the tree, not that the shell is blocked.
 
 pi 0.80.10 exposes **no** extension hook to suppress skills from the `/help` /
 skill-list surface (that surface reads from the loaded skill set, and
-`resources_discover` is additive-only). So the six task-workflow skills **still
+`resources_discover` is additive-only). So the package's skills **still
 appear on `/help` in a work repo**. The gate covers the system prompt only.
 Explicit `/skill:<name>` is prevented via the `input` event (see above).
 
