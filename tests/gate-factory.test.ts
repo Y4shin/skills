@@ -86,12 +86,14 @@ interface StubExtensionAPI extends ExtensionAPI {
   getActiveTools(): string[];
 }
 
+// The gated names the package currently ships: the runtime derives the list
+// from package.json pi.skills, so the fixture matches the shipped surface.
+// finalize-effort joins when finalize-effort-skill lands (ticket 18).
 const GATED_SKILL_NAMES = [
   "task-workflow-overview",
   "setup-workflow",
   "wayfinder",
-  "implement-task",
-  "finalize-task",
+  "implement-ticket",
 ];
 
 function buildSkillsXml(skillNames: string[]): string {
@@ -391,13 +393,13 @@ describe("factory gate", () => {
       expect(inputHandlers.length).toBe(1);
 
       const result = await inputHandlers[0](
-        { type: "input", text: "/skill:implement-task", source: "interactive" },
+        { type: "input", text: "/skill:implement-ticket", source: "interactive" },
         { ui: stub.ui },
       );
 
       expect(result).toEqual({ action: "handled" });
       expect(stub.notifications).toContainEqual({
-        message: "task-workflow is gated in this work repo; not loading implement-task",
+        message: "task-workflow is gated in this work repo; not loading implement-ticket",
         level: "warning",
       });
     });
@@ -410,13 +412,13 @@ describe("factory gate", () => {
 
       const inputHandlers = stub.handlers["input"];
       const result = await inputHandlers[0](
-        { type: "input", text: "/skill:implement-task some args", source: "interactive" },
+        { type: "input", text: "/skill:implement-ticket some args", source: "interactive" },
         { ui: stub.ui },
       );
 
       expect(result).toEqual({ action: "handled" });
       expect(stub.notifications).toContainEqual({
-        message: "task-workflow is gated in this work repo; not loading implement-task",
+        message: "task-workflow is gated in this work repo; not loading implement-ticket",
         level: "warning",
       });
     });

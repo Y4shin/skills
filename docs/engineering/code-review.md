@@ -11,10 +11,10 @@ other, so there is no single winner.
 
 The **spec source** depends on what the diff delivers: a feature ticket
 reviews against its ticket doc (`docs/tasks/<effort>/tickets/<ticket-slug>/ticket.md`)
-plus the effort-root architecture spec
-(`docs/tasks/<effort>/arch-spec.md`); a bug ticket reviews against the bug
+plus the effort's architecture document
+(`docs/tasks/<effort>/architecture.md`); a bug ticket reviews against the bug
 doc (`docs/bugs/<slug>.md`) and its reproduction from the ticket body; a
-whole-effort review takes the ticket docs plus the arch spec.
+whole-effort review takes the ticket docs plus the architecture document.
 
 The **standards sources** are read directly: `AGENTS.md` and `CONTEXT.md`
 at the repo root, `docs/standards.md` when present, and `docs/testing.md`.
@@ -24,7 +24,7 @@ Fowler code smells, each a labelled judgement call ("possible Feature
 Envy"), skipped where tooling already enforces, and always overridden by a
 documented repo standard.
 
-The review is **advisory**: `implement-task` fires it at the end of the
+The review is **advisory**: `implement-ticket` fires it at the end of the
 feature and bug paths, before finalize, but it does not gate landing.
 
 ## When to reach for it

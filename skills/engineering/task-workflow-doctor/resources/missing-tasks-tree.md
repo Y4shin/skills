@@ -4,7 +4,7 @@
 
 - Tasks are not showing up.
 - `docs/tasks/` is missing or empty.
-- `/skill:wayfinder`, `/skill:implement-task`, or the tw_* tools cannot find
+- `/skill:wayfinder`, `/skill:implement-ticket`, or the tw_* tools cannot find
   task files.
 
 ## Missing artifact

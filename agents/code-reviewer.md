@@ -20,7 +20,7 @@ You run a two-axis review of the diff between a fixed point and `HEAD`. Consult 
    If either check fails, stop and report why.
 
 2. **Identify the spec source** from the task context:
-   - Feature ticket: the ticket doc (`docs/tasks/<effort>/tickets/<ticket-slug>/ticket.md`) + the effort-root arch spec (`docs/tasks/<effort>/arch-spec.md`).
+   - Feature ticket: the ticket doc (`docs/tasks/<effort>/tickets/<ticket-slug>/ticket.md`) + the effort's architecture document (`docs/tasks/<effort>/architecture.md`).
    - Bug ticket: the bug doc (`docs/bugs/<slug>.md`) + its reproduction, as referenced from the ticket body.
    - Whole-effort review: the effort's ticket docs + the effort-root arch spec.
 

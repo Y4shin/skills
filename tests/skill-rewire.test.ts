@@ -46,10 +46,13 @@ describe("seam 2e - improve-codebase-architecture delegates grilling to the skil
 // ─── Seam 2f: no router denies the standalone grilling skill ────────
 
 describe("seam 2f - no router denies the standalone grilling skill", () => {
-  test("implement-task does not claim grilling lacks a standalone skill", () => {
-    const router = readFile("skills/engineering/implement-task/SKILL.md");
-    expect(router).toMatch(/delegate to the `grilling` skill/);
-    expect(router).not.toMatch(/grilling[^\n]*no standalone skill/i);
+  test("implement-ticket does not claim grilling lacks a standalone skill and routes planning to wayfinder", () => {
+    const phase = readFile("skills/engineering/implement-ticket/SKILL.md");
+    expect(phase).not.toMatch(/grilling[^\n]*no standalone skill/i);
+    // Planning work is Wayfinder's frontier: the implementation phase never
+    // restates the grilling method, it hands the work back.
+    expect(phase).toMatch(/Wayfinder's frontier/);
+    expect(phase).toMatch(/\/skill:wayfinder/);
   });
 });
 
@@ -125,8 +128,7 @@ const WORKFLOW_SKILLS = [
   "wayfinder",
   "to-spec",
   "to-tickets",
-  "implement-task",
-  "finalize-task",
+  "implement-ticket",
   "setup-workflow",
   "task-workflow-overview",
   "task-workflow-doctor",
@@ -233,14 +235,14 @@ describe("seam 4 - each workflow skill ships its report resource", () => {
 // report resource is what keeps them out of the human-facing message.
 describe("seam 5 - chain and end-of-effort return shapes unchanged", () => {
   test("the shipped chain scripts still return the settled machine shape", () => {
-    const chain = readFile("skills/engineering/implement-task/scripts/ticket-chain.js");
+    const chain = readFile("skills/engineering/implement-ticket/scripts/ticket-chain.js");
     expect(chain).toMatch(/ok: false/);
     expect(chain).toMatch(/failed: "args"/);
     expect(chain).toMatch(/error: "ticket-chain\.js missing required args/);
     expect(chain).toMatch(/step: gate/);
     expect(chain).toMatch(/refs/);
 
-    const end = readFile("skills/engineering/implement-task/scripts/end-of-effort.js");
+    const end = readFile("skills/engineering/implement-ticket/scripts/end-of-effort.js");
     expect(end).toMatch(/ok: false/);
     expect(end).toMatch(/failed: "args"/);
     expect(end).toMatch(/step: spec/);
@@ -249,10 +251,10 @@ describe("seam 5 - chain and end-of-effort return shapes unchanged", () => {
   });
 
   test("the reporting prose names the machine result but never mirrors it", () => {
-    // The implement-task report resource is the one tuned to the chain: it
+    // The implement-ticket report resource is the one tuned to the chain: it
     // tells the model where the machine receipt belongs and where it does
     // not.
-    const report = readFile(reportPath("implement-task")).replace(/\s+/g, " ");
+    const report = readFile(reportPath("implement-ticket")).replace(/\s+/g, " ");
     expect(report).toMatch(/machine result/);
     expect(report).toMatch(/failure toolbelt/);
     expect(report).not.toMatch(/refs\s*:|step\s*:\s*\{/);
