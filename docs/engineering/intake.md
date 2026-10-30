@@ -4,8 +4,8 @@
 
 `intake` is the single front door to the workflow, for both the phase and
 the skill. It replaces `triage`. Every request that enters through it
-becomes an effort: there is no parallel bug substrate and no rejection
-path.
+becomes an effort under `docs/tasks/<effort>/`: there is no parallel bug
+substrate and no rejection path.
 
 One intake run runs a bounded, time-boxed round of sanity checks (active
 and archived efforts for a duplicate or fold-in target, related efforts for

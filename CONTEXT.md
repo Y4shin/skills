@@ -18,7 +18,7 @@ _Avoid_: epic, initiative, project (too broad)
 A single unit of work in the graph: a document at
 `docs/tasks/<slug>/task.md` with a `type:` (one of six, see below), a
 `blocked_by` list, and a `status`. Created by wayfinder (planning types)
-or `to-tickets` (implementation types). Executed by `implement-task`.
+or `to-tickets` (implementation types). Executed by `implement-ticket`.
 _Avoid_: ticket, issue (we use `docs/tasks/` files, not an issue tracker)
 
 **Slice**:
@@ -32,8 +32,9 @@ _Avoid_: step (too small), chunk (too vague)
 **Frontier**:
 The ready edge of the task graph: tasks (or slices) whose `blocked_by`
 dependencies are all done. `tw_frontier <map>` computes it;
-`tw_dependency_levels <map>` computes the BFS levels. implement-task
-works the frontier; wayfinder reassesses it after a frontier completes.
+`tw_dependency_levels <map>` computes the BFS levels. implement-ticket
+works the ticket frontier; wayfinder reassesses the planning frontier
+after a pass completes.
 _Avoid_: queue (implies FIFO only; the frontier is dependency-ordered, not
 strictly linear)
 
@@ -94,8 +95,9 @@ state-file rebuild drops it.
 _Avoid_: cursor, position (both imply a single value; there are two)
 
 **Task type**:
-One of six, declared in a task's `type:` frontmatter, routing
-`implement-task` to the matching resource:
+The planning and implementation subtypes, declared in a `type: task` or
+`type: ticket` artifact's `subtype:` frontmatter, routing
+`implement-ticket` to the matching resource for implementation tickets:
 - `research`: gather high-trust evidence (planning type; wayfinder creates
   it; the `research` skill is the reusable discipline).
 - `prototype`: build a throwaway artifact to answer one design question

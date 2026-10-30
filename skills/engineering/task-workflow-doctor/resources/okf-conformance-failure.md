@@ -46,7 +46,8 @@ done
   - `map.md` or `tasks/<task>/task.md`: `/skill:wayfinder`
   - `tickets/<ticket>/ticket.md`: `/skill:to-tickets`
   - `spec.md`: `/skill:to-spec`
-  - archived shapes under `docs/tasks/archive/`: `/skill:finalize-task`
+  - the changelog (`CHANGELOG.md`): the archive move (`tw_archive_effort`,
+    reached through `/skill:finalize-effort`)
 
 Report the file, the rule it breaks, and the route. The doctor diagnoses and
 routes; it does not fix.

@@ -1,13 +1,13 @@
-// End-of-effort workflow for the implement-task skill.
+// End-of-effort workflow for the implement-ticket skill.
 //
 // One launch runs the wrap-up after every ticket of an effort has landed,
 // in order:
 //   step 1: advisory whole-effort review (code-reviewer)   -- skipped when args.review === false
-//   step 2: final arch-spec reconcile (spec-reconciler)    -- skipped when args.reconcile === false
+//   step 2: final architecture reconcile (spec-reconciler)  -- skipped when args.reconcile === false
 //   step 3: coherence refactor (coherence-refactorer)      -- skipped when args.inconsistencies is empty
 //   step 4: suite gate (test-runner)                        -- always; the final ok-gate
 //
-// The caller (the model running implement-task) launches it as:
+// The caller (the model running implement-ticket) launches it as:
 //
 //   subagent({
 //     async: true,
@@ -69,15 +69,15 @@ function reviewTask() {
   return [
     'Review the whole-effort diff for effort "' + args.effort + '".',
     "Fixed point: " + args.startingBranch,
-    "Spec source: the ticket docs plus docs/tasks/" + args.effort + "/arch-spec.md"
+    "Spec source: the ticket docs plus the effort's architecture document"
   ].join("\n");
 }
 
 function specTask() {
   return [
-    'Final reconcile of the arch spec for effort "' + args.effort + '": make it read as what was built.',
+    'Final reconcile of the architecture document for effort "' + args.effort + '": make it read as what was built.',
     "",
-    "Arch spec: docs/tasks/" + args.effort + "/arch-spec.md",
+    "Architecture: docs/tasks/" + args.effort + "/architecture.md",
     "Deviation reports: docs/tasks/" + args.effort + "/tickets/*/deviation-reports/*.md"
   ].join("\n");
 }
@@ -87,7 +87,7 @@ function coherenceTask(reviewRef) {
     'Apply the coherence refactor for effort "' + args.effort + '": fix the listed inconsistencies.',
     "",
     "Combined diff: git diff " + args.startingBranch + "...HEAD (HEAD is the last landing branch)",
-    "Arch spec: docs/tasks/" + args.effort + "/arch-spec.md"
+    "Architecture: docs/tasks/" + args.effort + "/architecture.md"
   ];
   if (reviewRef) lines.push("Review findings: " + reviewRef);
   lines.push("", "Inconsistencies to fix:");
@@ -132,7 +132,7 @@ if (args.review !== false) {
 if (args.reconcile !== false) {
   const spec = await runs.run("spec", {
     agent: "spec-reconciler",
-    label: "Reconcile " + args.effort + " arch spec",
+    label: "Reconcile " + args.effort + " architecture document",
     task: specTask()
   });
   refs.spec = spec.outputReference || spec.output;

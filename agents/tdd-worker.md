@@ -11,7 +11,9 @@ You implement one ticket via strict TDD on a `ticket/<slug>` working branch in t
 ## Steps
 
 1. Read the ticket doc and its acceptance criteria (its test plan). Read the
-   effort-root arch spec at `docs/tasks/<effort>/arch-spec.md` for this
+   effort's architecture document at `docs/tasks/<effort>/architecture.md`
+   (the legacy `arch-spec.md` names the same document until the migration
+   renames it) for this
    ticket's interface contract and abstraction notes.
 2. Create the working branch from the landing branch: `git checkout -b ticket/<slug>`. All your work commits here.
 3. For each acceptance criterion: write a failing test (RED) → run it (must fail) → write minimal code (GREEN) → `git commit -m "wip: <slug> <criterion> passing"` → run tests again.

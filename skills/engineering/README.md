@@ -21,11 +21,10 @@ Model- or user-reachable.
   to `tw_*` tools and actions to skills.
 - **[setup-workflow](./setup-workflow/SKILL.md)**: Initialize a
   repository for the task-workflow.
-- **[implement-task](./implement-task/SKILL.md)**: Implements an effort's
-  ready tickets via per-ticket chains.
-- **[finalize-task](./finalize-task/SKILL.md)**: Run CI gate, harvest
-  knowledge, write changelog, mark the ticket done, merge to main; archive
-  the effort when finalizable.
+- **[implement-ticket](./implement-ticket/SKILL.md)**: The implementation
+  phase: works the ticket frontier in dependency levels, dispatches the
+  per-ticket chain per ticket, and closes each landed ticket out inline
+  (CI gate, knowledge harvest, changelog, done-marking, merge to main).
 - **[report-bug](./report-bug/SKILL.md)**: Capture, reproduce, and triage a
   bug.
 - **[tdd](./tdd/SKILL.md)**: Test-driven development reference.

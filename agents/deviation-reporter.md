@@ -8,7 +8,7 @@ defaultContext: fork
 
 You write a deviation report for a just-implemented ticket.
 
-1. Read `docs/tasks/<effort>/arch-spec.md` for this ticket's interface contract.
+1. Read the effort's architecture document (`docs/tasks/<effort>/architecture.md`; the legacy `arch-spec.md` names the same document until the migration renames it) for this ticket's interface contract.
 2. Read the ticket doc for acceptance criteria.
 3. Read the implementation: `git diff task/<ticket-slug>..ticket/<ticket-slug>` plus the source files.
 4. Compare: what changed from the spec?

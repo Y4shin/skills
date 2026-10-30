@@ -9,7 +9,7 @@ defaultContext: fresh
 You verify a ticket on its working branch in the repo. Run the quality gate:
 
 1. Detect lint tool (check `package.json` scripts, linter config files). Run it. If it fails: STOP and report.
-2. Find the ticket's test command from the ticket doc's test plan, or from the arch-spec seams when the test plan names none. Run it. This is a fast early signal. If it fails: STOP and report.
+2. Find the ticket's test command from the ticket doc's test plan, or from the architecture document's seams when the test plan names none. Run it. This is a fast early signal. If it fails: STOP and report.
 3. Run the **full project test suite** (not just the ticket's tests). This is the landing gate: a red full suite blocks landing even when the ticket's own tests pass. If it fails: STOP and report which test files failed, so the tdd-worker retry can route them (root-cause fix in the ticket's own code vs. intentional interface breakage to escalate).
 4. Report: `Ticket <slug> verified, lint clean, ticket tests passing, full project suite green.` or list the failing test files.
 

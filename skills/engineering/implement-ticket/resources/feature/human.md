@@ -1,21 +1,24 @@
-# Implement Task (feature human mode)
+# Implement Ticket (feature human mode)
 
 This resource is the human-owned feature pipeline. The feature router selects it
 only for clear human/manual intent, after the user confirms an ambiguous
 invocation, or when a `mode: human` marker routes the re-invocation here. It is
 orchestration protocol, not an application-code pipeline.
 
-## 1. Collaboratively approve the architecture
+## 1. Collaboratively confirm the architecture
 
 1. Read the ticket, the effort's tickets, and the effort-root architecture
-   specification (`docs/tasks/<effort>/arch-spec.md`).
-2. Present the proposed architecture, ticket dependency order, seams, and
-   interface contracts to the human; collaboratively review, discuss, and revise
-   them together.
+   document (`docs/tasks/<effort>/architecture.md`; the legacy `arch-spec.md`
+   names the same document until the migration renames it).
+2. Present the architecture spec as it reads, the ticket dependency order,
+   the seams, and the interface contracts to the human; collaboratively
+   review, discuss, and revise the understanding together. The architecture
+   document is `to-tickets`' output: this protocol never drafts or edits
+   it; a divergence goes into the deviation report and to the
+   spec-reconciler.
 3. Do not transition to implementation until the human gives explicit consent before
    implementation (for example, "approve the architecture" or "proceed with
    implementation").
-   Record the agreed decisions in the architecture spec as appropriate.
 
 No ticket implementation or code may be written before the per-ticket handoff;
 no ticket code, including tests, may be written before that handoff.

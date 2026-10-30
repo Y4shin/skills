@@ -88,8 +88,7 @@ const SKILL_FILES = [
   "skills/engineering/task-workflow-overview/SKILL.md",
   "skills/engineering/setup-workflow/SKILL.md",
   "skills/engineering/wayfinder/SKILL.md",
-  "skills/engineering/implement-task/SKILL.md",
-  "skills/engineering/finalize-task/SKILL.md",
+  "skills/engineering/implement-ticket/SKILL.md",
   "skills/engineering/tdd/SKILL.md",
   "skills/engineering/code-review/SKILL.md",
   "skills/engineering/task-workflow-doctor/SKILL.md",
@@ -157,7 +156,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(29);
+    expect(pkg.pi.skills.length).toBe(28);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
@@ -469,7 +468,7 @@ describe("triage is retired (intake-skill)", () => {
     const pkg = JSON.parse(readFile("package.json"));
     expect(pkg.pi.skills).toContain("./skills/engineering/intake");
     expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
-    expect(pkg.pi.skills.length).toBe(29);
+    expect(pkg.pi.skills.length).toBe(28);
     expect(pkg.pi.skills.filter((s: string) => s.includes("intake") || s.includes("triage"))).toEqual([
       "./skills/engineering/intake",
     ]);
@@ -499,13 +498,59 @@ describe("triage is retired (intake-skill)", () => {
     // The effort's own carried constraint: docs/bugs/ survives only as a
     // static archive, so the overview no longer names it as the bug list.
     expect(overview).not.toContain("docs/bugs/");
-  });});
+  });
+});
+
+// ─── implement-ticket: the implementation phase ──────────────────────
+
+// The phase is a model-invoked skill in the promoted set: it opens through
+// tw_open (the gate) and closes through tw_close. Its chain scripts live
+// under the skill directory; the retired implementation router and close-out
+// skill sit in skills/deprecated/ with their replacements named and are gone
+// from pi.skills and the docs page tree.
+describe("implement-ticket skill (implement-ticket-skill)", () => {
+  const content = readFile("skills/engineering/implement-ticket/SKILL.md");
+  const fm = parseFrontmatter(content);
+  const pkg = JSON.parse(readFile("package.json"));
+
+  test("is a model-invoked skill registered in pi.skills", () => {
+    expect(pkg.pi.skills).toContain("./skills/engineering/implement-ticket");
+    expect(fm["name"]).toBe("implement-ticket");
+    // Model-invoked: the frontmatter carries no disable-model-invocation.
+    expect(fm["disable-model-invocation"]).toBeUndefined();
+  });
+
+  test("opens through tw_open with the effort and target, and closes through tw_close", () => {
+    expect(content).toMatch(/tw_open/);
+    expect(content).toMatch(/skill: "implement-ticket", effort: "<effort-slug>", target: "<ticket-slug>"/);
+    expect(content).toContain("tw_close implement-ticket");
+  });
+
+  test("the chain scripts live under the skill; the retired router paths are gone", () => {
+    expect(existsSync(join(PROJECT, "skills/engineering/implement-ticket/scripts/ticket-chain.js"))).toBe(true);
+    expect(existsSync(join(PROJECT, "skills/engineering/implement-ticket/scripts/end-of-effort.js"))).toBe(true);
+    expect(existsSync(join(PROJECT, "skills/engineering/implement-task"))).toBe(false);
+    expect(existsSync(join(PROJECT, "skills/engineering/finalize-task"))).toBe(false);
+  });
+
+  test("implement-task and finalize-task are retired with their replacements named", () => {
+    for (const retired of ["implement-task", "finalize-task"]) {
+      expect(pkg.pi.skills).not.toContain(`./skills/engineering/${retired}`);
+      expect(existsSync(join(PROJECT, `docs/engineering/${retired}.md`))).toBe(false);
+      const deprecated = readFile(`skills/deprecated/${retired}/SKILL.md`);
+      expect(deprecated).toMatch(/implement-ticket/);
+    }
+    const readme = readFile("skills/deprecated/README.md");
+    expect(readme).toContain("[implement-task](./implement-task/SKILL.md)");
+    expect(readme).toContain("[finalize-task](./finalize-task/SKILL.md)");
+  });
+});
 
 describe("human-mode resource routing", () => {
   const routers = ["feature", "bug"];
 
   test.each(routers)("%s router is slim and references both mode resources", (kind) => {
-    const content = readFile(`skills/engineering/implement-task/resources/${kind}.md`);
+    const content = readFile(`skills/engineering/implement-ticket/resources/${kind}.md`);
     expect(content).toContain(`resources/${kind}/autonomous.md`);
     expect(content).toContain(`resources/${kind}/human.md`);
     expect(content).toMatch(/ambiguous/i);
@@ -514,14 +559,14 @@ describe("human-mode resource routing", () => {
   });
 
   test.each(routers)("%s mode resources exist and autonomous copy is substantial", (kind) => {
-    const autonomous = readFile(`skills/engineering/implement-task/resources/${kind}/autonomous.md`);
-    const human = readFile(`skills/engineering/implement-task/resources/${kind}/human.md`);
+    const autonomous = readFile(`skills/engineering/implement-ticket/resources/${kind}/autonomous.md`);
+    const human = readFile(`skills/engineering/implement-ticket/resources/${kind}/human.md`);
     expect(autonomous.length).toBeGreaterThan(2500);
     expect(human.length).toBeGreaterThan(100);
   });
 
   test.each(routers)("%s router documents clear human phrases, variants, and autonomous fallback", (kind) => {
-    const content = readFile(`skills/engineering/implement-task/resources/${kind}.md`);
+    const content = readFile(`skills/engineering/implement-ticket/resources/${kind}.md`);
     expect(content).toMatch(/implement (the task )?(yourself|manually)|human mode|manual mode/i);
     expect(content).toMatch(/no prose|no trailing prose|fallback|autonomous/i);
     expect(content).toMatch(/confirmation|confirm/i);
@@ -529,16 +574,16 @@ describe("human-mode resource routing", () => {
 });
 
 describe("human-mode feature pipeline", () => {
-  const content = readFile("skills/engineering/implement-task/resources/feature/human.md");
+  const content = readFile("skills/engineering/implement-ticket/resources/feature/human.md");
 
   test("requires collaborative architecture planning and explicit consent before implementation", () => {
     expect(content).toMatch(/architecture[- ]spec/i);
     expect(content).toMatch(/collaborat(e|ively).*review|review.*architecture/i);
     expect(content).toMatch(/explicit (user|human) consent|consent.*before/i);
     expect(content).toMatch(/no ticket (code|implementation).*before.*handoff/i);
-    // v4: the architecture spec lives at the effort root, shared by the
-    // effort's ticket chains; ordering reads the effort graph.
-    expect(content).toMatch(/docs\/tasks\/<effort>\/arch-spec\.md/);
+    // v5: the architecture document lives at the effort root (to-tickets'
+    // output); ordering reads the effort graph.
+    expect(content).toMatch(/docs\/tasks\/<effort>\/architecture\.md/);
     expect(content).toContain("tw_dependency_levels <effort-slug>");
   });
 
@@ -580,7 +625,7 @@ describe("human-mode feature pipeline", () => {
 });
 
 describe("human-mode bug pipeline", () => {
-  const content = readFile("skills/engineering/implement-task/resources/bug/human.md");
+  const content = readFile("skills/engineering/implement-ticket/resources/bug/human.md");
 
   test("requires collaborative reproduction and diagnosis planning with consent", () => {
     expect(content).toMatch(/reproduction|reproduce/i);
@@ -625,22 +670,24 @@ describe("human-mode integration coverage", () => {
   const taskKinds = ["feature", "bug"] as const;
 
   test.each(taskKinds)("%s router is the sole dispatch entry and discovers both modes", (kind) => {
-    const router = readFile(`skills/engineering/implement-task/resources/${kind}.md`);
+    const router = readFile(`skills/engineering/implement-ticket/resources/${kind}.md`);
     expect(router).toContain(`resources/${kind}/autonomous.md`);
     expect(router).toContain(`resources/${kind}/human.md`);
     expect(router).toMatch(/no trailing mode prose|no prose/i);
     expect(router).toMatch(/ambiguous/i);
     expect(router).toContain("ask_user_question");
 
-    const wrapper = readFile("skills/engineering/implement-task/SKILL.md");
-    expect(wrapper).toContain(`resources/${kind}.md`);
-    expect(wrapper).not.toContain(`resources/${kind}/human.md`);
-    expect(wrapper).not.toContain(`resources/${kind}/autonomous.md`);
+    const phase = readFile("skills/engineering/implement-ticket/SKILL.md");
+    expect(phase).toContain(`resources/${kind}.md`);
+    // The mode-specific pipelines are the routers' own discovery; the phase
+    // never selects one directly.
+    expect(phase).not.toContain(`resources/${kind}/human.md`);
+    expect(phase).not.toContain(`resources/${kind}/autonomous.md`);
   });
 
   test.each(taskKinds.flatMap((kind) => modes.map((mode) => [kind, mode] as const)))
     ("%s %s resource exists and is non-empty", (kind, mode) => {
-      const content = readFile(`skills/engineering/implement-task/resources/${kind}/${mode}.md`);
+      const content = readFile(`skills/engineering/implement-ticket/resources/${kind}/${mode}.md`);
       expect(content.trim().length).toBeGreaterThan(100);
     });
 
@@ -651,7 +698,7 @@ describe("human-mode integration coverage", () => {
     expect(reviewer.tools).not.toMatch(/edit|write|land-worker/);
 
     for (const kind of taskKinds) {
-      const human = readFile(`skills/engineering/implement-task/resources/${kind}/human.md`);
+      const human = readFile(`skills/engineering/implement-ticket/resources/${kind}/human.md`);
       expect(human).toMatch(/read[- ]only/i);
       expect(human).toMatch(/must not edit|cannot edit/i);
       expect(human).toContain("land-worker");
@@ -660,7 +707,7 @@ describe("human-mode integration coverage", () => {
   });
 
   test.each(taskKinds)("%s human protocol covers verifier failure and approval rejection", (kind) => {
-    const human = readFile(`skills/engineering/implement-task/resources/${kind}/human.md`);
+    const human = readFile(`skills/engineering/implement-ticket/resources/${kind}/human.md`);
     expect(human).toMatch(/verifier[- ]first/i);
     expect(human).toMatch(/fast[- ]fail/i);
     expect(human).toMatch(/failure.*return|return.*failure/i);
@@ -669,7 +716,7 @@ describe("human-mode integration coverage", () => {
   });
 
   test("feature human protocol preserves collaborative post-handoff assistance boundary", () => {
-    const human = readFile("skills/engineering/implement-task/resources/feature/human.md");
+    const human = readFile("skills/engineering/implement-ticket/resources/feature/human.md");
     expect(human).toMatch(/after the per[- ]ticket handoff|after.*handoff/i);
     expect(human).toMatch(/explicit request.*code assistance|code assistance.*explicit/i);
     expect(human).toMatch(/multiple tickets|each ticket|every ticket/i);
@@ -681,37 +728,39 @@ describe("skill cross-references", () => {
   test("overview references all core skills", () => {
     const content = readFile("skills/engineering/task-workflow-overview/SKILL.md");
     expect(content).toContain("wayfinder");
-    expect(content).toContain("implement-task");
-    expect(content).toContain("finalize-task");
+    expect(content).toContain("/skill:implement-ticket");
     expect(content).toContain("setup-workflow");
+    // The retired routers are gone from the router table.
+    expect(content).not.toContain("/skill:implement-task");
+    expect(content).not.toContain("/skill:finalize-task");
   });
 
-  test("implement-task router does not deny the grilling skill exists", () => {
-    // Ticket grilling-delegation-fix: the router that claimed grilling has
-    // "no standalone skill" was corrected; grilling delegates like research
-    // and prototype.
-    const content = readFile("skills/engineering/implement-task/SKILL.md");
-    expect(content).toMatch(/delegate to the `grilling` skill/);
+  test("implement-ticket never denies the grilling skill exists", () => {
+    // The implementation phase routes planning work back to wayfinder
+    // (grilling-delegation-fix): it never restates the method and never
+    // claims grilling lacks a standalone skill.
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
+    expect(content).toMatch(/Wayfinder's frontier/);
+    expect(content).toMatch(/\/skill:wayfinder/);
     expect(content).not.toMatch(/grilling[^\n]*no standalone skill/i);
   });
 
-  test("implement-task wrapper reads subtype (type fallback) and dispatches to resources", () => {
-    const content = readFile("skills/engineering/implement-task/SKILL.md");
-    expect(content).toContain("tw_get");
-    // v4 routing field: subtype, falling back to type for legacy artifacts.
+  test("implement-ticket routes feature and bug tickets and hands planning back to wayfinder", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
+    // The v5 routing fields: subtype names the ticket kind (feature or bug),
+    // mode marks a human-owned ticket. Implementation work is always a
+    // ticket; there is no type fallback and no planning dispatch here.
     expect(content).toMatch(/"subtype"/);
-    expect(content).toContain("type");
     expect(content).toContain("resources/feature.md");
     expect(content).toContain("resources/bug.md");
-    // The planning resources consolidate under wayfinder/resources (ticket
-    // wayfinder-reconcile-and-passes); the planning subtypes delegate to
-    // their standalone skills.
-    expect(content).toContain("wayfinder/resources/");
+    expect(content).toMatch(/`type: ticket` with `subtype` `feature` or `bug`/);
+    // The planning frontier is Wayfinder's; the phase never dispatches a
+    // planning subtype and never restates the grilling method.
+    expect(content).toMatch(/planning subtypes \(research, prototype, grilling, manual\) are/);
     expect(content).not.toContain("implement-task/resources/research.md");
     expect(content).not.toContain("implement-task/resources/prototype.md");
     expect(content).not.toContain("implement-task/resources/grilling.md");
     expect(content).not.toContain("implement-task/resources/manual.md");
-    expect(content).toMatch(/absent.*feature|feature.*default|\btype:\s*feature\b/i);
   });
 
   test("wayfinder creates planning tasks only; to-tickets owns feature and bug creation", () => {
@@ -747,41 +796,41 @@ describe("skill cross-references", () => {
     expect(existsSync(join(PROJECT, "skills/engineering/wayfinder/resources/bug.md"))).toBe(false);
   });
 
-  test("implement-task re-enters wayfinder after a frontier", () => {
-    const content = readFile("skills/engineering/implement-task/SKILL.md");
-    // v4: the reassessment call keeps the effort slug (the map lives inside
-    // the effort directory; the effort slug is the invocation argument).
-    expect(content).toContain("wayfinder <effort-slug>");
-    expect(content).toContain("reassess the map");
+  test("implement-ticket sends planning work back to wayfinder", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
+    // Planning work discovered mid-implementation is Wayfinder's: the run
+    // stops and tells the human, it never improvises a hidden plan.
+    expect(content).toMatch(/tells? the human to run `\/skill:wayfinder`/);
+    expect(content).toMatch(/do not improvise a hidden/);
   });
 
-  test("implement-task feature resource references tw_dependency_levels", () => {
-    const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
+  test("implement-ticket feature resource references tw_dependency_levels", () => {
+    const content = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
     expect(content).toContain("tw_dependency_levels");
   });
 
-  test("implement-task feature resource references tdd-worker agent", () => {
-    const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
+  test("implement-ticket feature resource references tdd-worker agent", () => {
+    const content = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
     expect(content).toContain("tdd-worker");
   });
 
-  test("implement-task feature resource references slice-verifier agent", () => {
-    const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
+  test("implement-ticket feature resource references slice-verifier agent", () => {
+    const content = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
     expect(content).toContain("slice-verifier");
   });
 
-  test("implement-task feature resource references land-worker agent", () => {
-    const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
+  test("implement-ticket feature resource references land-worker agent", () => {
+    const content = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
     expect(content).toContain("land-worker");
   });
 
-  test("implement-task feature resource references deviation-reporter agent", () => {
-    const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
+  test("implement-ticket feature resource references deviation-reporter agent", () => {
+    const content = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
     expect(content).toContain("deviation-reporter");
   });
 
-  test("implement-task feature resource references code-reviewer agent", () => {
-    const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
+  test("implement-ticket feature resource references code-reviewer agent", () => {
+    const content = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
     expect(content).toContain("code-reviewer");
   });
 
@@ -793,38 +842,38 @@ describe("skill cross-references", () => {
     });
   }
 
-  test("implement-task bug resource references tdd-worker agent", () => {
-    const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
+  test("implement-ticket bug resource references tdd-worker agent", () => {
+    const content = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
     expect(content).toContain("tdd-worker");
   });
 
-  test("implement-task bug resource references slice-verifier agent", () => {
-    const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
+  test("implement-ticket bug resource references slice-verifier agent", () => {
+    const content = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
     expect(content).toContain("slice-verifier");
   });
 
-  test("implement-task bug resource references land-worker agent", () => {
-    const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
+  test("implement-ticket bug resource references land-worker agent", () => {
+    const content = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
     expect(content).toContain("land-worker");
   });
 
-  test("implement-task bug resource references code-reviewer agent", () => {
-    const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
+  test("implement-ticket bug resource references code-reviewer agent", () => {
+    const content = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
     expect(content).toContain("code-reviewer");
   });
 
-  test("implement-task bug chain keeps the red-first regression test rule", () => {
+  test("implement-ticket bug chain keeps the red-first regression test rule", () => {
     // The rule lives in the diagnosing-bugs skill the worker receives; the
     // task text never restates it.
     const diagnosing = readFile("skills/engineering/diagnosing-bugs/SKILL.md");
     expect(diagnosing).toMatch(/regression test .{0,40}before the fix/i);
-    const chain = readFile("skills/engineering/implement-task/scripts/ticket-chain.js");
+    const chain = readFile("skills/engineering/implement-ticket/scripts/ticket-chain.js");
     expect(chain).not.toMatch(/regression test/i);
   });
 
   test("feature and bug resources include failure toolbelt in order", () => {
-    const feature = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
-    const bug = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
+    const feature = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
+    const bug = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
     for (const content of [feature, bug]) {
       const splitIdx = content.indexOf("split");
       const retryIdx = content.indexOf("retry");
@@ -835,18 +884,35 @@ describe("skill cross-references", () => {
     }
   });
 
-  test("finalize-task references tw_finalizable", () => {
-    const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toContain("tw_finalizable");
+  test("the close-out marks the ticket done through tw_mark_done, the one owner", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
+    expect(content).toContain("tw_mark_done");
+    expect(content).toMatch(/the one owner of the/i);
+    // The chain never marks it: the close-out is the marking's only writer.
+    expect(content).toMatch(/the chain never marks it/);
   });
 
-  test("finalize-task does not tick a map array (no array exists to tick)", () => {
-    const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).not.toContain("tw_map_tick");
+  test("the close-out runs inline in the same run that lands the ticket", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
+    expect(content).toMatch(/close-out runs inline, in the same autonomous run that lands the/i);
+    expect(content).toMatch(/The human never waits to type a close-out skill/i);
   });
 
-  test("finalize-task keeps Pi tool calls out of the set -e shell blocks", () => {
-    const content = readFile("skills/engineering/finalize-task/SKILL.md");
+  test("the changelog entry lands before the done-marking, through the only writer", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
+    expect(content).toMatch(/tw_write_changelog/);
+    expect(content).toMatch(/the only\n   writer of `docs\/tasks\/CHANGELOG\.md`/);
+    expect(content).toMatch(/changelog step must land first/i);
+  });
+
+  test("the CI gate runs before the merge; a red branch is never merged", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
+    expect(content).toMatch(/CI gate/i);
+    expect(content).toMatch(/Do not merge a red branch/i);
+  });
+
+  test("the close-out keeps Pi tool calls out of the set -e shell blocks", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
     const fence = /```[^\n]*\n([\s\S]*?)```/g;
     let m: RegExpExecArray | null;
     let shellBlocks = 0;
@@ -854,9 +920,9 @@ describe("skill cross-references", () => {
       if (/git\s+merge\s+--no-ff/.test(m[1])) {
         shellBlocks++;
         // Wrapping a Pi tool call in a set -e shell block fails with
-        // command not found and aborts the archive mid-sequence (see
+        // command not found and aborts the close-out mid-sequence (see
         // docs/bugs/finalize-task-set-e-tool-confusion.md).
-        expect(m[1]).not.toMatch(/tw_state_set|tw_finalizable|tw_map_finalizable/);
+        expect(m[1]).not.toMatch(/tw_state_set|tw_finalizable/);
       }
     }
     expect(shellBlocks).toBeGreaterThan(0);
@@ -865,34 +931,46 @@ describe("skill cross-references", () => {
     expect(content).toMatch(/Pi tool|tool call|tool invocation|not a shell command/i);
   });
 
-  test("finalize-task references tw_map_finalizable", () => {
-    const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toContain("tw_map_finalizable");
+  test("the done-marking verifies with tw_finalizable and clears the task pointer", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
+    expect(content).toContain("tw_finalizable <ticket-slug>");
+    expect(content).toMatch(/anomal/i);
+    expect(content).toContain("tw_state_set task null");
+    // The slice pointer is not called: the state setter has no slice field.
+    expect(content).not.toMatch(/tw_state_set slice/);
   });
 
-  test("finalize-task has a subtype: bug branch", () => {
-    const content = readFile("skills/engineering/finalize-task/SKILL.md");
-    expect(content).toMatch(/subtype:\s*bug/i);
+  test("no per-ticket git mv: the ticket stays in the live effort", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
+    expect(content).toMatch(/no per-ticket move|the ticket stays in the live effort/i);
+    expect(content).toMatch(/the effort archives as a unit/i);
+    // Archiving is finalize-effort's; the close-out never moves the ticket.
+    expect(content).not.toContain("docs/tasks/archive/<effort>");
   });
 
-  test("finalize-task bug branch archives bug docs to docs/bugs/archive", () => {
-    const content = readFile("skills/engineering/finalize-task/SKILL.md");
+  test("the close-out has a subtype: bug branch", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
+    expect(content).toMatch(/subtype: bug/i);
+  });
+
+  test("the bug branch archives bug docs to docs/bugs/archive", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
     expect(content).toContain("docs/bugs/archive");
   });
 
-  test("finalize-task bug branch sets status fixed and fills fix_commit", () => {
-    const content = readFile("skills/engineering/finalize-task/SKILL.md");
+  test("the bug branch sets status fixed and fills fix_commit", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
     expect(content).toContain("status: fixed");
     expect(content).toContain("fix_commit");
   });
 
-  test("finalize-task bug branch asks user when the body reference is absent", () => {
-    const content = readFile("skills/engineering/finalize-task/SKILL.md");
+  test("the bug branch asks user when the body reference is absent", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
     expect(content).toMatch(/ask.{0,80}(which bug|bug doc)/i);
   });
 
-  test("finalize-task takes the bug slug from the ticket body's reference", () => {
-    const content = readFile("skills/engineering/finalize-task/SKILL.md");
+  test("the bug branch takes the bug slug from the ticket body's reference", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
     expect(content).toMatch(/ticket body/i);
     // The bug frontmatter field is dead; the body reference is the convention.
     expect(content).not.toContain("bug: <slug>");
@@ -930,9 +1008,9 @@ describe("skill cross-references", () => {
     expect(content).toContain("routes");
   });
 
-  test("implement-task bug chain references diagnosing-bugs skill", () => {
+  test("implement-ticket bug chain references diagnosing-bugs skill", () => {
     // The discipline routing moved into the shipped chain script.
-    const chain = readFile("skills/engineering/implement-task/scripts/ticket-chain.js");
+    const chain = readFile("skills/engineering/implement-ticket/scripts/ticket-chain.js");
     expect(chain).toContain("diagnosing-bugs");
   });
 
@@ -1359,7 +1437,8 @@ const SURVIVING_TOOLS = new Set([
   // implementation-transition-tools (tw_mark_blocked,
   // tw_record_out_of_scope, tw_add_ticket, tw_split_ticket,
   // tw_write_spec, tw_finalize_map, tw_write_section), and
-  // to-tickets-architecture (tw_write_architecture).
+  // to-tickets-architecture (tw_write_architecture), and
+  // implementation-transition-tools (tw_write_changelog, tw_archive_effort).
   "tw_open",
   "tw_close",
   "tw_next",
@@ -1371,6 +1450,8 @@ const SURVIVING_TOOLS = new Set([
   "tw_finalize_map",
   "tw_write_section",
   "tw_write_architecture",
+  "tw_write_changelog",
+  "tw_archive_effort",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -1588,10 +1669,10 @@ describe("wayfinder v5 (wayfinder-reconcile-and-passes)", () => {
     expect(content).toMatch(/forces one more\s+pass/i);
   });
 
-  test("planning resources consolidate under wayfinder/resources; the implement-task duplicates are gone", () => {
+  test("planning resources consolidate under wayfinder/resources; the implementation router carries none", () => {
     for (const subtype of ["research", "prototype", "grilling", "manual"]) {
       expect(existsSync(join(PROJECT, `skills/engineering/wayfinder/resources/${subtype}.md`))).toBe(true);
-      expect(existsSync(join(PROJECT, `skills/engineering/implement-task/resources/${subtype}.md`))).toBe(false);
+      expect(existsSync(join(PROJECT, `skills/engineering/implement-ticket/resources/${subtype}.md`))).toBe(false);
     }
   });
 
@@ -2038,7 +2119,7 @@ describe("task-workflow-doctor v4 (overhaul-planning-skills)", () => {
     expect(resource).toContain("/skill:wayfinder");
     expect(resource).toContain("/skill:to-tickets");
     expect(resource).toContain("/skill:to-spec");
-    expect(resource).toContain("/skill:finalize-task");
+    expect(resource).toContain("/skill:finalize-effort");
     for (const file of ["map.md", "task.md", "ticket.md", "spec.md"]) {
       expect(resource).toContain(file);
     }
@@ -2153,54 +2234,9 @@ describe("planning skills structure facts (overhaul-planning-skills)", () => {
   });
 });
 
-// ─── implement-task v4 (overhaul-execution-skills) ───────────────────
-
-describe("implement-task v4 (overhaul-execution-skills)", () => {
-  const content = readFile("skills/engineering/implement-task/SKILL.md");
-
-  test("the router reads subtype from frontmatter, falls back to type, defaults feature", () => {
-    // The v4 routing field is subtype; legacy artifacts (no subtype) keep
-    // today's behavior via the type fallback; absent both defaults feature.
-    expect(content).toMatch(/\"subtype\"/);
-    expect(content).toMatch(/subtype[^\n]*fallback|falls? back to `?type`?/i);
-    expect(content).toMatch(/\|\|\s*"feature"/);
-    expect(content).toMatch(/legacy artifacts keep today's behavior|absent subtype defaults/i);
-  });
-
-  test("dispatch routes feature and bug to their resources and delegates the planning subtypes", () => {
-    for (const subtype of ["feature", "bug"]) {
-      expect(content).toContain(`resources/${subtype}.md`);
-    }
-    // Planning subtypes delegate to their standalone skills; manual runs the
-    // consolidated wayfinder resource (no standalone skill).
-    expect(content).toMatch(/`research` skill/i);
-    expect(content).toMatch(/`prototype` skill/i);
-    expect(content).toMatch(/`grilling` skill/i);
-    expect(content).toContain("wayfinder/resources/manual.md");
-  });
-
-  test("resolves artifacts through the resolver, with no hardcoded task-path template", () => {
-    // Path-agnostic selectors: the resolver finds ticket.md and task.md in
-    // both shapes; the wrapper must not hardcode docs/tasks/<slug>/task.md.
-    expect(content).toMatch(/resolver/i);
-    expect(content).toMatch(/ticket\.md/);
-    expect(content).toMatch(/task\.md/);
-    expect(content).not.toMatch(/docs\/tasks\/\$\{taskSlug\}\/task\.md/);
-  });
-
-  test("frontier mode runs tw_frontier over the effort, routing each item by subtype", () => {
-    expect(content).toContain("tw_frontier <effort-slug>");
-    expect(content).toMatch(/routing each (item|ticket|task) by (its )?subtype/i);
-  });
-
-  test("references only surviving tools", () => {
-    expectOnlySurvivingTools(content);
-  });
-});
-
 describe("mode: human refusal (overhaul-execution-skills)", () => {
-  test("the wrapper hard-refuses autonomous dispatch for a mode: human artifact", () => {
-    const content = readFile("skills/engineering/implement-task/SKILL.md");
+  test("the phase hard-refuses autonomous dispatch for a mode: human ticket", () => {
+    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
     expect(content).toMatch(/mode: human/);
     expect(content).toMatch(/hard-refuses autonomous dispatch/i);
     // It never dispatches chains for a marked ticket, and it does not fall
@@ -2208,23 +2244,23 @@ describe("mode: human refusal (overhaul-execution-skills)", () => {
     expect(content).toMatch(/never launches subagent chains|never dispatches chains/i);
     expect(content).toMatch(/does not fall through/i);
     // The handoff names the skill invocation for the human to run.
-    expect(content).toContain("/skill:implement-task <slug>");
+    expect(content).toContain("/skill:implement-ticket <slug>");
     // The refusal is a router rule: it fires before any resource is selected.
     expect(content).toMatch(/before any resource is selected/);
   });
 
   test.each(["feature", "bug"])("the %s router repeats the refusal rule", (kind) => {
-    const content = readFile(`skills/engineering/implement-task/resources/${kind}.md`);
+    const content = readFile(`skills/engineering/implement-ticket/resources/${kind}.md`);
     expect(content).toMatch(/mode: human/);
     expect(content).toMatch(/hard-refus|refuse/i);
-    expect(content).toContain("/skill:implement-task");
+    expect(content).toContain("/skill:implement-ticket");
   });
 });
 
 // ─── Per-ticket chains v4 (overhaul-execution-skills) ────────────────
 
 describe("feature chain v4 (overhaul-execution-skills)", () => {
-  const content = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
+  const content = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
 
   test("step 0 reads the ticket (subtype, mode, size) and works the effort frontier", () => {
     expect(content).toContain("tw_frontier <effort-slug>");
@@ -2232,24 +2268,15 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/subtype, mode, size/i);
   });
 
-  test("the architecture spec lives at the effort root, user-approved, frontmattered", () => {
-    expect(content).toMatch(/docs\/tasks\/<effort>\/arch-spec\.md/);
-    expect(content).toMatch(/user-approved|user approves/i);
-    // Committed on the starting branch before the first chain dispatch, so
-    // every ticket branch includes it.
-    expect(content).toMatch(/committed on the starting branch before the first chain dispatch/i);
-  });
-
-  test("the arch-spec frontmatter template conforms", () => {
-    const templates = extractFrontmatterTemplates(content);
-    const arch = templates.find((t) => /^type: arch spec$/m.test(t));
-    expect(arch).toBeDefined();
-    const keys = frontmatterKeys(arch!);
-    expect(keys).toContain("type");
-    expect(keys).toContain("title");
-    expect(keys).toContain("status");
-    for (const killed of KILLED_KEYS) expect(keys).not.toContain(killed);
-    assertTemplateConforms(arch!);
+  test("the architecture document lives at the effort root and is read, never drafted", () => {
+    // v5: the architecture is to-tickets' output; the opener gates on it
+    // (stable, architecture.md; the legacy arch-spec.md is tolerated input)
+    // and implementation only reads it.
+    expect(content).toMatch(/docs\/tasks\/<effort>\/architecture\.md/);
+    expect(content).toMatch(/the legacy\n`arch-spec\.md` is a tolerated input/i);
+    expect(content).toMatch(/`to-tickets`' output/i);
+    expect(content).toMatch(/never a draft step here|never drafted here/i);
+    expect(content).toMatch(/the opener has checked/i);
   });
 
   test("budgets key off the ticket's size with the m default, expressed as timeoutMs", () => {
@@ -2265,10 +2292,13 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/timeoutMs/);
   });
 
-  test("chains run per ticket per dependency level, sequential within a level", () => {
+  test("chains run per ticket per dependency level; the level boundary serializes", () => {
     expect(content).toContain("tw_dependency_levels <effort-slug>");
-    expect(content).toMatch(/sequentially/i);
+    // Tickets within one level may run concurrently; across levels the
+    // boundary serializes (strict barriers).
+    expect(content).toMatch(/may run \*\*concurrently\*\*/i);
     expect(content).toMatch(/strict barriers/i);
+    expect(content).toMatch(/level N\+1 starts only after every ticket in level N has landed/i);
   });
 
   test("the chain dispatches tdd, then verify plus deviation gated, then land", () => {
@@ -2283,12 +2313,16 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/ok-gate|ok gate/i);
   });
 
-  test("the chain never marks the ticket done; finalize owns the marking", () => {
-    const beforeToolbelt = content.split("## Failure toolbelt")[0];
-    // No chain step sets the field: the marking has one owner, finalize.
-    expect(beforeToolbelt).not.toMatch(/tw_mark_done|tw_set[^)]*workflow_state/);
-    expect(beforeToolbelt).not.toMatch(/workflow_state.{0,20}done/);
-    expect(content).toMatch(/\/skill:finalize-task/);
+  test("the chain never marks the ticket done; the inlined close-out owns the marking", () => {
+    // The dispatch loop, before the close-out section: no chain step sets the
+    // field, the marking has one owner (the close-out).
+    const beforeCloseout = content.split("## Step 2b -- The inlined per-ticket close-out")[0];
+    expect(beforeCloseout).not.toMatch(/tw_mark_done|tw_set[^)]*workflow_state/);
+    expect(beforeCloseout).not.toMatch(/workflow_state.{0,20}done/);
+    // The close-out itself marks done (the one-owner rule) and the report
+    // hands the effort close to finalize-effort.
+    expect(content).toMatch(/tw_mark_done/);
+    expect(content).toMatch(/one-owner rule holds|one owner/i);
   });
 
   test("dispatch points the state file at the ticket", () => {
@@ -2327,7 +2361,7 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
 });
 
 describe("bug chain v4 (overhaul-execution-skills)", () => {
-  const content = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
+  const content = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
 
   test("the lean per-ticket chain: tdd, verify, land, gated; no deviation-reporter", () => {
     expect(content).toContain("tdd-worker");
@@ -2359,7 +2393,7 @@ describe("bug chain v4 (overhaul-execution-skills)", () => {
     // discipline via the skill field and never restates it.
     const diagnosing = readFile("skills/engineering/diagnosing-bugs/SKILL.md");
     expect(diagnosing).toMatch(/regression test .{0,40}before the fix/i);
-    const chain = readFile("skills/engineering/implement-task/scripts/ticket-chain.js");
+    const chain = readFile("skills/engineering/implement-ticket/scripts/ticket-chain.js");
     expect(chain).toMatch(/skill: subtype === "bug" \? "diagnosing-bugs" : "tdd"/);
     expect(chain).not.toMatch(/regression test/i);
   });
@@ -2375,10 +2409,10 @@ describe("bug chain v4 (overhaul-execution-skills)", () => {
 
 describe("chain call shapes (shipped ticket-chain.js)", () => {
   const resources = [
-    "skills/engineering/implement-task/resources/feature/autonomous.md",
-    "skills/engineering/implement-task/resources/bug/autonomous.md",
+    "skills/engineering/implement-ticket/resources/feature/autonomous.md",
+    "skills/engineering/implement-ticket/resources/bug/autonomous.md",
   ];
-  const chain = readFile("skills/engineering/implement-task/scripts/ticket-chain.js");
+  const chain = readFile("skills/engineering/implement-ticket/scripts/ticket-chain.js");
 
   test.each(resources)("%s launches the shipped chain script, no retired chain API", (file) => {
     const content = readFile(file);
@@ -2481,11 +2515,11 @@ describe("end-of-effort agents", () => {
     expect(content).toMatch(/never edit/i);
   });
 
-  test("spec-reconciler edits exactly one file: the arch spec", () => {
+  test("spec-reconciler edits exactly one file: the architecture document", () => {
     const content = readFile("agents/spec-reconciler.md");
     const fm = parseFrontmatter(content);
     expect(String(fm.tools)).toBe("read, edit, submit_feedback");
-    expect(content).toMatch(/arch-spec\.md/);
+    expect(content).toMatch(/architecture\.md/);
     expect(content).toMatch(/exactly one file/i);
     expect(content).toMatch(/Pending update/i);
     expect(content).toMatch(/Final reconcile/i);
@@ -2495,7 +2529,7 @@ describe("end-of-effort agents", () => {
 });
 
 describe("end-of-effort workflow (shipped end-of-effort.js)", () => {
-  const script = readFile("skills/engineering/implement-task/scripts/end-of-effort.js");
+  const script = readFile("skills/engineering/implement-ticket/scripts/end-of-effort.js");
 
   test("runs review, spec, coherence, and the suite gate with keyed awaited runs.run", () => {
     expect(script).toMatch(/await runs\.run\("review"/);
@@ -2540,15 +2574,15 @@ describe("chain agents v4 (overhaul-execution-skills)", () => {
     const content = readFile("agents/tdd-worker.md");
     expect(content).toMatch(/ticket\/<slug>/);
     expect(content).not.toMatch(/slice\//);
-    expect(content).toMatch(/docs\/tasks\/<effort>\/arch-spec\.md/);
+    expect(content).toMatch(/docs\/tasks\/<effort>\/architecture\.md/);
     expect(content).toMatch(/ticket doc/i);
     expect(content).toMatch(/tickets\/<ticket-slug>\/\.work\/uncertainty\.md/);
   });
 
-  test("slice-verifier verifies the ticket from its test plan or the arch-spec seams", () => {
+  test("slice-verifier verifies the ticket from its test plan or the architecture seams", () => {
     const content = readFile("agents/slice-verifier.md");
     expect(content).toMatch(/ticket doc/i);
-    expect(content).toMatch(/arch-spec seams|test plan/i);
+    expect(content).toMatch(/architecture document's seams|test plan/i);
     expect(content).not.toMatch(/slice doc/i);
   });
 
@@ -2596,8 +2630,8 @@ describe("chain agents v4 (overhaul-execution-skills)", () => {
 });
 
 describe("failure splits v4 (overhaul-execution-skills)", () => {
-  const feature = readFile("skills/engineering/implement-task/resources/feature/autonomous.md");
-  const bug = readFile("skills/engineering/implement-task/resources/bug/autonomous.md");
+  const feature = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
+  const bug = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
 
   test.each([[feature, "feature"], [bug, "bug"]] as const)(
     "the %s toolbelt splits into sub-tickets registered in the effort",
@@ -2637,10 +2671,10 @@ describe("standards direct reads (overhaul-execution-skills)", () => {
     expect(content).toMatch(/smells\.md/);
   });
 
-  test("the code-review spec sources go v4", () => {
+  test("the code-review spec sources go v5", () => {
     const content = readFile("skills/engineering/code-review/SKILL.md");
     expect(content).toMatch(/docs\/tasks\/<effort>\/tickets\/<ticket-slug>\/ticket\.md/);
-    expect(content).toMatch(/docs\/tasks\/<effort>\/arch-spec\.md/);
+    expect(content).toMatch(/docs\/tasks\/<effort>\/architecture\.md/);
     expect(content).toMatch(/bug doc/i);
     // The old per-task paths are gone.
     expect(content).not.toMatch(/docs\/tasks\/\$\{taskSlug\}|docs\/tasks\/<taskSlug>/);
@@ -2668,9 +2702,9 @@ describe("standards direct reads (overhaul-execution-skills)", () => {
     // Procedure lives in the agent definitions and skills (pinned by the
     // agent tests); the composed tasks carry identity, pointers, and the
     // tdd uncertainty anchor only.
-    const chain = readFile("skills/engineering/implement-task/scripts/ticket-chain.js");
+    const chain = readFile("skills/engineering/implement-ticket/scripts/ticket-chain.js");
     expect(chain).toMatch(/Ticket doc: /);
-    expect(chain).toMatch(/Arch spec: docs\/tasks\//);
+    expect(chain).toMatch(/Architecture: docs\/tasks\//);
     expect(chain).toMatch(/uncertainty\.md and stop/);
     expect(chain).not.toMatch(/Before writing code/);
     expect(chain).not.toMatch(/Commit after each GREEN/);
@@ -2678,7 +2712,7 @@ describe("standards direct reads (overhaul-execution-skills)", () => {
     expect(chain).not.toMatch(/Run lint and tests/);
     expect(chain).not.toContain("get_guidelines");
     for (const kind of ["feature", "bug"]) {
-      const content = readFile(`skills/engineering/implement-task/resources/${kind}/autonomous.md`);
+      const content = readFile(`skills/engineering/implement-ticket/resources/${kind}/autonomous.md`);
       expect(content).not.toContain("get_guidelines");
     }
   });
@@ -2713,59 +2747,66 @@ describe("planning resources v4 touch (overhaul-execution-skills)", () => {
   });
 });
 
-// ─── finalize-task v4 (overhaul-execution-skills) ────────────────────
+// ─── The inlined per-ticket close-out (implement-ticket-skill) ───────
 
-describe("finalize-task v4 (overhaul-execution-skills)", () => {
-  const content = readFile("skills/engineering/finalize-task/SKILL.md");
+// The retired finalize-task's per-ticket close-out runs inline in
+// implement-ticket, in the same autonomous run that lands the ticket. The
+// close-out tests above pin the SKILL.md sequence; these pin the resources'
+// close-out sections and the one-owner rule across the surface.
+describe("the inlined per-ticket close-out (implement-ticket-skill)", () => {
+  for (const kind of ["feature", "bug"]) {
+    const content = readFile(`skills/engineering/implement-ticket/resources/${kind}/autonomous.md`);
 
-  test("step 0 gates on the ticket resolving and implement-task having landed its chains", () => {
-    expect(content).toMatch(/the ticket resolves|resolves through the resolver/i);
-    expect(content).toMatch(/implement-task reported its chains landed|chains landed/i);
+    test(`the ${kind} close-out marks done through tw_mark_done and verifies with tw_finalizable`, () => {
+      expect(content).not.toContain("tw_set");
+      expect(content).toMatch(/tw_mark_done/);
+      expect(content).toMatch(/one owner/i);
+      expect(content).toContain("tw_finalizable <ticket-slug>");
+      expect(content).toMatch(/anomal/i);
+    });
+
+    test(`the ${kind} close-out clears the task pointer; the slice pointer is not called`, () => {
+      expect(content).toMatch(/tw_state_set task null/);
+      expect(content).not.toMatch(/tw_state_set slice/);
+    });
+
+    test(`the ${kind} close-out writes the changelog through the only writer`, () => {
+      expect(content).toMatch(/tw_write_changelog/);
+      expect(content).toMatch(/writer of `docs\/tasks\/CHANGELOG\.md`/);
+    });
+
+    test(`the ${kind} close-out gates on the CI check and never merges a red branch`, () => {
+      expect(content).toMatch(/CI gate/i);
+      expect(content).toMatch(/red branch/i);
+    });
+
+    test(`the ${kind} close-out merges the landing branch into main with --no-ff`, () => {
+      expect(content).toMatch(/git merge --no-ff task\/<ticket-slug>/);
+    });
+  }
+
+  test("the bug close-out closes and archives the bug doc; the feature one skips it", () => {
+    const feature = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
+    const bug = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
+    expect(feature).toMatch(/subtype: bug only/i);
+    expect(bug).toContain("docs/bugs/archive");
+    expect(bug).toContain("status: fixed");
+    expect(bug).toContain("fix_commit");
+    expect(bug).toMatch(/ask the user which bug doc/i);
+    expect(bug).toMatch(/ticket body/i);
+    expect(bug).not.toContain("bug: <slug>");
   });
 
-  test("the per-ticket close-out marks the ticket done without the set tool, then verifies", () => {
-    expect(content).not.toContain("tw_set");
-    expect(content).toMatch(/workflow_state:? done/);
-    expect(content).toContain("tw_finalizable <ticket-slug>");
-    // The finalizable check also surfaces the effort graph's anomalies.
-    expect(content).toMatch(/anomal/i);
-  });
-
-  test("the current item pointer is cleared; the slice pointer is not called", () => {
-    expect(content).toMatch(/tw_state_set task null/);
-    expect(content).not.toMatch(/tw_state_set slice/);
-  });
-
-  test("archiving is gated on the scan tools, not a tick", () => {
-    expect(content).toContain("tw_map_finalizable <effort-slug>");
-  });
-
-  test("no per-ticket git mv: the ticket stays in the live effort", () => {
-    const closeout = content.split(/## Step \d+.*close-out/i)[1]?.split("## Step")[0] ?? "";
-    expect(closeout).not.toContain("git mv");
-    expect(content).toMatch(/no per-ticket (git mv|move)|the ticket stays in the live effort/i);
-  });
-
-  test("the effort archives as a unit, deprecated-marked, with the index regenerated", () => {
-    expect(content).toMatch(/git mv docs\/tasks\/<effort>\/ docs\/tasks\/archive\/<effort>\//);
-    expect(content).toMatch(/status: deprecated/);
-    expect(content).toMatch(/docs\/tasks\/index\.md/);
-    expect(content).toMatch(/## Archived/);
-    expect(content).toMatch(/## Live/);
-    expect(content).toMatch(/sorted/i);
-  });
-
-  test("both pointers clear when the effort finalizes", () => {
-    expect(content).toMatch(/tw_state_set map null/);
-  });
-
-  test("the impeccable-note check is gone", () => {
-    expect(content).not.toMatch(/impeccable/i);
-    expect(content).not.toMatch(/ui-noter/i);
-  });
-
-  test("references only surviving tools", () => {
-    expectOnlySurvivingTools(content);
+  test("only this phase sets a ticket's workflow_state: done (the one-owner rule)", () => {
+    const skill = readFile("skills/engineering/implement-ticket/SKILL.md");
+    const feature = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
+    const bug = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
+    for (const text of [skill, feature, bug]) {
+      expect(text).toMatch(/one owner|only owner|the one owner of the marking/i);
+    }
+    // The chain never marks it.
+    const chain = readFile("skills/engineering/implement-ticket/scripts/ticket-chain.js");
+    expect(chain).toMatch(/is NOT marked done/);
   });
 });
 
@@ -2837,7 +2878,7 @@ describe("human-facing docs pages (backfill-skill-docs-pages)", () => {
     }
   });
 
-  test("the seven flow pages describe the v4 effort-grouped tree", () => {
+  test("the flow pages describe the effort-grouped tree", () => {
     // The effort-grouped path is what distinguishes v4 prose from the v3
     // maps/ subtree: each flow page must name the effort directory shape.
     const flowPages = [
@@ -2846,8 +2887,8 @@ describe("human-facing docs pages (backfill-skill-docs-pages)", () => {
       "to-tickets",
       "task-workflow-overview",
       "task-workflow-doctor",
-      "implement-task",
-      "finalize-task",
+      "implement-ticket",
+      "intake",
     ];
     for (const name of flowPages) {
       const content = readFile(join("docs", "engineering", `${name}.md`));

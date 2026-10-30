@@ -19,3 +19,11 @@ note naming what replaced it.
   Replaced by `intake` (the `enforced-workflow-v5` map: the single front
   door; every request becomes an effort, bugs included, so the parallel bug
   substrate and the rejection path both go).
+- **[implement-task](./implement-task/SKILL.md)**: Implements an effort's
+  ready tickets via per-ticket chains (planning subtypes included).
+  Replaced by `implement-ticket` (the implementation phase; the planning
+  half is Wayfinder's).
+- **[finalize-task](./finalize-task/SKILL.md)**: Close out a landed ticket
+  and, when the effort is done, the whole effort. Replaced by
+  `implement-ticket` (the per-ticket close-out runs inline in the same
+  run that lands the ticket); the effort-level close is `finalize-effort`.
