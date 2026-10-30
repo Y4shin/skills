@@ -65,6 +65,8 @@ const GATED_NAMES = [
   "tw_finalize_map",
   "tw_write_section",
   "tw_write_spec",
+  "tw_add_task",
+  "tw_create_effort",
   "tw_add_ticket",
   "tw_split_ticket",
   "tw_mark_blocked",

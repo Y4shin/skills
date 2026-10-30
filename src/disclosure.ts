@@ -57,9 +57,19 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     takesTarget: false,
     gate: "none",
     // The front door: it surveys existing efforts for duplicates and links,
-    // creates the effort, and adds the bug ticket a bug report becomes.
-    // tw_state_set is its signature tool.
-    toolset: ["tw_state", "tw_state_set", "tw_list", "tw_get", "tw_add_ticket"],
+    // creates the effort (tw_create_effort: the map, with the two canonical
+    // sections seeded empty), adds the one non-negotiables grilling task
+    // (tw_add_task), and adds the bug ticket a bug report becomes
+    // (tw_add_ticket). tw_create_effort is its signature tool.
+    toolset: [
+      "tw_create_effort",
+      "tw_add_task",
+      "tw_add_ticket",
+      "tw_state",
+      "tw_state_set",
+      "tw_list",
+      "tw_get",
+    ],
     conflicts: ["setup-workflow", "wayfinder", "to-spec", "to-tickets", "implement-ticket", "finalize-effort"],
   },
   {

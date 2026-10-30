@@ -16,9 +16,28 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-import { dump } from "../src/core/frontmatter.js";
+import { dump, parse } from "../src/core/frontmatter.js";
 import { createTools } from "../src/pi.js";
-import { ALWAYS_DECLARED, CLOSER, SKILL_REGISTRY, openSkillsIn, signatureToolOf } from "../src/disclosure.js";
+import {
+  ALWAYS_DECLARED,
+  CLOSER,
+  SKILL_REGISTRY,
+  openSkillsIn,
+  signatureToolOf,
+} from "../src/disclosure.js";
+import {
+  MAP_SECTION_NON_GOALS,
+  MAP_SECTION_NON_NEGOTIABLE_FACTS,
+  readMapSection,
+} from "../src/core/art.js";
+import { parse as frontmatterParse } from "../src/core/frontmatter.js";
+import { fromFrontmatter } from "../src/core/art.js";
+
+/** Read a fixture artifact file the way the tools' own seam does. */
+function parseArtifactFile(path: string): { art: ReturnType<typeof fromFrontmatter>; doc: ReturnType<typeof frontmatterParse> } {
+  const doc = frontmatterParse(readFileSync(path, "utf-8"));
+  return { art: fromFrontmatter(doc.data, path), doc };
+}
 
 // ─── Fixture tree ─────────────────────────────────────────────────────────────
 
@@ -575,7 +594,7 @@ describe("the phase-to-toolset registry", () => {
   test("maps every skill to its real phase toolset", () => {
     const toolsetOf = Object.fromEntries(SKILL_REGISTRY.map((e) => [e.name, e.toolset.sort()]));
     expect(toolsetOf).toEqual({
-      intake: ["tw_add_ticket", "tw_get", "tw_list", "tw_state", "tw_state_set"],
+      intake: ["tw_add_task", "tw_add_ticket", "tw_create_effort", "tw_get", "tw_list", "tw_state", "tw_state_set"],
       "setup-workflow": ["tw_context", "tw_get", "tw_list"],
       wayfinder: [
         "tw_finalize_map",
@@ -647,5 +666,167 @@ describe("the phase-to-toolset registry", () => {
       expect(active.filter((t) => !expected.includes(t) && !ALWAYS_DECLARED.includes(t as any))).toEqual([]);
       await tools.tw_close.execute({ skill: entry.name }, disclosureCtx(active));
     }
+  });
+});
+
+/** The bullet names one `##` section of an index-style body lists. */
+function sectionNames(body: string, section: string): string[] {
+  const lines = readMapSection(body, section) ?? [];
+  return lines
+    .filter((l) => /^- /.test(l.trim()))
+    .map((l) => l.trim().replace(/^- /, ""));
+}
+
+// ─── The intake creation tools (intake-skill) ────────────────────────────────
+//
+// Intake always creates an effort through the named transition tools: the map
+// (tw_create_effort, with the two canonical sections seeded empty), the one
+// non-negotiables grilling task (tw_add_task), and, for a bug report, the
+// subtype: bug implementation ticket (tw_add_ticket). These are the only
+// writers of the tree intake needs, so a run needs no built-in write.
+
+describe("the intake creation tools", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => {
+    tools = createTools();
+  });
+
+  test("tw_create_effort writes the map with the two canonical sections seeded empty", async () => {
+    const out = (await tools.tw_create_effort.execute(
+      { effort: "fresh-request", title: "Fresh request" },
+      { directory: repo },
+    )) as unknown as string;
+    expect(out).toContain("map.md");
+    const mapPath = join(repo, "docs", "tasks", "fresh-request", "map.md");
+    expect(existsSync(mapPath)).toBe(true);
+    const { art, doc } = parseArtifactFile(mapPath);
+    expect(art.type).toBe("map");
+    expect(art.title).toBe("Fresh request");
+    // The sections exist as empty placeholders: a later gate refusal names
+    // missing content, not a missing section.
+    expect(readMapSection(doc.body, MAP_SECTION_NON_GOALS)).toEqual([]);
+    expect(readMapSection(doc.body, MAP_SECTION_NON_NEGOTIABLE_FACTS)).toEqual([]);
+    // The write goes through the frontmatter seam (YAML-verified shape).
+    expect(existsSync(mapPath)).toBe(true);
+  });
+
+  test("tw_create_effort refuses a slug that is not safe", async () => {
+    await expect(
+      tools.tw_create_effort.execute({ effort: "../escape", title: "Escape" }, { directory: repo }),
+    ).rejects.toThrow(/slug/);
+  });
+
+  test("tw_create_effort refuses an effort that already exists", async () => {
+    await expect(
+      tools.tw_create_effort.execute({ effort: "fresh-request", title: "Again" }, { directory: repo }),
+    ).rejects.toThrow(/fresh-request/);
+  });
+
+  test("tw_create_effort registers the effort in the root index's Live list, sorted", async () => {
+    const before = sectionNames(
+      parse(readFileSync(join(repo, "docs", "tasks", "index.md"), "utf-8")).body,
+      "Live",
+    );
+    await tools.tw_create_effort.execute({ effort: "another-request", title: "Another" }, { directory: repo });
+    const after = sectionNames(
+      parse(readFileSync(join(repo, "docs", "tasks", "index.md"), "utf-8")).body,
+      "Live",
+    );
+    expect(after).toContain("fresh-request");
+    expect(after).toContain("another-request");
+    expect(after).toEqual([...after].sort());
+    expect(before).not.toContain("another-request");
+  });
+
+  test("tw_add_task creates exactly one grilling task with the given body", async () => {
+    const out = (await tools.tw_add_task.execute(
+      {
+        effort: "fresh-request",
+        slug: "grill-non-negotiables",
+        subtype: "grilling",
+        title: "Grill the non-negotiables",
+        content: "\n## Decision to settle\n\nThe non-goals and non-negotiable facts.\n",
+      },
+      { directory: repo },
+    )) as unknown as string;
+    expect(out).toContain("task.md");
+    const taskPath = join(repo, "docs", "tasks", "fresh-request", "tasks", "grill-non-negotiables", "task.md");
+    const { art } = parseArtifactFile(taskPath);
+    expect(art.type).toBe("task");
+    expect(art.subtype).toBe("grilling");
+    expect(art.status).toBe("stable");
+    expect(art.workflow_state).toBe("ready");
+    expect(art.blocked_by).toEqual([]);
+  });
+
+  test("tw_add_task refuses a planning subtype outside the schema and an unsafe slug", async () => {
+    await expect(
+      tools.tw_add_task.execute(
+        { effort: "fresh-request", slug: "not-a-task", subtype: "feature", title: "No" },
+        { directory: repo },
+      ),
+    ).rejects.toThrow(/subtype/);
+    await expect(
+      tools.tw_add_task.execute(
+        { effort: "fresh-request", slug: "Bad Slug", subtype: "grilling", title: "No" },
+        { directory: repo },
+      ),
+    ).rejects.toThrow(/slug/);
+  });
+
+  test("tw_add_task refuses a task the effort already has", async () => {
+    await expect(
+      tools.tw_add_task.execute(
+        { effort: "fresh-request", slug: "grill-non-negotiables", subtype: "grilling", title: "Again" },
+        { directory: repo },
+      ),
+    ).rejects.toThrow(/grill-non-negotiables/);
+  });
+
+  test("tw_add_task requires an effort with a map", async () => {
+    await expect(
+      tools.tw_add_task.execute(
+        { effort: "no-such-effort", slug: "orphan", subtype: "grilling", title: "Orphan" },
+        { directory: repo },
+      ),
+    ).rejects.toThrow(/no live effort/);
+  });
+
+  test("tw_add_task refuses a slug that collides with an existing ticket of the effort", async () => {
+    await expect(
+      tools.tw_add_task.execute(
+        { effort: "ready-effort", slug: "one", subtype: "grilling", title: "Clash" },
+        { directory: repo },
+      ),
+    ).rejects.toThrow(/'one' already exists/);
+  });
+
+  test("a bug intake creates the subtype: bug implementation ticket through tw_add_ticket", async () => {
+    await tools.tw_create_effort.execute({ effort: "bug-report", title: "Bug report" }, { directory: repo });
+    await tools.tw_add_task.execute(
+      {
+        effort: "bug-report",
+        slug: "grill-non-negotiables",
+        subtype: "grilling",
+        title: "Grill the non-negotiables",
+      },
+      { directory: repo },
+    );
+    const out = (await tools.tw_add_ticket.execute(
+      {
+        effort: "bug-report",
+        slug: "fix-defect",
+        title: "Fix the defect",
+        subtype: "bug",
+        content: "\n## What to build\n\nThe defect fix.\n",
+      },
+      { directory: repo },
+    )) as unknown as string;
+    expect(out).toContain("bug");
+    const ticketPath = join(repo, "docs", "tasks", "bug-report", "tickets", "fix-defect", "ticket.md");
+    const { art } = parseArtifactFile(ticketPath);
+    expect(art.subtype).toBe("bug");
+    expect(art.workflow_state).toBe("ready");
   });
 });

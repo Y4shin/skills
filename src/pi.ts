@@ -21,7 +21,7 @@ import { Type, type TSchema } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
-import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, readMapSection, writeMapSection, effortDirOf, MAP_SECTION_NON_GOALS, MAP_SECTION_NON_NEGOTIABLE_FACTS, TICKET_SUBTYPES, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
+import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, readMapSection, writeMapSection, effortDirOf, MAP_SECTION_NON_GOALS, MAP_SECTION_NON_NEGOTIABLE_FACTS, TICKET_SUBTYPES, TASK_SUBTYPES, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
 import {
   CLOSER,
   buildOpenParameters,
@@ -792,6 +792,41 @@ function ensureArchivalNote(specPath: string): boolean {
 const SAFE_SLUG = /^[a-z0-9][a-z0-9-]*$/;
 
 const TICKET_SIZES = ["s", "m", "l", "xl"] as const;
+
+/**
+ * The intake creation helpers: the front door needs the same safe-slug and
+ * effort-anchoring checks the other creators carry. A created map seeds the
+ * two canonical sections as empty placeholders, so a later gate refusal
+ * names missing content rather than a missing section.
+ */
+
+/**
+ * The map document intake creates: v4 shape, stable, with the two canonical
+ * sections present as empty placeholders and the standard body skeleton.
+ */
+function createEffortDocument(title: string): Document {
+  let body = `# ${title}\n\n## Destination\n\n<what done looks like>\n\n## Constraints\n\n- (none yet)\n`;
+  body = writeMapSection(body, MAP_SECTION_NON_GOALS, "");
+  body = writeMapSection(body, MAP_SECTION_NON_NEGOTIABLE_FACTS, "");
+  return { data: { type: "map", title, status: "stable" }, body };
+}
+
+/**
+ * Register an effort in the root index's `## Live` list, sorted, creating
+ * the index with the landed index shape when the tree has none yet.
+ */
+function registerLiveEffort(root: string, effort: string): void {
+  const indexPath = join(taskRoot(root), "index.md");
+  const indexDoc: Document = isFile(indexPath)
+    ? parse(readFileSync(indexPath, "utf-8"))
+    : { data: { type: "index", okf_version: OKF_VERSION, title: "docs/tasks" }, body: "\n# docs/tasks\n" };
+  const live = [...new Set([...indexNames(indexDoc.body, "Live"), effort])].sort((a, b) => a.localeCompare(b));
+  const archived = indexNames(indexDoc.body, "Archived");
+  let body = writeMapSection(indexDoc.body, "Live", indexSection(live));
+  body = writeMapSection(body, "Archived", indexSection(archived));
+  indexDoc.body = body;
+  writeFileSync(indexPath, dump(indexDoc), "utf-8");
+}
 
 /** True when a path sits strictly inside a directory. */
 function isInside(dir: string, path: string): boolean {
@@ -1693,6 +1728,122 @@ export function createTools(): Record<string, Tool> {
         writeFileSync(ticketPath, dump(ticketDocument(seed)), "utf-8");
         const sizeNote = seed.size !== undefined ? `, size: ${seed.size}` : "";
         return `created ${relative(root, ticketPath)} (${seed.subtype}${sizeNote})`;
+      },
+    ),
+
+    tw_create_effort: def(
+      "Create an effort: the named effort/map creation tool. Writes docs/tasks/<effort>/map.md through " +
+        "the frontmatter seam (type: map, status: stable) with '## Non-goals' and '## Non-negotiable facts' " +
+        "seeded as empty placeholders, so a later gate refusal names missing content rather than a missing " +
+        "section, and registers the effort in the root index's Live list (sorted; creating docs/tasks/index.md " +
+        "when the tree has none). Refuses an unsafe slug, an effort that already exists, and a missing title.",
+      {
+        effort: Str("The effort slug (lowercase letters, digits, hyphens)"),
+        title: Str("The effort title"),
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const effort = String(p.effort ?? "");
+        const title = typeof p.title === "string" ? p.title.trim() : "";
+        if (!SAFE_SLUG.test(effort)) {
+          throw new Error(
+            `invalid effort slug '${effort}': use lowercase letters, digits, and hyphens (a slug becomes a directory name)`,
+          );
+        }
+        if (title === "") throw new Error("title is empty: an effort needs a title");
+        const effortDir = join(taskRoot(root), effort);
+        if (liveEffortDir(root, effort) !== null) {
+          throw new Error(
+            `effort '${effort}' already exists: intake creates an effort once; fold new work into it instead`,
+          );
+        }
+        if (existsSync(effortDir)) {
+          throw new Error(
+            `a directory for '${effort}' already exists under docs/tasks/ but holds no map: resolve it before creating the effort`,
+          );
+        }
+        mkdirSync(effortDir, { recursive: true });
+        const mapPath = join(effortDir, "map.md");
+        writeFileSync(mapPath, dump(createEffortDocument(title)), "utf-8");
+        registerLiveEffort(root, effort);
+        return `created ${relative(root, mapPath)} (both canonical sections seeded empty); registered '${effort}' in the root index`;
+      },
+    ),
+
+    tw_add_task: def(
+      "Create a planning task at docs/tasks/<effort>/tasks/<slug>/task.md: the named task creator, writing " +
+        "through the frontmatter seam. Writes type: task with the given planning subtype (research, prototype, " +
+        "grilling, or manual), status: stable, workflow_state: ready, and an empty blocked_by (tasks are " +
+        "created before their edges are known; edges are wired when the blockers exist). Refuses an unsafe or " +
+        "duplicate slug (a slug that collides with any artifact of the effort, including tickets), a subtype " +
+        "outside the planning set, and an effort with no map.",
+      {
+        effort: Str("The effort slug the task lands in"),
+        slug: Str("The task slug (lowercase letters, digits, hyphens)"),
+        subtype: {
+          type: "string" as const,
+          enum: [...TASK_SUBTYPES],
+          description: "research | prototype | grilling | manual",
+        },
+        title: Str("The task title"),
+        mode: OptStr("'human' when the human must perform it; omit otherwise"),
+        content: OptStr("The task body (the decision to settle, the known choices, the recommended answer)"),
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const slug = String(p.slug ?? "");
+        const title = typeof p.title === "string" ? p.title.trim() : "";
+        if (!SAFE_SLUG.test(slug)) {
+          throw new Error(
+            `invalid slug '${slug}': use lowercase letters, digits, and hyphens (a slug becomes a directory name)`,
+          );
+        }
+        if (title === "") throw new Error(`task '${slug}' has no title`);
+        const subtype = String(p.subtype ?? "");
+        if (!(TASK_SUBTYPES as readonly string[]).includes(subtype)) {
+          throw new Error(`invalid subtype '${subtype}': a task is '${TASK_SUBTYPES.join("' or '")}'`);
+        }
+        if (p.mode !== undefined && p.mode !== "human") {
+          throw new Error(`invalid mode '${p.mode}': the only mode value is 'human'; omit it otherwise`);
+        }
+        const effortDir = liveEffortDir(root, p.effort);
+        if (effortDir === null) {
+          throw new Error(
+            `no live effort '${p.effort}': create the effort (a map at docs/tasks/<effort>/map.md) before adding tasks`,
+          );
+        }
+        requireV4Shape(parseArtifactFile(join(effortDir, "map.md")).art);
+        const index = scanMemo(root)();
+        const clash = index.hits.find((h) => h.art.slug === slug && isInside(effortDir, h.path));
+        if (clash !== undefined) {
+          throw new Error(
+            `'${slug}' already exists in '${p.effort}' (${clash.art.type} at ${relative(root, clash.path)})`,
+          );
+        }
+        if (isDir(join(effortDir, "tasks", slug)) || isDir(join(effortDir, "tickets", slug))) {
+          throw new Error(`'${slug}' already exists in '${p.effort}' (its directory is there)`);
+        }
+        const data: FrontmatterData = {
+          type: "task",
+          subtype,
+          title,
+          status: "stable",
+          workflow_state: "ready",
+          blocked_by: [],
+        };
+        if (p.mode === "human") data.mode = "human";
+        const taskDir = join(effortDir, "tasks", slug);
+        const taskPath = join(taskDir, "task.md");
+        mkdirSync(taskDir, { recursive: true });
+        writeFileSync(
+          taskPath,
+          dump({
+            data,
+            body: typeof p.content === "string" && p.content.trim() !== "" ? normalizedBody(p.content) : "\n",
+          }),
+          "utf-8",
+        );
+        return `created ${relative(root, taskPath)} (${subtype})`;
       },
     ),
 
