@@ -1798,6 +1798,73 @@ describe("task-workflow tools: tw_write_architecture, the architecture writer", 
   });
 });
 
+describe("task-workflow tools: tw_add_task, the planning-task creator (intake-skill)", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function taskPath(t: string, slug: string): string {
+    return join(t, "docs/tasks/specgate/tasks", slug, "task.md");
+  }
+
+  test("creates a planning task through the frontmatter seam with the ready shape", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    const out = await tools.tw_add_task.execute(
+      {
+        effort: "specgate",
+        slug: "decide-more",
+        subtype: "grilling",
+        title: "Decide more",
+        content: "## Decision to settle\n\nThe new question.",
+      },
+      ctx(t),
+    );
+    expect(out).toContain("decide-more");
+    const doc = parse(readFileSync(taskPath(t, "decide-more"), "utf-8"));
+    expect(doc.data.type).toBe("task");
+    expect(doc.data.subtype).toBe("grilling");
+    expect(doc.data.title).toBe("Decide more");
+    expect(doc.data.status).toBe("stable");
+    expect(doc.data.workflow_state).toBe("ready");
+    expect(doc.data.blocked_by).toEqual([]);
+    expect(doc.body).toBe("\n## Decision to settle\n\nThe new question.\n");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("adds a task clears the map's ready flag: any plan change forces one more Wayfinder pass", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    setReadyForSpec(t, true);
+    await tools.tw_add_task.execute(
+      { effort: "specgate", slug: "late-task", subtype: "research", title: "Late task" },
+      ctx(t),
+    );
+    expect(parse(specGateMap(t)).data.ready_for_spec).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("an added task does not disturb an absent flag (minimal frontmatter stays minimal)", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    expect(parse(specGateMap(t)).data).not.toHaveProperty("ready_for_spec");
+    await tools.tw_add_task.execute(
+      { effort: "specgate", slug: "late-task", subtype: "research", title: "Late task" },
+      ctx(t),
+    );
+    expect(parse(specGateMap(t)).data).not.toHaveProperty("ready_for_spec");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a human mode value other than 'human'", async () => {
+    const t = mkTmp(); seedPlanningTree(t);
+    await expect(
+      tools.tw_add_task.execute(
+        { effort: "specgate", slug: "x", subtype: "manual", title: "X", mode: "afk" },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/mode/);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
 describe("task-workflow tools: tw_add_ticket, the ticket creator", () => {
   let tools: Record<string, { description: string; execute: Function }>;
 

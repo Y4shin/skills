@@ -1774,7 +1774,8 @@ export function createTools(): Record<string, Tool> {
       "Create a planning task at docs/tasks/<effort>/tasks/<slug>/task.md: the named task creator, writing " +
         "through the frontmatter seam. Writes type: task with the given planning subtype (research, prototype, " +
         "grilling, or manual), status: stable, workflow_state: ready, and an empty blocked_by (tasks are " +
-        "created before their edges are known; edges are wired when the blockers exist). Refuses an unsafe or " +
+        "created before their edges are known; edges are wired when the blockers exist). An added task clears " +
+        "the map's ready flag, so a post-reconcile addition forces one more Wayfinder pass. Refuses an unsafe or " +
         "duplicate slug (a slug that collides with any artifact of the effort, including tickets), a subtype " +
         "outside the planning set, and an effort with no map.",
       {
@@ -1812,7 +1813,8 @@ export function createTools(): Record<string, Tool> {
             `no live effort '${p.effort}': create the effort (a map at docs/tasks/<effort>/map.md) before adding tasks`,
           );
         }
-        requireV4Shape(parseArtifactFile(join(effortDir, "map.md")).art);
+        const mapHit = parseArtifactFile(join(effortDir, "map.md"));
+        requireV4Shape(mapHit.art);
         const index = scanMemo(root)();
         const clash = index.hits.find((h) => h.art.slug === slug && isInside(effortDir, h.path));
         if (clash !== undefined) {
@@ -1843,7 +1845,12 @@ export function createTools(): Record<string, Tool> {
           }),
           "utf-8",
         );
-        return `created ${relative(root, taskPath)} (${subtype})`;
+        // A planning addition is a plan change: the ready flag clears, so any
+        // post-reconcile task addition forces one more Wayfinder pass. Only a
+        // present `true` is rewritten (absent stays absent).
+        const cleared = clearReadyForSpec(mapHit.doc);
+        if (cleared) writeFileSync(join(effortDir, "map.md"), dump(mapHit.doc), "utf-8");
+        return `created ${relative(root, taskPath)} (${subtype})${cleared ? "; ready_for_spec cleared" : ""}`;
       },
     ),
 
