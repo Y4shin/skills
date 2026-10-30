@@ -91,8 +91,8 @@ you invoke as functions, **not** shell binaries; wrapping them in a
 aborts the sequence. Call them as tools, and run the shell steps in a
 separate bash block.
 
-1. **CI gate**: checkout `task/<ticket-slug>`, `git merge main 2>/dev/null
-   || true`, run the project's CI command (from the `tw_context` profile or
+1. **CI gate**: checkout `task/<ticket-slug>`, `git merge <effort-branch>
+   2>/dev/null || true`, run the project's CI command (from the `tw_context` profile or
    detected from repo tooling; ask the user when ambiguous). A red branch
    is never merged: fix forward on the landing branch, and record that
    fix-forward fired with `submit_feedback({ kind: "expected", data })`.
@@ -123,16 +123,19 @@ separate bash block.
    anomalies, which you should report if any appear.
 7. **`tw_state_set task null`** (Pi tool, not a shell command): clears the
    current item pointer.
-8. **Merge the landing branch into main** (shell, safe under `set -e`):
+8. **Merge the landing branch into the effort's branch** (shell, safe under
+   `set -e`), where `<effort-branch>` is the branch the previous ticket
+   landed on (see the branch model in `SKILL.md`), not the literal `main`
+   unless `main` is that branch:
 
    ```bash
    set -e
-   git checkout main
+   git checkout <effort-branch>
    git merge --no-ff task/<ticket-slug> -m "ticket: finalize {ticketSlug}"
    git branch -d task/<ticket-slug>
    ```
 
-   If remote exists: `git push origin main`
+   If remote exists: `git push origin <effort-branch>`
 
 There is **no per-ticket move**: the ticket stays in the live effort.
 Moving one ticket out would split the effort's graph scope and trip the

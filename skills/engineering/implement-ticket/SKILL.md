@@ -1,6 +1,6 @@
 ---
 name: implement-ticket
-description: "Autonomous. Owns the implementation phase: reads the effort's architecture document, works the ticket frontier in dependency levels, dispatches the per-ticket chain per ticket, and closes each landed ticket out inline (CI gate, knowledge harvest, changelog, done-marking, merge to main). The successor to the ticket half of the retired implementation router and the retired close-out skill."
+description: "Autonomous. Owns the implementation phase: reads the effort's architecture document, works the ticket frontier in dependency levels, dispatches the per-ticket chain per ticket, and closes each landed ticket out inline (CI gate, knowledge harvest, changelog, done-marking, merge to the effort's landing branch). The successor to the ticket half of the retired implementation router and the retired close-out skill."
 ---
 
 # Implement Ticket
@@ -75,7 +75,8 @@ landed on (the effort's starting branch, typically main, for the first
 ticket), so a chain sees the code its blockers delivered. The tdd-worker
 commits checkpoints on the **working branch** `ticket/<ticket-slug>`, created
 off the landing branch; the land-worker merges it back with `--no-ff` and
-deletes it.
+deletes it. The close-out merges back into that same branch, written below as
+`<effort-branch>`.
 
 **Communication via context pointers.** Communicate to and from subagents
 primarily through context pointers (to the architecture document, ticket
@@ -168,7 +169,7 @@ separate bash block.
 
    ```
    git checkout task/<ticket-slug>
-   git merge main 2>/dev/null || true
+   git merge <effort-branch> 2>/dev/null || true
    ```
 
    Run the project's CI command (from the `tw_context` profile or detected
@@ -229,16 +230,18 @@ separate bash block.
    tw_state_set task null   # Pi tool, not a shell command
    ```
 
-8. **Merge the landing branch into main** (shell, safe under `set -e`):
+8. **Merge the landing branch into the effort's branch** (shell, safe under
+   `set -e`), where `<effort-branch>` is the branch the previous ticket
+   landed on, not the literal `main` unless `main` is that branch:
 
    ```bash
    set -e
-   git checkout main
+   git checkout <effort-branch>
    git merge --no-ff task/<ticket-slug> -m "ticket: finalize {ticketSlug}"
    git branch -d task/<ticket-slug>
    ```
 
-   If remote exists: `git push origin main`
+   If remote exists: `git push origin <effort-branch>`
 
 There is **no per-ticket move**: the ticket stays in the live effort.
 Moving one ticket out would split the effort's graph scope and trip the
