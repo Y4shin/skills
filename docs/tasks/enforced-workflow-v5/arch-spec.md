@@ -733,7 +733,7 @@ exports to the tickets that depend on it.
       runs over the corpus with the other corpus checks' exemptions, `.changeset/`
       holds one `major` entry for v5, the orphaned flow map and the stale
       handoff are deleted, and the interim "decision task" vocabulary is gone
-      from the overview.
+      from the live pages (the overview and the pages that describe it).
 
 ## Testing seams
 
