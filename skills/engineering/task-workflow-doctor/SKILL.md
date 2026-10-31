@@ -78,8 +78,8 @@ missing or unstable architecture document) and their routes are in
 
 ## Routing notes
 
-- For anything that involves the task tree, the state file, or the standard
-  docs, run `/skill:setup-workflow`. Do not duplicate its setup logic here.
+- For the `docs/tasks/` tree or the repo-root `CONTEXT.md`, run
+  `/skill:setup-workflow`. Do not duplicate its setup logic here.
 - The manifest is not a diagnosis target: nothing here edits it, and a
   registration problem is the package's own, not the tree's.
 - For an opener refusal, `legal_next` is the route. If it names a skill, run
