@@ -2645,6 +2645,16 @@ describe("chain agents v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/finalize/i);
   });
 
+  test("finalize triage keeps planning-artifact and documentary findings informational", () => {
+    const content = readFile("skills/engineering/finalize-effort/SKILL.md");
+    // D21: a fix under docs/tasks/ cannot be an implementation ticket.
+    expect(content).toMatch(/fix lives under `docs\/tasks\/`/);
+    expect(content).toMatch(/no writer for them/);
+    // D22: a doc finding whose subject already holds does not reopen the effort.
+    expect(content).toMatch(/already true in code and tests/);
+    expect(content).toMatch(/never converges/);
+  });
+
   test("implement-preconditions gates the chain read-only before any worker", () => {
     const content = readFile("agents/implement-preconditions.md");
     const fm = parseFrontmatter(content);

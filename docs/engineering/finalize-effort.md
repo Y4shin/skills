@@ -28,7 +28,14 @@ writer of it. Every finding is dispositioned exactly one way:
   only after the human says yes, created with `tw_create_effort` and linked
   by `origin_effort` on the child map (a field on the child, never a graph
   edge);
-- an **informational** finding stays in the review artifact, accepted.
+- an **informational** finding stays in the review artifact, accepted. Two
+  kinds are informational by construction: a finding whose fix lives under
+  `docs/tasks/` (the implementation phase has no writer for planning
+  artifacts, so ticketing it creates impossible work), and a documentary
+  finding whose subject already holds in code and tests (rewriting settled
+  prose changes nothing the tool does). Without the second rule the advisory
+  review and the finalize review keep feeding each other new doc findings and
+  the effort never converges.
 
 When a human accepts a follow-up, the findings move into the child effort's
 `review.md` through `tw_write_review` with `follow_up`, so one artifact holds

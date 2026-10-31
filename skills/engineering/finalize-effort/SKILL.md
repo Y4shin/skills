@@ -67,6 +67,31 @@ argument:
 3. **Purely informational** stays in the review artifact, recorded as
    accepted by the human.
 
+Two kinds of finding are informational by construction, and neither becomes
+a ticket:
+
+- **A finding whose fix lives under `docs/tasks/`.** The map, the spec, and
+  the planning tasks are planning-owned artifacts: the implementation phase
+  has no writer for them: the write lockdown refuses the built-in tools, and
+  the implementation toolset exposes no map or spec writer. Ticketing
+  such a finding creates work the chain physically cannot do, and the only
+  way out is a shell write the workflow forbids. Record it in the review with
+  the file and line, and let a later effort that re-plans that area carry it.
+  The living record of what was built is the architecture document, which the
+  end-of-effort pass already reconciles.
+- **A documentary finding whose subject is already true in code and tests.**
+  Stale wording, an unticked acceptance box, a glossary entry that lags the
+  chosen name, a testing-protocol sentence that overstates what the suite
+  asserts: once the behavior and its tests agree, rewriting prose does not
+  change what the tool does. Record it and archive. Without this rule the
+  advisory review and the finalize review feed each other new doc findings
+  every pass and the effort never converges, which is what a rehearsal run
+  hit three times in a row.
+
+Everything else is judged on its merits: a finding that changes what the code
+does, or that would mislead the next person to act on the effort's record,
+gets a ticket or a follow-up.
+
 The writer sets the archive flag only when every finding in the `findings`
 list carries a disposition. Until then the effort stays live, which is the
 point: a review finding is never stranded in an archive nobody reads again.
