@@ -91,7 +91,13 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // records deferred work in the out-of-scope KB, and runs the reconcile,
     // which sets ready_for_spec through tw_finalize_map. tw_write_section is
     // its signature tool. tw_state_set and tw_dependency_levels are disclosed
-    // because the phase sets the state pointers and layers the effort itself.
+    // because the phase sets the state pointers and layers the effort itself,
+    // and tw_state because a phase that writes a pointer must be able to read
+    // both back.
+    // tw_show is disclosed because the overview's read-only table (which
+    // cannot open anything itself: task-workflow-overview has no registry
+    // entry) routes its artifact read to this phase, and the reconcile reads
+    // the recorded artifacts behind it.
     toolset: [
       "tw_write_section",
       "tw_finalize_map",
@@ -100,7 +106,9 @@ export const SKILL_REGISTRY: SkillEntry[] = [
       "tw_mark_done",
       "tw_mark_blocked",
       "tw_record_out_of_scope",
+      "tw_state",
       "tw_state_set",
+      "tw_show",
       "tw_get",
       "tw_list",
     ],
@@ -153,12 +161,17 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // The implementation phase: owns the ticket frontier and levels, creates
     // and splits tickets, marks tickets done (after the changelog entry),
     // resolves uncertainties, and writes the per-ticket changelog entry.
-    // tw_write_changelog is its signature tool. tw_finalizable and
-    // tw_state_set are disclosed because the close-out checks finalizability
-    // and moves the state pointer. tw_context stays setup-workflow's, so the
-    // CI command is read from the repo rather than through that profile.
+    // tw_write_changelog is its signature tool. tw_finalizable,
+    // tw_state, and tw_state_set are disclosed because the close-out checks
+    // finalizability and reads then moves the state pointer. tw_context stays
+    // setup-workflow's, so the CI command is read from the repo rather than
+    // through that profile.
     // tw_mark_blocked is not disclosed here: it marks planning tasks and
     // refuses tickets, so it stays in wayfinder's toolset only.
+    // tw_write_ticket_note is disclosed because this phase performs the
+    // landing that writes the ticket doc's implementation notes; the landing
+    // worker calls it by name (a subagent reaches a gated tool through its
+    // own tools allowlist, never through this opener).
     toolset: [
       "tw_frontier",
       "tw_dependency_levels",
@@ -168,9 +181,11 @@ export const SKILL_REGISTRY: SkillEntry[] = [
       "tw_write_changelog",
       "tw_resolve_uncertainty",
       "tw_finalizable",
+      "tw_state",
       "tw_state_set",
       "tw_get",
       "tw_list",
+      "tw_write_ticket_note",
     ],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-spec", "to-tickets", "finalize-effort"],
   },
@@ -207,9 +222,10 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // nests inside any open phase and discloses its bundled scripts wrapped
     // as registered tools (skill_validate, skill_scaffold, skill_discover in
     // src/pi.ts, each running its bundled script directly, no shell), plus
-    // the tree read parked here. tw_show keeps the private signature tool
-    // the open-set derivation keys on; the script tools are private to this
-    // entry too.
+    // the tree read parked here. The signature tool the open-set derivation
+    // keys on is the first of its private tools, a script tool
+    // (skill_validate): tw_show is a shared artifact read, disclosed to
+    // wayfinder as well, so it is not this entry's private tool.
     toolset: ["tw_show", "skill_validate", "skill_scaffold", "skill_discover"],
     conflicts: [],
   },

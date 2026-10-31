@@ -11,6 +11,8 @@
  * callable; after close they are absent and unsearchable again.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import { Type } from "typebox";
 
@@ -121,7 +123,7 @@ describe("disclosure core: the three-way flip", () => {
     for (const name of ["tw_close", "tw_frontier", "tw_list", "tw_write_section", "tw_get"]) {
       expect(opened, `${name} must be declared once wayfinder is open`).toContain(name);
     }
-    for (const name of ["tw_show", "tw_state", "tw_context", "tw_write_spec"]) {
+    for (const name of ["tw_context", "tw_write_spec", "tw_write_architecture"]) {
       expect(opened, `${name} belongs to no open skill`).not.toContain(name);
     }
 
@@ -132,12 +134,13 @@ describe("disclosure core: the three-way flip", () => {
     expect(toolResultTexts(s.session, "tw_frontier").length).toBeGreaterThan(0);
 
     // Unsearchable while closed: tool_search cannot reach a direct gated
-    // tool, before open and after close alike.
-    s.setResponses([reply([call("tool_search", { query: "show artifact frontmatter selector" })])]);
-    await s.session.prompt("Search for the show tool.");
+    // tool, before open and after close alike. tw_write_spec belongs to a
+    // phase that is not open here.
+    s.setResponses([reply([call("tool_search", { query: "write the specification body" })])]);
+    await s.session.prompt("Search for the spec writer.");
     const searchResult = latestToolResultText(s.session, "tool_search") ?? "";
-    expect(searchResult).not.toContain("tw_show");
-    expect(s.session.getActiveToolNames()).not.toContain("tw_show");
+    expect(searchResult).not.toContain("tw_write_spec");
+    expect(s.session.getActiveToolNames()).not.toContain("tw_write_spec");
 
     s.setResponses([reply([call("tw_close", { skill: "wayfinder" })])]);
     await s.session.prompt("Close wayfinder.");
@@ -177,7 +180,7 @@ describe("disclosure core: nested opens", () => {
     for (const tool of phaseSet) {
       expect(nested.has(tool), `${tool} must survive the nested open`).toBe(true);
     }
-    expect(nested.has("tw_show"), "the nested skill's own tool is declared").toBe(true);
+    expect(nested.has("skill_validate"), "the nested skill's own tool is declared").toBe(true);
     for (const tool of ["tw_open", "tw_next", "tw_close"]) {
       expect(nested.has(tool), `${tool} is declared while skills are open`).toBe(true);
     }
@@ -187,7 +190,7 @@ describe("disclosure core: nested opens", () => {
     await s.session.prompt("Close skill-creator.");
 
     const afterClose = new Set(s.session.getActiveToolNames());
-    expect(afterClose.has("tw_show"), "the closed skill's tool is gone").toBe(false);
+    expect(afterClose.has("skill_validate"), "the closed skill's tool is gone").toBe(false);
     for (const tool of phaseSet) {
       expect(afterClose.has(tool), `${tool} keeps the phase open with its own tools intact`).toBe(true);
     }
@@ -218,7 +221,7 @@ describe("disclosure core: nested opens", () => {
     await s.session.prompt("Close skill-creator.");
 
     const afterClose = new Set(s.session.getActiveToolNames());
-    for (const tool of ["skill_validate", "skill_scaffold", "skill_discover", "tw_show"]) {
+    for (const tool of ["skill_validate", "skill_scaffold", "skill_discover"]) {
       expect(afterClose.has(tool), `${tool} leaves with skill-creator`).toBe(false);
     }
     for (const tool of phaseSet) {
@@ -324,7 +327,7 @@ describe("disclosure core: telemetry absorption", () => {
       parameters: Type.Object({ skill_name: Type.String(), target: Type.Optional(Type.String()) }),
       execute: async (_id: string, args: Record<string, unknown>) => {
         telemetryCalls.push(args);
-        return { content: [{ type: "text", text: "recorded" }], details: {} };
+        return { content: [{ type: "text" as const, text: "recorded" }], details: {} };
       },
     };
     const s = await createTaskSession({
@@ -361,7 +364,7 @@ describe("disclosure core: telemetry absorption", () => {
       parameters: Type.Object({ skill_name: Type.String(), target: Type.Optional(Type.String()) }),
       execute: async (_id: string, args: Record<string, unknown>) => {
         telemetryCalls.push(args);
-        return { content: [{ type: "text", text: "recorded" }], details: {} };
+        return { content: [{ type: "text" as const, text: "recorded" }], details: {} };
       },
     };
     const s = await createTaskSession({
@@ -385,5 +388,56 @@ describe("disclosure core: telemetry absorption", () => {
     await s.session.prompt("Open wayfinder.");
 
     expect(s.session.getActiveToolNames()).toContain("tw_frontier");
+  });
+});
+
+// ─── A subagent reaches a gated writer through its own tools allowlist ───────
+//
+// end-of-effort-reconciliation: the land-worker appends the ticket doc's
+// implementation note through `tw_write_ticket_note`. A subagent runs in its
+// own session with no phase open, so the opener never declares that tool for
+// it; the agent's `tools:` frontmatter is the allowlist, and pi activates a
+// named declarable tool even when it is `defaultActive: false`.
+
+describe("disclosure core: a subagent's tools allowlist reaches a gated writer", () => {
+  let sessions: TaskSession[] = [];
+  afterEach(() => {
+    for (const s of sessions) s.dispose();
+    sessions = [];
+  });
+
+  test("naming tw_write_ticket_note in the allowlist declares it, with no opener", async () => {
+    const s = await createTaskSession({
+      extensions: [taskWorkflow],
+      tools: ["read", "tw_write_ticket_note"],
+      projectFiles: fixtureFiles(),
+    });
+    sessions.push(s);
+
+    const active = s.session.getActiveToolNames();
+    expect(active, "the allowlist declares the gated writer").toContain("tw_write_ticket_note");
+    expect(active, "the allowlist is the whole declared set").not.toContain("tw_open");
+
+    // Callable: the writer really runs in this session, with no phase open.
+    s.setResponses([
+      reply([
+        call("tw_write_ticket_note", {
+          selector: "a-ticket",
+          note: "The landing note.",
+        }),
+      ]),
+    ]);
+    await s.session.prompt("Write the landing note.");
+    expect(toolCallNames(s.events)).toContain("tw_write_ticket_note");
+    const result = latestToolResultText(s.session, "tw_write_ticket_note") ?? "";
+    expect(result).toContain("Implementation notes");
+    // The write really landed on the ticket doc, in the land-worker's shape.
+    const ticket = readFileSync(
+      join(s.cwd, "docs/tasks/some-effort/tickets/a-ticket/ticket.md"),
+      "utf-8",
+    );
+    expect(ticket).toContain("## Implementation notes");
+    expect(ticket).toContain("The landing note.");
+    expect(ticket, "the frontmatter survives the note").toContain("workflow_state: ready");
   });
 });

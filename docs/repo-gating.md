@@ -35,6 +35,13 @@ are the only writers of the tree.
   sibling directory such as `docs/tasks-archive` does not match.
 - **Independent of the active tool set.** The guard is a hook, not a declared
   tool, so it blocks in every phase, including while a skill's toolset is open.
+- **Two segments are exempt: `.work/` and `deviation-reports/`.** They sit
+  beside an artifact rather than being artifacts (neither is an artifact
+  leaf), and two shipped procedures write them: the tdd-worker's uncertainty
+  stop (`.work/uncertainty.md`) and the deviation reporter
+  (`deviation-reports/<slug>.md`). A refusal still names the exemption and
+  the named tool that would have worked, so a model that hits the guard can
+  reroute.
 - **`docs/bugs/**` is not guarded.** The bug substrate retires in schema 5;
   the guard scope is `docs/tasks/**` only.
 - **Reading stays allowed.** `read` and `bash` can read the tree freely, and
@@ -43,6 +50,10 @@ are the only writers of the tree.
   soundly, so the previous heuristic idea was dropped rather than kept; every
   mutating operation that needs `bash` (the archive move, the `git mv`, the
   changelog write) belongs in a `tw_*` tool instead.
+- **The ticket doc's implementation notes have a named writer.**
+  `tw_write_ticket_note` replaces or appends the `## Implementation notes`
+  section of a live-effort ticket, so the landing worker's note needs no
+  `edit` on the tree.
 
 **Residual risk, accepted and documented:** a model that insists can still
 mutate the tree through `bash` (`rm`, `git`, `python -c`, and so on), because
@@ -126,15 +137,12 @@ load; it fails open to personal on any detection error).
 
 ## Background
 
-Design and decisions: `docs/tasks/maps/gate-skills-by-repo/map.md`. Research
-findings that grounded the implementation:
-
-- `docs/tasks/gate-config-mechanics/findings.md`, pi's `Settings` schema keeps
-  unknown top-level keys; the extension factory gets no `SettingsManager` and
-  reads the files itself; the `before_agent_start` result can rewrite the full
-  system prompt.
-- `docs/tasks/gate-skills-prompt-and-help/findings.md`, the real skills-XML
-  format (`<available_skills>` with `<skill><name>` children); no subtractive
-  `/help` hook; the `input` event can prevent `/skill:` expansion.
-- `docs/tasks/gate-skills-prompt-and-help/limitations.md`, the `/help`
-  limitation note.
+Design and decisions: `docs/tasks/archive/gate-skills-by-repo/map.md`. The
+research that grounded the implementation lives under that archived effort:
+`tasks/gate-config-mechanics/findings.md` records that pi's `Settings` schema
+keeps unknown top-level keys, the extension factory gets no `SettingsManager`
+and reads the files itself, and the `before_agent_start` result can rewrite the
+full system prompt; `tasks/gate-skills-prompt-and-help/slices/archive/` holds
+the skills-XML format (`<available_skills>` with `<skill><name>` children), the
+absence of a subtractive `/help` hook, the `/help` limitation note, and the
+`input` event's ability to prevent `/skill:` expansion.

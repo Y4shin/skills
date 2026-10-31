@@ -38,9 +38,9 @@ fold it in at the level close.
 
 > **Async dispatch (hard rule):** launch every chain with `async: true`. Never
 > block on a foreground subagent. After dispatching a ticket's chain, return
-> control; Pi wakes this session when each one completes, so no wait call is
-> needed. Tickets within a level may run at the same time; each run stays
-> tracked, interruptible, and steerable.
+> control; Pi wakes this session when it completes, so no wait call is needed.
+> One chain runs at a time; each run stays tracked, interruptible, and
+> steerable.
 
 The effort's tickets form a **ticket graph** with blocking relationships: each
 ticket declares its `blocked_by` dependencies, and the **frontier** is the set
@@ -63,10 +63,14 @@ primarily through context pointers (to the architecture document, ticket
 docs, research notes, previous commits). Do not duplicate information
 already available via pointers; pass the pointer, not the content.
 
-Tickets within a level may run **concurrently**; tickets across levels
-**serialize on the level boundary**: levels remain **strict barriers**,
-level N+1 starts only after every ticket in level N has landed and closed
-out.
+**Tickets run one at a time, in level order.** The dependency levels remain
+**strict barriers**: level N+1 starts only after every ticket in level N has
+landed and closed out, one ticket at a time. Nothing implements level concurrency: every chain
+shares the repo working directory, so two chains at once would checkout
+different landing branches in one tree and the per-ticket `tw_state_set task`
+would be last-writer-wins. Worktree isolation is the follow-up effort's seed,
+recorded in the effort's architecture document, not behaviour this pipeline
+claims.
 
 Each ticket runs as a **sequential chain** that shares the repo working
 directory: `tdd-worker → (slice-verifier ∥ deviation-reporter) → land-worker`,
@@ -89,7 +93,7 @@ output references gathered before the failure.
 levels = JSON.parse(tw_dependency_levels(effortSlug)).levels
 
 for each level in levels:
-    for each ticket in level:   // concurrent within the level; levels serialize
+    for each ticket in level:   // one at a time; the level boundary is a strict barrier
         // Budgets come from the ticket's size; absent means m, never an error.
         size = tw_get(ticketPath, "size") || "m"
         budgetMinutes = { s: 15, m: 30, l: 45, xl: 60 }
@@ -117,9 +121,9 @@ for each level in levels:
             }
         })
 
-        // Tickets within a level may run concurrently; across levels the
-        // boundary serializes. Return control after dispatching: Pi wakes
-        // this session with the chain's result.
+        // One ticket at a time in level order; the level boundary is a
+        // strict barrier. Return control after dispatching: Pi wakes this
+        // session with the chain's result.
         result = <the chain's return: { ok, failed?, step?, refs }>
 
         // Process the chain result
@@ -174,58 +178,18 @@ for each level in levels:
 
 ## Step 2b -- The inlined per-ticket close-out
 
-After a ticket's chain returns ok, run the close-out in this same run
-before the next dispatch. The steps interleave **Pi tool calls** with shell
-commands: the tw_* tools are tools you invoke as functions, **not** shell
-binaries; wrapping them in a `set -e` block makes them fail with
-`command not found` (exit 127) and aborts the sequence. Call them as tools,
-and run the shell steps in a separate bash block.
+The close-out sequence has one home: [Step 2 of
+`SKILL.md`](../../SKILL.md#step-2----the-inlined-per-ticket-close-out). Run
+it in this same run, before the next ticket's dispatch: the CI gate, the
+knowledge harvest (which reads the ticket doc, all deviation reports, and the
+combined diff), the changelog through `tw_write_changelog`, the done-marking
+through `tw_mark_done` (this phase is the one owner of the marking), the
+`tw_finalizable` check, the state pointer cleared with `tw_state_set task
+null`, and the `--no-ff` merge into `<effort-branch>`. It is not restated
+here, so the copies cannot drift again.
 
-1. **CI gate**: checkout `task/<ticket-slug>`, `git merge <effort-branch>
-   2>/dev/null || true`, run the project's CI command, detected from repo
-   tooling or the `docs/testing.md` protocol; ask the user when ambiguous.
-   A red branch
-   is never merged: fix forward on the landing branch, and record that
-   fix-forward fired with `submit_feedback({ kind: "expected", data })`.
-2. **Knowledge harvest**: read the ticket doc, all deviation reports from
-   `docs/tasks/<effort>/tickets/<ticket-slug>/deviation-reports/`, and the
-   combined diff; fold durable knowledge into `docs/testing.md` and other
-   relevant docs, and append architecture lessons to the ticket doc's
-   `## Implementation notes`. Commit:
-   `git add -A && git commit -m "docs(ticket): harvest knowledge for {ticketSlug}"`
-3. **Changelog**: write the entry through `tw_write_changelog`, the only
-   writer of `docs/tasks/CHANGELOG.md` (the built-in write and edit are
-   refused there): the slug, the ticket title, and a 3-5 line body. Commit
-   through the shell afterwards (the commit is git, not a tree mutation):
-   `git add docs/tasks/CHANGELOG.md && git commit -m "docs: changelog {ticketSlug}"`
-4. **Bug closure (subtype: bug only)**: read the ticket body for the bug doc
-   reference; if the body names no bug doc, ask the user which bug doc to
-   close and do not proceed until answered. Read `docs/bugs/<slug>.md`, set
-   `status: fixed`, fill `fix_commit` with the landing branch's SHA, fill
-   the Root cause and Fix summary sections, commit, then archive the bug
-   doc with `git mv docs/bugs/<slug>.md docs/bugs/archive/<slug>.md` and
-   commit.
-5. **Mark the ticket done through `tw_mark_done`** (the one owner of the
-   marking: this phase; the chain never marks it). The tool checks the
-   changelog entry references the ticket before it writes the done state,
-   so the changelog step must land first.
-6. **`tw_finalizable <ticket-slug>`** (Pi tool, not a shell command):
-   verifies the ticket is finalizable and surfaces the effort graph's
-   anomalies, which you should report if any appear.
-7. **`tw_state_set task null`** (Pi tool, not a shell command): clears the
-   current item pointer.
-8. **Merge the landing branch into the effort's branch** (shell, safe under
-   `set -e`), where `<effort-branch>` is the branch the previous ticket
-   landed on, not the literal `main` unless `main` is that branch:
-
-   ```bash
-   set -e
-   git checkout <effort-branch>
-   git merge --no-ff task/<ticket-slug> -m "ticket: finalize {ticketSlug}"
-   git branch -d task/<ticket-slug>
-   ```
-
-   If remote exists: `git push origin <effort-branch>`
+A feature ticket has no bug-closure step: `docs/bugs/` is a static archive in
+schema 5 and the implementation ticket is the defect's record.
 
 There is **no per-ticket move**: the ticket stays in the live effort.
 Moving one ticket out would split the effort's graph scope and trip the
@@ -318,7 +282,7 @@ Hard rule: on subagent failure the parent never implements. Its only moves are r
 
 **Split rules (sub-tickets, never ad-hoc files).** A split goes through
 `tw_split_ticket`, which creates the sub-tickets and supersedes the
-original, so the effort's graph absorbs it; no ad-hoc slice docs and no
+original, so the effort's graph absorbs it; no ad-hoc artifact docs and no
 ad-hoc numbering convention exist anymore:
 
 - `tw_split_ticket` writes each sub-ticket to

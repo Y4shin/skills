@@ -9,7 +9,7 @@ the live tool, `tw_next`, instead of the story.
 
 It describes the task tree as an OKF bundle: one directory per effort under
 `docs/tasks/<effort>/` holding `map.md`, an optional `spec.md`, a `tasks/`
-subdirectory of decision tasks, and a `tickets/` subdirectory of
+subdirectory of planning tasks, and a `tickets/` subdirectory of
 implementation tickets. The `tw_*` tools make that graph queryable. Every
 request, bugs included, enters as an effort through `/skill:intake`; there
 is no parallel bug substrate (the retired bug directory survives only as
@@ -28,9 +28,10 @@ onto it: `/skill:diagnosing-bugs` for something broken,
 `/skill:improve-codebase-architecture` for a survey, `/skill:eval-review` for
 an eval suite or a failed run, and `/skill:skill-review` for an Agent Skill.
 Reference tables map
-read-only questions to tools (`tw_next`, `tw_finalizable`, `tw_list`,
-`tw_show`, `tw_state`, `tw_dependency_levels` / `tw_frontier`) and actions to
-skills.
+read-only questions to the phase that declares the tool (`tw_next` answers
+directly; `tw_finalizable`, `tw_list`, `tw_show`, `tw_state`, and
+`tw_dependency_levels` / `tw_frontier` are called inside the phase the row
+names) and actions to skills.
 
 The explainer is layered so a reader can stop at any depth: the `tw_next`
 fast track, then a short narrative of the arc, then the main flow, then the skill's `PHASE-BOUNDARIES.md` reference for the
@@ -51,9 +52,9 @@ becomes an effort (a map plus exactly one non-negotiables grilling task,
 and for a bug the `subtype: bug` implementation ticket inside that effort).
 There is no triage queue and no rejection path.
 
-**What is the difference between a decision task and an implementation
+**What is the difference between a planning task and an implementation
 ticket?**
-A decision task (under `docs/tasks/<effort>/tasks/`) holds a question whose
+A planning task (under `docs/tasks/<effort>/tasks/`) holds a question whose
 resolution is a decision; wayfinder creates it. An implementation ticket
 (under `docs/tasks/<effort>/tickets/`) holds buildable work with acceptance
 criteria; `to-tickets` creates it. The vocabulary is separate on purpose.
@@ -75,12 +76,15 @@ decision tree.
   a specific skill invocation, never a shrug, and it names the right on-ramp
   for your starting situation.
 - The flow it describes matches the tree on disk: efforts grouped under
-  `docs/tasks/<effort>/`, decision tasks under `tasks/`, tickets under
+  `docs/tasks/<effort>/`, planning tasks under `tasks/`, tickets under
   `tickets/`, and every request entering through `/skill:intake`. There is
   no parallel bug substrate: the retired bug directory survives only as an
   archive.
-- Its query table routes "is this ready?" to `tw_finalizable` and "what's
-  left?" to `tw_frontier <effort>` / `tw_dependency_levels <effort>`.
+- Its query table routes "is this ready?" to `tw_finalizable` inside
+  `/skill:implement-ticket` and "what's left?" to `tw_frontier <effort>` /
+  `tw_dependency_levels <effort>` inside `/skill:wayfinder` or
+  `/skill:implement-ticket`, and "show artifact X" to `tw_show` inside
+  `/skill:wayfinder`.
 - Context hygiene is respected: planning stays in one window, execution
   gets a fresh one per ticket.
 - The routing turn ends with the completion report from the skill's

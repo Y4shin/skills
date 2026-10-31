@@ -1,5 +1,5 @@
 /**
- * Integration tests for task-workflow v2 — simplified harness.
+ * Integration tests for task-workflow v2: simplified harness.
  *
  * These tests verify the extension tools work inside a real pi AgentSession
  * backed by the faux LLM provider. They exercise the full round-trip:

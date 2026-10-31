@@ -1,6 +1,6 @@
 ---
 name: wayfinder
-description: The single planning-phase skill. Each invocation is one bounded pass over a shared map of decision tasks (research, prototype, grilling, manual): work the ready frontier, write results back to the map, and reconcile when the frontier empties. Produces decisions, not deliverables; hands off to to-spec and to-tickets for implementation.
+description: The single planning-phase skill. Each invocation is one bounded pass over a shared map of planning tasks (research, prototype, grilling, manual): work the ready frontier, write results back to the map, and reconcile when the frontier empties. Produces decisions, not deliverables; hands off to to-spec and to-tickets for implementation.
 disable-model-invocation: true
 ---
 

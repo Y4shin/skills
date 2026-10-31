@@ -1,7 +1,7 @@
 /**
  * YAML frontmatter parsing and serialization.
  *
- * Pure functions — no file I/O. The caller manages reading/writing files.
+ * Pure functions, no file I/O. The caller manages reading/writing files.
  */
 
 import YAML from "yaml";

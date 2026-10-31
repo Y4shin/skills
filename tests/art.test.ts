@@ -563,7 +563,7 @@ describe("dependencyLevels", () => {
       { slug: "a", status: "todo", type: null, size: "m", blocked_by: ["b"] },
       { slug: "b", status: "todo", type: null, size: "m", blocked_by: ["a"] },
     ];
-    // Should not deadlock — puts remaining in one level
+    // Should not deadlock: puts remaining in one level
     const levels = dependencyLevels(items);
     expect(levels.length).toBe(1);
     expect(levels[0]).toEqual(expect.arrayContaining(["a", "b"]));

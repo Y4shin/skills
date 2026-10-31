@@ -19,10 +19,11 @@ naming the legal next calls.
 
 **The ticket frontier and the level loop:** the ready edge comes from
 `tw_frontier <effort-slug>` and the waves from
-`tw_dependency_levels <effort-slug>`. Tickets within one dependency level
-may run concurrently; tickets across levels serialize on the level
-boundary. Running tickets from different levels at once is out of scope
-unless the human asks for it explicitly.
+`tw_dependency_levels <effort-slug>`. Tickets run one at a time, in level
+order; the levels stay strict barriers. Concurrency inside a level is not
+implemented: every chain shares the one repo working directory, so two at
+once would checkout different landing branches in the same tree. Worktree
+isolation is a recorded follow-up, not current behaviour.
 
 **The per-ticket chain** is one pre-canned workflow script,
 `scripts/ticket-chain.js` in the skill directory (shared by the feature and
@@ -51,10 +52,9 @@ written through `tw_write_changelog` (the only writer of
 (the one owner of the marking), verified with
 `tw_finalizable <ticket-slug>` (which also surfaces the effort graph's
 anomalies), the state pointer cleared with `tw_state_set task null`, and
-the landing branch merged into main with `--no-ff`. Bug tickets get a
-closure branch: the bug doc reference is read from the ticket body, the doc
-is set to `status: fixed` with `fix_commit` and root-cause sections filled,
-then archived to `docs/bugs/archive/`.
+the landing branch merged into main with `--no-ff`. A bug ticket has no
+closure step: `docs/bugs/` is a static archive in schema 5, and the
+implementation ticket is the defect's record.
 
 After the last ticket, the **end-of-effort pass** runs as a second shipped
 workflow, `scripts/end-of-effort.js`: the advisory whole-effort review, the

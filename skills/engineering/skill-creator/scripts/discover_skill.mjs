@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// discover_skill.mjs — Discover existing skills matching an intent.
+// discover_skill.mjs: Discover existing skills matching an intent.
 //
 // Usage: node discover_skill.mjs "<intent>" --skills-dir <dir> [--threshold 0.4] [--json]
 //
@@ -142,7 +142,7 @@ function main() {
     } else {
       process.stdout.write("Matching skills (UPDATE over create):\n");
       for (const c of candidates) {
-        process.stdout.write(`  ${c.name} (score: ${c.score}) — UPDATE over create\n`);
+        process.stdout.write(`  ${c.name} (score: ${c.score}) : UPDATE over create\n`);
         process.stdout.write(`    ${c.description}\n`);
         process.stdout.write(`    ${c.path}\n`);
       }

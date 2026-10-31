@@ -50,9 +50,12 @@ graph with `tw_dependency_levels <effort-slug>` (BFS levels). A level is a
 wave of tickets whose blockers are all done; levels are strict barriers:
 level N+1 starts only after every ticket in level N has landed.
 
-Ticket concurrency: tickets within one dependency level may run concurrently;
-tickets across levels serialize on the level boundary. Running tickets from
-different levels at once is out of scope unless the human asks explicitly.
+**The loop is serial: tickets run one at a time, in level order.** The levels
+stay barriers, and no two chains ever run at once. Every chain shares the one
+repo working directory, so a second chain at the same time would `git
+checkout` a different `task/<ticket-slug>` branch in the same tree, and the
+per-ticket `tw_state_set task <slug>` would be last-writer-wins. Worktree
+isolation is the follow-up effort's seed, not behaviour this skill claims.
 
 ## Step 1 -- Per-ticket chain dispatch
 
@@ -88,7 +91,10 @@ The chain ships as a pre-canned workflow script,
 and bug pipelines): resolve its path against this skill's directory, launch
 it once per ticket with `async: true` and the ticket's parameters as
 `args`, and it owns the preconditions gate, the step order, the ok-gates,
-and the per-step output bindings. Each child task is composed from identity
+and the per-step output bindings. The land-worker writes the landing note
+through `tw_write_ticket_note`, the named writer for a ticket doc: it
+reaches the tool through its own `tools:` allowlist, because a subagent runs
+in its own session where no phase is open. Each child task is composed from identity
 and pointers only; procedure lives in the agent definitions and the tdd /
 diagnosing-bugs skills, and the caller never authors worker prompts. The
 gate is the read-only `implement-preconditions` agent: it refuses to launch
@@ -129,9 +135,9 @@ runId = subagent({
     }
 })
 
-// Tickets within a level may run concurrently; tickets across levels
-// serialize on the level boundary. Return control after dispatching:
-// Pi wakes this session with the chain's result.
+// Tickets run one at a time in level order; the level boundary stays a
+// strict barrier. Return control after dispatching: Pi wakes this session
+// with the chain's result.
 result = <the chain's return: { ok, failed?, step?, refs }>
 ```
 
@@ -187,7 +193,9 @@ separate bash block.
    combined diff. Fold durable knowledge into project docs: update
    `docs/testing.md` if new patterns or tools were discovered, update any
    other relevant docs under `docs/`, and append architecture lessons to the
-   ticket doc's `## Implementation notes`.
+   ticket doc's `## Implementation notes` through `tw_write_ticket_note`, the
+   only writer of that section (the built-in edit is refused under
+   `docs/tasks/`).
    Commit: `git add -A && git commit -m "docs(ticket): harvest knowledge for {ticketSlug}"`
 
 3. **Changelog.** Write the entry through `tw_write_changelog`, the only
@@ -198,22 +206,19 @@ separate bash block.
    "docs: changelog {ticketSlug}"` (the tool writes the file; the commit is
    git, not a tree mutation).
 
-4. **Bug closure (subtype: bug only).** If the ticket's `subtype` is
-   `feature` or absent, skip. Otherwise read the ticket body for the bug doc
-   reference; if the body names no bug doc, ask the user which bug doc to
-   close and do not proceed until answered. Read `docs/bugs/<slug>.md`, set
-   `status: fixed`, fill `fix_commit` with the landing branch's SHA
-   (`git rev-parse task/<ticket-slug>`), fill the Root cause and Fix summary
-   sections from the ticket's `## Implementation notes` and deviation
-   reports, commit, then archive the bug doc with
-   `git mv docs/bugs/<slug>.md docs/bugs/archive/<slug>.md` and commit.
-   (`docs/bugs/` is outside the write guard's scope, so these writes are
-   legal there.)
+4. **There is no bug-closure step.** A bug ticket's record is the ticket
+   itself: `docs/bugs/` is a static archive in schema 5, the defect's doc and
+   reproduction are read from the ticket body as the spec source, and nothing
+   in this phase writes under `docs/bugs/`.
 
 5. **Mark the ticket done through `tw_mark_done`** (the one owner of the
-   marking: this phase; the chain never marks it). The tool checks the
-   changelog entry references the ticket before it writes
-   `workflow_state: done`, so the changelog step must land first.
+   marking for a landed ticket: this phase; the chain never marks it). The tool
+   checks the changelog entry references the ticket before it writes
+   `workflow_state: done`, so the changelog step must land first. The rule has
+   two sanctioned exceptions, named so it reads true: wayfinder's
+   planning-task half of `tw_mark_done` marks planning tasks (that half
+   refuses tickets), and `tw_split_ticket` supersedes an oversized ticket as
+   `status: deprecated` plus `workflow_state: done`.
 
 6. **Call the Pi tool** to verify the ticket is finalizable; the check also
    surfaces the effort graph's anomalies, which you should report if any
@@ -223,8 +228,8 @@ separate bash block.
    tw_finalizable <ticket-slug>   # Pi tool, not a shell command
    ```
 
-7. **Call the Pi tool** to clear the current item (the state setter has no
-   slice field and it is not called):
+7. **Call the Pi tool** to clear the current item (the state setter takes
+   pointers only, so the task pointer is the one cleared):
 
    ```
    tw_state_set task null   # Pi tool, not a shell command
@@ -352,7 +357,7 @@ subtype and `blocked_by`, with the new sub edges chained between the subs
 and sizes taken from the diagnosis) and supersedes the original as
 `status: deprecated` plus `workflow_state: done` with a body note naming
 its sub-tickets, so the graph absorbs the split and the history reads. No
-ad-hoc slice docs and no ad-hoc numbering convention exist; hand edits to
+ad-hoc artifact docs and no ad-hoc numbering convention exist; hand edits to
 ticket files are refused by the write guard. Re-run the chain per
 sub-ticket; the frontier and dependency levels pick the sub-tickets up like
 any other ticket.

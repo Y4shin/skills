@@ -11,6 +11,7 @@ import { parse as parseYaml } from "yaml";
 import { parse } from "../src/core/frontmatter.js";
 import { findAnomalies, fromFrontmatter, validateArtifact, type Artifact } from "../src/core/art.js";
 import { createTools } from "../src/pi.js";
+import { SKILL_REGISTRY } from "../src/disclosure.js";
 
 const PROJECT = process.cwd();
 
@@ -950,25 +951,15 @@ describe("skill cross-references", () => {
     expect(content).not.toContain("docs/tasks/archive/<effort>");
   });
 
-  test("the close-out has a subtype: bug branch", () => {
+  test("the close-out has no bug-closure step: docs/bugs/ is a static archive", () => {
+    // end-of-effort-reconciliation retired the substrate write: the defect's
+    // record is the implementation ticket. (The former pins here asserted the
+    // `status: fixed` / `fix_commit` / archive-move closure, which schema 5
+    // retired.)
     const content = readFile("skills/engineering/implement-ticket/SKILL.md");
-    expect(content).toMatch(/subtype: bug/i);
-  });
-
-  test("the bug branch archives bug docs to docs/bugs/archive", () => {
-    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
-    expect(content).toContain("docs/bugs/archive");
-  });
-
-  test("the bug branch sets status fixed and fills fix_commit", () => {
-    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
-    expect(content).toContain("status: fixed");
-    expect(content).toContain("fix_commit");
-  });
-
-  test("the bug branch asks user when the body reference is absent", () => {
-    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
-    expect(content).toMatch(/ask.{0,80}(which bug|bug doc)/i);
+    expect(content).toMatch(/docs\/bugs\/` is a static archive/);
+    expect(content).not.toContain("fix_commit");
+    expect(content).not.toContain("status: fixed");
   });
 
   test("the bug branch takes the bug slug from the ticket body's reference", () => {
@@ -978,9 +969,10 @@ describe("skill cross-references", () => {
     expect(content).not.toContain("bug: <slug>");
   });
 
-  test("setup-workflow creates docs/bugs/archive directory", () => {
+  test("setup-workflow scaffolds no bug directory: an archive is left where it is", () => {
     const content = readFile("skills/engineering/setup-workflow/SKILL.md");
-    expect(content).toContain("docs/bugs/archive");
+    expect(content).not.toMatch(/mkdir[^\n]*docs\/bugs/);
+    expect(content).toMatch(/docs\/bugs\/` is a static archive/);
   });
 
   test("setup-workflow writes docs/dev-env.md template", () => {
@@ -1384,6 +1376,10 @@ const DEAD_SURFACE_EXEMPT_PREFIXES = [
   "docs/tasks/overhaul-execution-skills/",
   "docs/tasks/tool-surface-inventory/",
   "docs/tasks/workflow-tool-usage-audit/",
+  // The effort that retires the v4 surface keeps the retired names in its own
+  // record: a finding, a ticket, or an amendment that names a deleted tool to
+  // retire it is a historical record, the same class as an archived tree.
+  "docs/tasks/enforced-workflow-v5/",
 ];
 
 describe("dead surface deletion (corpus check)", () => {
@@ -1458,6 +1454,9 @@ const SURVIVING_TOOLS = new Set([
   // argument of the effort creator.
   "tw_write_review",
   "tw_create_effort",
+  // end-of-effort-reconciliation: the ticket doc's implementation-notes
+  // writer, the named replacement for the built-in edit on a ticket.
+  "tw_write_ticket_note",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -2144,6 +2143,30 @@ describe("task-workflow-doctor v4 (overhaul-planning-skills)", () => {
     for (const text of [content, readFile(resourcePath)]) expectOnlySurvivingTools(text);
   });
 
+  test("the missing-scaffolding scope names exactly its two scopes", () => {
+    // end-of-effort-reconciliation: the doctor owns what the tools cannot
+    // self-diagnose. The scaffold section named the manifest, docs/dev-env.md,
+    // docs/testing.md, and docs/adr/ too, and one row said to edit the
+    // manifest while the same page says never to edit the tree.
+    const section = content.slice(content.indexOf("## Missing scaffolding"), content.indexOf("\n## ", content.indexOf("## Missing scaffolding") + 1));
+    expect(section).toMatch(/`CONTEXT\.md`/);
+    expect(section).toMatch(/`docs\/tasks\/`/);
+    for (const out of ["docs\/dev-env\.md", "docs\/testing\.md", "docs\/adr\/", "package\.json", "pi\.skills", "state\.yaml"]) {
+      expect(section, `the scaffold scope still owns ${out}`).not.toMatch(new RegExp(out));
+    }
+    expect(section).not.toMatch(/edit the manifest/i);
+    // The out-of-scope resources are gone, not orphaned.
+    for (const gone of [
+      "missing-dev-env.md",
+      "missing-testing-md.md",
+      "missing-adr-dir.md",
+      "manifest-misconfigured.md",
+      "missing-state-yaml.md",
+    ]) {
+      expect(existsSync(join(PROJECT, "skills/engineering/task-workflow-doctor/resources", gone)), gone).toBe(false);
+    }
+  });
+
   test("missing-tasks-tree resource describes the v4 tree shape", () => {
     const resource = readFile("skills/engineering/task-workflow-doctor/resources/missing-tasks-tree.md");
     expect(resource).toMatch(/map\.md/);
@@ -2167,7 +2190,10 @@ describe("task-workflow-overview v4 (overhaul-planning-skills)", () => {
     expect(content).toMatch(/spec\.md/);
     expect(content).toMatch(/tasks\//);
     expect(content).toMatch(/tickets\//);
-    expect(content).toMatch(/decision tasks/i);
+    // end-of-effort-reconciliation retired the interim vocabulary: the two
+    // graph kinds are planning tasks and implementation tickets.
+    expect(content).toMatch(/planning tasks/i);
+    expect(content).not.toMatch(/decision tasks/i);
     expect(content).toMatch(/implementation tickets/i);
   });
 
@@ -2184,7 +2210,7 @@ describe("task-workflow-overview v4 (overhaul-planning-skills)", () => {
   });
 
   test("tw_list lists efforts, tasks, and tickets", () => {
-    expect(content).toMatch(/List efforts \/ tasks \/ tickets/);
+    expect(content).toMatch(/List efforts, planning tasks, tickets/);
   });
 
   test("actions include the doctor row", () => {
@@ -2298,13 +2324,17 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/timeoutMs/);
   });
 
-  test("chains run per ticket per dependency level; the level boundary serializes", () => {
+  test("tickets run one at a time in level order; the levels stay strict barriers", () => {
     expect(content).toContain("tw_dependency_levels <effort-slug>");
-    // Tickets within one level may run concurrently; across levels the
-    // boundary serializes (strict barriers).
-    expect(content).toMatch(/may run \*\*concurrently\*\*/i);
+    // The loop is serial: the levels are still barriers, and level concurrency
+    // is documented behaviour that nothing implements (no worktree mechanism
+    // exists; every chain shares the repo working directory).
+    expect(content).toMatch(/one at a time/i);
     expect(content).toMatch(/strict barriers/i);
-    expect(content).toMatch(/level N\+1 starts only after every ticket in level N has landed/i);
+    expect(content).toMatch(/level N\+1 starts only after every ticket in level N has\s+landed/i);
+    expect(content, "the concurrency claim is retired: nothing implements it").not.toMatch(/concurrent/i);
+    // The gap is named, not silent: worktree isolation is the follow-up seed.
+    expect(content).toMatch(/worktree/i);
   });
 
   test("the chain dispatches tdd, then verify plus deviation gated, then land", () => {
@@ -2760,45 +2790,54 @@ describe("planning resources v4 touch (overhaul-execution-skills)", () => {
 // close-out tests above pin the SKILL.md sequence; these pin the resources'
 // close-out sections and the one-owner rule across the surface.
 describe("the inlined per-ticket close-out (implement-ticket-skill)", () => {
+  // One close-out, one home: the sequence lives in SKILL.md's Step 2 and the
+  // two resources point at it (end-of-effort-reconciliation collapsed the
+  // three copies, which had already drifted).
+  const skill = readFile("skills/engineering/implement-ticket/SKILL.md");
+
+  test("the canonical close-out carries every step, including the dropped details", () => {
+    expect(skill).not.toContain("tw_set");
+    expect(skill).toMatch(/tw_mark_done/);
+    expect(skill).toMatch(/one owner/i);
+    expect(skill).toContain("tw_finalizable <ticket-slug>");
+    expect(skill).toMatch(/anomal/i);
+    expect(skill).toMatch(/tw_state_set task null/);
+    expect(skill).not.toMatch(/tw_state_set slice/);
+    expect(skill).toMatch(/tw_write_changelog/);
+    expect(skill).toMatch(/writer of `docs\/tasks\/CHANGELOG\.md`/);
+    expect(skill).toMatch(/CI gate/i);
+    expect(skill).toMatch(/red branch/i);
+    expect(skill).toMatch(/git merge --no-ff task\/<ticket-slug>/);
+    // The source of the harvest notes: the feature copy had dropped it.
+    expect(skill).toMatch(/all deviation reports/);
+    expect(skill).toMatch(/combined diff/);
+  });
+
   for (const kind of ["feature", "bug"]) {
     const content = readFile(`skills/engineering/implement-ticket/resources/${kind}/autonomous.md`);
 
-    test(`the ${kind} close-out marks done through tw_mark_done and verifies with tw_finalizable`, () => {
-      expect(content).not.toContain("tw_set");
-      expect(content).toMatch(/tw_mark_done/);
-      expect(content).toMatch(/one owner/i);
-      expect(content).toContain("tw_finalizable <ticket-slug>");
-      expect(content).toMatch(/anomal/i);
-    });
-
-    test(`the ${kind} close-out clears the task pointer; the slice pointer is not called`, () => {
-      expect(content).toMatch(/tw_state_set task null/);
-      expect(content).not.toMatch(/tw_state_set slice/);
-    });
-
-    test(`the ${kind} close-out writes the changelog through the only writer`, () => {
-      expect(content).toMatch(/tw_write_changelog/);
-      expect(content).toMatch(/writer of `docs\/tasks\/CHANGELOG\.md`/);
-    });
-
-    test(`the ${kind} close-out gates on the CI check and never merges a red branch`, () => {
-      expect(content).toMatch(/CI gate/i);
-      expect(content).toMatch(/red branch/i);
-    });
-
-    test(`the ${kind} close-out merges the landing branch into main with --no-ff`, () => {
-      expect(content).toMatch(/git merge --no-ff task\/<ticket-slug>/);
+    test(`the ${kind} resource points at the one close-out instead of copying it`, () => {
+      expect(content).toMatch(/close-out sequence has one home/i);
+      expect(content).toMatch(/SKILL\.md/);
+      // It still names the steps so a reader knows what it is delegating, but
+      // it does not re-teach them with their own numbered sequence.
+      expect(content).not.toMatch(/\*\*CI gate/);
+      expect(content).not.toMatch(/git merge --no-ff task\/<ticket-slug>/);
+      expect(content).not.toMatch(/git add -A && git commit -m "docs\(ticket\): harvest/);
     });
   }
 
-  test("the bug close-out closes and archives the bug doc; the feature one skips it", () => {
+  test("neither resource carries a bug-closure step: the bug doc is the spec source", () => {
     const feature = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
     const bug = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
-    expect(feature).toMatch(/subtype: bug only/i);
-    expect(bug).toContain("docs/bugs/archive");
-    expect(bug).toContain("status: fixed");
-    expect(bug).toContain("fix_commit");
-    expect(bug).toMatch(/ask the user which bug doc/i);
+    for (const [label, text] of [
+      ["feature", feature],
+      ["bug", bug],
+    ] as const) {
+      expect(text, `${label} still closes a bug doc`).not.toMatch(/status: fixed|fix_commit|docs\/bugs\/archive/);
+      expect(text, `${label} never names docs/bugs as a static archive`).toMatch(/docs\/bugs\/` is a static archive/);
+    }
+    // The bug doc is still the chain's spec source, read from the ticket body.
     expect(bug).toMatch(/ticket body/i);
     expect(bug).not.toContain("bug: <slug>");
   });
@@ -3325,15 +3364,26 @@ describe("documentation re-sync (docs-resync)", () => {
     }
   });
 
-  test("the re-synced prose carries no em-dash", () => {
-    for (const file of [
-      "README.md",
-      "CONTEXT.md",
-      "skills/engineering/README.md",
-      "skills/productivity/README.md",
-    ]) {
-      expect(readFile(file), `${file} carries an em-dash`).not.toContain("\u2014");
+  test("no file in the corpus carries an em-dash", () => {
+    // AGENTS.md bans em-dashes in this repo's prose, and the check used to name
+    // four files, so a new one could never be caught. It runs over the corpus
+    // with the same skip rules as the other corpus checks (archived trees,
+    // vendored experiment trees, node_modules/.git) and the same historical
+    // record exemptions those checks carry, so a planning document or a dated
+    // record is skipped rather than repunctuated.
+    const offenders: string[] = [];
+    for (const file of corpusFiles(PROJECT)) {
+      const rel = file.slice(PROJECT.length + 1);
+      if (CORPUS_EXEMPTIONS.has(rel) || DEAD_SURFACE_EXEMPT_FILES.has(rel)) continue;
+      let text = "";
+      try {
+        text = readFileSync(file, "utf-8");
+      } catch {
+        continue; // a binary file cannot carry prose punctuation
+      }
+      if (text.includes("\u2014")) offenders.push(rel);
     }
+    expect(offenders).toEqual([]);
   });
 
   test("the top-level README describes the v5 arc", () => {
@@ -3363,6 +3413,394 @@ describe("documentation re-sync (docs-resync)", () => {
     const overview = readFile("skills/engineering/task-workflow-overview/SKILL.md");
     for (const skill of promoted.filter((s) => s.name !== "task-workflow-overview")) {
       expect(overview, `the overview never names /skill:${skill.name}`).toContain(`/skill:${skill.name}`);
+    }
+  });
+});
+
+// ─── End-of-effort reconciliation (end-of-effort-reconciliation) ─────────────
+//
+// The end-of-effort review found claims the shipped code does not support. The
+// effort documents are the record, so they are amended surgically: the claims
+// that are now false change, and the reconciliation itself is recorded as
+// arch-spec entry 21. These pins hold the amendments in place.
+
+describe("end-of-effort reconciliation: the effort documents match the shipped code", () => {
+  const archSpec = readFile("docs/tasks/enforced-workflow-v5/arch-spec.md");
+  const spec = readFile("docs/tasks/enforced-workflow-v5/spec.md");
+  const implement = readFile("skills/engineering/implement-ticket/SKILL.md");
+  const featureResource = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
+  const bugResource = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
+
+  test("the ticket loop is documented as serial in the skill and both resources", () => {
+    for (const [label, content] of [
+      ["implement-ticket SKILL.md", implement],
+      ["the feature resource", featureResource],
+      ["the bug resource", bugResource],
+    ] as const) {
+      expect(content, `${label} never says tickets run one at a time`).toMatch(/one at a time/i);
+      expect(content, `${label} still claims ticket concurrency`).not.toMatch(/concurrent/i);
+    }
+  });
+
+  test("the arch spec records the serial loop and the worktree gap as a follow-up seed", () => {
+    // The settled "Ticket concurrency" bullet is amended, not restated.
+    expect(archSpec).not.toMatch(/Tickets within one dependency level may run\s+concurrently/);
+    expect(archSpec).toMatch(/tickets run one at a time|Tickets run one at a time/i);
+    // The reconciliation is entry 21, and it carries the follow-up seed.
+    expect(archSpec).toMatch(/^21\. \*\*`end-of-effort-reconciliation`\*\*/m);
+    const entry = archSpec.slice(archSpec.indexOf("21. **`end-of-effort-reconciliation`**"));
+    expect(entry).toMatch(/worktree/i);
+    expect(entry.slice(0, 4000)).toMatch(/follow-up/i);
+  });
+
+  test("the spec's concurrency story no longer promises an uncorrupted working directory", () => {
+    expect(spec).not.toMatch(/shared repo working\s+directory is never corrupted/);
+    expect(spec).toMatch(/one ticket at a time/i);
+  });
+
+  test("the ready_for_spec auto-clear claims only the writers that exist", () => {
+    // No writer can reopen or un-done anything (tw_mark_done and
+    // tw_mark_blocked refuse done items, tw_state_set takes pointers only), and
+    // blocked_by edges cannot be repaired after creation.
+    expect(spec).not.toMatch(/auto-clears\*\* when a planning task is added, reopened/);
+    expect(archSpec).not.toMatch(/auto-clear surface is fully landed/);
+    expect(spec).toMatch(/reopen[\s\S]{0,200}follow-up|follow-up[\s\S]{0,200}reopen/i);
+    expect(archSpec).toMatch(/reopen and edge repair|edge repair/);
+    // The amend names the writers that do clear it.
+    expect(spec).toMatch(/adding a\s+planning task/i);
+    expect(spec).toMatch(/tw_write_section/);
+    expect(spec).toMatch(/planning\s+half\s+of `tw_mark_done`|planning `tw_mark_done`|planning done-marking/i);
+  });
+
+  test("the one-owner rule names its two sanctioned exceptions", () => {
+    // wayfinder's planning-task half of tw_mark_done, and tw_split_ticket's
+    // supersede of the original, which the arch spec itself sanctions.
+    const rule = implement.slice(implement.indexOf("**Mark the ticket done through `tw_mark_done`**"));
+    expect(rule.slice(0, 1200)).toMatch(/wayfinder/i);
+    expect(rule.slice(0, 1200)).toMatch(/tw_split_ticket/);
+    const archRule = archSpec.slice(archSpec.indexOf("one-owner rule holds with two sanctioned exceptions"));
+    expect(archRule.slice(0, 900)).toMatch(/wayfinder/i);
+    expect(archRule.slice(0, 900)).toMatch(/tw_split_ticket/);
+  });
+
+  test("the report-template claim names the nine run-ending skills instead of claiming all", () => {
+    const runEnding = [
+      "intake",
+      "wayfinder",
+      "to-spec",
+      "to-tickets",
+      "implement-ticket",
+      "finalize-effort",
+      "setup-workflow",
+      "task-workflow-overview",
+      "task-workflow-doctor",
+    ];
+    expect(spec).not.toMatch(/Every workflow skill ends its run with one shared completion report/);
+    expect(archSpec).not.toMatch(/\*\*Every workflow skill ends its run with one shared completion report/);
+    for (const skill of runEnding) {
+      expect(spec, `the spec never names ${skill} in the report coverage`).toMatch(
+        new RegExp(`\\b${skill}\\b`),
+      );
+    }
+    expect(spec).toMatch(/nine/i);
+    expect(archSpec).toMatch(/nine/i);
+  });
+});
+
+describe("the overview's read-only table routes to owning phases (end-of-effort-reconciliation)", () => {
+  const overview = readFile("skills/engineering/task-workflow-overview/SKILL.md");
+  const page = readFile("docs/engineering/task-workflow-overview.md");
+
+  /** The rows of the read-only query table, as [label, cell] pairs. */
+  function tableRows(content: string): string[][] {
+    const start = content.indexOf("## Read-only queries");
+    expect(start, "the overview carries the read-only query section").toBeGreaterThan(-1);
+    const section = content.slice(start, content.indexOf("\n## ", start + 1));
+    return section
+      .split("\n")
+      .filter((line) => line.startsWith("|") && !/^\|\s*-+/.test(line) && !/\| Question \|/.test(line))
+      .map((line) => line.split("|").slice(1, -1).map((cell) => cell.trim()))
+      .filter((cells) => cells.length >= 2);
+  }
+
+  test("every row names the phase that declares its tool, and tw_next stays directly callable", () => {
+    for (const [question, route] of tableRows(overview)) {
+      const tools = [...route.matchAll(/`(tw_[a-z_]+)/g)].map((m) => m[1]);
+      expect(tools.length, `row '${question}' names no tool`).toBeGreaterThan(0);
+      if (tools.every((tool) => tool === "tw_next")) continue;
+      for (const tool of tools) {
+        if (tool === "tw_next") continue;
+        expect(route, `row '${question}' names ${tool} with no phase to open it`).toMatch(/\/skill:[\w-]+/);
+      }
+    }
+    // The fast track stays the one directly callable answer.
+    expect(tableRows(overview).some(([, route]) => /`tw_next`/.test(route) && !/\/skill:/.test(route))).toBe(true);
+  });
+
+  test("the table names no tool the reader cannot reach: every named tool is disclosed by a phase", () => {
+    const disclosed = new Set(SKILL_REGISTRY.flatMap((e) => e.toolset));
+    for (const [question, route] of tableRows(overview)) {
+      for (const [, tool] of route.matchAll(/`(tw_[a-z_]+)/g)) {
+        if (tool === "tw_next" || tool === "tw_open" || tool === "tw_close") continue;
+        expect(disclosed.has(tool), `row '${question}' names ${tool}, which no phase discloses`).toBe(true);
+      }
+    }
+  });
+
+  test("the docs page carries the same routed table", () => {
+    // The human-facing page names the phases too, so the two surfaces agree.
+    expect(page).toMatch(/tw_show[\s\S]{0,80}\/skill:wayfinder/);
+    expect(page).toMatch(/Read-only queries|read-only questions/);
+  });
+});
+
+// ─── The retired bug substrate stays out of the live instructions ────────────
+//
+// end-of-effort-reconciliation: `docs/bugs/` is a static archive in schema 5,
+// and the implementation ticket is the defect's record. No live skill or docs
+// prose may instruct a write under it; a `docs/bugs/` mention is a read (the
+// bug doc as the ticket's spec source) or an archive reference.
+
+describe("the retired bug substrate (end-of-effort-reconciliation)", () => {
+  // The write shapes the retired bug-closure step used: a frontmatter fix
+  // stamp, the fix commit field, the archive move, and the scaffold mkdir.
+  const BUG_WRITE_PATTERNS: [string, RegExp][] = [
+    ["status: fixed", /\bstatus:\s*fixed\b/],
+    ["fix_commit", /\bfix_commit\b/],
+    ["the archive move", /git mv docs\/bugs\//],
+    ["the scaffold mkdir", /mkdir[^\n]*docs\/bugs/],
+    ["the archive directory", /docs\/bugs\/archive/],
+    ["a write to a bug doc", /write\s+`?docs\/bugs\//],
+  ];
+
+  /** Live prose files: the two promoted buckets' skills and the docs pages. */
+  function liveProseFiles(): string[] {
+    const out: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) walk(path);
+        else if (entry.isFile() && entry.name.endsWith(".md")) out.push(path.slice(PROJECT.length + 1));
+      }
+    };
+    walk(join(PROJECT, "skills", "engineering"));
+    walk(join(PROJECT, "skills", "productivity"));
+    walk(join(PROJECT, "docs", "engineering"));
+    out.push("CONTEXT.md", "README.md");
+    return out;
+  }
+
+  test("no live prose instructs a write under docs/bugs", () => {
+    const offenders: string[] = [];
+    for (const rel of liveProseFiles()) {
+      // The upgrade resources are the compatibility layer: they record what the
+      // v4 substrate was, and the migration prose owns it.
+      if (rel.startsWith("skills/engineering/setup-workflow/resources/upgrade-")) continue;
+      const content = readFile(rel);
+      for (const [label, pattern] of BUG_WRITE_PATTERNS) {
+        if (pattern.test(content)) offenders.push(`${rel}: ${label}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("code-review reads a docs/bugs path only as an archive reference", () => {
+    const content = readFile("skills/engineering/code-review/SKILL.md");
+    expect(content).toMatch(/docs\/bugs\//);
+    expect(content).toMatch(/archive/i);
+    for (const [, pattern] of BUG_WRITE_PATTERNS) expect(content).not.toMatch(pattern);
+  });
+
+  test("the bug doc is the ticket's spec source, not a substrate to close", () => {
+    const bug = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
+    // The bug doc still feeds the chain: it is the spec source.
+    expect(bug).toMatch(/bug doc/i);
+    expect(bug).toMatch(/spec/i);
+    for (const [, pattern] of BUG_WRITE_PATTERNS) expect(bug).not.toMatch(pattern);
+  });
+});
+
+// ─── The mechanical single homes (end-of-effort-reconciliation) ──────────────
+//
+// The review found three duplications that had already drifted: the two
+// effort-root writers, the two root-index rewrites, and the triplicated
+// per-ticket close-out. Each now has one implementation, and these pins keep
+// the copies from coming back.
+
+describe("mechanical single homes (end-of-effort-reconciliation)", () => {
+  const source = readFile("src/pi.ts");
+  const skill = readFile("skills/engineering/implement-ticket/SKILL.md");
+  const feature = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
+  const bug = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
+
+  /** How many times a pattern occurs in a text. */
+  function count(text: string, pattern: RegExp): number {
+    return [...text.matchAll(new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`))]
+      .length;
+  }
+
+  test("one effort-root writer: the create path's title fallback exists once", () => {
+    // tw_write_spec and tw_write_architecture shared the empty-body guard, the
+    // create-or-refuse message, and this fallback before the extraction.
+    expect(count(source, /readArtifactTitle\(join\(effortDir, "map\.md"\)\) \?\? basename\(effortDir\)/)).toBe(1);
+    expect(count(source, /no live effort '\$\{o\.selector\}': create the effort/)).toBe(1);
+    expect(count(source, /function writeEffortRootArtifact/)).toBe(1);
+    // Both writers go through it.
+    expect(count(source, /writeEffortRootArtifact\(/)).toBeGreaterThanOrEqual(3);
+  });
+
+  test("one root-index writer: the Live/Archived rewrite exists once", () => {
+    expect(count(source, /function writeTasksIndex/)).toBe(1);
+    // The section rewrite itself lives only inside the helper: no caller
+    // builds the index body by hand.
+    expect(count(source, /writeMapSection\([^)]*, "Archived"/)).toBe(1);
+    expect(count(source, /writeMapSection\([^)]*, "Live"/)).toBe(1);
+  });
+
+  test("one close-out: the numbered sequence appears once, the resources point at it", () => {
+    // The canonical sequence is implement-ticket's Step 2; the two resources
+    // carry a pointer, not a copy.
+    expect(count(skill, /\*\*CI gate/)).toBe(1);
+    for (const [label, resource] of [
+      ["feature", feature],
+      ["bug", bug],
+    ] as const) {
+      expect(resource, `${label} duplicates the close-out`).not.toMatch(/\*\*CI gate/);
+      expect(resource, `${label} never points at the canonical close-out`).toMatch(/close-out[\s\S]{0,120}SKILL\.md/);
+    }
+    // The details the feature copy had dropped live in the canonical sequence.
+    expect(skill).toMatch(/all deviation reports/);
+    expect(skill).toMatch(/combined diff/);
+  });
+});
+
+// ─── Retired vocabulary across the live language (end-of-effort-reconciliation) ──
+//
+// The docs-resync pin checked CONTEXT.md only, so the retired terms survived in
+// skill prose and in a tool description. The check now runs over the live
+// language with targeted patterns: the tool names and path shapes that were
+// retired, never the ordinary English word ("a vertical slice" is craft
+// language, and the `slice-verifier` agent keeps its name).
+describe("retired vocabulary across the live language (end-of-effort-reconciliation)", () => {
+  const RETIRED_VOCABULARY: [string, RegExp][] = [
+    ["the retired slices/ directory", /(^|[^-\w])slices\//],
+    ["per-slice", /per-slice/i],
+    ["the tw_slices tool", /tw_slices/],
+    ["a slice in the artifact sense", /\bslice (doc|field|directory|substrate)s?\b/i],
+    ["mode: hitl/afk", /mode:\s*(hitl|afk)\b/i],
+    ["the retired triage skill", /\/skill:triage\b|skills\/engineering\/triage\b/],
+    ["the retired implement-task skill", /\/skill:implement-task\b|skills\/engineering\/implement-task\b/],
+    ["the retired finalize-task skill", /\/skill:finalize-task\b|skills\/engineering\/finalize-task\b/],
+    ["the retired docs/tasks/maps/ tree", /docs\/tasks\/maps\//],
+  ];
+
+  /** The live prose: promoted skills, docs pages, and the repo-level docs. */
+  function liveLanguage(): string[] {
+    const out: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) walk(path);
+        else if (entry.isFile() && entry.name.endsWith(".md")) out.push(path.slice(PROJECT.length + 1));
+      }
+    };
+    walk(join(PROJECT, "skills", "engineering"));
+    walk(join(PROJECT, "skills", "productivity"));
+    walk(join(PROJECT, "docs", "engineering"));
+    out.push("CONTEXT.md", "README.md", "skills/engineering/README.md", "skills/productivity/README.md");
+    // The compatibility layer keeps the old words by design: the upgrade
+    // resources and the migration prose record what the reshape renames.
+    return out.filter((rel) => !/^skills\/engineering\/setup-workflow\/resources\/upgrade-/.test(rel));
+  }
+
+  test("no live prose carries a retired term", () => {
+    const offenders: string[] = [];
+    for (const rel of liveLanguage()) {
+      const content = readFile(rel);
+      for (const [label, pattern] of RETIRED_VOCABULARY) {
+        if (pattern.test(content)) offenders.push(`${rel}: ${label}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("no registered tool description offers the retired vocabulary", () => {
+    // A tool description has no craft language to protect, so the bare word is
+    // retired there too: `tw_show` once offered "map, task, or slice".
+    const tools = createTools();
+    const offenders: string[] = [];
+    for (const [name, tool] of Object.entries(tools)) {
+      if (/\bslices?\b/i.test(tool.description)) offenders.push(`${name}: the retired word 'slice'`);
+      for (const [label, pattern] of RETIRED_VOCABULARY) {
+        if (pattern.test(tool.description)) offenders.push(`${name}: ${label}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+// ─── The gates and hygiene (end-of-effort-reconciliation) ────────────────────
+
+describe("the gates and hygiene (end-of-effort-reconciliation)", () => {
+  const pkg = JSON.parse(readFile("package.json"));
+  const testing = readFile("docs/testing.md");
+
+  test("the tests are typechecked: tsconfig.test.json and a recorded script", () => {
+    // The recorded `tsc --noEmit` never saw a changed test line, because the
+    // base config includes src/** only.
+    const config = JSON.parse(readFile("tsconfig.test.json"));
+    expect(config.include).toContain("tests/**/*.ts");
+    expect(config.include).toContain("src/**/*.ts");
+    expect(config.extends).toBe("./tsconfig.json");
+    expect(pkg.scripts["typecheck:tests"]).toBe("tsc -p tsconfig.test.json");
+    // It is part of the CI protocol the test-runner reads.
+    const always = testing.slice(testing.indexOf("Run these always"), testing.indexOf("Run if asked"));
+    expect(always).toContain("npm run typecheck:tests");
+  });
+
+  test("the changesets hold one major entry for v5 and no retired skill entry", () => {
+    const entries = readdirSync(join(PROJECT, ".changeset")).filter((name) => name.endsWith(".md"));
+    // README.md is the folder's own documentation, not an entry.
+    const releases = entries.filter((name) => name !== "README.md");
+    expect(releases.length).toBe(1);
+    // The one entry is the v5 release note: no pending entry describes a
+    // retired skill (three of the four swept entries described
+    // `implement-task`, so the next release would have published notes for a
+    // skill that no longer exists).
+    expect(releases[0]).toBe("enforced-workflow-v5.md");
+    const content = readFile(join(".changeset", releases[0]!));
+    expect(content).toMatch(/"task-workflow":\s*major/);
+    expect(content).toMatch(/v5|schema 5|schema_version 5/i);
+    for (const name of ["end-of-effort-workflow", "quiet-chain-dispatch", "scoped-uncertainty-tool", "shipped-ticket-chain"]) {
+      expect(existsSync(join(PROJECT, ".changeset", `${name}.md`)), name).toBe(false);
+    }
+    // The version bump is a release action, not this ticket's.
+    expect(pkg.version).toBe("4.0.0");
+  });
+
+  test("the orphaned flow map and the stale handoff are gone", () => {
+    expect(existsSync(join(PROJECT, "docs/workflow-flows.md"))).toBe(false);
+    expect(existsSync(join(PROJECT, "handoff-enforced-workflow-v5.md"))).toBe(false);
+    // No live prose links either one; the historical records under docs/tasks/
+    // may still name them.
+    const offenders = corpusFiles(PROJECT)
+      .map((file) => file.slice(PROJECT.length + 1))
+      .filter(
+        (rel) =>
+          !rel.startsWith("docs/tasks/") &&
+          !rel.startsWith(".git/") &&
+          // This file names both paths to pin their absence.
+          rel !== "tests/skills.test.ts",
+      );
+    for (const rel of offenders) {
+      let text = "";
+      try {
+        text = readFileSync(join(PROJECT, rel), "utf-8");
+      } catch {
+        continue;
+      }
+      expect(text, `${rel} links the deleted flow map`).not.toContain("docs/workflow-flows.md");
+      expect(text, `${rel} links the deleted handoff`).not.toContain("handoff-enforced-workflow-v5.md");
     }
   });
 });

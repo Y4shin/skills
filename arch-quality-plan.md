@@ -1,8 +1,8 @@
-# Architecture & Code Quality — Deviation Feedback Loop
+# Architecture & Code Quality: Deviation Feedback Loop
 
 ## The Core Idea
 
-Acknowledging that plans change during implementation is not a weakness —
+Acknowledging that plans change during implementation is not a weakness:
 it's reality. The question is whether those changes accumulate as debt or
 get fed back into the planning documents.
 
@@ -100,7 +100,7 @@ Then THE PARENT reads the report and decides:
 ### What the report contains
 
 ```markdown
-## Deviation report — env-loading
+## Deviation report: env-loading
 
 ### Source of truth checked
 - Arch spec: {chain_dir}/arch-spec.md
@@ -115,15 +115,15 @@ Then THE PARENT reads the report and decides:
    → Internal only, no affect on dependents.
 
 ### Deviations from slice doc
-(none — acceptance criteria all met)
+(none: acceptance criteria all met)
 
 ### Task doc update needed?
-Yes — append to ## Implementation notes:
+Yes: append to ## Implementation notes:
   "Slice 2 (env-loading): LoadEnv now accepts embed.FS for embedded env
    support. Added ValidateEnv() helper. arch-spec updated for slice 3."
 
 ### User attention needed?
-No — backward-compatible change, internal addition.
+No: backward-compatible change, internal addition.
 ```
 
 ---
@@ -136,7 +136,7 @@ During finalize-task, after the CI gate and before archiving.
 
 ### Who
 
-The parent (not a subagent — this is a skill instruction in finalize-task).
+The parent (not a subagent: this is a skill instruction in finalize-task).
 
 ### What it checks
 
@@ -161,7 +161,7 @@ finalize-task reads:
 ### What gets written
 
 ```markdown
-## Deviation report — repo-foundation
+## Deviation report: repo-foundation
 
 ### Source of truth checked
 - Task doc: docs/tasks/repo-foundation/task.md
@@ -173,7 +173,7 @@ finalize-task reads:
 
 2. **User story:** "Developer can configure server port via env var" was
    delivered as "config file + env var with config file taking precedence."
-   More flexible than planned — no change needed.
+   More flexible than planned; no change needed.
 
 ### Map update needed?
 This task is part of map "backend-infrastructure".
@@ -182,7 +182,7 @@ This task is part of map "backend-infrastructure".
 → Update map's description: env-loading supports embed.FS now.
 
 ### User attention needed?
-No — scope change was documented, user story was exceeded, not missed.
+No: scope change was documented, user story was exceeded, not missed.
 ```
 
 ### What gets updated
@@ -227,7 +227,7 @@ map doesn't have a notes section, the map doc gets updated).
 
 ### What gets updated
 
-- The map doc's `tasks:` list — each child task gets an `actual:` note
+- The map doc's `tasks:` list; each child task gets an `actual:` note
   if it diverged from the plan
 - The map doc's description gets updated if the overall outcome changed
 

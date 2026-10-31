@@ -19,7 +19,7 @@ architecture document and the ticket graph, `/skill:implement-ticket` builds
 and closes each ticket, and `/skill:finalize-effort` runs the effort close
 and archive. `/skill:setup-workflow` initializes or migrates a repo once.
 `docs/tasks/` is an OKF bundle: one directory per effort holding `map.md`,
-an optional `spec.md`, a `tasks/` subdirectory of decision tasks, and a
+an optional `spec.md`, a `tasks/` subdirectory of planning tasks, and a
 `tickets/` subdirectory of implementation tickets. The `tw_*` tools make
 that graph queryable. No external issue tracker, everything in git.
 
@@ -133,21 +133,28 @@ Off the main flow entirely.
 
 ## Read-only queries
 
-| Question | Tool |
+`tw_next` is declared in every state and answers directly: it is the one row
+you can just call. Every other row names the phase that declares the tool;
+`tw_open` is that phase's opener, and its own `SKILL.md` opens with the
+exact call. Read-only tools are not poured into the always-declared set:
+each is disclosed by the phase that owns it, so the table names the phase
+and the call.
+
+| Question | How to get the answer |
 |---|---|
-| "What do I run next?" | `tw_next` |
-| "Is this task ready?" | `tw_finalizable <slug>` |
-| "What's left on effort X?" | `tw_dependency_levels <effort>` / `tw_frontier <effort>` |
-| "List efforts / tasks / tickets" | `tw_list` |
-| "Show artifact X" | `tw_show <slug>` |
-| "Where am I?" | `tw_state` (both pointers) |
+| "What do I run next?" | `tw_next` (declared in every state) |
+| "Is this ticket ready?" | open `/skill:implement-ticket` (or `/skill:finalize-effort`), then `tw_finalizable <ticket-slug>` |
+| "What's left on effort X?" | open `/skill:wayfinder` for the planning graph or `/skill:implement-ticket` for the ticket graph, then `tw_frontier <effort>` / `tw_dependency_levels <effort>` |
+| "List efforts, planning tasks, tickets" | open `/skill:wayfinder`, then `tw_list` |
+| "Show artifact X" | open `/skill:wayfinder`, then `tw_show <slug>` (or read the file: the tree is readable) |
+| "Where am I?" | open `/skill:wayfinder` or `/skill:implement-ticket`, then `tw_state` (both pointers) |
 
 ## Actions
 
 | Action | Skill |
 |---|---|
 | Start a new effort from a request (bug included) | `/skill:intake` |
-| Plan an idea or grow a decision-task graph (mandatory initial grilling) | `/skill:wayfinder` |
+| Plan an idea or grow a planning-task graph (mandatory initial grilling) | `/skill:wayfinder` |
 | Turn a conversation/map into a spec | `/skill:to-spec` |
 | Break a spec into tracer-bullet feature/bug tickets | `/skill:to-tickets` |
 | Implement the ready frontier | `/skill:implement-ticket` |

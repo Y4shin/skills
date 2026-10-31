@@ -1,5 +1,5 @@
 /**
- * Tests for frontmatter parsing — pure functions, no I/O.
+ * Tests for frontmatter parsing: pure functions, no I/O.
  */
 
 import { describe, expect, test } from "vitest";

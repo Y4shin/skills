@@ -49,8 +49,10 @@ The spec source depends on what the diff delivers:
   (`docs/tasks/<effort>/tickets/<ticket-slug>/ticket.md`) plus the effort's
   architecture document (`docs/tasks/<effort>/architecture.md`; the legacy
   `arch-spec.md` names the same document until the migration renames it).
-- **Bug ticket:** the bug doc (`docs/bugs/<slug>.md`) plus its reproduction,
-  as referenced from the ticket body.
+- **Bug ticket:** the ticket doc plus the bug doc and reproduction the ticket
+  body references. A `docs/bugs/` path is read as an archive reference only:
+  `docs/bugs/` is a static archive in schema 5, and the implementation ticket
+  is the defect's record.
 - **Whole-effort review:** the effort's ticket docs plus the effort's
   architecture document.
 

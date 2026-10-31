@@ -14,7 +14,7 @@ time to hand off.
 
 The map lives at `docs/tasks/<effort>/map.md` and carries Destination,
 Constraints, Decisions so far, Fog, Non-goals, and Non-negotiable facts. Its
-decision tasks live at `docs/tasks/<effort>/tasks/<task-slug>/task.md`; the
+planning tasks live at `docs/tasks/<effort>/tasks/<task-slug>/task.md`; the
 directory is the registration, there is no list to update. Each task carries
 one planning subtype: `research` (gather high-trust evidence), `prototype`
 (throwaway code answering one design question), `grilling` (resolve a human

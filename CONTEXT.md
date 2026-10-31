@@ -65,8 +65,9 @@ _Avoid_: queue, backlog (both imply FIFO, and the frontier is dependency-ordered
 
 **Dependency level**:
 A breadth-first level of one kind's graph: level 0 is the unblocked frontier,
-level N is blocked by level N-1. `tw_dependency_levels` returns them. Tickets in
-one level may run concurrently; the level boundary is a strict barrier.
+level N is blocked by level N-1. `tw_dependency_levels` returns them. Tickets
+run one at a time in level order; the level boundary is a strict barrier, and
+level concurrency is not implemented.
 _Avoid_: rank, tier
 
 **Specification**:

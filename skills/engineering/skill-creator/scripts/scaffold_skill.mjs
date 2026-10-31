@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
-// scaffold_skill.mjs — Scaffold a new Agent Skill directory.
+// scaffold_skill.mjs: Scaffold a new Agent Skill directory.
 //
 // Usage: node scaffold_skill.mjs <name> [--path <dir>] [--resources scripts,references,assets]
 //
 // Normalizes the name (lowercase, spaces→hyphens, trim), creates the skill
 // folder + a SKILL.md template (name + a TODO description), and optionally
 // the specified resource subdirectories. Refuses to overwrite an existing
-// skill — to UPDATE, edit in place.
+// skill; to UPDATE, edit in place.
 //
 // By-hand fallback: create the directory manually, write a SKILL.md with
 // frontmatter `name: <normalized-name>` and a `description: TODO` placeholder,

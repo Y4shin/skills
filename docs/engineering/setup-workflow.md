@@ -8,9 +8,9 @@ One skill, two lifecycle events, chosen by reading
 is **5**.
 
 - **Fresh repo** (no `state.yaml`, or no `schema_version`): the **onboard**
-  branch scaffolds the whole tree at the v5 shape: the `docs/tasks/`,
-  `docs/bugs/` (plus `archive/`), `docs/adr/`, and `docs/agents/`
-  directories; a `state.yaml` carrying `schema_version: 5` with two real-null
+  branch scaffolds the whole tree at the v5 shape: the `docs/tasks/` tree,
+  the `docs/adr/` and `docs/agents/` directories; a `state.yaml` carrying
+  `schema_version: 5` with two real-null
   pointers; `docs/tasks/index.md` (`okf_version: "0.2"`); a frontmattered
   `docs/tasks/CHANGELOG.md`; templates for `docs/testing.md` and
   `docs/dev-env.md` (an existing `dev-env.md` is never clobbered); and the
@@ -22,7 +22,9 @@ is **5**.
   **MigrateReport** and surfaces every needs-human item: normalized
   status/workflow_state pairs, legacy slice directories (reported, never
   deleted), vendored trees moved outside the bundle, unresolvable
-  `blocked_by` references. Repos still on schema 2 follow
+  `blocked_by` references. A `docs/bugs/` archive is left exactly where it
+  is: schema 5 makes it a static archive, never a substrate and never moved.
+  Repos still on schema 2 follow
   `resources/upgrade-2-to-3.md` first; a repo on schema 4 follows
   `resources/upgrade-4-to-5.md`, the schema-5 hop (the `architecture` type
   and filename rename, the map body sections, the state stamp).

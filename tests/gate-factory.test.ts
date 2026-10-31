@@ -75,6 +75,7 @@ const GATED_NAMES = [
   "tw_write_architecture",
   "tw_write_changelog",
   "tw_write_review",
+  "tw_write_ticket_note",
   "notify_user",
 ];
 
@@ -85,6 +86,8 @@ interface StubExtensionAPI extends ExtensionAPI {
   activeTools: string[];
   setActiveTools(toolNames: string[]): void;
   getActiveTools(): string[];
+  /** The one UI surface the extension touches; the stub records the notices. */
+  ui: { notify(message: string, level: string): void };
 }
 
 // The gated names the package currently ships: the runtime derives the list
@@ -701,6 +704,59 @@ describe("factory gate", () => {
       expect(doc).toContain("Residual risk");
       expect(doc).toContain("cannot be gated soundly");
       expect(doc).toContain("bash");
+    });
+
+    test("exempts scratch and evidence beside an artifact: .work/ and deviation-reports/", async () => {
+      const repo = setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      // .work/ and deviation-reports/ sit beside an artifact rather than being
+      // artifacts: the designed escape hatch (the uncertainty stop) and the
+      // deviation evidence are shipped procedures the guard must let through.
+      const allowed = [
+        "docs/tasks/effort-one/tickets/one/.work/uncertainty.md",
+        "docs/tasks/effort-one/tickets/one/.work/resolution.md",
+        join(repo, "docs/tasks/effort-one/tickets/one/.work/uncertainty.md"),
+        "docs/tasks/effort-one/tickets/one/deviation-reports/one.md",
+        join(repo, "docs/tasks/effort-one/tickets/one/deviation-reports/one.md"),
+      ];
+      for (const path of allowed) {
+        const write = await fireGuard(stub, repo, "write", { path, content: "x" });
+        expect(write, `write '${path}' is scratch or evidence and must pass`).toBeUndefined();
+        const edit = await fireGuard(stub, repo, "edit", { path, edits: [] });
+        expect(edit, `edit '${path}' is scratch or evidence and must pass`).toBeUndefined();
+      }
+
+      // The artifact beside them stays guarded: the exemption is the two
+      // segments, not the ticket directory.
+      for (const path of [
+        "docs/tasks/effort-one/tickets/one/ticket.md",
+        "docs/tasks/effort-one/tickets/one/.work/../../ticket.md",
+        "docs/tasks/effort-one/tickets/one/deviation-reports/../../ticket.md",
+      ]) {
+        const result = await fireGuard(stub, repo, "write", { path, content: "x" });
+        expect(result, `write '${path}' must stay blocked`).toMatchObject({ block: true });
+      }
+    });
+
+    test("a refusal names the exemption and the named tool that would have worked", async () => {
+      const repo = setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const result = await fireGuard(stub, repo, "edit", {
+        path: "docs/tasks/effort-one/tickets/one/ticket.md",
+        edits: [],
+      });
+      expect(result).toMatchObject({ block: true });
+      // A model that hits the guard can reroute: the reason names the two
+      // exempt segments and the named writer for the artifact it wanted.
+      expect(result.reason).toContain(".work/");
+      expect(result.reason).toContain("deviation-reports/");
+      expect(result.reason).toContain("tw_write_ticket_note");
     });
 
     test("allows write and edit outside docs/tasks, including docs/bugs", async () => {

@@ -11,9 +11,10 @@ scopes:
   OKF conformance (missing frontmatter, an empty `type`, an invalid
   `status` / `workflow_state` pair), or `docs/tasks/state.yaml` names a
   schema older than 5. Route: `/skill:setup-workflow`'s migrate branch.
-- **Missing scaffolding.** The `docs/tasks/` tree, `state.yaml`,
-  `CONTEXT.md`, `docs/testing.md`, `docs/dev-env.md`, or `docs/adr/` is
-  absent. Route: `/skill:setup-workflow`, whose onboard branch writes the
+- **Missing scaffolding.** The `docs/tasks/` tree or the repo-root
+  `CONTEXT.md` is absent. Those two are the whole scope: other docs the repo
+  may lack are not the doctor's business, and the manifest is never edited
+  from here. Route: `/skill:setup-workflow`, whose onboard branch writes the
   current scaffold without clobbering an existing file.
 - **A failed migration.** The migrate branch stopped partway, so the tree
   sits between schemas. Route: restore the backup branch the migrate branch

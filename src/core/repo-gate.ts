@@ -338,7 +338,7 @@ function validateRegexArray(
       valid.push(pattern);
     } catch (e) {
       diagnostics.push(
-        `invalid regex skipped: "${pattern}" — ${(e as Error).message}`,
+        `invalid regex skipped: "${pattern}": ${(e as Error).message}`,
       );
     }
   }
@@ -422,7 +422,7 @@ export function isWorkRepo(
       }
     } catch (e) {
       diagnostics.push(
-        `invalid regex skipped: "${pattern}" — ${(e as Error).message}`,
+        `invalid regex skipped: "${pattern}": ${(e as Error).message}`,
       );
     }
   }

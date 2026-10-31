@@ -179,12 +179,20 @@ pillar; each traces to a task body via the map's `## Decisions so far`.
   done-marking, close-out, merge to main).
 - **`finalize-task` is retired.** Its per-ticket close-out runs inline in
   `implement-ticket`, in the same autonomous run that lands the ticket. The
-  one-owner rule holds: that closing phase is still the only thing that sets
-  a ticket's `workflow_state: done`.
-- **Ticket concurrency.** Tickets within one dependency level may run
-  concurrently; tickets across levels serialize on the level boundary.
-  Running tickets from different levels at once is out of scope unless the
-  human asks for it explicitly.
+  one-owner rule holds with two sanctioned exceptions, named so the rule is
+  true rather than aspirational: `implement-ticket`'s close-out is the only
+  thing that marks a landed ticket done, wayfinder's planning-task half of
+  `tw_mark_done` marks planning tasks (it refuses tickets), and
+  `tw_split_ticket` supersedes an oversized ticket as `status: deprecated`
+  plus `workflow_state: done`.
+- **The ticket loop is serial.** Tickets run one at a time in level order,
+  and the dependency levels stay strict barriers. Level concurrency was the
+  settled story but nothing implements it: every chain shares the one repo
+  working directory, so two chains at once would `git checkout` different
+  `task/<ticket-slug>` branches in one tree and the per-ticket
+  `tw_state_set task <slug>` would be last-writer-wins. Worktree isolation is
+  recorded as the follow-up effort's seed (`end-of-effort-reconciliation`,
+  entry 21), not behaviour this effort claims.
 - **`task-workflow-overview` stays**, model-invoked, as a progressively
   disclosed explainer of the workflow plus a fast track that points at
   `tw_next` for the live answer.
@@ -206,7 +214,8 @@ pillar; each traces to a task body via the map's `## Decisions so far`.
   (`implement-task/SKILL.md`) is corrected. `wayfinder/resources/grilling.md`
   keeps creating the task document and stops describing how questions are
   asked.
-- **The effort's final ticket is the documentation re-sync.** It audits
+- **The effort's final ticket was the documentation re-sync; the effort's
+  close is `end-of-effort-reconciliation` (entry 21).** The re-sync audited
   `CONTEXT.md`, the top-level `README.md`, the bucket `README.md`s,
   `package.json`'s `pi.skills` array, and the `docs/<bucket>/<skill>.md`
   pages against the implemented v5 and fixes what drifted. It is blocked by
@@ -343,11 +352,16 @@ pillar; each traces to a task body via the map's `## Decisions so far`.
 
 ### Reports
 
-- **Every workflow skill ends its run with one shared completion report
-  shape**, in a fixed order: (1) what is now true, (2) what needs the human,
-  (3) what to run next, (4) what is broken or blocked, (5) one pointer to the
-  detail. A skill may add at most one skill-specific line inside that order;
-  it may not reorder or add sections.
+- **The nine run-ending workflow skills end their run with one shared
+  completion report shape**, in a fixed order: (1) what is now true, (2) what
+  needs the human, (3) what to run next, (4) what is broken or blocked, (5)
+  one pointer to the detail. The nine are `intake`, `wayfinder`, `to-spec`,
+  `to-tickets`, `implement-ticket`, `finalize-effort`, `setup-workflow`,
+  `task-workflow-overview`, and `task-workflow-doctor`; the disciplines and
+  vocabulary skills (`tdd`, `code-review`, `diagnosing-bugs`, `grilling`, and
+  the rest) do not run a phase and carry no report template. A run-ending
+  skill may add at most one skill-specific line inside that order; it may not
+  reorder or add sections.
 - **The language is simplified technical English**: compact, no yapping, and
   written for someone who did not watch the run.
 - **Never inline**: subagent run ids, per-step receipts, output references,
@@ -666,6 +680,60 @@ exports to the tickets that depend on it.
     tools cannot self-diagnose.
 20. **`docs-resync`** exports the shipped documentation. Contract: shipped
     prose matches shipped v5.
+21. **`end-of-effort-reconciliation`** exports the amendments the end-of-effort
+    review grounded, and it is the effort's close (the documentation re-sync
+    framing above is superseded: this ticket is the last one). Contract: the
+    workflow's own writes fit under the write lockdown, and the shipped prose
+    says what the code does.
+    - **The lockdown covers the workflow's own writes.** `isTaskTreePath`
+      exempts two segments that sit beside an artifact rather than being one:
+      `.work/` (the tdd-worker's uncertainty stop and the recorded resolution)
+      and `deviation-reports/` (the deviation evidence). The ticket doc's
+      implementation notes get a named writer, `tw_write_ticket_note` (replace
+      or append the `## Implementation notes` section; refuses a non-ticket, an
+      empty note, and an archived effort), disclosed to `implement-ticket` and
+      named in `land-worker`'s `tools:` allowlist, because a subagent's session
+      has no phase open and reaches a gated tool through its own allowlist. A
+      refusal still names the exemption and the named tool that would have
+      worked.
+    - **The ticket loop is serial.** Level concurrency was settled and is not
+      implemented; the skill, both resources, and the concurrency bullet above
+      say one ticket at a time in level order, with the levels as strict
+      barriers. Worktree isolation is this effort's follow-up seed: a shared
+      working directory means two chains at once would collide on
+      `git checkout`, and a per-ticket state pointer would be last-writer-wins.
+    - **The overview's read-only table routes to owning phases.** Every row
+      names the phase invocation that declares the tool, `tw_next` stays the
+      one directly callable answer, and `tw_show` is disclosed to the phase the
+      table sends the reader to (it was never `skill-creator`'s private
+      signature tool; that entry's private tools are its script tools).
+    - **The retired bug substrate leaves the live instructions.**
+      `docs/bugs/` is a static archive: no live skill or docs prose instructs a
+      write under it, and `code-review` reads a `docs/bugs/` path only as an
+      archive reference.
+    - **Three claims the code does not support are amended, not silently
+      kept.** (a) `ready_for_spec` auto-clears for the writers that exist
+      (adding a planning task, the map-section writer, and planning
+      done-marking); no writer can reopen a done planning task or repair a
+      `blocked_by` edge after creation, and reopen plus edge repair are
+      recorded as a follow-up rather than claimed. (b) The one-owner rule names
+      its two sanctioned exceptions: wayfinder's planning-task half of
+      `tw_mark_done`, and `tw_split_ticket`'s supersede of the original.
+      (c) The report template covers the nine run-ending workflow skills, not
+      every workflow skill.
+    - **Mechanical single homes.** One effort-root writer helper behind
+      `tw_write_spec` and `tw_write_architecture`, one `writeTasksIndex(root,
+      { live, archived })` behind effort creation and the archive move (both
+      lists sorted), one canonical per-ticket close-out sequence in
+      `implement-ticket` that the resources point at, and a doctor whose
+      missing-scaffolding scope is exactly the missing `CONTEXT.md` and
+      `docs/tasks/`.
+    - **The gates carry the corpus.** `tsconfig.test.json` typechecks the
+      tests and joins the CI protocol in `docs/testing.md`, the em-dash guard
+      runs over the corpus with the other corpus checks' exemptions, `.changeset/`
+      holds one `major` entry for v5, the orphaned flow map and the stale
+      handoff are deleted, and the interim "decision task" vocabulary is gone
+      from the live pages (the overview and the pages that describe it).
 
 ## Testing seams
 
@@ -693,12 +761,15 @@ assert the internal shape of a helper.
   the disclosure ticket.
 - **The write guard is best-effort against a determined shell.** The residual
   risk is accepted and documented; no ticket attempts a sound shell gate.
-- **`ready_for_spec` auto-clear covered every writer.** Planning
-  `tw_mark_done` clears the flag, and the landed ticket-half writers
-  (`tw_write_spec`, `tw_add_ticket`, `tw_split_ticket`, ticket
-  `tw_mark_done`, `tw_mark_blocked`, `tw_write_changelog`,
-  `tw_archive_effort`) all leave `ready_for_spec` untouched, so the
-  auto-clear surface is fully landed for this effort.
+- **`ready_for_spec` auto-clear covers the writers that exist, and not the
+  transitions that do not.** Adding a planning task, `tw_write_section`, and
+  planning `tw_mark_done` clear the flag; the landed ticket-half writers
+  (`tw_write_spec`, `tw_add_ticket`, `tw_split_ticket`, ticket `tw_mark_done`,
+  `tw_mark_blocked`, `tw_write_changelog`, `tw_archive_effort`) leave it
+  untouched. Nothing can reopen a done planning task or repair a `blocked_by`
+  edge after creation, so those two clearers are absent by mechanism, not by
+  oversight: reopen and edge repair are the follow-up seed recorded by
+  `end-of-effort-reconciliation` (entry 21).
 - **The open-set derivation keys on signature tools.** Two skills whose
   toolsets overlap fully cannot both be modeled; tickets 9 and 14 must keep
   one private tool per skill or revisit the derivation (the throw makes the

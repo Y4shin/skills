@@ -224,6 +224,7 @@ describe("task-workflow tools", () => {
         "tw_write_review",
         "tw_write_section",
         "tw_write_spec",
+        "tw_write_ticket_note",
       ]);
     });
 
@@ -1328,7 +1329,7 @@ describe("task-workflow tools: tw_finalize_map, the ready_for_spec checking tool
 
   test("reports every failed check together, exactly what is missing", async () => {
     const t = mkTmp(); seedPlanningTree(t);
-    const error = await tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t)).catch((e) => e);
+    const error = await tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t)).catch((e: Error) => e);
     expect(error.message).toMatch(/3 check\(s\) failed/);
     expect(error.message).toMatch(/planning frontier is not empty: decide/);
     expect(error.message).toMatch(/'## Non-goals' is empty/);
@@ -2434,6 +2435,120 @@ describe("task-workflow tools: tw_write_changelog, the changelog writer", () => 
   });
 });
 
+describe("task-workflow tools: tw_write_ticket_note, the implementation-notes writer", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  function ticketPath(t: string, slug = "land-it"): string {
+    return join(t, "docs/tasks/specgate/tickets", slug, "ticket.md");
+  }
+
+  function seedTicket(t: string, slug = "land-it", body = "\n## What to build\n\nLand it.\n"): void {
+    seedPlanningTree(t);
+    writeMd(
+      ticketPath(t, slug),
+      "type: ticket\nsubtype: feature\ntitle: Land it\nstatus: stable\nworkflow_state: ready\nblocked_by: []\n",
+      body,
+    );
+  }
+
+  test("appends the note under a new ## Implementation notes section", async () => {
+    const t = mkTmp(); seedTicket(t);
+    const out = await tools.tw_write_ticket_note.execute(
+      { selector: "land-it", note: "The guard needed the .work exemption." },
+      ctx(t),
+    );
+    expect(out).toContain("land-it");
+    const doc = parse(readFileSync(ticketPath(t), "utf-8"));
+    // The frontmatter and the ticket body survive the note write.
+    expect(doc.data.type).toBe("ticket");
+    expect(doc.data.workflow_state).toBe("ready");
+    expect(doc.body).toContain("## What to build");
+    expect(doc.body).toContain("## Implementation notes");
+    expect(doc.body).toContain("The guard needed the .work exemption.");
+    expect(doc.body.indexOf("## What to build")).toBeLessThan(doc.body.indexOf("## Implementation notes"));
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("appends to an existing notes section, keeping the earlier notes", async () => {
+    const t = mkTmp();
+    seedTicket(t, "land-it", "\n## What to build\n\nLand it.\n\n## Implementation notes\n\nFirst landing note.\n");
+    await tools.tw_write_ticket_note.execute({ selector: "land-it", note: "Second landing note." }, ctx(t));
+    const body = parse(readFileSync(ticketPath(t), "utf-8")).body;
+    expect(body).toContain("First landing note.");
+    expect(body).toContain("Second landing note.");
+    expect(body.indexOf("First landing note.")).toBeLessThan(body.indexOf("Second landing note."));
+    // The section appears once, not once per note.
+    expect(body.match(/## Implementation notes/g)?.length).toBe(1);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("replace: true rewrites the section instead of appending", async () => {
+    const t = mkTmp();
+    seedTicket(t, "land-it", "\n## What to build\n\nLand it.\n\n## Implementation notes\n\nStale note.\n");
+    await tools.tw_write_ticket_note.execute(
+      { selector: "land-it", note: "Fresh note.", replace: true },
+      ctx(t),
+    );
+    const body = parse(readFileSync(ticketPath(t), "utf-8")).body;
+    expect(body).toContain("Fresh note.");
+    expect(body).not.toContain("Stale note.");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("resolves a ticket by its path as well as by slug", async () => {
+    const t = mkTmp(); seedTicket(t);
+    await tools.tw_write_ticket_note.execute(
+      { selector: join(t, "docs/tasks/specgate/tickets/land-it/ticket.md"), note: "By path." },
+      ctx(t),
+    );
+    expect(readFileSync(ticketPath(t), "utf-8")).toContain("By path.");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses an empty note", async () => {
+    const t = mkTmp(); seedTicket(t);
+    await expect(
+      tools.tw_write_ticket_note.execute({ selector: "land-it", note: "   " }, ctx(t)),
+    ).rejects.toThrow(/note is empty/);
+    expect(readFileSync(ticketPath(t), "utf-8")).not.toContain("## Implementation notes");
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a non-ticket artifact, naming the type it found", async () => {
+    const t = mkTmp(); seedTicket(t);
+    await expect(
+      tools.tw_write_ticket_note.execute({ selector: "specgate", note: "Not a ticket." }, ctx(t)),
+    ).rejects.toThrow(/not a ticket|type 'map'/);
+    await expect(
+      tools.tw_write_ticket_note.execute(
+        { selector: join(t, "docs/tasks/specgate/map.md"), note: "Not a ticket." },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/not a ticket|type 'map'/);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("refuses a ticket in an archived effort: the note belongs to a live effort", async () => {
+    const t = mkTmp();
+    seedTicket(t, "old-ticket", "\n## What to build\n\nOld.\n");
+    mkdirSync(join(t, "docs/tasks/archive/old"), { recursive: true });
+    writeMd(
+      join(t, "docs/tasks/archive/old/tickets/old-ticket/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Old\nstatus: stable\nworkflow_state: done\nblocked_by: []\n",
+      "\n## What to build\n\nOld.\n",
+    );
+    await expect(
+      tools.tw_write_ticket_note.execute(
+        { selector: "docs/tasks/archive/old/tickets/old-ticket/ticket.md", note: "Archived." },
+        ctx(t),
+      ),
+    ).rejects.toThrow(/live effort|archived/i);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
 describe("task-workflow tools: tw_record_out_of_scope, the out-of-scope KB writer", () => {
   let tools: Record<string, { description: string; execute: Function }>;
 
@@ -2916,6 +3031,42 @@ describe("task-workflow tools: tw_write_review, the review artifact writer", () 
     ).rejects.toThrow(/follow-up/);
     expect(existsSync(reviewPath(t))).toBe(false);
     expect(existsSync(reviewPath(t, "follow-up-effort"))).toBe(false);
+    rmSync(t, { recursive: true, force: true });
+  });
+});
+
+describe("the root index has one writer (end-of-effort-reconciliation)", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  const INDEX_FM = 'type: index\nokf_version: "0.2"\ntitle: docs/tasks\n';
+
+  test("creating an effort sorts both index lists, not only Live", async () => {
+    const t = mkTmp();
+    writeMd(
+      join(t, "docs/tasks/index.md"),
+      INDEX_FM,
+      "\n# docs/tasks\n\n## Live\n\n- winding-down\n\n## Archived\n\n- zeta\n- alpha\n",
+    );
+    await tools.tw_create_effort.execute({ effort: "new-effort", title: "New effort" }, ctx(t));
+    const doc = parse(readFileSync(join(t, "docs/tasks/index.md"), "utf-8"));
+    // Both lists are rewritten by the one writer, so the map-creation path
+    // cannot drift from the archive path.
+    expect(readMapSection(doc.body, "Live")).toEqual(["- new-effort", "- winding-down"]);
+    expect(readMapSection(doc.body, "Archived")).toEqual(["- alpha", "- zeta"]);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("creating an effort in a tree with no index writes the landed index shape", async () => {
+    const t = mkTmp();
+    mkdirSync(join(t, "docs/tasks"), { recursive: true });
+    await tools.tw_create_effort.execute({ effort: "fresh", title: "Fresh" }, ctx(t));
+    const doc = parse(readFileSync(join(t, "docs/tasks/index.md"), "utf-8"));
+    expect(doc.data.type).toBe("index");
+    expect(doc.data.okf_version).toBe("0.2");
+    expect(readMapSection(doc.body, "Live")).toEqual(["- fresh"]);
+    expect(readMapSection(doc.body, "Archived")).toEqual(["(none)"]);
     rmSync(t, { recursive: true, force: true });
   });
 });
