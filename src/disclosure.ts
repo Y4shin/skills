@@ -92,6 +92,10 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // which sets ready_for_spec through tw_finalize_map. tw_write_section is
     // its signature tool. tw_state_set and tw_dependency_levels are disclosed
     // because the phase sets the state pointers and layers the effort itself.
+    // tw_show is disclosed because the overview's read-only table (which
+    // cannot open anything itself: task-workflow-overview has no registry
+    // entry) routes its artifact read to this phase, and the reconcile reads
+    // the recorded artifacts behind it.
     toolset: [
       "tw_write_section",
       "tw_finalize_map",
@@ -101,6 +105,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
       "tw_mark_blocked",
       "tw_record_out_of_scope",
       "tw_state_set",
+      "tw_show",
       "tw_get",
       "tw_list",
     ],
@@ -212,9 +217,10 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // nests inside any open phase and discloses its bundled scripts wrapped
     // as registered tools (skill_validate, skill_scaffold, skill_discover in
     // src/pi.ts, each running its bundled script directly, no shell), plus
-    // the tree read parked here. tw_show keeps the private signature tool
-    // the open-set derivation keys on; the script tools are private to this
-    // entry too.
+    // the tree read parked here. The signature tool the open-set derivation
+    // keys on is the first of its private tools, a script tool
+    // (skill_validate): tw_show is a shared artifact read, disclosed to
+    // wayfinder as well, so it is not this entry's private tool.
     toolset: ["tw_show", "skill_validate", "skill_scaffold", "skill_discover"],
     conflicts: [],
   },

@@ -11,6 +11,7 @@ import { parse as parseYaml } from "yaml";
 import { parse } from "../src/core/frontmatter.js";
 import { findAnomalies, fromFrontmatter, validateArtifact, type Artifact } from "../src/core/art.js";
 import { createTools } from "../src/pi.js";
+import { SKILL_REGISTRY } from "../src/disclosure.js";
 
 const PROJECT = process.cwd();
 
@@ -1462,6 +1463,9 @@ const SURVIVING_TOOLS = new Set([
   // argument of the effort creator.
   "tw_write_review",
   "tw_create_effort",
+  // end-of-effort-reconciliation: the ticket doc's implementation-notes
+  // writer, the named replacement for the built-in edit on a ticket.
+  "tw_write_ticket_note",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -2171,7 +2175,10 @@ describe("task-workflow-overview v4 (overhaul-planning-skills)", () => {
     expect(content).toMatch(/spec\.md/);
     expect(content).toMatch(/tasks\//);
     expect(content).toMatch(/tickets\//);
-    expect(content).toMatch(/decision tasks/i);
+    // end-of-effort-reconciliation retired the interim vocabulary: the two
+    // graph kinds are planning tasks and implementation tickets.
+    expect(content).toMatch(/planning tasks/i);
+    expect(content).not.toMatch(/decision tasks/i);
     expect(content).toMatch(/implementation tickets/i);
   });
 
@@ -2188,7 +2195,7 @@ describe("task-workflow-overview v4 (overhaul-planning-skills)", () => {
   });
 
   test("tw_list lists efforts, tasks, and tickets", () => {
-    expect(content).toMatch(/List efforts \/ tasks \/ tickets/);
+    expect(content).toMatch(/List efforts, planning tasks, tickets/);
   });
 
   test("actions include the doctor row", () => {
@@ -3414,5 +3421,52 @@ describe("end-of-effort reconciliation: the effort documents match the shipped c
   test("the spec's concurrency story no longer promises an uncorrupted working directory", () => {
     expect(spec).not.toMatch(/shared repo working\s+directory is never corrupted/);
     expect(spec).toMatch(/one ticket at a time/i);
+  });
+});
+
+describe("the overview's read-only table routes to owning phases (end-of-effort-reconciliation)", () => {
+  const overview = readFile("skills/engineering/task-workflow-overview/SKILL.md");
+  const page = readFile("docs/engineering/task-workflow-overview.md");
+
+  /** The rows of the read-only query table, as [label, cell] pairs. */
+  function tableRows(content: string): string[][] {
+    const start = content.indexOf("## Read-only queries");
+    expect(start, "the overview carries the read-only query section").toBeGreaterThan(-1);
+    const section = content.slice(start, content.indexOf("\n## ", start + 1));
+    return section
+      .split("\n")
+      .filter((line) => line.startsWith("|") && !/^\|\s*-+/.test(line) && !/\| Question \|/.test(line))
+      .map((line) => line.split("|").slice(1, -1).map((cell) => cell.trim()))
+      .filter((cells) => cells.length >= 2);
+  }
+
+  test("every row names the phase that declares its tool, and tw_next stays directly callable", () => {
+    for (const [question, route] of tableRows(overview)) {
+      const tools = [...route.matchAll(/`(tw_[a-z_]+)/g)].map((m) => m[1]);
+      expect(tools.length, `row '${question}' names no tool`).toBeGreaterThan(0);
+      if (tools.every((tool) => tool === "tw_next")) continue;
+      for (const tool of tools) {
+        if (tool === "tw_next") continue;
+        expect(route, `row '${question}' names ${tool} with no phase to open it`).toMatch(/\/skill:[\w-]+/);
+      }
+    }
+    // The fast track stays the one directly callable answer.
+    expect(tableRows(overview).some(([, route]) => /`tw_next`/.test(route) && !/\/skill:/.test(route))).toBe(true);
+  });
+
+  test("the table names no tool the reader cannot reach: every named tool is disclosed by a phase", () => {
+    const disclosed = new Set(SKILL_REGISTRY.flatMap((e) => e.toolset));
+    for (const [question, route] of tableRows(overview)) {
+      for (const [, tool] of route.matchAll(/`(tw_[a-z_]+)/g)) {
+        if (tool === "tw_next" || tool === "tw_open" || tool === "tw_close") continue;
+        expect(disclosed.has(tool), `row '${question}' names ${tool}, which no phase discloses`).toBe(true);
+      }
+    }
+  });
+
+  test("the docs page carries the same routed table", () => {
+    // The human-facing page names the phases too, so the two surfaces agree.
+    expect(page).toMatch(/tw_show[\s\S]{0,80}\/skill:wayfinder/);
+    expect(page).toMatch(/Read-only queries|read-only questions/);
   });
 });

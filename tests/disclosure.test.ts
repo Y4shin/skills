@@ -95,7 +95,7 @@ describe("disclosure core: tw_open", () => {
     for (const tool of ["tw_frontier", "tw_list", "tw_write_section", "tw_finalize_map", "tw_mark_done"]) {
       expect(active, `${tool} must be declared once wayfinder is open`).toContain(tool);
     }
-    for (const tool of ["tw_show", "tw_state", "tw_context", "tw_write_spec", "tw_write_architecture"]) {
+    for (const tool of ["tw_state", "tw_context", "tw_write_spec", "tw_write_architecture", "tw_archive_effort"]) {
       expect(active, `${tool} belongs to no open skill and stays undeclared`).not.toContain(tool);
     }
   });
@@ -213,8 +213,11 @@ describe("disclosure core: tw_open", () => {
     const result = (await tools.tw_close.execute({ skill: "skill-creator" }, ctx)) as ToolResult;
     expect(result.text).toContain("Closed skill-creator");
     expect(result.details.closed).toBe(true);
-    // The closed skill's own tools are gone.
-    expect(active).not.toContain("tw_show");
+    // The closed skill's own tools are gone (tw_show stays declared: the open
+    // wayfinder phase discloses it too).
+    for (const tool of ["skill_validate", "skill_scaffold", "skill_discover"]) {
+      expect(active, `${tool} is skill-creator's own and leaves with it`).not.toContain(tool);
+    }
     // The still-open phase keeps its own tools, and tw_close stays declared
     // because a skill is still open.
     for (const tool of ["tw_frontier", "tw_list", "tw_write_section", "tw_get", "tw_close", "tw_open", "tw_next"]) {

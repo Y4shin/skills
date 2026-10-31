@@ -687,6 +687,7 @@ describe("the phase-to-toolset registry", () => {
         "tw_mark_blocked",
         "tw_mark_done",
         "tw_record_out_of_scope",
+        "tw_show",
         "tw_state_set",
         "tw_write_section",
       ],
@@ -757,6 +758,19 @@ describe("the phase-to-toolset registry", () => {
     for (const name of registered) {
       expect(disclosed.has(name), `${name} must be disclosed by some phase toolset`).toBe(true);
     }
+  });
+
+  test("tw_show is disclosed to the phase the overview's read-only table routes to", () => {
+    // The overview cannot open (no registry entry), so a row may only name a
+    // tool some phase declares. tw_show is the artifact read: wayfinder, the
+    // phase the table sends a reader to, declares it; skill-creator keeps it
+    // as the nested discipline's tree read.
+    const wayfinder = SKILL_REGISTRY.find((e) => e.name === "wayfinder")!;
+    expect(wayfinder.toolset).toContain("tw_show");
+    // The corrected claim: skill-creator's signature tool is one of its own
+    // script tools, not the shared tree read.
+    const creator = SKILL_REGISTRY.find((e) => e.name === "skill-creator")!;
+    expect(signatureToolOf(creator)).toMatch(/^skill_/);
   });
 
   test("finalize-effort's private signature tool stays the archive move", () => {

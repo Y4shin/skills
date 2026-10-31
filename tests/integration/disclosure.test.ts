@@ -121,7 +121,7 @@ describe("disclosure core: the three-way flip", () => {
     for (const name of ["tw_close", "tw_frontier", "tw_list", "tw_write_section", "tw_get"]) {
       expect(opened, `${name} must be declared once wayfinder is open`).toContain(name);
     }
-    for (const name of ["tw_show", "tw_state", "tw_context", "tw_write_spec"]) {
+    for (const name of ["tw_state", "tw_context", "tw_write_spec", "tw_write_architecture"]) {
       expect(opened, `${name} belongs to no open skill`).not.toContain(name);
     }
 
@@ -132,12 +132,13 @@ describe("disclosure core: the three-way flip", () => {
     expect(toolResultTexts(s.session, "tw_frontier").length).toBeGreaterThan(0);
 
     // Unsearchable while closed: tool_search cannot reach a direct gated
-    // tool, before open and after close alike.
-    s.setResponses([reply([call("tool_search", { query: "show artifact frontmatter selector" })])]);
-    await s.session.prompt("Search for the show tool.");
+    // tool, before open and after close alike. tw_write_spec belongs to a
+    // phase that is not open here.
+    s.setResponses([reply([call("tool_search", { query: "write the specification body" })])]);
+    await s.session.prompt("Search for the spec writer.");
     const searchResult = latestToolResultText(s.session, "tool_search") ?? "";
-    expect(searchResult).not.toContain("tw_show");
-    expect(s.session.getActiveToolNames()).not.toContain("tw_show");
+    expect(searchResult).not.toContain("tw_write_spec");
+    expect(s.session.getActiveToolNames()).not.toContain("tw_write_spec");
 
     s.setResponses([reply([call("tw_close", { skill: "wayfinder" })])]);
     await s.session.prompt("Close wayfinder.");
@@ -177,7 +178,7 @@ describe("disclosure core: nested opens", () => {
     for (const tool of phaseSet) {
       expect(nested.has(tool), `${tool} must survive the nested open`).toBe(true);
     }
-    expect(nested.has("tw_show"), "the nested skill's own tool is declared").toBe(true);
+    expect(nested.has("skill_validate"), "the nested skill's own tool is declared").toBe(true);
     for (const tool of ["tw_open", "tw_next", "tw_close"]) {
       expect(nested.has(tool), `${tool} is declared while skills are open`).toBe(true);
     }
@@ -187,7 +188,7 @@ describe("disclosure core: nested opens", () => {
     await s.session.prompt("Close skill-creator.");
 
     const afterClose = new Set(s.session.getActiveToolNames());
-    expect(afterClose.has("tw_show"), "the closed skill's tool is gone").toBe(false);
+    expect(afterClose.has("skill_validate"), "the closed skill's tool is gone").toBe(false);
     for (const tool of phaseSet) {
       expect(afterClose.has(tool), `${tool} keeps the phase open with its own tools intact`).toBe(true);
     }
@@ -218,7 +219,7 @@ describe("disclosure core: nested opens", () => {
     await s.session.prompt("Close skill-creator.");
 
     const afterClose = new Set(s.session.getActiveToolNames());
-    for (const tool of ["skill_validate", "skill_scaffold", "skill_discover", "tw_show"]) {
+    for (const tool of ["skill_validate", "skill_scaffold", "skill_discover"]) {
       expect(afterClose.has(tool), `${tool} leaves with skill-creator`).toBe(false);
     }
     for (const tool of phaseSet) {
