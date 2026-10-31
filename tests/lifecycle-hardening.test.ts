@@ -216,14 +216,26 @@ describe("the advisory review has a home", () => {
     expect(result.details.pass).toBe("end-of-effort");
     const path = join(repo, "docs", "tasks", "records", "end-of-effort-review.md");
     expect(readFileSync(path, "utf-8")).toContain("One test landed green first");
-    // review.md stays finalize's artifact: the advisory pass writes no flag.
+    // The finalize triage dispositions the advisory findings in place, so the
+    // record lands where the findings live; moving them stays refused.
+    const disposed = (await t.tw_write_review.execute(
+      {
+        selector: "records",
+        pass: "end-of-effort",
+        content: "## Findings\n\n- One test landed green first.",
+        findings: [{ finding: "One test landed green first.", disposition: "informational" }],
+      },
+      ctx([...ALWAYS_DECLARED]),
+    )) as ToolResult;
+    expect(disposed.details.dispositioned).toBe(true);
+    expect(readFileSync(path, "utf-8")).toContain("## Dispositions");
     await expect(
       t.tw_write_review.execute(
         {
           selector: "records",
           pass: "end-of-effort",
           content: "## Findings\n\n- x",
-          findings: [{ finding: "x", disposition: "informational" }],
+          follow_up: "some-followup",
         },
         ctx([...ALWAYS_DECLARED]),
       ),

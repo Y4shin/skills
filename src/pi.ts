@@ -1930,25 +1930,42 @@ export function createTools(): Record<string, Tool> {
         // dispositions them or moves them. Its file is a separate artifact so
         // the finalize pass can read it and disposition every finding.
         if (pass === "end-of-effort") {
-          if (p.follow_up !== undefined || p.findings !== undefined) {
+          // The advisory pass records findings and, later, the finalize
+          // triage's dispositions of them. It never moves findings to a
+          // follow-up and it never sets the archive flag: the finalize
+          // review owns that.
+          if (p.follow_up !== undefined) {
             throw new Error(
-              "the end-of-effort review pass is advisory: record findings only; disposition them with the " +
-                "finalize pass through tw_write_review",
+              "the end-of-effort review pass is advisory: its findings are dispositioned here but moved " +
+                "only by the finalize review",
             );
           }
           const path = reviewPathFor(effortDir, pass);
           const existing = isFile(path) ? parseArtifactFile(path).doc : undefined;
           const givenTitle = typeof p.title === "string" && p.title.trim() !== "" ? p.title.trim() : undefined;
           const title = givenTitle ?? `End-of-effort review of ${basename(effortDir)}`;
-          writeFileSync(
-            path,
-            dump({ data: { ...(existing?.data ?? {}), type: "review", title, pass }, body: `\n${content}\n` }),
-            "utf-8",
+          const advisoryFindings = parseReviewFindings(p.findings);
+          const body =
+            advisoryFindings === undefined
+              ? `\n${content}\n`
+              : writeMapSection(
+                  `\n${content}\n`,
+                  REVIEW_DISPOSITIONS_SECTION,
+                  advisoryFindings.length === 0
+                    ? "(no findings)"
+                    : advisoryFindings.map(reviewDispositionLine).join("\n"),
+                );
+          const data: Record<string, unknown> = { ...(existing?.data ?? {}), type: "review", title, pass };
+          if (advisoryFindings !== undefined) {
+            data.dispositioned = advisoryFindings.every((f) => f.disposition !== undefined);
+          }
+          writeFileSync(path, dump({ data, body }), "utf-8");
+          return outcome(
+            `wrote ${relative(root, path)} (advisory end-of-effort pass${
+              advisoryFindings === undefined ? "" : `, dispositioned: ${String(data.dispositioned)}`
+            })`,
+            { path: relative(root, path), pass, dispositioned: data.dispositioned },
           );
-          return outcome(`wrote ${relative(root, path)} (advisory end-of-effort pass)`, {
-            path: relative(root, path),
-            pass,
-          });
         }
         {
         const effortName = basename(effortDir);
