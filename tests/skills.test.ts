@@ -80,6 +80,15 @@ describe("agent frontmatter", () => {
         expect(fm["description"]).toBeDefined();
         expect(fm["description"].length).toBeGreaterThan(10);
       });
+
+      test("names no gated tw_* tool in its allowlist", () => {
+        // An agent runs in its own session with no phase open, and the opener
+        // gated tools are not available there: naming one makes pi-subagents
+        // report "requested unavailable child tools" and drop it, so the agent
+        // loses the tool it was written around. Writes under docs/tasks/** are
+        // the phase's job (through its named writer), never the agent's.
+        expect(fm["tools"], `${file} claims a gated tool CI cannot give it`).not.toMatch(/\btw_[a-z_]+/);
+      });
     });
   }
 });

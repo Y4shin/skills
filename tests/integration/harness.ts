@@ -95,10 +95,11 @@ export interface TaskSessionOptions {
   /** The session_start reason to emit. The CLI sets "resume"/"fork" when reopening a session file. */
   sessionStartReason?: "startup" | "reload" | "new" | "resume" | "fork";
   /**
-   * The active-tool allowlist, which is how a subagent's `tools:` frontmatter
-   * reaches its session. Naming a declarable tool activates it even when it is
-   * `defaultActive: false`, so this is the seam that proves a gated writer is
-   * reachable without an opener.
+   * The active-tool allowlist for the session. Naming a declarable tool
+   * activates it even when it is `defaultActive: false`, so this is the seam
+   * that proves a gated writer is reachable without an opener. Note that
+   * pi-subagents does not route an agent's `tools:` frontmatter through this
+   * seam: it refuses a gated `tw_*` name as a child tool it cannot supply.
    */
   tools?: string[];
 }

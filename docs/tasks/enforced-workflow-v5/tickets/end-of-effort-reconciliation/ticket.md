@@ -226,3 +226,60 @@ line: this ticket is now the effort's close.
   disclosure, the stale `art.ts` comment, the em-dashes in
   `tests/pi-disclosure-apis.test.ts`, and the `pi 0.80.10` version pin. Do not
   re-open them.
+
+## Implementation notes
+
+The writer's reachability was settled by experiment, not by the ticket's
+three options, and the experiment failed. `tw_write_ticket_note` is registered
+gated and disclosed to `implement-ticket`, and `land-worker`'s `tools:`
+allowlist briefly named it on the assumption that pi-core's registry refresh
+activates a declarable tool a session allowlists. pi core does that for a
+session the extension is loaded into, which the integration test pins, but
+pi-subagents reads an agent's `tools:` frontmatter through its own loader and
+refuses a gated `tw_*` name as an unavailable child tool: the landing run was
+reported failed and the tool was dropped. The mechanism the ticket chose does
+not exist on the agent path.
+
+The correction keeps the one-writer decision and moves the write to the phase
+that owns the tool. `land-worker`'s allowlist is `read, bash, submit_feedback`
+again, its step 3 composes the note and returns it under
+`## Implementation note`, and `implement-ticket` writes it through
+`tw_write_ticket_note` from the landing branch before merging, committing it as
+`docs(ticket): note <slug>` (SKILL.md step 8). A new invariant pins the rule
+from the other side: an agent's `tools:` list may name no `tw_*` tool, so the
+next agent that reaches for one fails in the suite rather than at landing. The
+harness comment now records that its `tools` option is a pi-core seam and not
+the agent path.
+
+The rest of the ticket landed as designed. `tw_write_ticket_note` exists with
+its refusals; `isTaskTreePath` exempts `.work/` and `deviation-reports/` with
+traversal still blocked, and `lockdownReason` names both exemptions and the
+writer a refused write should reroute to. `tw_show` is disclosed to
+`wayfinder`, which is the phase the read-only table sends the reader to, and
+stays in `skill-creator`, whose signature tool is now `skill_validate`; the
+registry comment is corrected. Five doctor resources were deleted with the
+narrowed scope, and `setup-workflow` stops scaffolding `docs/bugs/`, which
+section 4 implies though it does not name it. The two writer duplications and
+the triplicated close-out each have one home, and the index writer's sort drift
+is fixed. The em-dash guard runs over the corpus and now applies the
+`CORPUS_EXEMPTIONS` and `DEAD_SURFACE_EXEMPT_FILES` sets instead of only the
+changelog, after its comment was found to claim exemptions the code did not
+apply.
+
+Two deviations the report raised were resolved rather than deferred, and one
+scoped out. The overview's "where am I?" row named phases that could write the
+state pointers but not read them, so `tw_state` joins `wayfinder`'s and
+`implement-ticket`'s toolsets and an invariant now fails if a phase carries
+`tw_state_set` without `tw_state`. `docs/repo-gating.md`'s Background section
+pointed at four paths that no longer exist, including the retired `maps/`
+subtree, and now points at the archived `gate-skills-by-repo` effort. The
+report left two scope calls standing as they were: the five deleted doctor
+resources and the whole-corpus em-dash rewrites, which comply with the repo
+rule either way.
+
+One known gap the ticket records rather than fixes: a missing
+`docs/tasks/state.yaml` no longer has a diagnosis path in the doctor, because
+the narrowed scope leaves it nothing to say. Verification at the landing tip:
+`npx tsc --noEmit` and `npx tsc -p tsconfig.test.json` both exit 0, full suite
+18 files and 1182 tests against the 1146 baseline at 5c7aa33. Acceptance
+checkboxes stay unticked, matching every other landed ticket in this effort.

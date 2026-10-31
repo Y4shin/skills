@@ -391,15 +391,21 @@ describe("disclosure core: telemetry absorption", () => {
   });
 });
 
-// ─── A subagent reaches a gated writer through its own tools allowlist ───────
+// ─── A named declarable tool activates through a session's tool allowlist ────
 //
-// end-of-effort-reconciliation: the land-worker appends the ticket doc's
-// implementation note through `tw_write_ticket_note`. A subagent runs in its
-// own session with no phase open, so the opener never declares that tool for
-// it; the agent's `tools:` frontmatter is the allowlist, and pi activates a
-// named declarable tool even when it is `defaultActive: false`.
+// pi core activates a declarable tool that a session's allowlist names, even
+// when it is `defaultActive: false`, with no opener in play. This is pinned
+// because it is the mechanism a future feature would use for a session that
+// must write one artifact and open nothing.
+//
+// It is NOT the mechanism a subagent uses. An agent's `tools:` frontmatter is
+// read by pi-subagents' own loader, which refuses a gated `tw_*` name as an
+// unavailable child tool (observed on `land-worker` requesting
+// `tw_write_ticket_note`: the run is failed and the tool is dropped). That is
+// why no agent names a gated tool and why the phase writes the ticket doc's
+// implementation note; `tests/skills.test.ts` pins the agent side.
 
-describe("disclosure core: a subagent's tools allowlist reaches a gated writer", () => {
+describe("disclosure core: a session's tool allowlist activates a gated writer", () => {
   let sessions: TaskSession[] = [];
   afterEach(() => {
     for (const s of sessions) s.dispose();

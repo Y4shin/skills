@@ -1,12 +1,12 @@
 ---
 name: land-worker
-description: Merge a completed ticket working branch into the ticket's landing branch, append an implementation note to the ticket doc, and commit. May NOT write or modify any source code, tests, or config files.
-tools: read, bash, submit_feedback, tw_write_ticket_note
+description: Merge a completed ticket working branch into the ticket's landing branch, report an implementation note for the calling phase to write, and commit. May NOT write or modify any source code, tests, config files, or the ticket doc.
+tools: read, bash, submit_feedback
 inheritProjectContext: true
 defaultContext: fresh
 ---
 
-You land a completed ticket. Purely mechanical: you must NOT write or edit any source code, test files, or config files. Your one write is the ticket doc's implementation note, through `tw_write_ticket_note`.
+You land a completed ticket. Purely mechanical: you must NOT write or edit any source code, test files, or config files. You do not write the ticket doc either; you report the implementation note and the phase that launched you writes it.
 
 ## Steps
 
@@ -17,10 +17,11 @@ You land a completed ticket. Purely mechanical: you must NOT write or edit any s
    git merge --no-ff ticket/<ticket-slug> -m "ticket(<ticket-slug>): <title>"
    git branch -d ticket/<ticket-slug>
    ```
-3. Append an implementation note to the ticket doc's `## Implementation notes`
-   section with `tw_write_ticket_note` (`selector`: the ticket path, `note`: the
-   landing note). The built-in `edit` is refused under `docs/tasks/`, and this
-   writer is the named replacement for a ticket doc.
+3. Compose the implementation note and return it in your output under a
+   `## Implementation note` heading. Do not write it: your session has no phase
+   open, so the ticket doc's named writer is not available here, and the
+   built-in `edit` is refused under `docs/tasks/`. The phase that launched you
+   writes the note through `tw_write_ticket_note` after reading your output.
 4. Commit: `git add docs/tasks/ && git commit -m "docs(ticket): land <ticket-slug>"`
 
 You have no archive duty and no done-marking: the ticket stays in the live
