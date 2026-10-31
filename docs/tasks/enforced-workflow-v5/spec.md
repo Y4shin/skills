@@ -326,10 +326,16 @@ pillar; each traces to a task body via the map's `## Decisions so far`.
   finishes every task and skips reconciliation is refused with a pointer back
   to Wayfinder. The producer of the flag owns the check; the consumer owns
   only the flag.
-- **`ready_for_spec` auto-clears** when a planning task is added, reopened,
-  or moved out of done, or when the map is edited through the section writer
-  or a plan write. The flag-setting tool is the only setter, and it sets it
-  last. Any post-reconcile plan change forces one more Wayfinder pass.
+- **`ready_for_spec` auto-clears for the writers that exist**: adding a
+  planning task, `tw_write_section` (any map-body edit), and the planning half
+  of `tw_mark_done` all clear it. The flag-setting tool is the only setter,
+  and it sets it last. Any post-reconcile plan change forces one more
+  Wayfinder pass. (Amended at `end-of-effort-reconciliation`: the settled text
+  also claimed a reopen, a move out of done, and plan writes as clearers, but
+  no writer can reopen or un-done anything (`tw_mark_done` and
+  `tw_mark_blocked` refuse done items, `tw_state_set` takes pointers only),
+  and `blocked_by` edges cannot be repaired after creation. Reopen plus edge
+  repair are recorded as a follow-up effort, not a silent gap.)
 - **`to-spec` no longer runs a seam or architecture interview.** It
   synthesizes the specification from the settled record.
 - **`to-tickets` produces `architecture.md`** alongside the ticket graph. It
@@ -441,7 +447,8 @@ pillar; each traces to a task body via the map's `## Decisions so far`.
   (`implement-task/SKILL.md`) is corrected. `wayfinder/resources/grilling.md`
   keeps creating the task document and stops describing how questions are
   asked.
-- **The effort's final ticket is the documentation re-sync.** It audits
+- **The documentation re-sync was the last planned ticket; the effort's close
+  is `end-of-effort-reconciliation`.** The re-sync audited
   `CONTEXT.md`, the top-level `README.md`, the bucket `README.md`s,
   `package.json`'s `pi.skills` array, and the `docs/<bucket>/<skill>.md`
   pages against the implemented v5 and fixes what drifted. It is blocked by
@@ -578,11 +585,16 @@ pillar; each traces to a task body via the map's `## Decisions so far`.
 
 ### Reports
 
-- **Every workflow skill ends its run with one shared completion report
-  shape**, in a fixed order: (1) what is now true, (2) what needs the human,
-  (3) what to run next, (4) what is broken or blocked, (5) one pointer to the
-  detail. A skill may add at most one skill-specific line inside that order;
-  it may not reorder or add sections.
+- **The nine run-ending workflow skills end their run with one shared
+  completion report shape**, in a fixed order: (1) what is now true, (2) what
+  needs the human, (3) what to run next, (4) what is broken or blocked, (5)
+  one pointer to the detail. The nine are `intake`, `wayfinder`, `to-spec`,
+  `to-tickets`, `implement-ticket`, `finalize-effort`, `setup-workflow`,
+  `task-workflow-overview`, and `task-workflow-doctor`; the disciplines and
+  vocabulary skills (`tdd`, `code-review`, `diagnosing-bugs`, `grilling`, and
+  the rest) do not run a phase and carry no report template. A run-ending
+  skill may add at most one skill-specific line inside that order; it may not
+  reorder or add sections.
 - **The language is simplified technical English**: compact, no yapping, and
   written for someone who did not watch the run.
 - **Never inline**: subagent run ids, per-step receipts, output references,

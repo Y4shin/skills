@@ -179,8 +179,12 @@ pillar; each traces to a task body via the map's `## Decisions so far`.
   done-marking, close-out, merge to main).
 - **`finalize-task` is retired.** Its per-ticket close-out runs inline in
   `implement-ticket`, in the same autonomous run that lands the ticket. The
-  one-owner rule holds: that closing phase is still the only thing that sets
-  a ticket's `workflow_state: done`.
+  one-owner rule holds with two sanctioned exceptions, named so the rule is
+  true rather than aspirational: `implement-ticket`'s close-out is the only
+  thing that marks a landed ticket done, wayfinder's planning-task half of
+  `tw_mark_done` marks planning tasks (it refuses tickets), and
+  `tw_split_ticket` supersedes an oversized ticket as `status: deprecated`
+  plus `workflow_state: done`.
 - **The ticket loop is serial.** Tickets run one at a time in level order,
   and the dependency levels stay strict barriers. Level concurrency was the
   settled story but nothing implements it: every chain shares the one repo
@@ -210,7 +214,8 @@ pillar; each traces to a task body via the map's `## Decisions so far`.
   (`implement-task/SKILL.md`) is corrected. `wayfinder/resources/grilling.md`
   keeps creating the task document and stops describing how questions are
   asked.
-- **The effort's final ticket is the documentation re-sync.** It audits
+- **The effort's final ticket was the documentation re-sync; the effort's
+  close is `end-of-effort-reconciliation` (entry 21).** The re-sync audited
   `CONTEXT.md`, the top-level `README.md`, the bucket `README.md`s,
   `package.json`'s `pi.skills` array, and the `docs/<bucket>/<skill>.md`
   pages against the implemented v5 and fixes what drifted. It is blocked by
@@ -347,11 +352,16 @@ pillar; each traces to a task body via the map's `## Decisions so far`.
 
 ### Reports
 
-- **Every workflow skill ends its run with one shared completion report
-  shape**, in a fixed order: (1) what is now true, (2) what needs the human,
-  (3) what to run next, (4) what is broken or blocked, (5) one pointer to the
-  detail. A skill may add at most one skill-specific line inside that order;
-  it may not reorder or add sections.
+- **The nine run-ending workflow skills end their run with one shared
+  completion report shape**, in a fixed order: (1) what is now true, (2) what
+  needs the human, (3) what to run next, (4) what is broken or blocked, (5)
+  one pointer to the detail. The nine are `intake`, `wayfinder`, `to-spec`,
+  `to-tickets`, `implement-ticket`, `finalize-effort`, `setup-workflow`,
+  `task-workflow-overview`, and `task-workflow-doctor`; the disciplines and
+  vocabulary skills (`tdd`, `code-review`, `diagnosing-bugs`, `grilling`, and
+  the rest) do not run a phase and carry no report template. A run-ending
+  skill may add at most one skill-specific line inside that order; it may not
+  reorder or add sections.
 - **The language is simplified technical English**: compact, no yapping, and
   written for someone who did not watch the run.
 - **Never inline**: subagent run ids, per-step receipts, output references,
@@ -751,12 +761,15 @@ assert the internal shape of a helper.
   the disclosure ticket.
 - **The write guard is best-effort against a determined shell.** The residual
   risk is accepted and documented; no ticket attempts a sound shell gate.
-- **`ready_for_spec` auto-clear covered every writer.** Planning
-  `tw_mark_done` clears the flag, and the landed ticket-half writers
-  (`tw_write_spec`, `tw_add_ticket`, `tw_split_ticket`, ticket
-  `tw_mark_done`, `tw_mark_blocked`, `tw_write_changelog`,
-  `tw_archive_effort`) all leave `ready_for_spec` untouched, so the
-  auto-clear surface is fully landed for this effort.
+- **`ready_for_spec` auto-clear covers the writers that exist, and not the
+  transitions that do not.** Adding a planning task, `tw_write_section`, and
+  planning `tw_mark_done` clear the flag; the landed ticket-half writers
+  (`tw_write_spec`, `tw_add_ticket`, `tw_split_ticket`, ticket `tw_mark_done`,
+  `tw_mark_blocked`, `tw_write_changelog`, `tw_archive_effort`) leave it
+  untouched. Nothing can reopen a done planning task or repair a `blocked_by`
+  edge after creation, so those two clearers are absent by mechanism, not by
+  oversight: reopen and edge repair are the follow-up seed recorded by
+  `end-of-effort-reconciliation` (entry 21).
 - **The open-set derivation keys on signature tools.** Two skills whose
   toolsets overlap fully cannot both be modeled; tickets 9 and 14 must keep
   one private tool per skill or revisit the derivation (the throw makes the

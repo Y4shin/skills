@@ -212,9 +212,13 @@ separate bash block.
    in this phase writes under `docs/bugs/`.
 
 5. **Mark the ticket done through `tw_mark_done`** (the one owner of the
-   marking: this phase; the chain never marks it). The tool checks the
-   changelog entry references the ticket before it writes
-   `workflow_state: done`, so the changelog step must land first.
+   marking for a landed ticket: this phase; the chain never marks it). The tool
+   checks the changelog entry references the ticket before it writes
+   `workflow_state: done`, so the changelog step must land first. The rule has
+   two sanctioned exceptions, named so it reads true: wayfinder's
+   planning-task half of `tw_mark_done` marks planning tasks (that half
+   refuses tickets), and `tw_split_ticket` supersedes an oversized ticket as
+   `status: deprecated` plus `workflow_state: done`.
 
 6. **Call the Pi tool** to verify the ticket is finalizable; the check also
    surfaces the effort graph's anomalies, which you should report if any

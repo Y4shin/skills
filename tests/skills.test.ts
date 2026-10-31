@@ -3416,6 +3416,54 @@ describe("end-of-effort reconciliation: the effort documents match the shipped c
     expect(spec).not.toMatch(/shared repo working\s+directory is never corrupted/);
     expect(spec).toMatch(/one ticket at a time/i);
   });
+
+  test("the ready_for_spec auto-clear claims only the writers that exist", () => {
+    // No writer can reopen or un-done anything (tw_mark_done and
+    // tw_mark_blocked refuse done items, tw_state_set takes pointers only), and
+    // blocked_by edges cannot be repaired after creation.
+    expect(spec).not.toMatch(/auto-clears\*\* when a planning task is added, reopened/);
+    expect(archSpec).not.toMatch(/auto-clear surface is fully landed/);
+    expect(spec).toMatch(/reopen[\s\S]{0,200}follow-up|follow-up[\s\S]{0,200}reopen/i);
+    expect(archSpec).toMatch(/reopen and edge repair|edge repair/);
+    // The amend names the writers that do clear it.
+    expect(spec).toMatch(/adding a\s+planning task/i);
+    expect(spec).toMatch(/tw_write_section/);
+    expect(spec).toMatch(/planning\s+half\s+of `tw_mark_done`|planning `tw_mark_done`|planning done-marking/i);
+  });
+
+  test("the one-owner rule names its two sanctioned exceptions", () => {
+    // wayfinder's planning-task half of tw_mark_done, and tw_split_ticket's
+    // supersede of the original, which the arch spec itself sanctions.
+    const rule = implement.slice(implement.indexOf("**Mark the ticket done through `tw_mark_done`**"));
+    expect(rule.slice(0, 1200)).toMatch(/wayfinder/i);
+    expect(rule.slice(0, 1200)).toMatch(/tw_split_ticket/);
+    const archRule = archSpec.slice(archSpec.indexOf("one-owner rule holds with two sanctioned exceptions"));
+    expect(archRule.slice(0, 900)).toMatch(/wayfinder/i);
+    expect(archRule.slice(0, 900)).toMatch(/tw_split_ticket/);
+  });
+
+  test("the report-template claim names the nine run-ending skills instead of claiming all", () => {
+    const runEnding = [
+      "intake",
+      "wayfinder",
+      "to-spec",
+      "to-tickets",
+      "implement-ticket",
+      "finalize-effort",
+      "setup-workflow",
+      "task-workflow-overview",
+      "task-workflow-doctor",
+    ];
+    expect(spec).not.toMatch(/Every workflow skill ends its run with one shared completion report/);
+    expect(archSpec).not.toMatch(/\*\*Every workflow skill ends its run with one shared completion report/);
+    for (const skill of runEnding) {
+      expect(spec, `the spec never names ${skill} in the report coverage`).toMatch(
+        new RegExp(`\\b${skill}\\b`),
+      );
+    }
+    expect(spec).toMatch(/nine/i);
+    expect(archSpec).toMatch(/nine/i);
+  });
 });
 
 describe("the overview's read-only table routes to owning phases (end-of-effort-reconciliation)", () => {
