@@ -11,6 +11,8 @@
  * callable; after close they are absent and unsearchable again.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import { Type } from "typebox";
 
@@ -386,5 +388,56 @@ describe("disclosure core: telemetry absorption", () => {
     await s.session.prompt("Open wayfinder.");
 
     expect(s.session.getActiveToolNames()).toContain("tw_frontier");
+  });
+});
+
+// ─── A subagent reaches a gated writer through its own tools allowlist ───────
+//
+// end-of-effort-reconciliation: the land-worker appends the ticket doc's
+// implementation note through `tw_write_ticket_note`. A subagent runs in its
+// own session with no phase open, so the opener never declares that tool for
+// it; the agent's `tools:` frontmatter is the allowlist, and pi activates a
+// named declarable tool even when it is `defaultActive: false`.
+
+describe("disclosure core: a subagent's tools allowlist reaches a gated writer", () => {
+  let sessions: TaskSession[] = [];
+  afterEach(() => {
+    for (const s of sessions) s.dispose();
+    sessions = [];
+  });
+
+  test("naming tw_write_ticket_note in the allowlist declares it, with no opener", async () => {
+    const s = await createTaskSession({
+      extensions: [taskWorkflow],
+      tools: ["read", "tw_write_ticket_note"],
+      projectFiles: fixtureFiles(),
+    });
+    sessions.push(s);
+
+    const active = s.session.getActiveToolNames();
+    expect(active, "the allowlist declares the gated writer").toContain("tw_write_ticket_note");
+    expect(active, "the allowlist is the whole declared set").not.toContain("tw_open");
+
+    // Callable: the writer really runs in this session, with no phase open.
+    s.setResponses([
+      reply([
+        call("tw_write_ticket_note", {
+          selector: "a-ticket",
+          note: "The landing note.",
+        }),
+      ]),
+    ]);
+    await s.session.prompt("Write the landing note.");
+    expect(toolCallNames(s.events)).toContain("tw_write_ticket_note");
+    const result = latestToolResultText(s.session, "tw_write_ticket_note") ?? "";
+    expect(result).toContain("Implementation notes");
+    // The write really landed on the ticket doc, in the land-worker's shape.
+    const ticket = readFileSync(
+      join(s.cwd, "docs/tasks/some-effort/tickets/a-ticket/ticket.md"),
+      "utf-8",
+    );
+    expect(ticket).toContain("## Implementation notes");
+    expect(ticket).toContain("The landing note.");
+    expect(ticket, "the frontmatter survives the note").toContain("workflow_state: ready");
   });
 });

@@ -94,6 +94,13 @@ export interface TaskSessionOptions {
   sessionManager?: SessionManager;
   /** The session_start reason to emit. The CLI sets "resume"/"fork" when reopening a session file. */
   sessionStartReason?: "startup" | "reload" | "new" | "resume" | "fork";
+  /**
+   * The active-tool allowlist, which is how a subagent's `tools:` frontmatter
+   * reaches its session. Naming a declarable tool activates it even when it is
+   * `defaultActive: false`, so this is the seam that proves a gated writer is
+   * reachable without an opener.
+   */
+  tools?: string[];
 }
 
 export interface TaskSession {
@@ -178,7 +185,7 @@ export async function createTaskSession(options: TaskSessionOptions = {}): Promi
     sessionManager,
     settingsManager,
     customTools: options.customTools,
-    noTools: "builtin",
+    ...(options.tools ? { tools: options.tools } : { noTools: "builtin" as const }),
     ...(options.sessionStartReason
       ? { sessionStartEvent: { type: "session_start", reason: options.sessionStartReason } as const }
       : {}),
