@@ -3,7 +3,7 @@ type: ticket
 subtype: bug
 title: Give the effort close a living-architecture reconcile
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: m
 ---
@@ -47,3 +47,11 @@ that the migration is the human prerequisite.
       skill step, whichever shape is chosen).
 - [ ] `docs/engineering/finalize-effort.md` is re-synced to the same contract.
 - [ ] Both typechecks and `npx vitest run` are green.
+
+## Implementation notes
+
+Closed out inline at the effort close, implemented by the operator at `8e4c718` (no chain dispatched).
+
+Outcome of the architecture reconcile: attempted and refused by the tool, recorded rather than edited by hand. `tw_write_architecture enforced-workflow-v5` returned `effort 'enforced-workflow-v5' still holds the legacy architecture shape (docs/tasks/enforced-workflow-v5/arch-spec.md): run the schema-5 migration (it renames arch-spec.md to architecture.md) before using the v5 architecture writer`, and the tree was unchanged afterwards. This is the schema-4 path the delivered SKILL and docs page describe: the close holds the writer, and a legacy `arch-spec.md` keeps the reconcile unavailable until the repo migrates. Consequence for this effort: `arch-spec.md:325-326` still says `finalize-effort` runs one pass with no second advisory review, and lines 671-675 and 797 still describe the archive gate as reading every review artifact's `dispositioned` flag; the review records the same gap as finding F2, informational, because the fix is a planning artifact plus a human `setup-workflow` migration.
+
+Lesson for the next effort: run `setup-workflow`'s migration on this repo's own `docs/tasks/` tree before a close needs to write the architecture, otherwise every schema-4 close can only record the gap. The registry change is pinned by `tests/opener-gate.test.ts`.

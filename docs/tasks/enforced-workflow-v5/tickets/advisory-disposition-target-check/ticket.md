@@ -3,7 +3,7 @@ type: ticket
 subtype: bug
 title: Validate advisory review disposition targets
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: s
 ---
@@ -35,3 +35,11 @@ still refuses `follow_up`, and it still never sets a follow-up target).
 - [ ] `tests/lifecycle-hardening.test.ts` gains a case for the advisory pass
       refusal, and the existing advisory-pass cases stay green.
 - [ ] Both typechecks and `npx vitest run` are green.
+
+## Implementation notes
+
+Closed out inline at the effort close, implemented by the operator at `8e4c718` (no chain dispatched).
+
+Outcome: the target validation the finalize branch performed is now one `validateReviewTargets` helper (src/pi.ts) called from both `tw_write_review` branches, so the advisory pass refuses a `ticket` disposition naming no ticket in the effort and a `follow-up` naming no live effort stamped `origin_effort`. The finalize refusals keep their messages, and `tests/lifecycle-hardening.test.ts` gained the advisory-pass case the ticket's acceptance criteria asked for. The four criteria hold.
+
+Hygiene left in the landed commit, recorded rather than fixed here because the close does not edit code: the new helper's doc comment was inserted above the pre-existing `/** One finding's line in the tool-owned '## Dispositions' record. */` line, so that one-line comment now sits orphaned above `validateReviewTargets`'s own comment and `reviewDispositionLine` has no doc. A one-line move in a later change, same class as review finding F6.
