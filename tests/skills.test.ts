@@ -2143,6 +2143,30 @@ describe("task-workflow-doctor v4 (overhaul-planning-skills)", () => {
     for (const text of [content, readFile(resourcePath)]) expectOnlySurvivingTools(text);
   });
 
+  test("the missing-scaffolding scope names exactly its two scopes", () => {
+    // end-of-effort-reconciliation: the doctor owns what the tools cannot
+    // self-diagnose. The scaffold section named the manifest, docs/dev-env.md,
+    // docs/testing.md, and docs/adr/ too, and one row said to edit the
+    // manifest while the same page says never to edit the tree.
+    const section = content.slice(content.indexOf("## Missing scaffolding"), content.indexOf("\n## ", content.indexOf("## Missing scaffolding") + 1));
+    expect(section).toMatch(/`CONTEXT\.md`/);
+    expect(section).toMatch(/`docs\/tasks\/`/);
+    for (const out of ["docs\/dev-env\.md", "docs\/testing\.md", "docs\/adr\/", "package\.json", "pi\.skills", "state\.yaml"]) {
+      expect(section, `the scaffold scope still owns ${out}`).not.toMatch(new RegExp(out));
+    }
+    expect(section).not.toMatch(/edit the manifest/i);
+    // The out-of-scope resources are gone, not orphaned.
+    for (const gone of [
+      "missing-dev-env.md",
+      "missing-testing-md.md",
+      "missing-adr-dir.md",
+      "manifest-misconfigured.md",
+      "missing-state-yaml.md",
+    ]) {
+      expect(existsSync(join(PROJECT, "skills/engineering/task-workflow-doctor/resources", gone)), gone).toBe(false);
+    }
+  });
+
   test("missing-tasks-tree resource describes the v4 tree shape", () => {
     const resource = readFile("skills/engineering/task-workflow-doctor/resources/missing-tasks-tree.md");
     expect(resource).toMatch(/map\.md/);

@@ -40,20 +40,16 @@ by hand. Detection and the per-file producer routes are in
 
 ## Missing scaffolding
 
-The directories and files the workflow assumes are absent, so nothing can
-find anything. This covers the task tree, the state file, and the repo
-context documents. Route to `/skill:setup-workflow` and let it write the
-scaffold; it never clobbers an existing file.
+Two artifacts the workflow cannot run without, and nothing more: the
+`docs/tasks/` tree and the repo-root `CONTEXT.md`. Anything else a repo may
+choose to document is the repo's own business, and nothing here edits the
+manifest. Route to `/skill:setup-workflow` and let it write the scaffold; it
+never clobbers an existing file.
 
 | Symptom | Missing artifact | Route |
 |---|---|---|
 | Tasks are not showing up; `docs/tasks/` is empty or missing | `docs/tasks/` tree | `/skill:setup-workflow` (see [resources/missing-tasks-tree.md](resources/missing-tasks-tree.md)) |
-| The current map or task pointer is lost between sessions | `docs/tasks/state.yaml` | `/skill:setup-workflow` (see [resources/missing-state-yaml.md](resources/missing-state-yaml.md)) |
 | Repo-wide context is missing from agent prompts | repo-root `CONTEXT.md` | `/skill:setup-workflow` (see [resources/missing-context-md.md](resources/missing-context-md.md)) |
-| Dev environment setup is undocumented | `docs/dev-env.md` | `/skill:setup-workflow` (see [resources/missing-dev-env.md](resources/missing-dev-env.md)) |
-| Testing conventions are undocumented | `docs/testing.md` | `/skill:setup-workflow` (see [resources/missing-testing-md.md](resources/missing-testing-md.md)) |
-| ADRs have no home | `docs/adr/` | `/skill:setup-workflow` (see [resources/missing-adr-dir.md](resources/missing-adr-dir.md)) |
-| Skills or subagents are not registered | `package.json` `pi.skills` / `pi.subagents` | edit the manifest (see [resources/manifest-misconfigured.md](resources/manifest-misconfigured.md)) |
 
 ## Failed migration
 
@@ -84,8 +80,8 @@ missing or unstable architecture document) and their routes are in
 
 - For anything that involves the task tree, the state file, or the standard
   docs, run `/skill:setup-workflow`. Do not duplicate its setup logic here.
-- For the manifest, edit `package.json` directly and consult the manifest
-  documentation.
+- The manifest is not a diagnosis target: nothing here edits it, and a
+  registration problem is the package's own, not the tree's.
 - For an opener refusal, `legal_next` is the route. If it names a skill, run
   that skill; if it names a tool call, make that call.
 
