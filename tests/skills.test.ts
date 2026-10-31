@@ -951,25 +951,15 @@ describe("skill cross-references", () => {
     expect(content).not.toContain("docs/tasks/archive/<effort>");
   });
 
-  test("the close-out has a subtype: bug branch", () => {
+  test("the close-out has no bug-closure step: docs/bugs/ is a static archive", () => {
+    // end-of-effort-reconciliation retired the substrate write: the defect's
+    // record is the implementation ticket. (The former pins here asserted the
+    // `status: fixed` / `fix_commit` / archive-move closure, which schema 5
+    // retired.)
     const content = readFile("skills/engineering/implement-ticket/SKILL.md");
-    expect(content).toMatch(/subtype: bug/i);
-  });
-
-  test("the bug branch archives bug docs to docs/bugs/archive", () => {
-    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
-    expect(content).toContain("docs/bugs/archive");
-  });
-
-  test("the bug branch sets status fixed and fills fix_commit", () => {
-    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
-    expect(content).toContain("status: fixed");
-    expect(content).toContain("fix_commit");
-  });
-
-  test("the bug branch asks user when the body reference is absent", () => {
-    const content = readFile("skills/engineering/implement-ticket/SKILL.md");
-    expect(content).toMatch(/ask.{0,80}(which bug|bug doc)/i);
+    expect(content).toMatch(/docs\/bugs\/` is a static archive/);
+    expect(content).not.toContain("fix_commit");
+    expect(content).not.toContain("status: fixed");
   });
 
   test("the bug branch takes the bug slug from the ticket body's reference", () => {
@@ -979,9 +969,10 @@ describe("skill cross-references", () => {
     expect(content).not.toContain("bug: <slug>");
   });
 
-  test("setup-workflow creates docs/bugs/archive directory", () => {
+  test("setup-workflow scaffolds no bug directory: an archive is left where it is", () => {
     const content = readFile("skills/engineering/setup-workflow/SKILL.md");
-    expect(content).toContain("docs/bugs/archive");
+    expect(content).not.toMatch(/mkdir[^\n]*docs\/bugs/);
+    expect(content).toMatch(/docs\/bugs\/` is a static archive/);
   });
 
   test("setup-workflow writes docs/dev-env.md template", () => {
@@ -2806,14 +2797,17 @@ describe("the inlined per-ticket close-out (implement-ticket-skill)", () => {
     });
   }
 
-  test("the bug close-out closes and archives the bug doc; the feature one skips it", () => {
+  test("neither resource carries a bug-closure step: the bug doc is the spec source", () => {
     const feature = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
     const bug = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
-    expect(feature).toMatch(/subtype: bug only/i);
-    expect(bug).toContain("docs/bugs/archive");
-    expect(bug).toContain("status: fixed");
-    expect(bug).toContain("fix_commit");
-    expect(bug).toMatch(/ask the user which bug doc/i);
+    for (const [label, text] of [
+      ["feature", feature],
+      ["bug", bug],
+    ] as const) {
+      expect(text, `${label} still closes a bug doc`).not.toMatch(/status: fixed|fix_commit|docs\/bugs\/archive/);
+      expect(text, `${label} never names docs/bugs as a static archive`).toMatch(/docs\/bugs\/` is a static archive/);
+    }
+    // The bug doc is still the chain's spec source, read from the ticket body.
     expect(bug).toMatch(/ticket body/i);
     expect(bug).not.toContain("bug: <slug>");
   });
@@ -3468,5 +3462,71 @@ describe("the overview's read-only table routes to owning phases (end-of-effort-
     // The human-facing page names the phases too, so the two surfaces agree.
     expect(page).toMatch(/tw_show[\s\S]{0,80}\/skill:wayfinder/);
     expect(page).toMatch(/Read-only queries|read-only questions/);
+  });
+});
+
+// ─── The retired bug substrate stays out of the live instructions ────────────
+//
+// end-of-effort-reconciliation: `docs/bugs/` is a static archive in schema 5,
+// and the implementation ticket is the defect's record. No live skill or docs
+// prose may instruct a write under it; a `docs/bugs/` mention is a read (the
+// bug doc as the ticket's spec source) or an archive reference.
+
+describe("the retired bug substrate (end-of-effort-reconciliation)", () => {
+  // The write shapes the retired bug-closure step used: a frontmatter fix
+  // stamp, the fix commit field, the archive move, and the scaffold mkdir.
+  const BUG_WRITE_PATTERNS: [string, RegExp][] = [
+    ["status: fixed", /\bstatus:\s*fixed\b/],
+    ["fix_commit", /\bfix_commit\b/],
+    ["the archive move", /git mv docs\/bugs\//],
+    ["the scaffold mkdir", /mkdir[^\n]*docs\/bugs/],
+    ["the archive directory", /docs\/bugs\/archive/],
+    ["a write to a bug doc", /write\s+`?docs\/bugs\//],
+  ];
+
+  /** Live prose files: the two promoted buckets' skills and the docs pages. */
+  function liveProseFiles(): string[] {
+    const out: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) walk(path);
+        else if (entry.isFile() && entry.name.endsWith(".md")) out.push(path.slice(PROJECT.length + 1));
+      }
+    };
+    walk(join(PROJECT, "skills", "engineering"));
+    walk(join(PROJECT, "skills", "productivity"));
+    walk(join(PROJECT, "docs", "engineering"));
+    out.push("CONTEXT.md", "README.md");
+    return out;
+  }
+
+  test("no live prose instructs a write under docs/bugs", () => {
+    const offenders: string[] = [];
+    for (const rel of liveProseFiles()) {
+      // The upgrade resources are the compatibility layer: they record what the
+      // v4 substrate was, and the migration prose owns it.
+      if (rel.startsWith("skills/engineering/setup-workflow/resources/upgrade-")) continue;
+      const content = readFile(rel);
+      for (const [label, pattern] of BUG_WRITE_PATTERNS) {
+        if (pattern.test(content)) offenders.push(`${rel}: ${label}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("code-review reads a docs/bugs path only as an archive reference", () => {
+    const content = readFile("skills/engineering/code-review/SKILL.md");
+    expect(content).toMatch(/docs\/bugs\//);
+    expect(content).toMatch(/archive/i);
+    for (const [, pattern] of BUG_WRITE_PATTERNS) expect(content).not.toMatch(pattern);
+  });
+
+  test("the bug doc is the ticket's spec source, not a substrate to close", () => {
+    const bug = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
+    // The bug doc still feeds the chain: it is the spec source.
+    expect(bug).toMatch(/bug doc/i);
+    expect(bug).toMatch(/spec/i);
+    for (const [, pattern] of BUG_WRITE_PATTERNS) expect(bug).not.toMatch(pattern);
   });
 });

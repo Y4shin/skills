@@ -206,17 +206,10 @@ separate bash block.
    "docs: changelog {ticketSlug}"` (the tool writes the file; the commit is
    git, not a tree mutation).
 
-4. **Bug closure (subtype: bug only).** If the ticket's `subtype` is
-   `feature` or absent, skip. Otherwise read the ticket body for the bug doc
-   reference; if the body names no bug doc, ask the user which bug doc to
-   close and do not proceed until answered. Read `docs/bugs/<slug>.md`, set
-   `status: fixed`, fill `fix_commit` with the landing branch's SHA
-   (`git rev-parse task/<ticket-slug>`), fill the Root cause and Fix summary
-   sections from the ticket's `## Implementation notes` and deviation
-   reports, commit, then archive the bug doc with
-   `git mv docs/bugs/<slug>.md docs/bugs/archive/<slug>.md` and commit.
-   (`docs/bugs/` is outside the write guard's scope, so these writes are
-   legal there.)
+4. **There is no bug-closure step.** A bug ticket's record is the ticket
+   itself: `docs/bugs/` is a static archive in schema 5, the defect's doc and
+   reproduction are read from the ticket body as the spec source, and nothing
+   in this phase writes under `docs/bugs/`.
 
 5. **Mark the ticket done through `tw_mark_done`** (the one owner of the
    marking: this phase; the chain never marks it). The tool checks the

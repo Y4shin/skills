@@ -52,10 +52,9 @@ written through `tw_write_changelog` (the only writer of
 (the one owner of the marking), verified with
 `tw_finalizable <ticket-slug>` (which also surfaces the effort graph's
 anomalies), the state pointer cleared with `tw_state_set task null`, and
-the landing branch merged into main with `--no-ff`. Bug tickets get a
-closure branch: the bug doc reference is read from the ticket body, the doc
-is set to `status: fixed` with `fix_commit` and root-cause sections filled,
-then archived to `docs/bugs/archive/`.
+the landing branch merged into main with `--no-ff`. A bug ticket has no
+closure step: `docs/bugs/` is a static archive in schema 5, and the
+implementation ticket is the defect's record.
 
 After the last ticket, the **end-of-effort pass** runs as a second shipped
 workflow, `scripts/end-of-effort.js`: the advisory whole-effort review, the

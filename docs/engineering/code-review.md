@@ -12,9 +12,11 @@ other, so there is no single winner.
 The **spec source** depends on what the diff delivers: a feature ticket
 reviews against its ticket doc (`docs/tasks/<effort>/tickets/<ticket-slug>/ticket.md`)
 plus the effort's architecture document
-(`docs/tasks/<effort>/architecture.md`); a bug ticket reviews against the bug
-doc (`docs/bugs/<slug>.md`) and its reproduction from the ticket body; a
-whole-effort review takes the ticket docs plus the architecture document.
+(`docs/tasks/<effort>/architecture.md`); a bug ticket reviews against its
+ticket doc plus the bug doc and reproduction the body references, where a
+`docs/bugs/` path is an archive reference only (schema 5 makes `docs/bugs/` a
+static archive, and the ticket is the defect's record); a whole-effort review
+takes the ticket docs plus the architecture document.
 
 The **standards sources** are read directly: `AGENTS.md` and `CONTEXT.md`
 at the repo root, `docs/standards.md` when present, and `docs/testing.md`.

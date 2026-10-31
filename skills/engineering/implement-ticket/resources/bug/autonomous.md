@@ -109,14 +109,10 @@ separate bash block.
    refused there): the slug, the ticket title, and a 3-5 line body. Commit
    through the shell afterwards (the commit is git, not a tree mutation):
    `git add docs/tasks/CHANGELOG.md && git commit -m "docs: changelog {ticketSlug}"`
-4. **Bug closure**: read the ticket body for the bug doc reference; if the
-   body names no bug doc, ask the user which bug doc to close and do not
-   proceed until answered. Read `docs/bugs/<slug>.md`, set `status: fixed`,
-   fill `fix_commit` with the landing branch's SHA
-   (`git rev-parse task/<ticket-slug>`), fill the Root cause and Fix
-   summary sections from the ticket's `## Implementation notes`, commit,
-   then archive the bug doc with
-   `git mv docs/bugs/<slug>.md docs/bugs/archive/<slug>.md` and commit.
+4. **No bug-closure step.** `docs/bugs/` is a static archive in schema 5 and
+   this ticket is the defect's record: the bug doc and its reproduction are
+   read from the ticket body as the spec source, and nothing in this phase
+   writes under `docs/bugs/`.
 5. **Mark the ticket done through `tw_mark_done`** (the one owner of the
    marking: this phase; the chain never marks it). The tool checks the
    changelog entry references the ticket before it writes

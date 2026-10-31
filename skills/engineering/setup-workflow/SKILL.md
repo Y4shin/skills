@@ -35,12 +35,12 @@ Scaffold everything a repo needs to use the task-workflow:
    ```
    mkdir -p docs/tasks/archive
    mkdir -p docs/tasks/out-of-scope
-   mkdir -p docs/bugs
-   mkdir -p docs/bugs/archive
    mkdir -p docs/adr
    mkdir -p docs/agents
    ```
-   Empty directories get a `.gitkeep`.
+   Empty directories get a `.gitkeep`. There is no bug directory to scaffold:
+   `docs/bugs/` is a static archive in schema 5, so a fresh repo gets none and
+   an existing archive is left exactly where it is.
 
 2. Write `docs/tasks/state.yaml` (the v5 shape: two real-null pointers plus
    the stamp):
