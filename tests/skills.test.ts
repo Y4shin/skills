@@ -3458,10 +3458,14 @@ describe("documentation re-sync (docs-resync)", () => {
 // effort documents are the record, so they are amended surgically: the claims
 // that are now false change, and the reconciliation itself is recorded as
 // arch-spec entry 21. These pins hold the amendments in place.
+//
+// The effort is closed, so its documents live under docs/tasks/archive/. A pin
+// that reads a live effort path breaks the gate the moment that effort
+// archives, which is what happened when this effort closed.
 
 describe("end-of-effort reconciliation: the effort documents match the shipped code", () => {
-  const archSpec = readFile("docs/tasks/enforced-workflow-v5/arch-spec.md");
-  const spec = readFile("docs/tasks/enforced-workflow-v5/spec.md");
+  const archSpec = readFile("docs/tasks/archive/enforced-workflow-v5/arch-spec.md");
+  const spec = readFile("docs/tasks/archive/enforced-workflow-v5/spec.md");
   const implement = readFile("skills/engineering/implement-ticket/SKILL.md");
   const featureResource = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
   const bugResource = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
