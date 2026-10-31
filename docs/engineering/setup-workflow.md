@@ -31,6 +31,11 @@ is **5**.
 - **Current repo** (`schema_version` equals 5): the **no-op** branch.
   "Already on schema_version 5, nothing to do."
 
+The onboarding branch is the one legal direct writer of `docs/tasks/`: the
+write lockdown applies once `state.yaml` carries `schema_version`, so before
+the stamp exists there is no schema to protect. Write the state file first
+and every later write goes through the named `tw_*` tools.
+
 The migration is safe by construction: a dry-run mode prints the plan
 without writing, every rewrite is YAML-verified before it lands, a failure
 mid-migration leaves the tree untouched, re-runs resume from the last
@@ -43,6 +48,13 @@ workflow skills, and again whenever a schema upgrade is released. It is
 user-invoked: the model does not run it on its own.
 
 ## Common questions
+
+**Why does onboarding not use a named writer?**
+Because it runs before there is a named tree. The lockdown's rule is "an
+initialized tree has named writers"; an unstamped tree has nothing to
+protect, so the guard exempts it and setup writes the scaffold directly. Once
+the stamp lands, the same session's later writes are refused unless they use
+a `tw_*` tool.
 
 **Is the migration destructive?**
 It reorganizes the tree, but a backup branch (`migrate/schema-<from>-to-5`)

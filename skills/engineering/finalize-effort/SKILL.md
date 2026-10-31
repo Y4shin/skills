@@ -102,7 +102,13 @@ updates the root index.
    large.
 4. Create accepted follow-ups with `origin_effort`, then move the findings
    with `tw_write_review` and `follow_up`.
-5. Archive with `tw_archive_effort`.
+5. Archive with `tw_archive_effort`. The tool deprecates the finished items,
+   moves `docs/tasks/<effort>/` to `docs/tasks/archive/<effort>/` as a unit,
+   updates the root index, and clears the state file's `map` pointer when it
+   named the archived effort. Commit the move, because the tool writes the
+   tree and git makes it history:
+   `git add docs/tasks/ && git commit -m "chore: archive <effort>"`. A close
+   that leaves the archive uncommitted hands the next phase a dirty tree.
 6. Close the phase with `tw_close finalize-effort` and write the report.
 
 ## Report

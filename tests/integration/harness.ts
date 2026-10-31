@@ -216,6 +216,11 @@ export function seedTaskTree(cwd: string): void {
     join(cwd, "docs/tasks/test-effort/map.md"),
     "---\ntype: map\ntitle: Test effort\nstatus: stable\n---\n",
   );
+  // A published spec: the to-tickets opener requires one (tickets-ready).
+  writeFileSync(
+    join(cwd, "docs/tasks/test-effort/spec.md"),
+    "---\ntype: spec\ntitle: Test effort spec\nstatus: stable\n---\n",
+  );
   mkdirSync(join(cwd, "docs/tasks/login/slices"), { recursive: true });
   writeFileSync(
     join(cwd, "docs/tasks/login/task.md"),

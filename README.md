@@ -27,7 +27,14 @@
 
 ```bash
 pi install /path/to/task-workflow
+pi install git:github.com/Y4shin/pi-telemetry@v0.4.0
 ```
+
+Both packages are required. pi-subagents drives every ticket chain, and
+every shipped subagent lists `submit_feedback` in its `tools` allowlist;
+pi-subagents treats that allowlist as strict and fails a child whose tool is
+unavailable, so without pi-telemetry the chain stops at its first gate. The
+session start prints a warning when either package is missing.
 
 Then once per repo:
 

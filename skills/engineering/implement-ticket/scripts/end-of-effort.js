@@ -62,7 +62,13 @@ const inconsistencies = Array.isArray(args.inconsistencies) ? args.inconsistenci
 const optionalTests = Array.isArray(args.optionalTests) ? args.optionalTests : [];
 
 function verdict(receipt, marker) {
-  return receipt.ok && typeof receipt.output === "string" && receipt.output.trimStart().startsWith(marker);
+  if (!receipt || receipt.ok !== true) return false;
+  const text = typeof receipt.output === "string" ? receipt.output : "";
+  // The marker is checked as a line anywhere in the output, not as the first
+  // characters of it: one rehearsal run returned its summary instead of the
+  // verdict line, and the pass then false-failed a green suite. The caller
+  // retries once below rather than reading harness internals.
+  return text.split("\n").some((line) => line.trim().startsWith(marker));
 }
 
 function reviewTask() {
@@ -119,6 +125,7 @@ if (args.review !== false) {
     agent: "code-reviewer",
     skill: "code-review",
     label: "Review " + args.effort + " diff",
+    timeoutMs: 1800000,
     output: "review-" + args.effort + "/result.md",
     task: reviewTask()
   });
@@ -133,9 +140,12 @@ if (args.reconcile !== false) {
   const spec = await runs.run("spec", {
     agent: "spec-reconciler",
     label: "Reconcile " + args.effort + " architecture document",
+    timeoutMs: 1800000,
+    output: "spec-" + args.effort + "/reconciled.md",
     task: specTask()
   });
   refs.spec = spec.outputReference || spec.output;
+  refs.specText = typeof spec.output === "string" ? spec.output : undefined;
   if (!verdict(spec, "RECONCILED")) {
     return { ok: false, effort: args.effort, failed: "spec", step: spec, reviewOk, refs };
   }
@@ -148,6 +158,7 @@ if (inconsistencies.length > 0) {
   const coherence = await runs.run("coherence", {
     agent: "coherence-refactorer",
     label: "Refactor " + args.effort + " coherence",
+    timeoutMs: 2400000,
     task: coherenceTask(refs.review)
   });
   refs.coherence = coherence.outputReference || coherence.output;
@@ -164,11 +175,25 @@ if (inconsistencies.length > 0) {
 const suite = await runs.run("suite", {
   agent: "test-runner",
   label: "Run " + args.effort + " suite gate",
+  timeoutMs: 1200000,
   task: suiteTask()
 });
 refs.suite = suite.outputReference || suite.output;
-if (!verdict(suite, "SUITE: GREEN")) {
-  return { ok: false, effort: args.effort, failed: "suite", step: suite, reviewOk, refs };
+let suiteReceipt = suite;
+if (suite.ok === true && !verdict(suite, "SUITE: GREEN")) {
+  // A green suite whose verdict line did not survive the child's final message
+  // is a reporting miss, not a red suite. One re-run is idempotent and much
+  // cheaper than sending the caller back to the harness.
+  suiteReceipt = await runs.run("suite-retry", {
+    agent: "test-runner",
+    label: "Re-run " + args.effort + " suite gate",
+    timeoutMs: 1200000,
+    task: suiteTask()
+  });
+  refs.suite = suiteReceipt.outputReference || suiteReceipt.output;
+}
+if (!verdict(suiteReceipt, "SUITE: GREEN")) {
+  return { ok: false, effort: args.effort, failed: "suite", step: suiteReceipt, reviewOk, refs };
 }
 
 return { ok: true, effort: args.effort, reviewOk, refs };

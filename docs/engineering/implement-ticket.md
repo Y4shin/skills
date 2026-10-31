@@ -52,8 +52,10 @@ written through `tw_write_changelog` (the only writer of
 `docs/tasks/CHANGELOG.md`), the ticket marked done through `tw_mark_done`
 (the one owner of the marking), verified with
 `tw_finalizable <ticket-slug>` (which also surfaces the effort graph's
-anomalies), the state pointer cleared with `tw_state_set task null`, and
-the landing branch merged into main with `--no-ff`. A bug ticket has no
+anomalies), the state pointer cleared with `tw_state_set task null` and
+committed with the ticket note (a dirty `state.yaml` would otherwise travel
+into the next chain's checkout), and the landing branch merged into main with
+`--no-ff`. A bug ticket has no
 closure step: `docs/bugs/` is a static archive in schema 5, and the
 implementation ticket is the defect's record.
 
@@ -62,7 +64,22 @@ workflow, `scripts/end-of-effort.js`: the advisory whole-effort review, the
 architecture reconcile, the coherence refactor (driven by an explicit list
 of inconsistencies the model composes from the deviation reports), and the
 suite gate. The model composes inputs and handles the structured result; it
-never refactors, edits the architecture document, or runs the suite itself.
+never refactors or runs the suite itself.
+
+Two results become artifacts, because a child cannot write `docs/tasks/`:
+the reconciled architecture document comes back as `result.refs.spec` and
+the phase records it through `tw_write_architecture`, and the advisory
+review comes back as `result.refs.review` and the phase records it through
+`tw_write_review` with `pass: "end-of-effort"`, which writes
+`docs/tasks/<effort>/end-of-effort-review.md`. That file is what
+`finalize-effort`'s triage reads; a review that only lived in a run artifact
+would never be dispositioned.
+
+The verdict gates tolerate one reporting miss: a child that finishes without
+stating its line (`VERDICT: PASS`, `SUITE: GREEN`, `RECONCILED`,
+`REFACTORED`) is re-dispatched once before the step fails, and the marker is
+read as a line anywhere in the output rather than only as the first
+characters.
 
 **Human-owned tickets (`mode: human`) are hard-refused:** the router never
 launches chains for a marked ticket and does not fall through to the

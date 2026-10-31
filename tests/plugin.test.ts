@@ -225,6 +225,7 @@ describe("task-workflow tools", () => {
         "tw_write_review",
         "tw_write_section",
         "tw_write_spec",
+        "tw_write_task_note",
         "tw_write_ticket_note",
       ]);
     });
@@ -253,13 +254,19 @@ describe("task-workflow tools", () => {
       }
     });
 
-    test("tw_open keeps the discriminated union under the object type", () => {
-      // Adding the top-level type must not flatten the union: the union is what
-      // tells a model which fields each skill takes.
-      const open = (tools.tw_open as unknown as { parameters: { type?: string; anyOf?: unknown[] } }).parameters;
+    test("tw_open declares a plain object, not a discriminated union", () => {
+      // A union on `skill` is validated by the provider before the handler
+      // runs, so a missing target or an unknown skill came back as a TypeBox
+      // constant mismatch instead of the opener's own refusal. The schema is a
+      // plain object; the handler validates the shape and the phase gate names
+      // the legal next call. The openable set is named in the description.
+      const open = (tools.tw_open as unknown as { parameters: { type?: string; anyOf?: unknown[]; properties?: Record<string, { description?: string }> } }).parameters;
       expect(open.type).toBe("object");
-      expect(Array.isArray(open.anyOf)).toBe(true);
-      expect(open.anyOf!.length).toBe(SKILL_REGISTRY.length);
+      expect(open.anyOf).toBeUndefined();
+      expect(open.properties?.skill).toBeDefined();
+      for (const entry of SKILL_REGISTRY) {
+        expect(open.properties!.skill!.description).toContain(entry.name);
+      }
     });
   });
 

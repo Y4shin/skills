@@ -189,7 +189,9 @@ exactly that: open, reconcile, release.
 
 Every planning task writes its own results back to the map through
 `tw_write_section` as its final step, before it marks itself done with
-`tw_mark_done`. Wayfinder never re-synthesizes decisions from task bodies:
+`tw_mark_done`. The record the task leaves in its own body goes through
+`tw_write_task_note`, the named writer of a planning task's `## Notes` section
+(the built-in write and edit are refused under `docs/tasks/`). Wayfinder never re-synthesizes decisions from task bodies:
 the map's record comes from the task's own write-back, and the reconcile pass
 verifies it rather than reconstructing it.
 
@@ -218,8 +220,13 @@ When the ready frontier is empty, the pass reconciles before it releases:
 
 `tw_finalize_map` runs every precondition itself and refuses, naming every
 missing item, until the planning frontier is empty, `## Non-goals` exists and
-is non-empty, and `## Non-negotiable facts` exists, is non-empty, and opens
-with the bolded effort-level success-test line. When it refuses, fix what it
+is non-empty, `## Non-negotiable facts` exists, is non-empty, and opens
+with the bolded effort-level success-test line, and `## Fog` is empty. The
+fog check is the one that keeps the hand-off honest: a question still sitting
+in `## Fog` is a decision the spec phase would have to settle, and its
+boundary forbids that. Before finalizing, promote each fog line into a
+planning task, fold it into a canonical section, or record it through
+`tw_record_out_of_scope`. When the tool refuses, fix what it
 names and call it again. Never set the flag any other way: `to-spec` checks
 only the ready flag, and a run that finished every planning task but skipped
 reconciliation is refused there with a pointer back to Wayfinder.

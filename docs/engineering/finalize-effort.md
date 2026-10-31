@@ -4,8 +4,16 @@
 
 `finalize-effort` closes an effort: one holistic review of the whole effort,
 a triage of every finding, and the archive move. It is read-only toward the
-code it reviews, and it runs one pass per effort, so there is no second
-advisory review.
+code it reviews. A second run after review findings became tickets does not
+reuse the first artifact: it re-reads the effort as it now stands and
+rewrites the review, recording what the new work resolved.
+
+When `docs/tasks/<effort>/end-of-effort-review.md` exists, it is an input
+too. That file is the advisory review `implement-ticket` recorded when the
+last ticket landed, through `tw_write_review` with `pass: "end-of-effort"`
+(the finalize pass owns `review.md`). Its findings are dispositioned in the
+same triage, so a finding that only lived in a run artifact cannot be
+archived untriaged.
 
 The phase opens through `tw_open` with the effort. The review artifact is
 `docs/tasks/<effort>/review.md`, written through `tw_write_review`, the only
@@ -26,8 +34,10 @@ them. The origin keeps a review artifact that records each displaced
 finding's disposition and the follow-up slug, so the trail reads in both
 directions. `tw_archive_effort` performs the archive move: it refuses while
 a finding still lacks a disposition, then deprecates the finished items,
-moves `docs/tasks/<effort>/` to `docs/tasks/archive/<effort>/`, and updates
-the root index.
+moves `docs/tasks/<effort>/` to `docs/tasks/archive/<effort>/`, updates the
+root index, and clears `docs/tasks/state.yaml`'s `map` pointer when it named
+the archived effort. The move is committed with git as the phase's last
+step.
 
 ## When to reach for it
 
@@ -59,6 +69,11 @@ them find them there. The origin's review artifact becomes the disposition
 record, naming the follow-up slug. There is one copy of the findings, not
 two.
 
+**Why is the review re-run instead of reused?**
+Because the archive closes what the effort actually is. A dispositioned
+review from before three more tickets landed describes an older tree, and
+reusing it would archive work the close never read.
+
 **Can an effort archive with an unresolved finding?**
 No. The archive tool refuses while a finding lacks a disposition, naming the
 review artifact. That precondition lives in the tooling, so a model that
@@ -81,8 +96,9 @@ is the only path, and it is what sets the flag the archive reads.
 - An accepted follow-up receives the findings in its own `review.md`, while
   the origin's review artifact records the disposition and the follow-up
   slug.
-- The archive happens through `tw_archive_effort`, never the shell, and a
-  review with a pending finding makes the tool refuse.
+- The archive happens through `tw_archive_effort`, never the shell, a
+  review with a pending finding makes the tool refuse, the state pointer
+  stops naming the archived effort, and the move is committed.
 - The run ends with the completion report from the skill's
   `resources/report.md`: what archived, what needs the human, the next
   command, and one pointer, compact.

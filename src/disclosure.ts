@@ -15,9 +15,14 @@
 import { Type, type TSchema } from "typebox";
 
 /** Tools declared in every state, independent of the open set. */
-export const ALWAYS_DECLARED = ["tw_open", "tw_next"] as const;
+export const ALWAYS_DECLARED = ["tw_open", "tw_next", "tw_close"] as const;
 
-/** The closer: registered gated, disclosed by the opener, never declared idle. */
+/**
+ * The closer: declared in every state too, so a session that lost track of its
+ * open set gets a refusal from the tool itself ("'x' is not open") instead of
+ * a bare "Tool tw_close not found" from the harness. Its body refuses with the
+ * legal next call when nothing is open.
+ */
 export const CLOSER = "tw_close";
 
 /** Every tool the open/close engine itself manages. */
@@ -35,11 +40,11 @@ export interface SkillEntry {
    * Which phase precondition the opener evaluates before activating the
    * toolset. "none": no tree precondition (the front door, setup, and nested
    * disciplines). "effort": the named effort must be a live effort.
-   * Phase-specific gates name their own kind ("spec-ready",
+   * Phase-specific gates name their own kind ("spec-ready", "tickets-ready",
    * "implementation"). The evaluation lives in src/pi.ts, computed from the
    * artifact tree; this field is the registry's skill-to-precondition row.
    */
-  gate: "none" | "effort" | "spec-ready" | "implementation";
+  gate: "none" | "effort" | "spec-ready" | "tickets-ready" | "implementation";
 }
 
 /**
@@ -100,6 +105,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // the recorded artifacts behind it.
     toolset: [
       "tw_write_section",
+      "tw_write_task_note",
       "tw_finalize_map",
       "tw_frontier",
       "tw_dependency_levels",
@@ -130,7 +136,10 @@ export const SKILL_REGISTRY: SkillEntry[] = [
   {
     name: "to-tickets",
     takesTarget: false,
-    gate: "effort",
+    // The ticket-graph phase consumes a published spec, so the gate is
+    // tickets-ready: a live effort with a stable spec.md. Without it the
+    // phase that reads the spec could open before the spec existed.
+    gate: "tickets-ready",
     // The ticket-graph phase: produces the living architecture document and
     // the ticket graph from the settled spec. Creates tickets in dependency
     // order (tw_add_ticket validates blocked_by at creation), splits
@@ -186,6 +195,11 @@ export const SKILL_REGISTRY: SkillEntry[] = [
       "tw_get",
       "tw_list",
       "tw_write_ticket_note",
+      // The end-of-effort pass runs inside this phase: its architecture
+      // reconcile must be recorded (the reconciler child cannot reach the
+      // writer), and its advisory review needs a home in the effort tree.
+      "tw_write_architecture",
+      "tw_write_review",
     ],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-spec", "to-tickets", "finalize-effort"],
   },
@@ -286,38 +300,31 @@ export function conflictReason(skill: string, openSkill: string): string {
 }
 
 /**
- * The opener's parameter contract: a discriminated union on `skill`. An
- * effort-only open carries the effort; a target-carrying open (a ticket
- * open) carries the effort and the target. No phase passes a meaningless
- * target and no phase omits one it needs.
+ * The opener's parameter contract: a plain object with the skill, the effort,
+ * and an optional target. It is deliberately NOT a discriminated union on
+ * `skill`: a provider validates the union before the handler runs, so a
+ * missing target or an unknown skill came back as a TypeBox constant mismatch
+ * instead of the opener's own refusal naming the legal next call. The handler
+ * validates the shape at runtime (validateOpenArgs) and the phase gate decides
+ * whether a target is required, so every refusal reads.
  */
 export function buildOpenParameters(): TSchema {
-  // A TypeBox union serializes to a bare `anyOf` with no top-level `type`, and
-  // a strict OpenAI-compatible provider rejects a function schema that omits
-  // it (`schema must be a JSON Schema of 'type: "object"', got 'type: null'`).
-  // tw_open is declared in every state, so that rejection fails the whole
-  // request. Keep the union (validateOpenArgs backs it up at runtime) and
-  // declare the object type beside it.
-  return {
-    type: "object",
-    ...Type.Union(
-      SKILL_REGISTRY.map((entry) =>
-        Type.Object({
-          skill: Type.Literal(entry.name, { description: "The workflow skill to open" }),
-          effort: Type.String({ description: "The effort the skill works in" }),
-          ...(entry.takesTarget
-            ? { target: Type.String({ description: "The item the skill works on" }) }
-            : {}),
-        }),
-      ),
+  const openable = SKILL_REGISTRY.map((s) => s.name).join(", ");
+  return Type.Object({
+    skill: Type.String({ description: `The workflow skill to open: one of ${openable}` }),
+    effort: Type.String({ description: "The effort the skill works in" }),
+    target: Type.Optional(
+      Type.String({ description: "The item the skill works on; required only by a ticket open" }),
     ),
-  } as TSchema;
+  }) as TSchema;
 }
 
 /**
- * Runtime validation backing the union up, for a provider that flattens it
- * (TypeBox object schemas allow extra keys, so a flattened call can match a
- * union member it does not belong to). Throws with the precise mismatch.
+ * Runtime validation backing the parameters up, and the place the opener's
+ * argument-shape refusals live: an unknown skill names the openable set, a
+ * stray target names the skill that takes none. A missing target is not here:
+ * the phase gate owns that refusal, because it names the phase's legal next
+ * calls.
  */
 export function validateOpenArgs(args: { skill?: unknown; effort?: unknown; target?: unknown }): void {
   const entry = typeof args.skill === "string" ? skillEntry(args.skill) : undefined;

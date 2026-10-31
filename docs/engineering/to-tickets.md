@@ -36,7 +36,11 @@ the exception to vertical slicing: they run as **expand-contract**,
 expanding the new form beside the old, migrating call sites in batches, and
 contracting in a final ticket. One-ticket efforts are fine.
 
-The phase opens through `tw_open` (the opener is the gate) and is
+The phase opens through `tw_open` (the opener is the gate). That gate is
+`tickets-ready`: the effort is live and `spec.md` exists with status
+`stable`. Opening to-tickets before the spec is published is refused with
+`run to-spec` as the legal next call, so the phase that reads the spec cannot
+start before there is one. The skill is
 user-invoked: the model does not reach for it on its own.
 
 ## When to reach for it

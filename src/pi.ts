@@ -647,7 +647,8 @@ function activeAfterClose(active: string[], closing: SkillEntry, remaining: Set<
     for (const tool of skillEntry(name)?.toolset ?? []) stillNeeded.add(tool);
   }
   const removed = new Set(closing.toolset.filter((tool) => !stillNeeded.has(tool)));
-  if (remaining.size === 0) removed.add(CLOSER);
+  // The closer stays declared in every state, including idle: closing is how
+  // a lost open set is diagnosed, so the tool itself must never disappear.
   return active.filter((tool) => !removed.has(tool));
 }
 
@@ -854,6 +855,21 @@ function writeEffortRootArtifact(o: EffortRootWriteOptions): string {
 
 /** The ticket-doc section the implementation-notes writer owns. */
 const IMPLEMENTATION_NOTES_SECTION = "Implementation notes";
+
+/** The planning-task section the task-notes writer owns. */
+const PLANNING_NOTES_SECTION = "Notes";
+
+/**
+ * The two review passes and the file each writes. The finalize pass owns
+ * review.md and the archive flag; the end-of-effort pass is advisory and
+ * writes its own file, so the work that produces whole-effort findings and
+ * the phase that dispositions them both have a named artifact.
+ */
+const REVIEW_PASSES = ["finalize", "end-of-effort"] as const;
+type ReviewPass = (typeof REVIEW_PASSES)[number];
+function reviewPathFor(effortDir: string, pass: ReviewPass): string {
+  return join(effortDir, pass === "end-of-effort" ? "end-of-effort-review.md" : "review.md");
+}
 
 // ─── Review artifact helpers (finalize-effort) ─────────────────────────────
 
@@ -1224,6 +1240,35 @@ function phaseGate(
         return {
           reason: `the map of '${effort}' is not a readable artifact; the Wayfinder reconcile has not run`,
           legalNext: ["run wayfinder"],
+        };
+      }
+      return null;
+    }
+    case "tickets-ready": {
+      // to-tickets consumes the settled spec: a live effort with a spec.md
+      // that is published (stable). The spec phase's own gate owns the
+      // ready_for_spec flag; this one owns the artifact the next phase reads.
+      const missing = requireLiveEffort(root, effort);
+      if (missing !== null) return missing;
+      const specPath = directoryLeaf(liveEffortDir(root, effort)!, "spec");
+      if (specPath === null) {
+        return {
+          reason: `no spec in '${effort}': to-tickets consumes the settled specification`,
+          legalNext: ["run to-spec"],
+        };
+      }
+      try {
+        const status = parseArtifactFile(specPath).art.status;
+        if (status !== null && status !== "stable") {
+          return {
+            reason: `'${relative(root, specPath)}' has status '${status}', not stable: to-tickets consumes the published spec`,
+            legalNext: ["publish the spec through to-spec"],
+          };
+        }
+      } catch {
+        return {
+          reason: `'${relative(root, specPath)}' is not a readable artifact: rewrite it through to-spec`,
+          legalNext: ["run to-spec"],
         };
       }
       return null;
@@ -1693,6 +1738,20 @@ export function createTools(): Record<string, Tool> {
             `'## ${MAP_SECTION_NON_NEGOTIABLE_FACTS}' does not open with the bolded effort-level success-test line`,
           );
         }
+        // The map is done when the way is clear. A non-empty '## Fog' means
+        // decisions are still open, so handing off to the spec would push
+        // them into a phase whose boundary forbids settling them. Every fog
+        // line must be promoted to a task, folded into a canonical section,
+        // or recorded out of scope before the flag is set.
+        const fog = readMapSection(doc.body, "Fog");
+        const fogLines = (fog ?? []).map((line) => line.trim()).filter((line) => line !== "");
+        if (fogLines.length > 0) {
+          const preview = fogLines.slice(0, 3).join(" | ");
+          missing.push(
+            `'## Fog' still holds ${fogLines.length} open question(s): ${preview}` +
+              `; promote each to a planning task, fold it into a canonical section, or record it out of scope`,
+          );
+        }
         if (missing.length > 0) {
           throw new Error(
             `cannot finalize the map '${art.slug}'; ${missing.length} check(s) failed:\n- ${missing.join("\n- ")}`,
@@ -1846,6 +1905,13 @@ export function createTools(): Record<string, Tool> {
         follow_up: Type.Optional(
           Type.String({ description: "The accepted follow-up effort the findings move into" }),
         ),
+        pass: Type.Optional(
+          Type.Union([Type.Literal("finalize"), Type.Literal("end-of-effort")], {
+            description:
+              "Which review pass writes: 'finalize' (default) writes review.md and owns the archive flag; " +
+              "'end-of-effort' writes end-of-effort-review.md, the advisory review implement-ticket records",
+          }),
+        ),
       }),
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
@@ -1853,12 +1919,38 @@ export function createTools(): Record<string, Tool> {
         if (content === "") {
           throw new Error("content is empty: a review write needs the findings body");
         }
+        const pass: ReviewPass = p.pass === "end-of-effort" ? "end-of-effort" : "finalize";
         const effortDir = liveEffortDirOfArtifact(root, String(p.selector ?? ""), "review");
         if (effortDir === null) {
           throw new Error(
             `no live effort '${p.selector}': run finalize-effort on an existing effort's review`,
           );
         }
+        // The end-of-effort pass is advisory: it records findings and never
+        // dispositions them or moves them. Its file is a separate artifact so
+        // the finalize pass can read it and disposition every finding.
+        if (pass === "end-of-effort") {
+          if (p.follow_up !== undefined || p.findings !== undefined) {
+            throw new Error(
+              "the end-of-effort review pass is advisory: record findings only; disposition them with the " +
+                "finalize pass through tw_write_review",
+            );
+          }
+          const path = reviewPathFor(effortDir, pass);
+          const existing = isFile(path) ? parseArtifactFile(path).doc : undefined;
+          const givenTitle = typeof p.title === "string" && p.title.trim() !== "" ? p.title.trim() : undefined;
+          const title = givenTitle ?? `End-of-effort review of ${basename(effortDir)}`;
+          writeFileSync(
+            path,
+            dump({ data: { ...(existing?.data ?? {}), type: "review", title, pass }, body: `\n${content}\n` }),
+            "utf-8",
+          );
+          return outcome(`wrote ${relative(root, path)} (advisory end-of-effort pass)`, {
+            path: relative(root, path),
+            pass,
+          });
+        }
+        {
         const effortName = basename(effortDir);
         const findings = parseReviewFindings(p.findings);
         const followUp =
@@ -1917,7 +2009,7 @@ export function createTools(): Record<string, Tool> {
           );
         }
 
-        const reviewPath = join(effortDir, "review.md");
+        const reviewPath = reviewPathFor(effortDir, "finalize");
         const existing = isFile(reviewPath) ? parseArtifactFile(reviewPath).doc : undefined;
         const givenTitle = typeof p.title === "string" && p.title.trim() !== "" ? p.title.trim() : undefined;
         const existingTitle = typeof existing?.data.title === "string" ? existing.data.title : undefined;
@@ -1963,6 +2055,7 @@ export function createTools(): Record<string, Tool> {
           `wrote ${relative(root, reviewPath)} (dispositioned: ${dispositioned}${movedNote})`,
           { path: relative(root, reviewPath), dispositioned, movedTo: followUp },
         );
+        }
       },
     ),
 
@@ -2477,7 +2570,19 @@ export function createTools(): Record<string, Tool> {
           archived: [...indexNames(existing, "Archived"), effortKey],
         });
 
-        return `archived '${effortKey}' to ${relative(root, destDir)}; index updated (${relative(root, indexPath)})`;
+        // 4. The pointer: the archived effort is no longer the current map.
+        // Without this the stale pointer survives the close and every later
+        // read reports an archived effort as live.
+        const state = loadState(root);
+        const pointerNote =
+          state.map === effortKey
+            ? (() => {
+                saveState(root, { ...state, map: null, task: null });
+                return "; map pointer cleared";
+              })()
+            : "";
+
+        return `archived '${effortKey}' to ${relative(root, destDir)}; index updated (${relative(root, indexPath)})${pointerNote}`;
       },
     ),
 
@@ -2552,6 +2657,42 @@ export function createTools(): Record<string, Tool> {
         }
         writeFileSync(changelogPath, dump(doc), "utf-8");
         return `wrote ${relative(root, changelogPath)}: ${heading}`;
+      },
+    ),
+
+    tw_write_task_note: def(
+      "Write the '## Notes' section of a planning task doc: the named writer for the record a planning " +
+        "task leaves behind (a grilling's settled answers and rejected options, a research task's findings). " +
+        "Appends the note to the existing section, or replaces it with 'replace: true'. Built-in write and " +
+        "edit are refused under docs/tasks/, so this is the only legal path for a task body. Refuses an " +
+        "empty note, a selector that is not a planning task, and a task in an archived effort.",
+      {
+        selector: Str("Task slug or path"),
+        note: Str("The note text: the settled record the task leaves behind (markdown)"),
+        replace: OptBool,
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const note = typeof p.note === "string" ? p.note.trim() : "";
+        if (note === "") throw new Error("note is empty: a task note states the record it leaves behind");
+        const { path, art, doc } = resolveArt(root, p.selector);
+        if (art.type !== "task") {
+          throw new Error(
+            `'${p.selector}' is not a planning task (found type '${art.type}'): a ticket's notes go through ` +
+              `tw_write_ticket_note, a map section through tw_write_section`,
+          );
+        }
+        const treeRel = relative(taskRoot(root), path);
+        if (treeRel.split(/[\\/]/)[0] === "archive") {
+          throw new Error(
+            `'${p.selector}' is an archived task: a planning record belongs to a live effort`,
+          );
+        }
+        const existing = p.replace === true ? [] : readMapSection(doc.body, PLANNING_NOTES_SECTION) ?? [];
+        const content = existing.length > 0 ? [...existing, "", ...note.split("\n")].join("\n") : note;
+        doc.body = writeMapSection(doc.body, PLANNING_NOTES_SECTION, content);
+        writeFileSync(path, dump(doc), "utf-8");
+        return `wrote '## ${PLANNING_NOTES_SECTION}' in ${relative(root, path)}`;
       },
     ),
 
@@ -2807,7 +2948,8 @@ export function createTools(): Record<string, Tool> {
 
     tw_close: defStructured(
       "Close a named open workflow skill, removing the tools no other open skill still needs. " +
-        "Other open skills stay open. Refuses when the named skill is not open.",
+        "Declared in every state, including idle: closing a skill that is not open is refused with the " +
+        "legal next call instead of a missing-tool error. Other open skills stay open.",
       Type.Object({ skill: Type.String({ description: "The workflow skill to close" }) }),
       async (p, ctx) => {
         const entry = typeof p.skill === "string" ? skillEntry(p.skill) : undefined;
@@ -2821,10 +2963,18 @@ export function createTools(): Record<string, Tool> {
         const active = activeSet.get();
         const open = currentOpenSkills(ctx);
         if (!open.has(entry.name)) {
-          return outcome(`Refused: '${entry.name}' is not open.`, {
-            closed: false,
-            reason: `'${entry.name}' is not open`,
-          });
+          if (open.size === 0) {
+            return outcome(
+              `Refused: '${entry.name}' is not open; no workflow skill is open now, so close has nothing to ` +
+                `release. Legal next: open a phase with tw_open.`,
+              { closed: false, reason: `'${entry.name}' is not open`, open: [], legal_next: ["tw_open"] },
+            );
+          }
+          const still = [...open].sort().join(", ");
+          return outcome(
+            `Refused: '${entry.name}' is not open; open skills: ${still}. Legal next: close one of those.`,
+            { closed: false, reason: `'${entry.name}' is not open`, open: [...open] },
+          );
         }
         const remaining = new Set([...open].filter((name) => name !== entry.name));
         const next = activeAfterClose(active, entry, remaining);
@@ -2835,6 +2985,7 @@ export function createTools(): Record<string, Tool> {
           { closed: true, skill: entry.name, removed, active: next, open: [...remaining] },
         );
       },
+      { activeByDefault: true },
     ),
 
     tw_next: defStructured(
@@ -2874,8 +3025,9 @@ function lockdownReason(toolName: string, path: string): string {
     `the built-in ${toolName} is refused on that tree. Scratch and evidence are exempt: ` +
     `**/.work/** (the uncertainty stop) and **/deviation-reports/** (the deviation report). ` +
     `Use the matching tw_* tool for this change: a ticket doc's implementation notes go through ` +
-    `tw_write_ticket_note, a map section through tw_write_section, the changelog through ` +
-    `tw_write_changelog.`
+    `tw_write_ticket_note, a planning task's record through tw_write_task_note, a map section through ` +
+    `tw_write_section, the changelog through tw_write_changelog. An onboarding run is not locked: ` +
+    `the guard starts applying once state.yaml carries schema_version.`
   );
 }
 
@@ -2896,13 +3048,31 @@ const LOCKDOWN_EXEMPT_SEGMENTS = new Set([".work", "deviation-reports"]);
  * containment check, so `..` traversal cannot slip past and a sibling directory
  * such as `docs/tasks-archive` does not match.
  */
+/**
+ * True when the tree carries the schema stamp. The guard protects an
+ * initialized tree; before the stamp exists there is no schema to protect and
+ * onboarding has no named writer for the tree it creates, so a bootstrap write
+ * is legal by design (the setup-workflow onboard branch writes state.yaml
+ * first, after which every writer below is locked).
+ */
+function stateIsStamped(root: string): boolean {
+  try {
+    const raw = readYaml(join(taskRoot(root), "state.yaml")) as Record<string, unknown> | null;
+    return raw !== null && typeof raw === "object" && typeof raw.schema_version === "number";
+  } catch {
+    return false;
+  }
+}
+
 function isTaskTreePath(path: string, cwd: string): boolean {
   const resolved = resolvePath(cwd, path);
-  const tree = taskRoot(findRoot(cwd));
+  const root = findRoot(cwd);
+  const tree = taskRoot(root);
   const rel = relative(tree, resolved);
   if (rel !== "" && (rel.startsWith("..") || isAbsolute(rel))) return false;
   const segments = rel.split(/[\\/]/).filter((s) => s !== "" && s !== ".");
   if (segments.some((segment) => LOCKDOWN_EXEMPT_SEGMENTS.has(segment))) return false;
+  if (!stateIsStamped(root)) return false;
   return true;
 }
 
@@ -3072,7 +3242,12 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.notify("pi-subagents is not installed. Install it with: pi install npm:pi-subagents", "warning");
     }
     if (!tools.some((t) => t.name === "submit_feedback")) {
-      ctx.ui.notify("pi-telemetry is not installed. Install it with: pi install git:github.com/Y4shin/pi-telemetry@v0.4.0", "warning");
+      ctx.ui.notify(
+        "pi-telemetry is not installed. The shipped subagents list submit_feedback in their tools allowlist, " +
+          "and pi-subagents fails a child whose allowlisted tool is unavailable, so the ticket chain will not " +
+          "launch. Install it with: pi install git:github.com/Y4shin/pi-telemetry@v0.4.0",
+        "warning",
+      );
     }
   });
 

@@ -94,7 +94,13 @@ function gateTask() {
 }
 
 function verdict(receipt, marker) {
-  return receipt.ok && typeof receipt.output === "string" && receipt.output.trimStart().startsWith(marker);
+  if (!receipt || receipt.ok !== true) return false;
+  const text = typeof receipt.output === "string" ? receipt.output : "";
+  // The marker is checked as a line anywhere in the child's output, not as the
+  // literal first characters of it: a child that prefixes a status line still
+  // expressed the verdict, and one run in the lifecycle rehearsal returned its
+  // summary instead of the marker, which the caller then retried.
+  return text.split("\n").some((line) => line.trim().startsWith(marker));
 }
 
 function featureTddTask() {
@@ -160,11 +166,26 @@ function landTask(tddRef, verifyRef) {
 const gate = await runs.run("gate", {
   agent: "implement-preconditions",
   label: "Check " + args.ticket + " preconditions",
+  timeoutMs: 300000,
   gate: "test -f " + args.ticketPath,
   task: gateTask()
 });
-if (!verdict(gate, "VERDICT: PASS")) {
-  return { ok: false, ticket: args.ticket, subtype, failed: "gate", step: gate, refs: {} };
+let gateReceipt = gate;
+if (gate.ok === true && !verdict(gate, "VERDICT: PASS")) {
+  // The child finished but did not state its verdict line. One re-dispatch is
+  // the designed move (a gate refusal is not a worker failure and the failure
+  // toolbelt never applies), and it keeps a single stray completion from
+  // stopping the phase while the caller digs through harness internals.
+  gateReceipt = await runs.run("gate-retry", {
+    agent: "implement-preconditions",
+    label: "Re-check " + args.ticket + " preconditions",
+    timeoutMs: 300000,
+    gate: "test -f " + args.ticketPath,
+    task: gateTask()
+  });
+}
+if (!verdict(gateReceipt, "VERDICT: PASS")) {
+  return { ok: false, ticket: args.ticket, subtype, failed: "gate", step: gateReceipt, refs: {} };
 }
 
 // Step 1: tdd-worker implements the ticket on the working branch
@@ -181,8 +202,7 @@ const tdd = await runs.run("tdd", {
   output: "tdd-" + args.ticket + "/result.md",
   gate: "test ! -f " + args.ticketPath.replace(/ticket\.md$/, "") + ".work/uncertainty.md && git rev-parse --verify refs/heads/ticket/" + args.ticket,
   task: subtype === "bug" ? bugTddTask() : featureTddTask()
-});
-const refs = { tdd: tdd.outputReference || tdd.output };
+});const refs = { tdd: tdd.outputReference || tdd.output };
 if (!tdd.ok) {
   return { ok: false, ticket: args.ticket, subtype, failed: "tdd", step: tdd, refs };
 }
@@ -195,6 +215,8 @@ if (subtype === "feature") {
       key: "verify",
       agent: "slice-verifier",
       label: "Verify " + args.ticket,
+      // A hung child must fail its own step, not eat the ticket's whole budget.
+      timeoutMs: 900000,
       output: "verify-" + args.ticket + "/result.md",
       task: verifyTask(refs.tdd)
     },
@@ -202,6 +224,7 @@ if (subtype === "feature") {
       key: "deviation",
       agent: "deviation-reporter",
       label: "Report " + args.ticket + " deviations",
+      timeoutMs: 900000,
       output: "deviation-" + args.ticket + "/result.md",
       gate: "test -f " + args.ticketPath.replace(/ticket\.md$/, "") + "deviation-reports/" + args.ticket + ".md",
       task: deviationTask(refs.tdd)
@@ -219,6 +242,7 @@ if (subtype === "feature") {
   const verify = await runs.run("verify", {
     agent: "slice-verifier",
     label: "Verify " + args.ticket,
+    timeoutMs: 900000,
     output: "verify-" + args.ticket + "/result.md",
     task: verifyTask(refs.tdd)
   });
@@ -235,6 +259,7 @@ if (subtype === "feature") {
 const land = await runs.run("land", {
   agent: "land-worker",
   label: "Land " + args.ticket,
+  timeoutMs: 900000,
   output: "land-" + args.ticket + "/result.md",
   gate: "git rev-parse --verify refs/heads/task/" + args.ticket,
   task: landTask(refs.tdd, refs.verify)

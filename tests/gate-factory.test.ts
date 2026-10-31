@@ -75,6 +75,7 @@ const GATED_NAMES = [
   "tw_write_architecture",
   "tw_write_changelog",
   "tw_write_review",
+  "tw_write_task_note",
   "tw_write_ticket_note",
   "notify_user",
 ];
@@ -145,6 +146,10 @@ function setupPersonalRepo(): string {
   globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
   process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
   const repo = makeRepo("https://github.com/Y4shin/skills.git");
+  // An initialized tree: the lockdown protects it. The bootstrap exemption
+  // (an unstamped tree) has its own test.
+  mkdirSync(join(repo, "docs", "tasks"), { recursive: true });
+  writeFileSync(join(repo, "docs", "tasks", "state.yaml"), "schema_version: 5\nmap: null\ntask: null\n");
   process.chdir(repo);
   return repo;
 }
@@ -318,7 +323,13 @@ describe("factory gate", () => {
 
     const messages = stub.notifications.map((n) => n.message);
     expect(messages).toContain("pi-subagents is not installed. Install it with: pi install npm:pi-subagents");
-    expect(messages).toContain("pi-telemetry is not installed. Install it with: pi install git:github.com/Y4shin/pi-telemetry@v0.4.0");
+    // The warning names why the chain cannot run without it: the shipped
+    // agents list submit_feedback, and an allowlisted-but-unavailable tool
+    // fails the child at launch.
+    const telemetry = messages.find((m) => m.startsWith("pi-telemetry is not installed."));
+    expect(telemetry).toBeDefined();
+    expect(telemetry).toContain("pi install git:github.com/Y4shin/pi-telemetry@v0.4.0");
+    expect(telemetry).toMatch(/allowlist/);
   });
 
   test("detection throw falls open and registers all tools", async () => {
@@ -576,19 +587,21 @@ describe("factory gate", () => {
   });
 
   describe("disclosure registration", () => {
-    test("the dispatcher pair registers always-declared; every other workflow tool registers gated", () => {
+    test("the dispatcher trio registers always-declared; every other workflow tool registers gated", () => {
       setupPersonalRepo();
       const stub = createStub();
       factory(stub);
 
       const byName = new Map(stub.tools.map((t: any) => [t.name, t]));
-      for (const name of ["tw_open", "tw_next"]) {
+      for (const name of ["tw_open", "tw_next", "tw_close"]) {
         expect(byName.get(name)?.defaultActive, `${name} is declared in every state`).toBe(true);
         expect(byName.get(name)?.exposure, `${name} is direct`).toBe("direct");
       }
       // The bypass-free combination the prototype proved: direct (never
       // reachable through tool_search) and off until the opener activates it.
-      for (const name of GATED_NAMES.filter((n) => n.startsWith("tw_") && n !== "tw_open" && n !== "tw_next")) {
+      for (const name of GATED_NAMES.filter(
+        (n) => n.startsWith("tw_") && !["tw_open", "tw_next", "tw_close"].includes(n),
+      )) {
         expect(byName.get(name)?.defaultActive, `${name} is off until an opener activates it`).toBe(false);
         expect(byName.get(name)?.exposure, `${name} is direct, never deferred`).toBe("direct");
       }
@@ -781,5 +794,25 @@ describe("factory gate", () => {
         expect(result, `${toolName} '${path}' must pass the guard unblocked`).toBeUndefined();
       }
     });
+  });
+});
+
+describe("write lockdown bootstrap exemption", () => {
+  test("an unstamped tree is not locked, so onboarding can create it", async () => {
+    globalSettings = makeGlobalSettings([]);
+    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
+    const repo = makeRepo("https://github.com/Y4shin/skills.git");
+    // No docs/tasks/state.yaml yet: there is no schema to protect.
+    mkdirSync(join(repo, "docs", "tasks"), { recursive: true });
+    process.chdir(repo);
+
+    const stub = createStub();
+    factory(stub);
+    const handlers = stub.handlers["tool_call"];
+    const result = await handlers[0](
+      { type: "tool_call", toolCallId: "bootstrap-1", toolName: "write", input: { path: "docs/tasks/state.yaml", content: "schema_version: 5\n" } },
+      { cwd: repo, ui: stub.ui },
+    );
+    expect(result, "an onboard write is legal before the stamp exists").toBeUndefined();
   });
 });

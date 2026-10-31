@@ -34,7 +34,6 @@ afterEach(() => { while (sessions.length) sessions.pop()?.dispose(); });
 
 /** The workflow tools that stay closed until an opener activates them. */
 const GATED_WORKFLOW_TOOLS = [
-  "tw_close",
   "tw_show",
   "tw_get",
   "tw_list",
@@ -49,7 +48,8 @@ const GATED_WORKFLOW_TOOLS = [
 ];
 
 /** The declared set idle: exactly the dispatcher pair on the workflow surface. */
-const IDLE_WORKFLOW = ["tw_open", "tw_next"];
+// The closer is idle-declared too, so a lost open set is diagnosable.
+const IDLE_WORKFLOW = ["tw_open", "tw_next", "tw_close"];
 
 /**
  * A fixture effort the opener's gate can resolve: map with the flag set, a
@@ -273,7 +273,7 @@ describe("disclosure core: transcript persistence", () => {
     expect(preOpen, "the transcript records a leading system message").toBeTruthy();
     if (preOpen!.id !== leaf) await s.session.navigateTree(preOpen!.id);
     const branched = s.session.getActiveToolNames();
-    expect(branched).not.toContain("tw_close");
+    expect(branched).toContain("tw_close");
     expect(branched).not.toContain("tw_frontier");
 
     // Back to the leaf where tw_open ran: the working set is restored.

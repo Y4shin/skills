@@ -16,8 +16,12 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { dump } from "../src/core/frontmatter.js";
 import { createTools } from "../src/pi.js";
 
-/** The idle declared set: what registration leaves active before any open. */
-const IDLE = ["tw_open", "tw_next"];
+/**
+ * The idle declared set: what registration leaves active before any open. The
+ * closer is in it, so a session that lost track of its open set gets a refusal
+ * from tw_close itself instead of a harness "Tool not found".
+ */
+const IDLE = ["tw_open", "tw_next", "tw_close"];
 
 let repo: string;
 
@@ -39,6 +43,11 @@ beforeAll(() => {
     writeFileSync(
       join(dir, "arch-spec.md"),
       dump({ data: { type: "arch spec", title: `Fixture ${slug} architecture`, status: "stable" }, body: "\n" }),
+      "utf-8",
+    );
+    writeFileSync(
+      join(dir, "spec.md"),
+      dump({ data: { type: "spec", title: `Fixture ${slug} spec`, status: "stable" }, body: "\n" }),
       "utf-8",
     );
     mkdirSync(join(dir, "tickets", "fixture-ticket"), { recursive: true });
@@ -125,7 +134,7 @@ describe("disclosure core: tw_open", () => {
     expect(next.text).toContain("to-spec");
     await tools.tw_close.execute({ skill: "to-spec" }, ctx);
     expect(active).toEqual(expect.arrayContaining([...IDLE]));
-    for (const tool of ["tw_close", "tw_write_spec", "tw_get", "tw_list"]) {
+    for (const tool of ["tw_write_spec", "tw_get", "tw_list"]) {
       expect(active, `${tool} must leave the declared set when to-spec closes`).not.toContain(tool);
     }
   });
@@ -155,7 +164,9 @@ describe("disclosure core: tw_open", () => {
     expect(first).toEqual(afterWayfinder);
 
     // The reversed order must refuse symmetrically: exclusivity is a
-    // symmetric data table, so the check is order-independent.
+    // symmetric data table, so the check is order-independent. The fixture
+    // carries a stable spec so to-tickets' own gate passes and the conflict
+    // is what refuses, not an earlier precondition.
     const second = [...IDLE];
     const secondCtx = disclosureCtx(second);
     await tools.tw_open.execute({ skill: "to-tickets", effort: "e" }, secondCtx);
@@ -237,10 +248,11 @@ describe("disclosure core: tw_open", () => {
     await tools.tw_open.execute({ skill: "wayfinder", effort: "e" }, ctx);
     await tools.tw_close.execute({ skill: "wayfinder" }, ctx);
 
-    // The workflow part of the declared set is idle again: no toolset, no
-    // closer, exactly the dispatcher pair.
-    expect(active).toEqual(expect.arrayContaining(["tw_open", "tw_next"]));
-    for (const tool of ["tw_close", "tw_frontier", "tw_list", "tw_write_section", "tw_get"]) {
+    // The workflow part of the declared set is idle again: no toolset. The
+    // dispatcher trio stays, closer included, so a lost open set can still be
+    // diagnosed.
+    expect(active).toEqual(expect.arrayContaining([...IDLE]));
+    for (const tool of ["tw_frontier", "tw_list", "tw_write_section", "tw_get"]) {
       expect(active).not.toContain(tool);
     }
   });

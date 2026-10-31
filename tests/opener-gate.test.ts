@@ -666,7 +666,9 @@ describe("the opener gate", () => {
     )) as ToolResult;
     expect(conflict.details.opened).toBe(false);
     expect(conflict.details.legal_next).toEqual(["tw_close wayfinder"]);
-    expect(second).toEqual([...ALWAYS_DECLARED, "tw_close", ...SKILL_REGISTRY.find((e) => e.name === "wayfinder")!.toolset].sort());
+    expect(second).toEqual(
+      [...new Set([...ALWAYS_DECLARED, ...SKILL_REGISTRY.find((e) => e.name === "wayfinder")!.toolset])].sort(),
+    );
   });
 });
 
@@ -691,6 +693,7 @@ describe("the phase-to-toolset registry", () => {
         "tw_state",
         "tw_state_set",
         "tw_write_section",
+        "tw_write_task_note",
       ],
       "to-spec": ["tw_get", "tw_list", "tw_write_spec"],
       // The signature tool is the architecture writer: to-tickets-architecture
@@ -709,7 +712,9 @@ describe("the phase-to-toolset registry", () => {
         "tw_split_ticket",
         "tw_state",
         "tw_state_set",
+        "tw_write_architecture",
         "tw_write_changelog",
+        "tw_write_review",
         "tw_write_ticket_note",
       ],
       // tw_archive_effort stays the private signature tool; the review writer

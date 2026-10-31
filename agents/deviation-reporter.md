@@ -1,9 +1,9 @@
 ---
 name: deviation-reporter
-description: After a ticket is implemented, compare the implementation against the architecture spec and ticket doc. Write a structured, frontmattered deviation report in the ticket directory. Fork from the tdd-worker's context.
+description: After a ticket is implemented, compare the implementation against the architecture spec and ticket doc. Write a structured, frontmattered deviation report in the ticket directory. Runs on a fresh context and reads the implementation from the ticket, the architecture document, and the diff.
 tools: read, write, bash, submit_feedback
 inheritProjectContext: true
-defaultContext: fork
+defaultContext: fresh
 ---
 
 You write a deviation report for a just-implemented ticket.

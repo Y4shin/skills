@@ -1468,6 +1468,9 @@ const SURVIVING_TOOLS = new Set([
   // end-of-effort-reconciliation: the ticket doc's implementation-notes
   // writer, the named replacement for the built-in edit on a ticket.
   "tw_write_ticket_note",
+  // lifecycle-hardening: the planning task's record writer, the named
+  // replacement for the shell append the grilling resource needed.
+  "tw_write_task_note",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -2667,6 +2670,12 @@ describe("chain agents v4 (overhaul-execution-skills)", () => {
 
   test("deviation-reporter writes frontmattered reports to the ticket directory", () => {
     const content = readFile("agents/deviation-reporter.md");
+    // A forked context is the caller's (the orchestrator's), not the
+    // tdd-worker's, so this agent must run fresh and read the implementation
+    // from the ticket, the architecture, and the diff.
+    const fm = parseFrontmatter(content);
+    expect(String(fm.defaultContext)).toBe("fresh");
+    expect(content).not.toMatch(/Fork from the tdd-worker/);
     expect(content).toMatch(/deviation-reports/);
     expect(content).toMatch(/task\/<ticket-slug>\.\.ticket\/<ticket-slug>/);
     const templates = extractFrontmatterTemplates(content);

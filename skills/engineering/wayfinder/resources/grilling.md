@@ -33,10 +33,12 @@ The task body must state:
 Delegate the session to the `grilling` skill: it owns the interview method,
 and this resource does not restate it. Work inside the grilling skill's
 completion gate: the session ends only on its explicit shared-understanding
-confirmation. Record the user's answers in the task body in the user's terms,
-with the rejected options, constraints, and consequences for dependent tasks.
-Never answer for the user, and never settle a required human decision by
-assuming it.
+confirmation. Record the user's answers in the task body through
+`tw_write_task_note` (the named writer of a planning task's `## Notes`
+section; built-in write and edit are refused under `docs/tasks/`), in the
+user's terms, with the rejected options, constraints, and consequences for
+dependent tasks. Never answer for the user, and never settle a required human
+decision by assuming it.
 
 ## Write back, then mark done
 
@@ -51,7 +53,7 @@ remains; use `tw_mark_blocked` instead.
 
 ## Completion evidence
 
-The task must contain:
+The task must contain, in its `## Notes` section:
 
 - the final decision in the user's terms;
 - important alternatives considered;

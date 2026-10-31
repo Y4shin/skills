@@ -42,6 +42,11 @@ Scaffold everything a repo needs to use the task-workflow:
    `docs/bugs/` is a static archive in schema 5, so a fresh repo gets none and
    an existing archive is left exactly where it is.
 
+   The `docs/tasks/` write lockdown exempts an unstamped tree: until
+   `state.yaml` carries `schema_version`, there is no schema to protect, so the
+   onboarding run may create these files directly. Write the state file in
+   step 2 and every later write is locked.
+
 2. Write `docs/tasks/state.yaml` (the v5 shape: two real-null pointers plus
    the stamp):
    ```yaml
@@ -84,7 +89,6 @@ Scaffold everything a repo needs to use the task-workflow:
 
 9. Write `docs/agents/README.md` (per-repo config the skills read, seeded
    minimal; the skills populate it over time).
-
 10. Write `docs/tasks/out-of-scope/index.md` (the rejected-requests KB;
     explains its purpose).
 

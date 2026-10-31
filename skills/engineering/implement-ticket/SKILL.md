@@ -237,6 +237,10 @@ separate bash block.
    tw_state_set task null   # Pi tool, not a shell command
    ```
 
+   The pointer file is tracked, so it is committed with the note in step 8:
+   never leave `docs/tasks/state.yaml` dirty across the next chain's
+   checkout.
+
 8. **Merge the landing branch into the effort's branch** (shell, safe under
    `set -e`), where `<effort-branch>` is the branch the previous ticket
    landed on, not the literal `main` unless `main` is that branch:
@@ -245,7 +249,9 @@ separate bash block.
    `tw_write_ticket_note` (selector: the ticket doc, note: its
    `## Implementation note`), while the landing branch is checked out, and
    commit it there: `git add docs/tasks/ && git commit -m "docs(ticket):
-   note {ticketSlug}"`. The worker cannot: its session has no phase open.
+   note {ticketSlug}"`. The `git add docs/tasks/` covers the note and the
+   `state.yaml` pointer cleared in step 7, so both land in this commit. The
+   worker cannot write the note: its session has no phase open.
 
    ```bash
    set -e
@@ -306,8 +312,18 @@ runId = subagent({
 result = <the workflow's return: { ok, failed?, step?, reviewOk?, refs }>
 ```
 
-- The review is advisory: read `result.refs.review` and surface its
-  findings to the user. It does not gate landing or the close-out.
+- The review is advisory: read `result.refs.review`, surface its findings to
+  the user, and record them in the effort tree through `tw_write_review`
+  with `pass: "end-of-effort"`, which writes
+  `docs/tasks/<effort>/end-of-effort-review.md`. That file is the landing
+  place finalize-effort's triage reads; a review that only lives in a run
+  artifact is never dispositioned. It does not gate landing or the
+  close-out.
+- The reconcile's output is `result.refs.spec`; the reconciler child cannot
+  write `docs/tasks/`, so record the reconciled document through
+  `tw_write_architecture` (this phase holds the writer) before the close-out
+  report. A reconcile that is never recorded leaves the living architecture
+  document stale.
 - On `result.failed == "suite"`: emergent cross-ticket breakage. Add the
   failures to the inconsistencies list and relaunch the workflow with
   `review: false` (the review already ran). Large, ambiguous, or

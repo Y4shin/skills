@@ -26,6 +26,10 @@ resources live at `skills/engineering/wayfinder/resources/`.
 Every planning task writes its own results back to the map through
 `tw_write_section` as its final step, before it marks itself done with
 `tw_mark_done`; the done-marking refuses until the map references the task.
+The record the task leaves in its own body (a grilling's settled answers and
+rejected options, a research task's findings) goes through
+`tw_write_task_note`, the named writer of a planning task's `## Notes`
+section.
 When the ready frontier empties, the pass runs the reconcile: it verifies
 each done task's recorded results against the map, fixes what is missing
 through the writer, and sets the ready flag through `tw_finalize_map`, the
@@ -58,7 +62,11 @@ map straight into implementation throws the linked detail away.
 **What is "fog"?**
 Questions that are in scope but not yet sharp enough to become tasks. They
 sit in the map's Fog section instead of being invented into speculative
-tasks, and graduate as they sharpen.
+tasks, and graduate as they sharpen. Fog must be empty before the map
+finalizes: `tw_finalize_map` refuses while any fog line remains, because a
+question left there is a decision the spec phase would have to settle, and
+its boundary forbids that. Promote each line into a planning task, fold it
+into a canonical section, or record it out of scope.
 
 **What happens when the ready frontier is empty?**
 The pass reconciles instead of ending idle: it verifies the map against the
@@ -82,8 +90,10 @@ a designed-for escape hatch, and it is recorded when it fires.
   tasks, at most one grilling, then release.
 - Results land in the map through `tw_write_section` write-backs that
   reference their task, and `tw_mark_done` accepts them.
-- An empty frontier ends in `tw_finalize_map` setting the ready flag, and
-  `/skill:to-spec` opens on that flag alone.
+- An empty frontier ends in `tw_finalize_map` setting the ready flag, with
+  Fog empty, and `/skill:to-spec` opens on that flag alone.
+- Each grilling's record is in its task's `## Notes` section, written
+  through `tw_write_task_note` rather than a shell append.
 - The pass ends with the completion report from the skill's
   `resources/report.md`: what the pass changed, what needs you, the next
   command, and one pointer to the map.
