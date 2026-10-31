@@ -54,8 +54,8 @@ are the only writers of the tree.
   `tw_write_ticket_note` replaces or appends the `## Implementation notes`
   section of a live-effort ticket, so a landing note needs no `edit` on the
   tree. The landing worker reports the note and the phase that owns the tool
-  writes it: an agent session has no opener, and pi-subagents refuses a gated
-  `tw_*` name in an agent's `tools:` allowlist.
+  writes it, so the write never depends on a child session loading this
+  extension: an allowlisted tool name does not load extension code.
 
 **Residual risk, accepted and documented:** a model that insists can still
 mutate the tree through `bash` (`rm`, `git`, `python -c`, and so on), because

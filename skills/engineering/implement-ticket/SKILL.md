@@ -93,9 +93,9 @@ it once per ticket with `async: true` and the ticket's parameters as
 `args`, and it owns the preconditions gate, the step order, the ok-gates,
 and the per-step output bindings. The land-worker reports the landing note
 in its output and the phase writes it through `tw_write_ticket_note`, the
-named writer for a ticket doc: an agent runs in its own session with no
-phase open, so the opener gated tools are not available there and the note a
-worker composes is written by the phase that owns the tool. Each child task is composed from identity
+named writer for a ticket doc. The phase writes it rather than the worker: an
+agent's `tools:` allowlist does not load the extension that registers the
+writer, so a worker would need this package loaded in its own child session. Each child task is composed from identity
 and pointers only; procedure lives in the agent definitions and the tdd /
 diagnosing-bugs skills, and the caller never authors worker prompts. The
 gate is the read-only `implement-preconditions` agent: it refuses to launch

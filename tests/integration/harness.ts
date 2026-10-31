@@ -97,9 +97,10 @@ export interface TaskSessionOptions {
   /**
    * The active-tool allowlist for the session. Naming a declarable tool
    * activates it even when it is `defaultActive: false`, so this is the seam
-   * that proves a gated writer is reachable without an opener. Note that
-   * pi-subagents does not route an agent's `tools:` frontmatter through this
-   * seam: it refuses a gated `tw_*` name as a child tool it cannot supply.
+   * that proves a gated writer is reachable without an opener once the
+   * extension is loaded in the session. An agent's `tools:` frontmatter adds a
+   * second condition pi-subagents applies before this seam: the extension that
+   * registers the named tool must itself load in the child.
    */
   tools?: string[];
 }

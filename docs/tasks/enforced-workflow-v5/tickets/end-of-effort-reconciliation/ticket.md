@@ -235,11 +235,13 @@ three options, and the experiment failed. `tw_write_ticket_note` is registered
 gated and disclosed to `implement-ticket`, and `land-worker`'s `tools:`
 allowlist briefly named it on the assumption that pi-core's registry refresh
 activates a declarable tool a session allowlists. pi core does that for a
-session the extension is loaded into, which the integration test pins, but
-pi-subagents reads an agent's `tools:` frontmatter through its own loader and
-refuses a gated `tw_*` name as an unavailable child tool: the landing run was
-reported failed and the tool was dropped. The mechanism the ticket chose does
-not exist on the agent path.
+session the extension is loaded into, which the integration test pins. The
+landing run then failed with "requested unavailable child tools", which an
+isolated probe traced to the session, not to the agent path: with this package
+as the only package a background child reached the writer and wrote the note,
+and with every package except this one the identical agent failed with the same
+message. An agent's `tools:` allowlist simply does not load extension code, and
+this session never had this package loaded at all.
 
 The correction keeps the one-writer decision and moves the write to the phase
 that owns the tool. `land-worker`'s allowlist is `read, bash, submit_feedback`

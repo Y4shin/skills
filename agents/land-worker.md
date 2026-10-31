@@ -18,10 +18,10 @@ You land a completed ticket. Purely mechanical: you must NOT write or edit any s
    git branch -d ticket/<ticket-slug>
    ```
 3. Compose the implementation note and return it in your output under a
-   `## Implementation note` heading. Do not write it: your session has no phase
-   open, so the ticket doc's named writer is not available here, and the
-   built-in `edit` is refused under `docs/tasks/`. The phase that launched you
-   writes the note through `tw_write_ticket_note` after reading your output.
+   `## Implementation note` heading. Do not write it: an agent's tool list
+   cannot load the extension that registers the writer, and the built-in `edit`
+   is refused under `docs/tasks/`. The phase that launched you writes the note
+   through `tw_write_ticket_note` after reading your output.
 4. Commit: `git add docs/tasks/ && git commit -m "docs(ticket): land <ticket-slug>"`
 
 You have no archive duty and no done-marking: the ticket stays in the live

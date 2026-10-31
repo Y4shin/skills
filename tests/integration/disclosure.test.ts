@@ -398,12 +398,14 @@ describe("disclosure core: telemetry absorption", () => {
 // because it is the mechanism a future feature would use for a session that
 // must write one artifact and open nothing.
 //
-// It is NOT the mechanism a subagent uses. An agent's `tools:` frontmatter is
-// read by pi-subagents' own loader, which refuses a gated `tw_*` name as an
-// unavailable child tool (observed on `land-worker` requesting
-// `tw_write_ticket_note`: the run is failed and the tool is dropped). That is
-// why no agent names a gated tool and why the phase writes the ticket doc's
-// implementation note; `tests/skills.test.ts` pins the agent side.
+// An agent reaches such a tool only when the extension that registers it is
+// loadable in the child: an allowlisted name never loads extension code
+// (`pi-subagents` docs, "Tool and extension selection"). A background child
+// loads ambient extensions so an installed package's tools resolve, but a
+// foreground child loads none, and a path given only by the parent's `-e` flag
+// is not replayed into either. This repo keeps every `docs/tasks/**` write in
+// the phase that owns the named writer, so no agent depends on child extension
+// loading at all; `tests/skills.test.ts` pins the agent side.
 
 describe("disclosure core: a session's tool allowlist activates a gated writer", () => {
   let sessions: TaskSession[] = [];
