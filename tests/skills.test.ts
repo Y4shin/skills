@@ -2766,34 +2766,40 @@ describe("planning resources v4 touch (overhaul-execution-skills)", () => {
 // close-out tests above pin the SKILL.md sequence; these pin the resources'
 // close-out sections and the one-owner rule across the surface.
 describe("the inlined per-ticket close-out (implement-ticket-skill)", () => {
+  // One close-out, one home: the sequence lives in SKILL.md's Step 2 and the
+  // two resources point at it (end-of-effort-reconciliation collapsed the
+  // three copies, which had already drifted).
+  const skill = readFile("skills/engineering/implement-ticket/SKILL.md");
+
+  test("the canonical close-out carries every step, including the dropped details", () => {
+    expect(skill).not.toContain("tw_set");
+    expect(skill).toMatch(/tw_mark_done/);
+    expect(skill).toMatch(/one owner/i);
+    expect(skill).toContain("tw_finalizable <ticket-slug>");
+    expect(skill).toMatch(/anomal/i);
+    expect(skill).toMatch(/tw_state_set task null/);
+    expect(skill).not.toMatch(/tw_state_set slice/);
+    expect(skill).toMatch(/tw_write_changelog/);
+    expect(skill).toMatch(/writer of `docs\/tasks\/CHANGELOG\.md`/);
+    expect(skill).toMatch(/CI gate/i);
+    expect(skill).toMatch(/red branch/i);
+    expect(skill).toMatch(/git merge --no-ff task\/<ticket-slug>/);
+    // The source of the harvest notes: the feature copy had dropped it.
+    expect(skill).toMatch(/all deviation reports/);
+    expect(skill).toMatch(/combined diff/);
+  });
+
   for (const kind of ["feature", "bug"]) {
     const content = readFile(`skills/engineering/implement-ticket/resources/${kind}/autonomous.md`);
 
-    test(`the ${kind} close-out marks done through tw_mark_done and verifies with tw_finalizable`, () => {
-      expect(content).not.toContain("tw_set");
-      expect(content).toMatch(/tw_mark_done/);
-      expect(content).toMatch(/one owner/i);
-      expect(content).toContain("tw_finalizable <ticket-slug>");
-      expect(content).toMatch(/anomal/i);
-    });
-
-    test(`the ${kind} close-out clears the task pointer; the slice pointer is not called`, () => {
-      expect(content).toMatch(/tw_state_set task null/);
-      expect(content).not.toMatch(/tw_state_set slice/);
-    });
-
-    test(`the ${kind} close-out writes the changelog through the only writer`, () => {
-      expect(content).toMatch(/tw_write_changelog/);
-      expect(content).toMatch(/writer of `docs\/tasks\/CHANGELOG\.md`/);
-    });
-
-    test(`the ${kind} close-out gates on the CI check and never merges a red branch`, () => {
-      expect(content).toMatch(/CI gate/i);
-      expect(content).toMatch(/red branch/i);
-    });
-
-    test(`the ${kind} close-out merges the landing branch into main with --no-ff`, () => {
-      expect(content).toMatch(/git merge --no-ff task\/<ticket-slug>/);
+    test(`the ${kind} resource points at the one close-out instead of copying it`, () => {
+      expect(content).toMatch(/close-out sequence has one home/i);
+      expect(content).toMatch(/SKILL\.md/);
+      // It still names the steps so a reader knows what it is delegating, but
+      // it does not re-teach them with their own numbered sequence.
+      expect(content).not.toMatch(/\*\*CI gate/);
+      expect(content).not.toMatch(/git merge --no-ff task\/<ticket-slug>/);
+      expect(content).not.toMatch(/git add -A && git commit -m "docs\(ticket\): harvest/);
     });
   }
 
@@ -3576,5 +3582,59 @@ describe("the retired bug substrate (end-of-effort-reconciliation)", () => {
     expect(bug).toMatch(/bug doc/i);
     expect(bug).toMatch(/spec/i);
     for (const [, pattern] of BUG_WRITE_PATTERNS) expect(bug).not.toMatch(pattern);
+  });
+});
+
+// ─── The mechanical single homes (end-of-effort-reconciliation) ──────────────
+//
+// The review found three duplications that had already drifted: the two
+// effort-root writers, the two root-index rewrites, and the triplicated
+// per-ticket close-out. Each now has one implementation, and these pins keep
+// the copies from coming back.
+
+describe("mechanical single homes (end-of-effort-reconciliation)", () => {
+  const source = readFile("src/pi.ts");
+  const skill = readFile("skills/engineering/implement-ticket/SKILL.md");
+  const feature = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
+  const bug = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
+
+  /** How many times a pattern occurs in a text. */
+  function count(text: string, pattern: RegExp): number {
+    return [...text.matchAll(new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`))]
+      .length;
+  }
+
+  test("one effort-root writer: the create path's title fallback exists once", () => {
+    // tw_write_spec and tw_write_architecture shared the empty-body guard, the
+    // create-or-refuse message, and this fallback before the extraction.
+    expect(count(source, /readArtifactTitle\(join\(effortDir, "map\.md"\)\) \?\? basename\(effortDir\)/)).toBe(1);
+    expect(count(source, /no live effort '\$\{o\.selector\}': create the effort/)).toBe(1);
+    expect(count(source, /function writeEffortRootArtifact/)).toBe(1);
+    // Both writers go through it.
+    expect(count(source, /writeEffortRootArtifact\(/)).toBeGreaterThanOrEqual(3);
+  });
+
+  test("one root-index writer: the Live/Archived rewrite exists once", () => {
+    expect(count(source, /function writeTasksIndex/)).toBe(1);
+    // The section rewrite itself lives only inside the helper: no caller
+    // builds the index body by hand.
+    expect(count(source, /writeMapSection\([^)]*, "Archived"/)).toBe(1);
+    expect(count(source, /writeMapSection\([^)]*, "Live"/)).toBe(1);
+  });
+
+  test("one close-out: the numbered sequence appears once, the resources point at it", () => {
+    // The canonical sequence is implement-ticket's Step 2; the two resources
+    // carry a pointer, not a copy.
+    expect(count(skill, /\*\*CI gate/)).toBe(1);
+    for (const [label, resource] of [
+      ["feature", feature],
+      ["bug", bug],
+    ] as const) {
+      expect(resource, `${label} duplicates the close-out`).not.toMatch(/\*\*CI gate/);
+      expect(resource, `${label} never points at the canonical close-out`).toMatch(/close-out[\s\S]{0,120}SKILL\.md/);
+    }
+    // The details the feature copy had dropped live in the canonical sequence.
+    expect(skill).toMatch(/all deviation reports/);
+    expect(skill).toMatch(/combined diff/);
   });
 });

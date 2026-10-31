@@ -3034,3 +3034,39 @@ describe("task-workflow tools: tw_write_review, the review artifact writer", () 
     rmSync(t, { recursive: true, force: true });
   });
 });
+
+describe("the root index has one writer (end-of-effort-reconciliation)", () => {
+  let tools: Record<string, { description: string; execute: Function }>;
+
+  beforeAll(() => { tools = createTools(); });
+
+  const INDEX_FM = 'type: index\nokf_version: "0.2"\ntitle: docs/tasks\n';
+
+  test("creating an effort sorts both index lists, not only Live", async () => {
+    const t = mkTmp();
+    writeMd(
+      join(t, "docs/tasks/index.md"),
+      INDEX_FM,
+      "\n# docs/tasks\n\n## Live\n\n- winding-down\n\n## Archived\n\n- zeta\n- alpha\n",
+    );
+    await tools.tw_create_effort.execute({ effort: "new-effort", title: "New effort" }, ctx(t));
+    const doc = parse(readFileSync(join(t, "docs/tasks/index.md"), "utf-8"));
+    // Both lists are rewritten by the one writer, so the map-creation path
+    // cannot drift from the archive path.
+    expect(readMapSection(doc.body, "Live")).toEqual(["- new-effort", "- winding-down"]);
+    expect(readMapSection(doc.body, "Archived")).toEqual(["- alpha", "- zeta"]);
+    rmSync(t, { recursive: true, force: true });
+  });
+
+  test("creating an effort in a tree with no index writes the landed index shape", async () => {
+    const t = mkTmp();
+    mkdirSync(join(t, "docs/tasks"), { recursive: true });
+    await tools.tw_create_effort.execute({ effort: "fresh", title: "Fresh" }, ctx(t));
+    const doc = parse(readFileSync(join(t, "docs/tasks/index.md"), "utf-8"));
+    expect(doc.data.type).toBe("index");
+    expect(doc.data.okf_version).toBe("0.2");
+    expect(readMapSection(doc.body, "Live")).toEqual(["- fresh"]);
+    expect(readMapSection(doc.body, "Archived")).toEqual(["(none)"]);
+    rmSync(t, { recursive: true, force: true });
+  });
+});

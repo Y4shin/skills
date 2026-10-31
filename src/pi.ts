@@ -787,6 +787,68 @@ function ensureArchivalNote(specPath: string): boolean {
   return true;
 }
 
+/**
+ * The one effort-root artifact writer behind `tw_write_spec` and
+ * `tw_write_architecture`. The empty-body guard, the create-or-refuse message,
+ * and the title fallback (the argument, else the effort's map title, else the
+ * effort slug) live here once; the only per-kind part is the validation a
+ * creation runs and the note a write leaves behind, both passed in.
+ */
+interface EffortRootWriteOptions {
+  root: string;
+  selector: string;
+  content: unknown;
+  title: unknown;
+  publish: boolean;
+  /** The artifact type (`spec` or `architecture`) and so its leaf filename. */
+  kind: "spec" | "architecture";
+  /** The per-kind tail of the empty-body refusal. */
+  emptyBody: string;
+  /** Per-kind checks run before a creation; may throw its own refusal. */
+  validateCreation?: (effortDir: string, effortName: string) => void;
+  /** Per-kind side effect after the write; returns a suffix for the result. */
+  afterWrite?: (path: string, effortDir: string) => string;
+}
+
+function writeEffortRootArtifact(o: EffortRootWriteOptions): string {
+  const { root, kind } = o;
+  if (typeof o.content !== "string" || o.content.trim() === "") {
+    throw new Error(`content is empty: ${o.emptyBody}`);
+  }
+  const body = normalizedBody(o.content);
+  const publish = o.publish;
+
+  let hit: ScanHit | null = null;
+  try {
+    hit = resolveArt(root, o.selector, kind);
+  } catch { /* the effort may exist without the artifact yet: create it */ }
+
+  if (hit !== null) {
+    hit.doc.body = body;
+    if (publish) hit.doc.data.status = "stable";
+    writeFileSync(hit.path, dump(hit.doc), "utf-8");
+    const suffix = o.afterWrite ? o.afterWrite(hit.path, dirname(hit.path)) : "";
+    return `wrote ${relative(root, hit.path)}${publish ? " (status: stable)" : ""}${suffix}`;
+  }
+
+  const effortDir = liveEffortDir(root, o.selector);
+  if (effortDir === null) {
+    throw new Error(
+      `no live effort '${o.selector}': create the effort (a map at docs/tasks/<effort>/map.md) before writing its ${kind}`,
+    );
+  }
+  const effortName = basename(effortDir);
+  o.validateCreation?.(effortDir, effortName);
+  const title =
+    typeof o.title === "string" && o.title.trim() !== ""
+      ? o.title.trim()
+      : readArtifactTitle(join(effortDir, "map.md")) ?? basename(effortDir);
+  const path = join(effortDir, TYPE_LEAF[kind]);
+  writeFileSync(path, dump({ data: { type: kind, title, status: publish ? "stable" : "draft" }, body }), "utf-8");
+  const suffix = o.afterWrite ? o.afterWrite(path, effortDir) : "";
+  return `wrote ${relative(root, path)} (created, status: ${publish ? "stable" : "draft"})${suffix}`;
+}
+
 // ─── Review artifact helpers (finalize-effort) ─────────────────────────────
 
 /** The tool-owned body section the review writer replaces on every pass. */
@@ -938,15 +1000,11 @@ function createEffortDocument(title: string, originEffort?: string): Document {
  */
 function registerLiveEffort(root: string, effort: string): void {
   const indexPath = join(taskRoot(root), "index.md");
-  const indexDoc: Document = isFile(indexPath)
-    ? parse(readFileSync(indexPath, "utf-8"))
-    : { data: { type: "index", okf_version: OKF_VERSION, title: "docs/tasks" }, body: "\n# docs/tasks\n" };
-  const live = [...new Set([...indexNames(indexDoc.body, "Live"), effort])].sort((a, b) => a.localeCompare(b));
-  const archived = indexNames(indexDoc.body, "Archived");
-  let body = writeMapSection(indexDoc.body, "Live", indexSection(live));
-  body = writeMapSection(body, "Archived", indexSection(archived));
-  indexDoc.body = body;
-  writeFileSync(indexPath, dump(indexDoc), "utf-8");
+  const body = isFile(indexPath) ? parse(readFileSync(indexPath, "utf-8")).body : "";
+  writeTasksIndex(root, {
+    live: [...indexNames(body, "Live"), effort],
+    archived: indexNames(body, "Archived"),
+  });
 }
 
 /** True when a path sits strictly inside a directory. */
@@ -1071,6 +1129,26 @@ function indexNames(body: string, section: string): string[] {
   return (readMapSection(body, section) ?? [])
     .filter((line) => /^- /.test(line.trim()))
     .map((line) => line.trim().replace(/^- /, ""));
+}
+
+/**
+ * The one writer of `docs/tasks/index.md`: both lists are rewritten from the
+ * given names, both sorted, and the index is created with the landed shape
+ * when the tree has none. Effort creation and the archive move are its two
+ * callers, so the two paths cannot drift on sorting again (the creation path
+ * once sorted Live only while the archive path sorted both).
+ */
+function writeTasksIndex(root: string, lists: { live: string[]; archived: string[] }): string {
+  const indexPath = join(taskRoot(root), "index.md");
+  const doc: Document = isFile(indexPath)
+    ? parse(readFileSync(indexPath, "utf-8"))
+    : { data: { type: "index", okf_version: OKF_VERSION, title: "docs/tasks" }, body: "\n# docs/tasks\n" };
+  const sorted = (names: string[]): string[] => [...new Set(names)].sort((a, b) => a.localeCompare(b));
+  let body = writeMapSection(doc.body, "Live", indexSection(sorted(lists.live)));
+  body = writeMapSection(body, "Archived", indexSection(sorted(lists.archived)));
+  doc.body = body;
+  writeFileSync(indexPath, dump(doc), "utf-8");
+  return indexPath;
 }
 
 // ─── Opener gate: the phase preconditions ────────────────────────────────────────
@@ -1639,42 +1717,23 @@ export function createTools(): Record<string, Tool> {
       },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
-        if (typeof p.content !== "string" || p.content.trim() === "") {
-          throw new Error("content is empty: a spec write needs a body");
-        }
-        const body = normalizedBody(p.content);
-        const publish = p.publish === true;
-
-        let hit: ScanHit | null = null;
-        try {
-          hit = resolveArt(root, p.selector, "spec");
-        } catch { /* the effort may exist without a spec yet: create it */ }
-
-        if (hit !== null) {
-          requireV4Shape(hit.art);
-          hit.doc.body = body;
-          if (publish) hit.doc.data.status = "stable";
-          writeFileSync(hit.path, dump(hit.doc), "utf-8");
-          return `wrote ${relative(root, hit.path)}${publish ? " (status: stable)" : ""}`;
-        }
-
-        const effortDir = liveEffortDir(root, p.selector);
-        if (effortDir === null) {
-          throw new Error(
-            `no live effort '${p.selector}': create the effort (a map at docs/tasks/<effort>/map.md) before writing its spec`,
-          );
-        }
-        const title =
-          typeof p.title === "string" && p.title.trim() !== ""
-            ? p.title.trim()
-            : readArtifactTitle(join(effortDir, "map.md")) ?? basename(effortDir);
-        const doc: Document = {
-          data: { type: "spec", title, status: publish ? "stable" : "draft" },
-          body,
-        };
-        const path = join(effortDir, "spec.md");
-        writeFileSync(path, dump(doc), "utf-8");
-        return `wrote ${relative(root, path)} (created, status: ${publish ? "stable" : "draft"})`;
+        const existing = (() => {
+          try {
+            return resolveArt(root, p.selector, "spec");
+          } catch {
+            return null;
+          }
+        })();
+        if (existing !== null) requireV4Shape(existing.art);
+        return writeEffortRootArtifact({
+          root,
+          selector: p.selector,
+          content: p.content,
+          title: p.title,
+          publish: p.publish === true,
+          kind: "spec",
+          emptyBody: "a spec write needs a body",
+        });
       },
     ),
 
@@ -1697,82 +1756,62 @@ export function createTools(): Record<string, Tool> {
       },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
-        if (typeof p.content !== "string" || p.content.trim() === "") {
-          throw new Error("content is empty: an architecture write needs a body");
-        }
-        const body = normalizedBody(p.content);
-        const publish = p.publish === true;
-
-        // An existing document: the living architecture updates in place.
-        let hit: ScanHit | null = null;
-        try {
-          hit = resolveArt(root, p.selector, "architecture");
-        } catch { /* the effort may exist without an architecture document yet: create it */ }
-
-        if (hit !== null) {
-          hit.doc.body = body;
-          if (publish) hit.doc.data.status = "stable";
-          const specPath = join(dirname(hit.path), "spec.md");
-          const noted = isFile(specPath) ? ensureArchivalNote(specPath) : false;
-          writeFileSync(hit.path, dump(hit.doc), "utf-8");
-          return `wrote ${relative(root, hit.path)}${publish ? " (status: stable)" : ""}` +
-            (noted ? "; the spec now points at the architecture" : "");
-        }
-
-        let effortDir = liveEffortDir(root, p.selector);
-        if (effortDir === null) {
-          throw new Error(
-            `no live effort '${p.selector}': create the effort (a map at docs/tasks/<effort>/map.md) before writing its architecture`,
-          );
-        }
-        const effortName = basename(effortDir);
-        // The architecture consumes the architecture content already recorded
-        // in the spec: no spec, nothing to produce the document from.
-        const specPath = join(effortDir, "spec.md");
-        if (!isFile(specPath)) {
-          throw new Error(
-            `effort '${effortName}' has no spec: the architecture is produced from the spec's architecture content; ` +
-              `write the spec with tw_write_spec first`,
-          );
-        }
-        requireV4Shape(parseArtifactFile(specPath).art);
-        const index = scanMemo(root)();
-        // Legacy tolerance is input-only: a legacy arch-spec.md in the effort
-        // means the tree has not been migrated, and creating the v5 document
-        // beside it would leave two architecture documents in one effort.
-        const legacy = index.hits.filter((h) => isInside(effortDir, h.path) && h.art.type === "arch spec");
-        if (legacy.length > 0) {
-          throw new Error(
-            `effort '${effortName}' still holds the legacy architecture shape ` +
-              `(${legacy.map((h) => relative(root, h.path)).join(", ")}): run the schema-5 migration ` +
-              `(it renames arch-spec.md to architecture.md) before using the v5 architecture writer`,
-          );
-        }
-        const archPath = join(effortDir, "architecture.md");
-        // One living document per effort: a v5 architecture document the
-        // effort already holds elsewhere (the migration's multi-document
-        // rename corner) is a duplication to resolve, not to add to.
-        const duplicates = index.hits.filter(
-          (h) =>
-            isInside(effortDir, h.path) &&
-            h.art.type === "architecture" &&
-            resolvePath(h.path) !== resolvePath(archPath),
-        );
-        if (duplicates.length > 0) {
-          throw new Error(
-            `effort '${effortName}' already holds architecture document(s) elsewhere ` +
-              `(${duplicates.map((h) => relative(root, h.path)).join(", ")}): resolve the duplication before creating another one`,
-          );
-        }
-        const title =
-          typeof p.title === "string" && p.title.trim() !== ""
-            ? p.title.trim()
-            : readArtifactTitle(join(effortDir, "map.md")) ?? basename(effortDir);
-        const doc: Document = { data: { type: "architecture", title, status: publish ? "stable" : "draft" }, body };
-        writeFileSync(archPath, dump(doc), "utf-8");
-        const noted = ensureArchivalNote(specPath);
-        return `wrote ${relative(root, archPath)} (created, status: ${publish ? "stable" : "draft"})` +
-          (noted ? "; the spec now points at the architecture" : "");
+        return writeEffortRootArtifact({
+          root,
+          selector: p.selector,
+          content: p.content,
+          title: p.title,
+          publish: p.publish === true,
+          kind: "architecture",
+          emptyBody: "an architecture write needs a body",
+          // The architecture consumes the architecture content already
+          // recorded in the spec: no spec, nothing to produce it from.
+          validateCreation: (effortDir, effortName) => {
+            const specPath = join(effortDir, "spec.md");
+            if (!isFile(specPath)) {
+              throw new Error(
+                `effort '${effortName}' has no spec: the architecture is produced from the spec's architecture content; ` +
+                  `write the spec with tw_write_spec first`,
+              );
+            }
+            requireV4Shape(parseArtifactFile(specPath).art);
+            const index = scanMemo(root)();
+            // Legacy tolerance is input-only: a legacy arch-spec.md in the
+            // effort means the tree has not been migrated, and creating the v5
+            // document beside it would leave two architecture documents.
+            const legacy = index.hits.filter((h) => isInside(effortDir, h.path) && h.art.type === "arch spec");
+            if (legacy.length > 0) {
+              throw new Error(
+                `effort '${effortName}' still holds the legacy architecture shape ` +
+                  `(${legacy.map((h) => relative(root, h.path)).join(", ")}): run the schema-5 migration ` +
+                  `(it renames arch-spec.md to architecture.md) before using the v5 architecture writer`,
+              );
+            }
+            // One living document per effort: a v5 architecture document the
+            // effort already holds elsewhere (the migration's multi-document
+            // rename corner) is a duplication to resolve, not to add to.
+            const archPath = join(effortDir, TYPE_LEAF.architecture);
+            const duplicates = index.hits.filter(
+              (h) =>
+                isInside(effortDir, h.path) &&
+                h.art.type === "architecture" &&
+                resolvePath(h.path) !== resolvePath(archPath),
+            );
+            if (duplicates.length > 0) {
+              throw new Error(
+                `effort '${effortName}' already holds architecture document(s) elsewhere ` +
+                  `(${duplicates.map((h) => relative(root, h.path)).join(", ")}): resolve the duplication before creating another one`,
+              );
+            }
+          },
+          // The living document makes the spec's architecture content
+          // archival: the spec gains a pointer (idempotent, nothing deleted).
+          afterWrite: (_path, effortDir) => {
+            const specPath = join(effortDir, "spec.md");
+            const noted = isFile(specPath) ? ensureArchivalNote(specPath) : false;
+            return noted ? "; the spec now points at the architecture" : "";
+          },
+        });
       },
     ),
 
@@ -2437,18 +2476,12 @@ export function createTools(): Record<string, Tool> {
         renameSync(liveDir, destDir);
 
         // 3. The root index: the effort leaves Live and joins Archived.
-        const indexPath = join(taskRoot(root), "index.md");
-        const indexDoc: Document = isFile(indexPath)
-          ? parse(readFileSync(indexPath, "utf-8"))
-          : { data: { type: "index", okf_version: OKF_VERSION, title: "docs/tasks" }, body: "\n# docs/tasks\n" };
-        const live = indexNames(indexDoc.body, "Live").filter((n) => n !== effortKey);
-        const archived = [...new Set([...indexNames(indexDoc.body, "Archived"), effortKey])].sort((a, b) =>
-          a.localeCompare(b),
-        );
-        let body = writeMapSection(indexDoc.body, "Live", indexSection(live.sort((a, b) => a.localeCompare(b))));
-        body = writeMapSection(body, "Archived", indexSection(archived));
-        indexDoc.body = body;
-        writeFileSync(indexPath, dump(indexDoc), "utf-8");
+        const existingIndexPath = join(taskRoot(root), "index.md");
+        const existing = isFile(existingIndexPath) ? parse(readFileSync(existingIndexPath, "utf-8")).body : "";
+        const indexPath = writeTasksIndex(root, {
+          live: indexNames(existing, "Live").filter((n) => n !== effortKey),
+          archived: [...indexNames(existing, "Archived"), effortKey],
+        });
 
         return `archived '${effortKey}' to ${relative(root, destDir)}; index updated (${relative(root, indexPath)})`;
       },

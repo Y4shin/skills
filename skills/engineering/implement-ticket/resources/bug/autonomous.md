@@ -86,55 +86,18 @@ inline close-out owns the marking, one owner.
 
 ## Step 2 -- The inlined per-ticket close-out
 
-After the chain returns ok, run the close-out in this same run. The steps
-interleave **Pi tool calls** with shell commands: the tw_* tools are tools
-you invoke as functions, **not** shell binaries; wrapping them in a
-`set -e` block makes them fail with `command not found` (exit 127) and
-aborts the sequence. Call them as tools, and run the shell steps in a
-separate bash block.
+The close-out sequence has one home: [Step 2 of
+`SKILL.md`](../../SKILL.md#step-2----the-inlined-per-ticket-close-out). Run
+it in this same run, before the next ticket's dispatch: the CI gate, the
+knowledge harvest, the changelog through `tw_write_changelog`, the
+done-marking through `tw_mark_done` (this phase is the one owner of the
+marking), the `tw_finalizable` check, the state pointer cleared with
+`tw_state_set task null`, and the `--no-ff` merge into `<effort-branch>`. It
+is not restated here, so the copies cannot drift again.
 
-1. **CI gate**: checkout `task/<ticket-slug>`, `git merge <effort-branch>
-   2>/dev/null || true`, run the project's CI command, detected from repo
-   tooling or the `docs/testing.md` protocol; ask the user when ambiguous.
-   A red branch
-   is never merged: fix forward on the landing branch, and record that
-   fix-forward fired with `submit_feedback({ kind: "expected", data })`.
-2. **Knowledge harvest**: read the ticket doc and the combined diff; fold
-   durable knowledge into `docs/testing.md` and other relevant docs, and
-   append root-cause lessons to the ticket doc's `## Implementation notes`.
-   Commit:
-   `git add -A && git commit -m "docs(ticket): harvest knowledge for {ticketSlug}"`
-3. **Changelog**: write the entry through `tw_write_changelog`, the only
-   writer of `docs/tasks/CHANGELOG.md` (the built-in write and edit are
-   refused there): the slug, the ticket title, and a 3-5 line body. Commit
-   through the shell afterwards (the commit is git, not a tree mutation):
-   `git add docs/tasks/CHANGELOG.md && git commit -m "docs: changelog {ticketSlug}"`
-4. **No bug-closure step.** `docs/bugs/` is a static archive in schema 5 and
-   this ticket is the defect's record: the bug doc and its reproduction are
-   read from the ticket body as the spec source, and nothing in this phase
-   writes under `docs/bugs/`.
-5. **Mark the ticket done through `tw_mark_done`** (the one owner of the
-   marking: this phase; the chain never marks it). The tool checks the
-   changelog entry references the ticket before it writes
-   `workflow_state: done`, so the changelog step must land first.
-6. **`tw_finalizable <ticket-slug>`** (Pi tool, not a shell command):
-   verifies the ticket is finalizable and surfaces the effort graph's
-   anomalies, which you should report if any appear.
-7. **`tw_state_set task null`** (Pi tool, not a shell command): clears the
-   current item pointer.
-8. **Merge the landing branch into the effort's branch** (shell, safe under
-   `set -e`), where `<effort-branch>` is the branch the previous ticket
-   landed on (see the branch model in `SKILL.md`), not the literal `main`
-   unless `main` is that branch:
-
-   ```bash
-   set -e
-   git checkout <effort-branch>
-   git merge --no-ff task/<ticket-slug> -m "ticket: finalize {ticketSlug}"
-   git branch -d task/<ticket-slug>
-   ```
-
-   If remote exists: `git push origin <effort-branch>`
+The bug pipeline's own rule inside that sequence: a bug ticket has no
+bug-closure step, because `docs/bugs/` is a static archive in schema 5 and
+this ticket is the defect's record.
 
 There is **no per-ticket move**: the ticket stays in the live effort.
 Moving one ticket out would split the effort's graph scope and trip the
