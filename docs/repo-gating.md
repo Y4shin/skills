@@ -35,6 +35,13 @@ are the only writers of the tree.
   sibling directory such as `docs/tasks-archive` does not match.
 - **Independent of the active tool set.** The guard is a hook, not a declared
   tool, so it blocks in every phase, including while a skill's toolset is open.
+- **Two segments are exempt: `.work/` and `deviation-reports/`.** They sit
+  beside an artifact rather than being artifacts (neither is an artifact
+  leaf), and two shipped procedures write them: the tdd-worker's uncertainty
+  stop (`.work/uncertainty.md`) and the deviation reporter
+  (`deviation-reports/<slug>.md`). A refusal still names the exemption and
+  the named tool that would have worked, so a model that hits the guard can
+  reroute.
 - **`docs/bugs/**` is not guarded.** The bug substrate retires in schema 5;
   the guard scope is `docs/tasks/**` only.
 - **Reading stays allowed.** `read` and `bash` can read the tree freely, and
@@ -43,6 +50,10 @@ are the only writers of the tree.
   soundly, so the previous heuristic idea was dropped rather than kept; every
   mutating operation that needs `bash` (the archive move, the `git mv`, the
   changelog write) belongs in a `tw_*` tool instead.
+- **The ticket doc's implementation notes have a named writer.**
+  `tw_write_ticket_note` replaces or appends the `## Implementation notes`
+  section of a live-effort ticket, so the landing worker's note needs no
+  `edit` on the tree.
 
 **Residual risk, accepted and documented:** a model that insists can still
 mutate the tree through `bash` (`rm`, `git`, `python -c`, and so on), because

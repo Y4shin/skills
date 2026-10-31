@@ -1,12 +1,12 @@
 ---
 name: land-worker
 description: Merge a completed ticket working branch into the ticket's landing branch, append an implementation note to the ticket doc, and commit. May NOT write or modify any source code, tests, or config files.
-tools: read, edit, bash, submit_feedback
+tools: read, bash, submit_feedback, tw_write_ticket_note
 inheritProjectContext: true
 defaultContext: fresh
 ---
 
-You land a completed ticket. Purely mechanical: you must NOT write or edit any source code, test files, or config files. (You may `edit` the ticket doc only.)
+You land a completed ticket. Purely mechanical: you must NOT write or edit any source code, test files, or config files. Your one write is the ticket doc's implementation note, through `tw_write_ticket_note`.
 
 ## Steps
 
@@ -17,7 +17,10 @@ You land a completed ticket. Purely mechanical: you must NOT write or edit any s
    git merge --no-ff ticket/<ticket-slug> -m "ticket(<ticket-slug>): <title>"
    git branch -d ticket/<ticket-slug>
    ```
-3. Append an implementation note to the ticket doc's `## Implementation notes` section (use `edit`).
+3. Append an implementation note to the ticket doc's `## Implementation notes`
+   section with `tw_write_ticket_note` (`selector`: the ticket path, `note`: the
+   landing note). The built-in `edit` is refused under `docs/tasks/`, and this
+   writer is the named replacement for a ticket doc.
 4. Commit: `git add docs/tasks/ && git commit -m "docs(ticket): land <ticket-slug>"`
 
 You have no archive duty and no done-marking: the ticket stays in the live

@@ -791,6 +791,10 @@ function ensureArchivalNote(specPath: string): boolean {
 
 /** The tool-owned body section the review writer replaces on every pass. */
 const REVIEW_DISPOSITIONS_SECTION = "Dispositions";
+// ─── The implementation-notes writer's section name ────────────────────────
+
+/** The ticket-doc section the implementation-notes writer owns. */
+const IMPLEMENTATION_NOTES_SECTION = "Implementation notes";
 
 /** The three dispositions a finding can carry; absent means untriaged. */
 const REVIEW_DISPOSITIONS = ["ticket", "follow-up", "informational"] as const;
@@ -2524,6 +2528,42 @@ export function createTools(): Record<string, Tool> {
       },
     ),
 
+    tw_write_ticket_note: def(
+      "Write the '## Implementation notes' section of a ticket doc: the only writer of that section, and " +
+        "the named writer that replaces the built-in edit on a ticket path. Appends the note to the " +
+        "existing section (a plain `- ` paragraph per landing), or replaces the section with 'replace: " +
+        "true'. Refuses an empty note, a selector that is not a ticket, and a ticket in an archived " +
+        "effort: the note is part of a live effort's record.",
+      {
+        selector: Str("Ticket slug or path"),
+        note: Str("The note text: the implementation lesson the landing leaves behind"),
+        replace: OptBool,
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const note = typeof p.note === "string" ? p.note.trim() : "";
+        if (note === "") throw new Error("note is empty: a ticket note states the lesson it records");
+        const { path, art, doc } = resolveArt(root, p.selector);
+        if (art.type !== "ticket") {
+          throw new Error(
+            `'${p.selector}' is not a ticket (found type '${art.type}'): the implementation-notes writer ` +
+              `writes ticket docs only`,
+          );
+        }
+        const treeRel = relative(taskRoot(root), path);
+        if (treeRel.split(/[\\/]/)[0] === "archive") {
+          throw new Error(
+            `'${p.selector}' is an archived ticket: implementation notes belong to a live effort's record`,
+          );
+        }
+        const existing = p.replace === true ? [] : readMapSection(doc.body, IMPLEMENTATION_NOTES_SECTION) ?? [];
+        const content = existing.length > 0 ? [...existing, "", ...note.split("\n")].join("\n") : note;
+        doc.body = writeMapSection(doc.body, IMPLEMENTATION_NOTES_SECTION, content);
+        writeFileSync(path, dump(doc), "utf-8");
+        return `wrote '## ${IMPLEMENTATION_NOTES_SECTION}' in ${relative(root, path)}`;
+      },
+    ),
+
     tw_record_out_of_scope: def(
       "Record a consciously ruled-out request in the global out-of-scope knowledge base " +
         "(docs/tasks/out-of-scope/<slug>.md) and update its index: the escape hatch that keeps a rejected ask " +
@@ -2797,28 +2837,46 @@ export function createTools(): Record<string, Tool> {
 // ─── Write lockdown guard ──────────────────────────────────────────────────
 
 /**
- * The reason a blocked write or edit carries: it names the lockdown and the
- * legal alternative, so a model that hits it can reroute to a tw_* tool.
+ * The reason a blocked write or edit carries: it names the lockdown, the two
+ * exempt segments, and the legal alternative, so a model that hits it can
+ * reroute to a named tool.
  */
 function lockdownReason(toolName: string, path: string): string {
   return (
     `write lockdown: '${path}' is under docs/tasks/, which only the named tw_* tools may write; ` +
-    `the built-in ${toolName} is refused on that tree. Use the matching tw_* tool for this change.`
+    `the built-in ${toolName} is refused on that tree. Scratch and evidence are exempt: ` +
+    `**/.work/** (the uncertainty stop) and **/deviation-reports/** (the deviation report). ` +
+    `Use the matching tw_* tool for this change: a ticket doc's implementation notes go through ` +
+    `tw_write_ticket_note, a map section through tw_write_section, the changelog through ` +
+    `tw_write_changelog.`
   );
 }
 
 /**
- * True when the target path sits inside the session repo's docs/tasks tree.
- * Relative paths resolve against the session cwd, absolute paths are taken
- * as given; both are normalized before the containment check, so `..`
- * traversal cannot slip past and a sibling directory such as
- * `docs/tasks-archive` does not match.
+ * The two path segments the lockdown exempts: `.work/` and
+ * `deviation-reports/`. Both sit beside an artifact rather than being
+ * artifacts (neither is in TYPE_LEAVES), and both are written by shipped
+ * procedures: the uncertainty stop and the deviation report. A path is exempt
+ * when any segment under the tree is one of them, so the escape hatch keeps
+ * working wherever an artifact keeps its scratch.
+ */
+const LOCKDOWN_EXEMPT_SEGMENTS = new Set([".work", "deviation-reports"]);
+
+/**
+ * True when the target path sits inside the session repo's docs/tasks tree and
+ * is not in an exempt segment. Relative paths resolve against the session
+ * cwd, absolute paths are taken as given; both are normalized before the
+ * containment check, so `..` traversal cannot slip past and a sibling directory
+ * such as `docs/tasks-archive` does not match.
  */
 function isTaskTreePath(path: string, cwd: string): boolean {
   const resolved = resolvePath(cwd, path);
   const tree = taskRoot(findRoot(cwd));
   const rel = relative(tree, resolved);
-  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+  if (rel !== "" && (rel.startsWith("..") || isAbsolute(rel))) return false;
+  const segments = rel.split(/[\\/]/).filter((s) => s !== "" && s !== ".");
+  if (segments.some((segment) => LOCKDOWN_EXEMPT_SEGMENTS.has(segment))) return false;
+  return true;
 }
 
 /**

@@ -159,6 +159,10 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // CI command is read from the repo rather than through that profile.
     // tw_mark_blocked is not disclosed here: it marks planning tasks and
     // refuses tickets, so it stays in wayfinder's toolset only.
+    // tw_write_ticket_note is disclosed because this phase performs the
+    // landing that writes the ticket doc's implementation notes; the landing
+    // worker calls it by name (a subagent reaches a gated tool through its
+    // own tools allowlist, never through this opener).
     toolset: [
       "tw_frontier",
       "tw_dependency_levels",
@@ -171,6 +175,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
       "tw_state_set",
       "tw_get",
       "tw_list",
+      "tw_write_ticket_note",
     ],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-spec", "to-tickets", "finalize-effort"],
   },

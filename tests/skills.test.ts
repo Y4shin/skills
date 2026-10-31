@@ -1384,6 +1384,10 @@ const DEAD_SURFACE_EXEMPT_PREFIXES = [
   "docs/tasks/overhaul-execution-skills/",
   "docs/tasks/tool-surface-inventory/",
   "docs/tasks/workflow-tool-usage-audit/",
+  // The effort that retires the v4 surface keeps the retired names in its own
+  // record: a finding, a ticket, or an amendment that names a deleted tool to
+  // retire it is a historical record, the same class as an archived tree.
+  "docs/tasks/enforced-workflow-v5/",
 ];
 
 describe("dead surface deletion (corpus check)", () => {

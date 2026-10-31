@@ -707,6 +707,7 @@ describe("the phase-to-toolset registry", () => {
         "tw_split_ticket",
         "tw_state_set",
         "tw_write_changelog",
+        "tw_write_ticket_note",
       ],
       // tw_archive_effort stays the private signature tool; the review writer
       // joined the toolset when finalize-effort-skill landed, and the effort

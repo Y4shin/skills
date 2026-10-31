@@ -88,7 +88,10 @@ The chain ships as a pre-canned workflow script,
 and bug pipelines): resolve its path against this skill's directory, launch
 it once per ticket with `async: true` and the ticket's parameters as
 `args`, and it owns the preconditions gate, the step order, the ok-gates,
-and the per-step output bindings. Each child task is composed from identity
+and the per-step output bindings. The land-worker writes the landing note
+through `tw_write_ticket_note`, the named writer for a ticket doc: it
+reaches the tool through its own `tools:` allowlist, because a subagent runs
+in its own session where no phase is open. Each child task is composed from identity
 and pointers only; procedure lives in the agent definitions and the tdd /
 diagnosing-bugs skills, and the caller never authors worker prompts. The
 gate is the read-only `implement-preconditions` agent: it refuses to launch
@@ -187,7 +190,9 @@ separate bash block.
    combined diff. Fold durable knowledge into project docs: update
    `docs/testing.md` if new patterns or tools were discovered, update any
    other relevant docs under `docs/`, and append architecture lessons to the
-   ticket doc's `## Implementation notes`.
+   ticket doc's `## Implementation notes` through `tw_write_ticket_note`, the
+   only writer of that section (the built-in edit is refused under
+   `docs/tasks/`).
    Commit: `git add -A && git commit -m "docs(ticket): harvest knowledge for {ticketSlug}"`
 
 3. **Changelog.** Write the entry through `tw_write_changelog`, the only
