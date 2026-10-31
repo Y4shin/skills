@@ -917,7 +917,6 @@ function parseReviewFindings(raw: unknown): ReviewFinding[] | undefined {
   });
 }
 
-/** One finding's line in the tool-owned `## Dispositions` record. */
 /**
  * Validate every disposition target a review write supplies against the tree.
  * A `ticket` disposition names a ticket this effort already has; a
@@ -957,6 +956,7 @@ function validateReviewTargets(
   }
 }
 
+/** One finding's line in the tool-owned `## Dispositions` record. */
 function reviewDispositionLine(finding: ReviewFinding): string {
   switch (finding.disposition) {
     case "ticket":
