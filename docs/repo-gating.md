@@ -137,15 +137,12 @@ load; it fails open to personal on any detection error).
 
 ## Background
 
-Design and decisions: `docs/tasks/maps/gate-skills-by-repo/map.md`. Research
-findings that grounded the implementation:
-
-- `docs/tasks/gate-config-mechanics/findings.md`, pi's `Settings` schema keeps
-  unknown top-level keys; the extension factory gets no `SettingsManager` and
-  reads the files itself; the `before_agent_start` result can rewrite the full
-  system prompt.
-- `docs/tasks/gate-skills-prompt-and-help/findings.md`, the real skills-XML
-  format (`<available_skills>` with `<skill><name>` children); no subtractive
-  `/help` hook; the `input` event can prevent `/skill:` expansion.
-- `docs/tasks/gate-skills-prompt-and-help/limitations.md`, the `/help`
-  limitation note.
+Design and decisions: `docs/tasks/archive/gate-skills-by-repo/map.md`. The
+research that grounded the implementation lives under that archived effort:
+`tasks/gate-config-mechanics/findings.md` records that pi's `Settings` schema
+keeps unknown top-level keys, the extension factory gets no `SettingsManager`
+and reads the files itself, and the `before_agent_start` result can rewrite the
+full system prompt; `tasks/gate-skills-prompt-and-help/slices/archive/` holds
+the skills-XML format (`<available_skills>` with `<skill><name>` children), the
+absence of a subtractive `/help` hook, the `/help` limitation note, and the
+`input` event's ability to prevent `/skill:` expansion.

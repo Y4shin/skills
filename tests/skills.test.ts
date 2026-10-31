@@ -3368,12 +3368,13 @@ describe("documentation re-sync (docs-resync)", () => {
     // AGENTS.md bans em-dashes in this repo's prose, and the check used to name
     // four files, so a new one could never be caught. It runs over the corpus
     // with the same skip rules as the other corpus checks (archived trees,
-    // vendored experiment trees, node_modules/.git), plus the historical
-    // records those checks already exempt.
+    // vendored experiment trees, node_modules/.git) and the same historical
+    // record exemptions those checks carry, so a planning document or a dated
+    // record is skipped rather than repunctuated.
     const offenders: string[] = [];
     for (const file of corpusFiles(PROJECT)) {
       const rel = file.slice(PROJECT.length + 1);
-      if (rel === "docs/tasks/CHANGELOG.md") continue;
+      if (CORPUS_EXEMPTIONS.has(rel) || DEAD_SURFACE_EXEMPT_FILES.has(rel)) continue;
       let text = "";
       try {
         text = readFileSync(file, "utf-8");

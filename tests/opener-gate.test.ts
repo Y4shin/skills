@@ -688,6 +688,7 @@ describe("the phase-to-toolset registry", () => {
         "tw_mark_done",
         "tw_record_out_of_scope",
         "tw_show",
+        "tw_state",
         "tw_state_set",
         "tw_write_section",
       ],
@@ -706,6 +707,7 @@ describe("the phase-to-toolset registry", () => {
         "tw_mark_done",
         "tw_resolve_uncertainty",
         "tw_split_ticket",
+        "tw_state",
         "tw_state_set",
         "tw_write_changelog",
         "tw_write_ticket_note",
@@ -778,6 +780,16 @@ describe("the phase-to-toolset registry", () => {
     // joining the toolset must not rotate it away from tw_archive_effort.
     const entry = SKILL_REGISTRY.find((e) => e.name === "finalize-effort")!;
     expect(signatureToolOf(entry)).toBe("tw_archive_effort");
+  });
+
+  test("a phase that sets a state pointer can read it back", () => {
+    // The overview routes "where am I?" to a phase and has it call tw_state,
+    // so a toolset that carries the pointer writer but not the pointer reader
+    // is a phase that can move you without telling you where you are.
+    for (const entry of SKILL_REGISTRY) {
+      if (!entry.toolset.includes("tw_state_set")) continue;
+      expect(entry.toolset, `${entry.name} writes the pointers but cannot read them`).toContain("tw_state");
+    }
   });
 
   test("keeps one private signature tool per skill, so the open-set derivation stays exact", () => {

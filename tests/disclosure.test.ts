@@ -101,7 +101,7 @@ describe("disclosure core: tw_open", () => {
     for (const tool of ["tw_frontier", "tw_list", "tw_write_section", "tw_finalize_map", "tw_mark_done"]) {
       expect(active, `${tool} must be declared once wayfinder is open`).toContain(tool);
     }
-    for (const tool of ["tw_state", "tw_context", "tw_write_spec", "tw_write_architecture", "tw_archive_effort"]) {
+    for (const tool of ["tw_context", "tw_write_spec", "tw_write_architecture", "tw_archive_effort", "tw_create_effort"]) {
       expect(active, `${tool} belongs to no open skill and stays undeclared`).not.toContain(tool);
     }
   });
