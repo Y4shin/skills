@@ -292,17 +292,26 @@ export function conflictReason(skill: string, openSkill: string): string {
  * target and no phase omits one it needs.
  */
 export function buildOpenParameters(): TSchema {
-  return Type.Union(
-    SKILL_REGISTRY.map((entry) =>
-      Type.Object({
-        skill: Type.Literal(entry.name, { description: "The workflow skill to open" }),
-        effort: Type.String({ description: "The effort the skill works in" }),
-        ...(entry.takesTarget
-          ? { target: Type.String({ description: "The item the skill works on" }) }
-          : {}),
-      }),
+  // A TypeBox union serializes to a bare `anyOf` with no top-level `type`, and
+  // a strict OpenAI-compatible provider rejects a function schema that omits
+  // it (`schema must be a JSON Schema of 'type: "object"', got 'type: null'`).
+  // tw_open is declared in every state, so that rejection fails the whole
+  // request. Keep the union (validateOpenArgs backs it up at runtime) and
+  // declare the object type beside it.
+  return {
+    type: "object",
+    ...Type.Union(
+      SKILL_REGISTRY.map((entry) =>
+        Type.Object({
+          skill: Type.Literal(entry.name, { description: "The workflow skill to open" }),
+          effort: Type.String({ description: "The effort the skill works in" }),
+          ...(entry.takesTarget
+            ? { target: Type.String({ description: "The item the skill works on" }) }
+            : {}),
+        }),
+      ),
     ),
-  );
+  } as TSchema;
 }
 
 /**

@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
 import YAML from "yaml";
 import { createTools } from "../src/pi.js";
+import { SKILL_REGISTRY } from "../src/disclosure.js";
 import { parse, dump } from "../src/core/frontmatter.js";
 import {
   MAP_SECTION_NON_GOALS,
@@ -233,6 +234,32 @@ describe("task-workflow tools", () => {
         expect(typeof t.description).toBe("string");
         expect(typeof t.execute).toBe("function");
       }
+    });
+
+    test("every tool's parameter schema is a top-level object", () => {
+      // A strict OpenAI-compatible provider rejects a function whose schema has
+      // no `type` at the top level, and a bare TypeBox union serializes to
+      // `anyOf` alone. tw_open is declared in every state, so one such schema
+      // fails every request rather than one call. A tool declares either an
+      // explicit `parameters` schema or an `args` record, which pi turns into
+      // an object schema; both shapes have to be object at the top level.
+      const all = createTools() as unknown as Record<
+        string,
+        { parameters?: { type?: string }; args?: Record<string, unknown> }
+      >;
+      for (const [name, tool] of Object.entries(all)) {
+        const topLevel = tool.parameters ? tool.parameters.type : tool.args ? "object" : undefined;
+        expect(topLevel, `${name} must declare type: object`).toBe("object");
+      }
+    });
+
+    test("tw_open keeps the discriminated union under the object type", () => {
+      // Adding the top-level type must not flatten the union: the union is what
+      // tells a model which fields each skill takes.
+      const open = (tools.tw_open as unknown as { parameters: { type?: string; anyOf?: unknown[] } }).parameters;
+      expect(open.type).toBe("object");
+      expect(Array.isArray(open.anyOf)).toBe(true);
+      expect(open.anyOf!.length).toBe(SKILL_REGISTRY.length);
     });
   });
 

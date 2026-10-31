@@ -286,3 +286,31 @@ the narrowed scope leaves it nothing to say. Verification at the landing tip:
 `npx tsc --noEmit` and `npx tsc -p tsconfig.test.json` both exit 0, full suite
 18 files and 1182 tests against the 1146 baseline at 5c7aa33. Acceptance
 checkboxes stay unticked, matching every other landed ticket in this effort.
+
+### The opener schema blocked every strict provider
+
+The isolated probe that settled the landing-note question also found a
+blocker nobody had caught: with this package loaded as the only package, the
+first model call failed with `Invalid schema for function 'tw_open': schema
+must be a JSON Schema of 'type: "object"', got 'type: null'`. A TypeBox union
+serializes to a bare `anyOf` with no top-level `type`, DeepSeek and OpenAI
+both reject a function schema without it, and `tw_open` is in
+`ALWAYS_DECLARED`, so v5 could not complete a single request on a strict
+provider. The suite never saw it because every test drives the `faux`
+provider, which does not validate tool schemas the way a real API does, and
+`validateOpenArgs` only anticipates a provider that *flattens* the union.
+
+`buildOpenParameters` now declares `type: "object"` beside the union, so the
+discrimination a model reads is unchanged and the schema validates. Two pins
+guard it: every registered tool's top-level parameters are object-shaped
+(either an explicit schema or the `args` record pi turns into one), and
+`tw_open` keeps its `anyOf` with one member per registry entry, so adding the
+type cannot be mistaken for license to flatten the union.
+
+Verified against the real tree with a temporary config directory holding only
+this package and pi-subagents: `tw_open` opened `wayfinder` under DeepSeek and
+disclosed its toolset, and a background child holding
+`tw_write_ticket_note` in its allowlist wrote the note. The same probe with
+every package except this one reproduced
+`requested unavailable child tools`, which is what the landing failure was.
+The probe fixtures live under `/tmp/probe-landnote/` and are disposable.
