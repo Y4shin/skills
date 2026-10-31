@@ -3,8 +3,9 @@ type: ticket
 subtype: feature
 title: Reconcile the end-of-effort review findings against the shipped v5
 status: stable
-workflow_state: ready
-blocked_by: [docs-resync]
+workflow_state: done
+blocked_by:
+- docs-resync
 size: xl
 ---
 
