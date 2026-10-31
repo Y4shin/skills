@@ -282,7 +282,7 @@ Hard rule: on subagent failure the parent never implements. Its only moves are r
 
 **Split rules (sub-tickets, never ad-hoc files).** A split goes through
 `tw_split_ticket`, which creates the sub-tickets and supersedes the
-original, so the effort's graph absorbs it; no ad-hoc slice docs and no
+original, so the effort's graph absorbs it; no ad-hoc artifact docs and no
 ad-hoc numbering convention exist anymore:
 
 - `tw_split_ticket` writes each sub-ticket to

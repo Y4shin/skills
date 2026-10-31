@@ -228,8 +228,8 @@ separate bash block.
    tw_finalizable <ticket-slug>   # Pi tool, not a shell command
    ```
 
-7. **Call the Pi tool** to clear the current item (the state setter has no
-   slice field and it is not called):
+7. **Call the Pi tool** to clear the current item (the state setter takes
+   pointers only, so the task pointer is the one cleared):
 
    ```
    tw_state_set task null   # Pi tool, not a shell command
@@ -357,7 +357,7 @@ subtype and `blocked_by`, with the new sub edges chained between the subs
 and sizes taken from the diagnosis) and supersedes the original as
 `status: deprecated` plus `workflow_state: done` with a body note naming
 its sub-tickets, so the graph absorbs the split and the history reads. No
-ad-hoc slice docs and no ad-hoc numbering convention exist; hand edits to
+ad-hoc artifact docs and no ad-hoc numbering convention exist; hand edits to
 ticket files are refused by the write guard. Re-run the chain per
 sub-ticket; the frontier and dependency levels pick the sub-tickets up like
 any other ticket.

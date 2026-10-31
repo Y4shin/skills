@@ -1452,7 +1452,7 @@ function refusedOuttext(reason: string, legalNext: string[]): string {
 export function createTools(): Record<string, Tool> {
   return {
     tw_show: def(
-      "Show artifact frontmatter (map, task, or slice).",
+      "Show artifact frontmatter (map, planning task, or ticket).",
       { selector: Str("Slug or path"), json: OptBool },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);

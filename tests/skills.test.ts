@@ -3662,3 +3662,68 @@ describe("mechanical single homes (end-of-effort-reconciliation)", () => {
     expect(skill).toMatch(/combined diff/);
   });
 });
+
+// ─── Retired vocabulary across the live language (end-of-effort-reconciliation) ──
+//
+// The docs-resync pin checked CONTEXT.md only, so the retired terms survived in
+// skill prose and in a tool description. The check now runs over the live
+// language with targeted patterns: the tool names and path shapes that were
+// retired, never the ordinary English word ("a vertical slice" is craft
+// language, and the `slice-verifier` agent keeps its name).
+describe("retired vocabulary across the live language (end-of-effort-reconciliation)", () => {
+  const RETIRED_VOCABULARY: [string, RegExp][] = [
+    ["the retired slices/ directory", /(^|[^-\w])slices\//],
+    ["per-slice", /per-slice/i],
+    ["the tw_slices tool", /tw_slices/],
+    ["a slice in the artifact sense", /\bslice (doc|field|directory|substrate)s?\b/i],
+    ["mode: hitl/afk", /mode:\s*(hitl|afk)\b/i],
+    ["the retired triage skill", /\/skill:triage\b|skills\/engineering\/triage\b/],
+    ["the retired implement-task skill", /\/skill:implement-task\b|skills\/engineering\/implement-task\b/],
+    ["the retired finalize-task skill", /\/skill:finalize-task\b|skills\/engineering\/finalize-task\b/],
+    ["the retired docs/tasks/maps/ tree", /docs\/tasks\/maps\//],
+  ];
+
+  /** The live prose: promoted skills, docs pages, and the repo-level docs. */
+  function liveLanguage(): string[] {
+    const out: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) walk(path);
+        else if (entry.isFile() && entry.name.endsWith(".md")) out.push(path.slice(PROJECT.length + 1));
+      }
+    };
+    walk(join(PROJECT, "skills", "engineering"));
+    walk(join(PROJECT, "skills", "productivity"));
+    walk(join(PROJECT, "docs", "engineering"));
+    out.push("CONTEXT.md", "README.md", "skills/engineering/README.md", "skills/productivity/README.md");
+    // The compatibility layer keeps the old words by design: the upgrade
+    // resources and the migration prose record what the reshape renames.
+    return out.filter((rel) => !/^skills\/engineering\/setup-workflow\/resources\/upgrade-/.test(rel));
+  }
+
+  test("no live prose carries a retired term", () => {
+    const offenders: string[] = [];
+    for (const rel of liveLanguage()) {
+      const content = readFile(rel);
+      for (const [label, pattern] of RETIRED_VOCABULARY) {
+        if (pattern.test(content)) offenders.push(`${rel}: ${label}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("no registered tool description offers the retired vocabulary", () => {
+    // A tool description has no craft language to protect, so the bare word is
+    // retired there too: `tw_show` once offered "map, task, or slice".
+    const tools = createTools();
+    const offenders: string[] = [];
+    for (const [name, tool] of Object.entries(tools)) {
+      if (/\bslices?\b/i.test(tool.description)) offenders.push(`${name}: the retired word 'slice'`);
+      for (const [label, pattern] of RETIRED_VOCABULARY) {
+        if (pattern.test(tool.description)) offenders.push(`${name}: ${label}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
