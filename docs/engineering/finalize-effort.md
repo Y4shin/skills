@@ -13,7 +13,8 @@ too. That file is the advisory review `implement-ticket` recorded when the
 last ticket landed, through `tw_write_review` with `pass: "end-of-effort"`
 (the finalize pass owns `review.md`). Its findings are dispositioned in the
 same triage, so a finding that only lived in a run artifact cannot be
-archived untriaged.
+archived untriaged. The advisory file itself is an input, never a gate: it
+carries no dispositions, so `tw_archive_effort` ignores it.
 
 The phase opens through `tw_open` with the effort. The review artifact is
 `docs/tasks/<effort>/review.md`, written through `tw_write_review`, the only

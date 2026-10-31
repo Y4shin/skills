@@ -2524,11 +2524,16 @@ export function createTools(): Record<string, Tool> {
         // can complete inside the open phase: a refused archive still has the
         // triage tools declared.
         const liveDir = join(taskRoot(root), effortKey);
+        // The advisory end-of-effort review is an input to the finalize
+        // review, not a gate: its writer is forbidden from dispositioning
+        // findings, so counting it here would make every effort with an
+        // advisory review unarchivable.
         const unDispositioned = scanMemo(root)().hits.filter(
           (h) =>
             isInside(liveDir, h.path) &&
             h.art.type === "review" &&
             h.art.status !== "deprecated" &&
+            h.art.data.pass !== "end-of-effort" &&
             h.art.data.dispositioned !== true,
         );
         if (unDispositioned.length > 0) {

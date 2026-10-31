@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-import { dump } from "../src/core/frontmatter.js";
+import { dump, parse } from "../src/core/frontmatter.js";
 import { createTools } from "../src/pi.js";
 import { ALWAYS_DECLARED, buildOpenParameters } from "../src/disclosure.js";
 
@@ -239,5 +239,33 @@ describe("the archive clears the state pointer", () => {
     const state = readFileSync(join(repo, "docs", "tasks", "state.yaml"), "utf-8");
     expect(state).toContain("map: null");
     expect(state).not.toContain("map: closing");
+  });
+});
+
+describe("the advisory review does not block the archive", () => {
+  test("an effort with an end-of-effort review and a dispositioned finalize review archives", async () => {
+    const t = tools();
+    // The advisory pass writes its own file and cannot set dispositions.
+    await t.tw_write_review.execute(
+      { selector: "records", pass: "end-of-effort", content: "## Findings\n\n- A docs detail." },
+      ctx([...ALWAYS_DECLARED]),
+    );
+    // The finalize pass dispositions its own findings; the advisory file is
+    // an input, never a gate.
+    await t.tw_write_review.execute(
+      {
+        selector: "records",
+        content: "## Findings\n\n- A docs detail.",
+        findings: [{ finding: "A docs detail.", disposition: "informational" }],
+      },
+      ctx([...ALWAYS_DECLARED]),
+    );
+    // Mark the map finalizable so the archive gate is the only thing tested.
+    const ticketPath = join(repo, "docs", "tasks", "records", "tickets", "fix", "ticket.md");
+    const ticket = parse(readFileSync(ticketPath, "utf-8"));
+    ticket.data.workflow_state = "done";
+    writeFileSync(ticketPath, dump(ticket), "utf-8");
+    const out = (await t.tw_archive_effort.execute({ selector: "records" }, ctx([...ALWAYS_DECLARED]))) as string;
+    expect(out).toContain("archived 'records'");
   });
 });
