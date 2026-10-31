@@ -325,7 +325,7 @@ describe("disclosure core: telemetry absorption", () => {
       parameters: Type.Object({ skill_name: Type.String(), target: Type.Optional(Type.String()) }),
       execute: async (_id: string, args: Record<string, unknown>) => {
         telemetryCalls.push(args);
-        return { content: [{ type: "text", text: "recorded" }], details: {} };
+        return { content: [{ type: "text" as const, text: "recorded" }], details: {} };
       },
     };
     const s = await createTaskSession({
@@ -362,7 +362,7 @@ describe("disclosure core: telemetry absorption", () => {
       parameters: Type.Object({ skill_name: Type.String(), target: Type.Optional(Type.String()) }),
       execute: async (_id: string, args: Record<string, unknown>) => {
         telemetryCalls.push(args);
-        return { content: [{ type: "text", text: "recorded" }], details: {} };
+        return { content: [{ type: "text" as const, text: "recorded" }], details: {} };
       },
     };
     const s = await createTaskSession({

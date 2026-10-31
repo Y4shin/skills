@@ -1,7 +1,7 @@
 /**
  * Artifact model: represents the OKF artifacts in the docs/tasks/ tree.
  *
- * Pure data — no file I/O. The extension manages reading/writing files.
+ * Pure data, no file I/O. The extension manages reading/writing files.
  *
  * Two frontmatter shapes are read:
  * - v4: OKF `type` (the artifact kind) plus `subtype` (the workflow category).
@@ -508,7 +508,7 @@ export function dependencyLevels(items: WorkItemInfo[]): string[][] {
     }
 
     if (level.length === 0) {
-      // Circular dependency or orphaned blockers — assign the remaining
+      // Circular dependency or orphaned blockers: assign the remaining
       // ones anyway so the process doesn't deadlock
       for (const slug of remaining) level.push(slug);
     }

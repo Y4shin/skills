@@ -1,7 +1,7 @@
 /**
  * Integration-test harness for the task-workflow package.
  *
- * Spins up a real `AgentSession` backed by the `faux` LLM provider — no
+ * Spins up a real `AgentSession` backed by the `faux` LLM provider, no
  * network, no API keys. Canned responses drive the model; tests assert on
  * tool calls, filesystem state, and extension behaviour.
  *
@@ -30,12 +30,11 @@ import {
   type ExtensionFactory,
   type ExtensionUIContext,
   DefaultResourceLoader,
-  type Model,
   ModelRuntime,
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
+import { InMemoryCredentialStore, type Model } from "@earendil-works/pi-ai";
 
 export type { AssistantMessage, Context, FauxContentBlock };
 
@@ -62,7 +61,9 @@ function toStep(step: FauxStep): FauxResponseStep {
 }
 
 export const call = (name: string, args: Record<string, unknown> = {}, id?: string) =>
-  fauxToolCall(name, args, id ? { id } : undefined);
+  // The faux provider types tool arguments as JSON; the fixtures pass plain
+  // literal values, so the widened record casts at this one boundary.
+  fauxToolCall(name, args as never, id ? { id } : undefined);
 
 export interface NotifyRecord { message: string; type?: string }
 
@@ -161,7 +162,7 @@ export async function createTaskSession(options: TaskSessionOptions = {}): Promi
       reasoning: false,
       input: ["text"],
       maxTokens: 4096,
-      cost: { prompt: 0, completion: 0 },
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     }],
   });
 
@@ -238,7 +239,7 @@ export function toolCallNames(events: readonly AgentSessionEvent[]): string[] {
 
 export function assistantTexts(session: AgentSession): string[] {
   return session.messages
-    .filter((m): m is { role: string; content?: unknown } => (m as { role?: string }).role === "assistant")
+    .filter((m) => (m as { role?: string }).role === "assistant")
     .map((m) => {
       const c = (m as { content?: unknown }).content;
       if (typeof c === "string") return c;
@@ -254,7 +255,7 @@ export function lastAssistantText(session: AgentSession): string {
 
 export function toolResultTexts(session: AgentSession, toolName?: string): string[] {
   return session.messages
-    .filter((m): m is { role: string; toolName?: string; content?: unknown } => {
+    .filter((m) => {
       const mm = m as { role?: string; toolName?: string };
       return mm.role === "toolResult" && (toolName === undefined || mm.toolName === toolName);
     })
@@ -266,7 +267,10 @@ export function toolResultTexts(session: AgentSession, toolName?: string): strin
     });
 }
 
-export function latestToolResultText(context: Context, toolName: string): string | undefined {
+export function latestToolResultText(
+  context: { messages: readonly unknown[] },
+  toolName: string,
+): string | undefined {
   for (let i = context.messages.length - 1; i >= 0; i--) {
     const m = context.messages[i]! as { role?: string; toolName?: string; content?: unknown };
     if (m.role === "toolResult" && m.toolName === toolName) {

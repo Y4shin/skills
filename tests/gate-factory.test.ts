@@ -86,6 +86,8 @@ interface StubExtensionAPI extends ExtensionAPI {
   activeTools: string[];
   setActiveTools(toolNames: string[]): void;
   getActiveTools(): string[];
+  /** The one UI surface the extension touches; the stub records the notices. */
+  ui: { notify(message: string, level: string): void };
 }
 
 // The gated names the package currently ships: the runtime derives the list

@@ -70,7 +70,13 @@ function disclosureCtx(active: string[]) {
 
 interface ToolResult {
   text: string;
-  details: { opened?: boolean; closed?: boolean; reason?: string; open?: string[] };
+  details: {
+    opened?: boolean;
+    closed?: boolean;
+    reason?: string;
+    open?: string[];
+    legal_next?: string[];
+  };
 }
 
 describe("disclosure core: tw_open", () => {

@@ -3364,15 +3364,25 @@ describe("documentation re-sync (docs-resync)", () => {
     }
   });
 
-  test("the re-synced prose carries no em-dash", () => {
-    for (const file of [
-      "README.md",
-      "CONTEXT.md",
-      "skills/engineering/README.md",
-      "skills/productivity/README.md",
-    ]) {
-      expect(readFile(file), `${file} carries an em-dash`).not.toContain("\u2014");
+  test("no file in the corpus carries an em-dash", () => {
+    // AGENTS.md bans em-dashes in this repo's prose, and the check used to name
+    // four files, so a new one could never be caught. It runs over the corpus
+    // with the same skip rules as the other corpus checks (archived trees,
+    // vendored experiment trees, node_modules/.git), plus the historical
+    // records those checks already exempt.
+    const offenders: string[] = [];
+    for (const file of corpusFiles(PROJECT)) {
+      const rel = file.slice(PROJECT.length + 1);
+      if (rel === "docs/tasks/CHANGELOG.md") continue;
+      let text = "";
+      try {
+        text = readFileSync(file, "utf-8");
+      } catch {
+        continue; // a binary file cannot carry prose punctuation
+      }
+      if (text.includes("\u2014")) offenders.push(rel);
     }
+    expect(offenders).toEqual([]);
   });
 
   test("the top-level README describes the v5 arc", () => {
@@ -3725,5 +3735,71 @@ describe("retired vocabulary across the live language (end-of-effort-reconciliat
       }
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+// ─── The gates and hygiene (end-of-effort-reconciliation) ────────────────────
+
+describe("the gates and hygiene (end-of-effort-reconciliation)", () => {
+  const pkg = JSON.parse(readFile("package.json"));
+  const testing = readFile("docs/testing.md");
+
+  test("the tests are typechecked: tsconfig.test.json and a recorded script", () => {
+    // The recorded `tsc --noEmit` never saw a changed test line, because the
+    // base config includes src/** only.
+    const config = JSON.parse(readFile("tsconfig.test.json"));
+    expect(config.include).toContain("tests/**/*.ts");
+    expect(config.include).toContain("src/**/*.ts");
+    expect(config.extends).toBe("./tsconfig.json");
+    expect(pkg.scripts["typecheck:tests"]).toBe("tsc -p tsconfig.test.json");
+    // It is part of the CI protocol the test-runner reads.
+    const always = testing.slice(testing.indexOf("Run these always"), testing.indexOf("Run if asked"));
+    expect(always).toContain("npm run typecheck:tests");
+  });
+
+  test("the changesets hold one major entry for v5 and no retired skill entry", () => {
+    const entries = readdirSync(join(PROJECT, ".changeset")).filter((name) => name.endsWith(".md"));
+    // README.md is the folder's own documentation, not an entry.
+    const releases = entries.filter((name) => name !== "README.md");
+    expect(releases.length).toBe(1);
+    // The one entry is the v5 release note: no pending entry describes a
+    // retired skill (three of the four swept entries described
+    // `implement-task`, so the next release would have published notes for a
+    // skill that no longer exists).
+    expect(releases[0]).toBe("enforced-workflow-v5.md");
+    const content = readFile(join(".changeset", releases[0]!));
+    expect(content).toMatch(/"task-workflow":\s*major/);
+    expect(content).toMatch(/v5|schema 5|schema_version 5/i);
+    for (const name of ["end-of-effort-workflow", "quiet-chain-dispatch", "scoped-uncertainty-tool", "shipped-ticket-chain"]) {
+      expect(existsSync(join(PROJECT, ".changeset", `${name}.md`)), name).toBe(false);
+    }
+    // The version bump is a release action, not this ticket's.
+    expect(pkg.version).toBe("4.0.0");
+  });
+
+  test("the orphaned flow map and the stale handoff are gone", () => {
+    expect(existsSync(join(PROJECT, "docs/workflow-flows.md"))).toBe(false);
+    expect(existsSync(join(PROJECT, "handoff-enforced-workflow-v5.md"))).toBe(false);
+    // No live prose links either one; the historical records under docs/tasks/
+    // may still name them.
+    const offenders = corpusFiles(PROJECT)
+      .map((file) => file.slice(PROJECT.length + 1))
+      .filter(
+        (rel) =>
+          !rel.startsWith("docs/tasks/") &&
+          !rel.startsWith(".git/") &&
+          // This file names both paths to pin their absence.
+          rel !== "tests/skills.test.ts",
+      );
+    for (const rel of offenders) {
+      let text = "";
+      try {
+        text = readFileSync(join(PROJECT, rel), "utf-8");
+      } catch {
+        continue;
+      }
+      expect(text, `${rel} links the deleted flow map`).not.toContain("docs/workflow-flows.md");
+      expect(text, `${rel} links the deleted handoff`).not.toContain("handoff-enforced-workflow-v5.md");
+    }
   });
 });

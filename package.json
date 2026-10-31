@@ -1,7 +1,7 @@
 {
   "name": "task-workflow",
   "version": "4.0.0",
-  "description": "Wayfinder grilling → task frontier → type-specific execution — a planning workflow for docs/tasks/. Pi extension.",
+  "description": "Wayfinder grilling \u2192 task frontier \u2192 type-specific execution: a planning workflow for docs/tasks/. Pi extension.",
   "keywords": [
     "pi-package"
   ],
@@ -9,6 +9,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc -p tsconfig.test.json",
     "changeset": "changeset",
     "version": "changeset version"
   },

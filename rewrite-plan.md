@@ -1,4 +1,4 @@
-# task-workflow v2 — Clean-Slate Rewrite
+# task-workflow v2: Clean-Slate Rewrite
 
 A from-scratch reimagining of this package. Incorporates lessons from the
 original v1 codebase and from real pipeline runs (see `FEEDBACK.md`).
@@ -8,7 +8,7 @@ original v1 codebase and from real pipeline runs (see `FEEDBACK.md`).
 1. **The three-phase model** (plan → implement → finalize) is sound.
 2. **The task/slice hierarchy** (task = feature, slice = vertical tracer-bullet)
    is a good decomposition model.
-3. **`docs/tasks/` as the single source of truth** — no external issue tracker,
+3. **`docs/tasks/` as the single source of truth**: no external issue tracker,
    everything in git.
 
 ## What the Old One Got Wrong
@@ -34,7 +34,7 @@ original v1 codebase and from real pipeline runs (see `FEEDBACK.md`).
    substitution, subagent lifecycle, artifact discovery.
 
 6. **Skills are too long.** `pipeline-slices/SKILL.md` is 300+ lines of inline
-   JavaScript pseudocode — half error-handling loops.
+   JavaScript pseudocode, half error-handling loops.
 
 7. **Every skill duplicates the pre-flight check.** 7 files, same 15-line block.
 
@@ -64,8 +64,8 @@ original v1 codebase and from real pipeline runs (see `FEEDBACK.md`).
 
 1. **Three layers, not five.**
    - **One extension** (TypeScript): registers `tw_*` tools
-   - **Agent definitions** (markdown) — subagent behavior
-   - **N skills** (SKILL.md) — orchestration instructions for the parent
+   - **Agent definitions** (markdown): subagent behavior
+   - **N skills** (SKILL.md): orchestration instructions for the parent
    No chain JSON files. No barrel exports. No `dist/` build output.
 
 2. **Skills describe orchestration; agents describe execution.**
@@ -73,13 +73,13 @@ original v1 codebase and from real pipeline runs (see `FEEDBACK.md`).
    how to behave. Neither references a chain JSON.
 
 3. **Algorithms belong in tools, not in skill prose.** Dependency resolution,
-   dependency-level computation, artifact tree walks — all implemented as
+   dependency-level computation, artifact tree walks, all implemented as
    extension tools. The LLM calls the tool and gets structured JSON back.
 
 4. **Subagents are for parallelism, isolation, and focus.**
    - **Parallelism**: non-dependent slices implement concurrently via git worktrees
    - **Isolation**: each subagent starts with a clean fork of context
-   - **Focus**: subagents run *inside worktrees* — the parent stays clean
+   - **Focus**: subagents run *inside worktrees*, so the parent stays clean
 
 5. **Failures must have recovery paths.** A verifier failure re-dispatches the
    TDD worker with the error output. Timeouts must not lose partial work.
@@ -109,7 +109,7 @@ agents/
   land-worker.md                  # Purely mechanical: merge + archive + commit (NO code writing)
 
 skills/
-  task-overview/SKILL.md          # Entry point — routes queries
+  task-overview/SKILL.md          # Entry point: routes queries
   create-task/SKILL.md            # Interactive: interview → write task + slice docs
   implement-task/SKILL.md         # Orchestrate parallel slice implementation
   finalize-task/SKILL.md          # CI gate + archive + merge
@@ -122,7 +122,7 @@ tests/
   state.test.ts                   # State model (pure)
 ```
 
-Files deleted from v1 — all dead, deprecated, or merged:
+Files deleted from v1, all dead, deprecated, or merged:
 
 | Pattern | Count | Reason |
 |---|---|---|
@@ -159,11 +159,11 @@ Files deleted from v1 — all dead, deprecated, or merged:
 
 The parent agent interviews the user one question at a time:
 
-1. **Task definition** — title, description, user stories, layers,
+1. **Task definition**: title, description, user stories, layers,
    boundaries, out-of-scope
-2. **Slice breakdown** — vertical pieces with `blocked_by` edges and
+2. **Slice breakdown**: vertical pieces with `blocked_by` edges and
    `size` (S/M/L/XL)
-3. **Per-slice testing strategy** — asked inline: what layers, what
+3. **Per-slice testing strategy**: asked inline, what layers, what
    failure modes, what scenarios
 
 The parent writes the task doc and all slice docs directly. No subagents.
@@ -220,7 +220,7 @@ for each level in levels:
 - **Verifier failures get a retry path.** Instead of stopping, re-dispatch
   TDD worker with the specific error output.
 - **Land step is a restricted agent** (`land-worker`) with code write tools
-  removed — it can only merge, archive, and commit.
+  removed: it can only merge, archive, and commit.
 - **Checkpoint commits:** The TDD worker commits after each GREEN cycle
   (`git commit -m "wip: <slice> test N passing"`). If a timeout fires,
   partial work is on the worktree branch, not lost.
@@ -235,7 +235,7 @@ for each level in levels:
 
 1. Run CI hard gate
 2. Harvest knowledge into project docs
-3. Write changelog entry (parent writes it — it's 3-5 lines from `git log`)
+3. Write changelog entry (parent writes it: it's 3-5 lines from `git log`)
 4. Archive task directory
 5. Merge to main
 
@@ -291,7 +291,7 @@ cannot drift into editing production code.
 
 **Why separate from the parent?** Enforces scope. The v1 land step kept
 drifting into writing the next slice's code. This agent has `tools: read,
-bash` only — no `write` or `edit`. It literately cannot write code.
+bash` only, no `write` or `edit`. It literally cannot write code.
 
 ### What we drop
 
@@ -358,13 +358,13 @@ One file (`src/pi.ts`). Registers:
 ### New tool: `tw_dependency_levels`
 
 Reads task slug, computes BFS dependency levels from `blocked_by` edges,
-returns JSON. Pure algorithm — the LLM should not implement BFS in prose.
+returns JSON. Pure algorithm: the LLM should not implement BFS in prose.
 
 ### Task tools (17 total)
 
 Dropped from v1:
-- `task_workflow_gate` — unused; skills check via bash
-- `task_lint` — lives in slice-verifier, not a registered tool
+- `task_workflow_gate`: unused; skills check via bash
+- `task_lint`: lives in slice-verifier, not a registered tool
 
 Renamed:
 - `task_reference` + `task_profile` → `tw_context`
@@ -388,8 +388,8 @@ Simplified. No auto-notification hooks on `message_end`.
 ### Lifecycle hooks
 
 Kept:
-- `before_agent_start` — inject coding guidelines
-- `session_start` — detect pi-subagents availability
+- `before_agent_start`: inject coding guidelines
+- `session_start`: detect pi-subagents availability
 
 Dropped:
 - ObservMe env-var injection (belongs in ObservMe package)
@@ -418,8 +418,8 @@ slice: null    # active slice slug
 ```
 
 Dropped from v1:
-- `active.map` — redundant (map field is in task frontmatter)
-- `last_action`, `next_action` — redundant (parent reads frontmatter status)
+- `active.map`: redundant (map field is in task frontmatter)
+- `last_action`, `next_action`: redundant (parent reads frontmatter status)
 
 ---
 
@@ -438,7 +438,7 @@ Dropped from v1:
 | Verifier failure | Chain stops, manual fix | Retry: re-dispatch TDD with errors |
 | Divergence check | Separate step, caught nothing | Deleted |
 | Land step scope | Drifted into writing code | `land-worker`: no write tools at all |
-| Checkpoint commits | None — timeout lost work | Commit after each GREEN |
+| Checkpoint commits | None: a timeout lost work | Commit after each GREEN |
 | Turn budget | Fixed per chain | S/M/L/XL from slice frontmatter |
 | Pre-flight checks | Copy-pasted × 7 skills | Removed entirely |
 | Slice tool support | Broken (feedback_01.md) | All tools accept slices |

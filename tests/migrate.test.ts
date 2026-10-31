@@ -11,8 +11,8 @@ import { migrate, verifyStagedWrite, type TreePort } from "../src/core/migrate.j
 import { parse, dump } from "../src/core/frontmatter.js";
 import { readMapSection } from "../src/core/art.js";
 
-function parseYamlFileForTest(text: string): unknown {
-  return YAML.parse(text);
+function parseYamlFileForTest(text: string): Record<string, unknown> {
+  return YAML.parse(text) as Record<string, unknown>;
 }
 
 /** An in-memory TreePort: staged changes land only on commit. */

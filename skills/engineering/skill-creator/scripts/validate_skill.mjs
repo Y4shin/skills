@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// validate_skill.mjs — Validate an Agent Skill directory against the spec.
+// validate_skill.mjs: Validate an Agent Skill directory against the spec.
 //
 // Usage: node validate_skill.mjs <skill-dir>
 //

@@ -1329,7 +1329,7 @@ describe("task-workflow tools: tw_finalize_map, the ready_for_spec checking tool
 
   test("reports every failed check together, exactly what is missing", async () => {
     const t = mkTmp(); seedPlanningTree(t);
-    const error = await tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t)).catch((e) => e);
+    const error = await tools.tw_finalize_map.execute({ selector: "specgate" }, ctx(t)).catch((e: Error) => e);
     expect(error.message).toMatch(/3 check\(s\) failed/);
     expect(error.message).toMatch(/planning frontier is not empty: decide/);
     expect(error.message).toMatch(/'## Non-goals' is empty/);

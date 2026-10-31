@@ -1,5 +1,5 @@
 /**
- * Unit tests for repo-gate — pure gate-detection logic.
+ * Unit tests for repo-gate: pure gate-detection logic.
  *
  * These tests cover normalizeRemote, readOriginRemote, isWorkRepo,
  * readGateConfig, and resolveGate. No pi runtime, no real git repo required
@@ -99,7 +99,7 @@ describe("readOriginRemote", () => {
   test("reads origin URL from synthetic .git/config", () => {
     const existsSync = (p: string) => p === "/repo/.git";
     const isDir = () => true;
-    const readFileSync = (p: string) => {
+    const readFileSync = (p: string, _encoding: "utf-8" = "utf-8"): string => {
       if (p === "/repo/.git/config") {
         return '[remote "origin"]\n\turl = git@github.com:QNCGmbH/openai.git\n';
       }
@@ -113,7 +113,7 @@ describe("readOriginRemote", () => {
   test("returns null when .git directory has no origin remote", () => {
     const existsSync = (p: string) => p === "/repo/.git";
     const isDir = () => true;
-    const readFileSync = (p: string) => {
+    const readFileSync = (p: string, _encoding: "utf-8" = "utf-8"): string => {
       if (p === "/repo/.git/config") {
         return '[remote "upstream"]\n\turl = git@github.com:QNCGmbH/openai.git\n';
       }
@@ -151,14 +151,14 @@ describe("readOriginRemote", () => {
 });
 
 describe("readGateConfig", () => {
-  function notFound() {
+  function notFound(): never {
     const err = new Error("ENOENT") as NodeJS.ErrnoException;
     err.code = "ENOENT";
     throw err;
   }
 
   test("missing settings files returns defaults with no diagnostics", () => {
-    const readFileSync = () => notFound();
+    const readFileSync = (): string => notFound();
     const result = readGateConfig("/repo", {
       readFileSync,
       globalSettingsPath: "/global/settings.json",
@@ -178,9 +178,9 @@ describe("readGateConfig", () => {
         },
       }),
     };
-    const readFileSync = (p: string) => {
+    const readFileSync = (p: string, _encoding: "utf-8" = "utf-8"): string => {
       if (files[p]) return files[p];
-      notFound();
+      return notFound();
     };
     const result = readGateConfig("/repo", {
       readFileSync,
@@ -203,9 +203,9 @@ describe("readGateConfig", () => {
         taskWorkflow: { enable: false },
       }),
     };
-    const readFileSync = (p: string) => {
+    const readFileSync = (p: string, _encoding: "utf-8" = "utf-8"): string => {
       if (files[p]) return files[p];
-      notFound();
+      return notFound();
     };
     const result = readGateConfig("/repo", {
       readFileSync,
@@ -223,9 +223,9 @@ describe("readGateConfig", () => {
         taskWorkflow: { disableOnRepo: "oops" },
       }),
     };
-    const readFileSync = (p: string) => {
+    const readFileSync = (p: string, _encoding: "utf-8" = "utf-8"): string => {
       if (files[p]) return files[p];
-      notFound();
+      return notFound();
     };
     const result = readGateConfig("/repo", {
       readFileSync,
@@ -244,9 +244,9 @@ describe("readGateConfig", () => {
         taskWorkflow: { enable: "no" },
       }),
     };
-    const readFileSync = (p: string) => {
+    const readFileSync = (p: string, _encoding: "utf-8" = "utf-8"): string => {
       if (files[p]) return files[p];
-      notFound();
+      return notFound();
     };
     const result = readGateConfig("/repo", {
       readFileSync,
@@ -264,9 +264,9 @@ describe("readGateConfig", () => {
         taskWorkflow: { disableOnRepo: ["[", "^github\\.com/QNCGmbH/.*$"] },
       }),
     };
-    const readFileSync = (p: string) => {
+    const readFileSync = (p: string, _encoding: "utf-8" = "utf-8"): string => {
       if (files[p]) return files[p];
-      notFound();
+      return notFound();
     };
     const result = readGateConfig("/repo", {
       readFileSync,
@@ -282,9 +282,9 @@ describe("readGateConfig", () => {
     const files: Record<string, string> = {
       "/global/settings.json": "not json",
     };
-    const readFileSync = (p: string) => {
+    const readFileSync = (p: string, _encoding: "utf-8" = "utf-8"): string => {
       if (files[p]) return files[p];
-      notFound();
+      return notFound();
     };
     const result = readGateConfig("/repo", {
       readFileSync,

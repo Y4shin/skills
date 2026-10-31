@@ -3,7 +3,9 @@
 ## Framework
 
 - [Vitest](https://vitest.dev/) (`vitest run`), test files under `tests/`.
-- Type checking: `tsc --noEmit` (no emitted build; `type: module`).
+- Type checking: `tsc --noEmit` for `src/**` (no emitted build;
+  `type: module`), and `tsc -p tsconfig.test.json` for the test sources
+  (`tsconfig.test.json` extends the base config and adds `tests/**/*.ts`).
 
 ## Test protocol
 
@@ -14,7 +16,9 @@ the caller passes its number.
 Run these always:
 
 - `npm test` -- the full test suite
-- `npm run typecheck` -- type-check without emitting
+- `npm run typecheck` -- type-check `src/**` without emitting
+- `npm run typecheck:tests` -- type-check `tests/**` through
+  `tsconfig.test.json` (the base config includes `src/**` only)
 
 Run if asked (by number):
 
