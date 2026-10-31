@@ -11,7 +11,7 @@
 
 The `docs/tasks/` directory tree: one directory per effort holding `map.md`,
 an optional `spec.md`, an optional `architecture.md`, a `tasks/`
-subdirectory of decision tasks, and a `tickets/` subdirectory of
+subdirectory of planning tasks, and a `tickets/` subdirectory of
 implementation tickets; plus `archive/`, `out-of-scope/`, `state.yaml`,
 `index.md`, and `CHANGELOG.md` at the root.
 
