@@ -25,6 +25,20 @@ activates the toolset only when the check passes. Work only through the
 tools the opener discloses, and close the phase with
 `tw_close finalize-effort` when the run releases.
 
+## Reconcile the living architecture first
+
+Every end-of-effort reconcile runs before the last landing, so the design
+record can be stale exactly where the close matters most. Before the review,
+reconcile `architecture.md` against what actually landed: read the deviation
+reports, the ticket notes, and the diff, and record the corrected document
+through `tw_write_architecture` (this phase holds the writer). This
+reconciles the record; it never fixes code.
+
+On a schema-4 tree the v5 architecture writer refuses the legacy
+`arch-spec.md`, so the reconcile is unavailable until the repo migrates. Say
+so in the review and treat the stale legacy document as a recorded gap
+rather than rewriting it by hand.
+
 ## One holistic review pass
 
 Read the effort as a whole, not one ticket at a time: the map, the

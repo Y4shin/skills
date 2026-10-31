@@ -216,11 +216,14 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // tw_archive_effort is its signature tool; tw_write_review is the review
     // artifact's only writer. tw_create_effort is disclosed here because an
     // accepted follow-up is created inside this phase, and intake (the other
-    // discloser) is mutually exclusive with it.
+    // discloser) is mutually exclusive with it. tw_write_architecture is
+    // disclosed because the close reconciles the living architecture against
+    // what actually landed: no earlier reconcile can see the last landing.
     toolset: [
       "tw_archive_effort",
       "tw_finalizable",
       "tw_write_review",
+      "tw_write_architecture",
       "tw_add_ticket",
       "tw_create_effort",
       "tw_get",

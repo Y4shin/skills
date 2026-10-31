@@ -728,6 +728,7 @@ describe("the phase-to-toolset registry", () => {
         "tw_finalizable",
         "tw_get",
         "tw_list",
+        "tw_write_architecture",
         "tw_write_review",
       ],
       "skill-creator": ["skill_discover", "skill_scaffold", "skill_validate", "tw_show"],

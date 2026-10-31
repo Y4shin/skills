@@ -281,3 +281,20 @@ describe("the advisory review does not block the archive", () => {
     expect(out).toContain("archived 'records'");
   });
 });
+
+describe("advisory dispositions are validated like finalize ones", () => {
+  test("an advisory ticket disposition naming a missing ticket is refused", async () => {
+    const t = tools();
+    await expect(
+      t.tw_write_review.execute(
+        {
+          selector: "ticketready",
+          pass: "end-of-effort",
+          content: "## Findings\n\n- x",
+          findings: [{ finding: "x", disposition: "ticket", target: "does-not-exist" }],
+        },
+        ctx([...ALWAYS_DECLARED]),
+      ),
+    ).rejects.toThrow(/not an existing ticket/);
+  });
+});

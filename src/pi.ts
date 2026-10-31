@@ -918,6 +918,45 @@ function parseReviewFindings(raw: unknown): ReviewFinding[] | undefined {
 }
 
 /** One finding's line in the tool-owned `## Dispositions` record. */
+/**
+ * Validate every disposition target a review write supplies against the tree.
+ * A `ticket` disposition names a ticket this effort already has; a
+ * `follow-up` names a live effort linked back by origin_effort. Both review
+ * passes share it: an advisory disposition with a typo would otherwise record
+ * "ticketed to X" for a ticket that does not exist, and the archive skips
+ * advisory artifacts, so nothing would ever catch it.
+ */
+function validateReviewTargets(
+  root: string,
+  index: ScanIndex,
+  effortDir: string,
+  effortName: string,
+  findings: ReviewFinding[],
+): void {
+  for (const finding of findings) {
+    if (finding.disposition === "ticket") {
+      const known = index.hits.find(
+        (h) => h.art.type === "ticket" && h.art.slug === finding.target && isInside(effortDir, h.path),
+      );
+      if (known === undefined) {
+        throw new Error(
+          `ticket disposition for '${finding.finding}' names '${finding.target}', which is not an ` +
+            `existing ticket in '${effortName}'`,
+        );
+      }
+      continue;
+    }
+    if (finding.disposition === "follow-up") {
+      requireLinkedFollowUp(
+        root,
+        effortName,
+        finding.target!,
+        `finding '${finding.finding}'`,
+      );
+    }
+  }
+}
+
 function reviewDispositionLine(finding: ReviewFinding): string {
   switch (finding.disposition) {
     case "ticket":
@@ -1945,6 +1984,9 @@ export function createTools(): Record<string, Tool> {
           const givenTitle = typeof p.title === "string" && p.title.trim() !== "" ? p.title.trim() : undefined;
           const title = givenTitle ?? `End-of-effort review of ${basename(effortDir)}`;
           const advisoryFindings = parseReviewFindings(p.findings);
+          if (advisoryFindings !== undefined) {
+            validateReviewTargets(root, scanMemo(root)(), effortDir, basename(effortDir), advisoryFindings);
+          }
           const body =
             advisoryFindings === undefined
               ? `\n${content}\n`
@@ -1973,30 +2015,11 @@ export function createTools(): Record<string, Tool> {
         const followUp =
           typeof p.follow_up === "string" && p.follow_up.trim() !== "" ? p.follow_up.trim() : undefined;
 
-        // Every disposition's target is validated against the tree: a ticket
-        // disposition names a ticket this effort already has, and a follow-up
-        // names an effort linked back by origin_effort.
+        // Every disposition's target is validated against the tree, in both
+        // passes: a ticket disposition names a ticket this effort already has,
+        // a follow-up names an effort linked back by origin_effort.
         const index = scanMemo(root)();
-        for (const finding of findings ?? []) {
-          if (finding.disposition === "ticket") {
-            const known = index.hits.find(
-              (h) =>
-                h.art.type === "ticket" &&
-                h.art.slug === finding.target &&
-                isInside(effortDir, h.path),
-            );
-            if (known === undefined) {
-              throw new Error(
-                `ticket disposition for '${finding.finding}' names '${finding.target}', which is not an ` +
-                  `existing ticket in '${effortName}'`,
-              );
-            }
-            continue;
-          }
-          if (finding.disposition === "follow-up") {
-            requireLinkedFollowUp(root, effortName, finding.target!, `finding '${finding.finding}'`);
-          }
-        }
+        if (findings !== undefined) validateReviewTargets(root, index, effortDir, effortName, findings);
 
         const dispositioned = findings !== undefined && findings.every((f) => f.disposition !== undefined);
         const followUpFindings = (findings ?? []).filter((f) => f.disposition === "follow-up");

@@ -17,6 +17,12 @@ same triage, recorded in place with `tw_write_review` and
 run artifact cannot be archived untriaged. The advisory file is an input,
 never a gate: `tw_archive_effort` ignores it.
 
+Before the review, the phase reconciles the living architecture against what
+landed: every end-of-effort reconcile runs before the last landing, so the
+close holds `tw_write_architecture` and records the corrected document. On a
+schema-4 tree the v5 writer refuses the legacy `arch-spec.md`, so the gap is
+recorded in the review instead.
+
 The phase opens through `tw_open` with the effort. The review artifact is
 `docs/tasks/<effort>/review.md`, written through `tw_write_review`, the only
 writer of it. Every finding is dispositioned exactly one way:
