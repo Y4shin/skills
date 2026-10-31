@@ -129,8 +129,9 @@ runId = subagent({
         ticket: ticketSlug,
         ticketPath: ticketPath,
         subtype: "<feature|bug>",
-        // bug only: read the bug doc path and the reproduction path
-        // from the ticket body.
+        // bug only, optional: a separate bug doc and reproduction path,
+        // passed only when the ticket body names them. Schema 5 keeps the
+        // defect record in the ticket body, so most bug tickets pass neither.
         bugPath: bugPath,
         reproPath: reproPath
     }

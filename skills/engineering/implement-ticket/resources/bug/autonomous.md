@@ -11,16 +11,20 @@ plus the ticket doc.
 
 The ticket resolves through the resolver (a slug or a path, both tree shapes);
 the ticket document lives at
-`docs/tasks/<effort>/tickets/<ticket-slug>/ticket.md`. The bug doc (under
-`docs/bugs/`) and the reproduction are referenced from the ticket body: the
-old bug frontmatter field is dead, the reference moved into the body.
+`docs/tasks/<effort>/tickets/<ticket-slug>/ticket.md`. The ticket body is the
+defect record and the reproduction: it carries the steps, the expected versus
+actual behavior, and the impact. A separate bug doc under `docs/bugs/` is a
+static archive in schema 5, so a reference to one is optional and passed only
+when the body names it.
 
 ```
 const effortSlug = "<effort-slug>"
 const ticketPath = `docs/tasks/${effortSlug}/tickets/${ticketSlug}/ticket.md`
-// Read the ticket body for the bug doc path and the reproduction path.
-const bugPath = <from the ticket body>
-const reproPath = <from the ticket body>
+// The ticket body is the defect record: schema 5 makes docs/bugs a static
+// archive. Pass bugPath and reproPath only when the body names a separate
+// bug doc or reproduction that exists; both are optional.
+const bugPath = <from the ticket body, or omit>
+const reproPath = <from the ticket body, or omit>
 ```
 
 ## Step 1  --  Single chain dispatch
@@ -71,6 +75,7 @@ runId = subagent({
         ticket: ticketSlug,
         ticketPath: ticketPath,
         subtype: "bug",
+        // optional: only when the ticket body names separate evidence paths
         bugPath: bugPath,
         reproPath: reproPath
     }

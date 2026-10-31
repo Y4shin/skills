@@ -240,6 +240,11 @@ describe("seam 5 - chain and end-of-effort return shapes unchanged", () => {
     expect(chain).toMatch(/ok: false/);
     expect(chain).toMatch(/failed: "args"/);
     expect(chain).toMatch(/error: "ticket-chain\.js missing required args/);
+    // Schema 5 bug tickets carry the defect record in the ticket body, so a
+    // separate bug doc and reproduction are optional pointers, never
+    // required args: requiring them refused every bug ticket at the gate.
+    expect(chain).not.toMatch(/missing\.push\("bugPath"\)/);
+    expect(chain).not.toMatch(/missing\.push\("reproPath"\)/);
     expect(chain).toMatch(/step: gate/);
     expect(chain).toMatch(/refs/);
 

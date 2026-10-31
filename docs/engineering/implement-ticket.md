@@ -28,8 +28,9 @@ isolation is a recorded follow-up, not current behaviour.
 **The per-ticket chain** is one pre-canned workflow script,
 `scripts/ticket-chain.js` in the skill directory (shared by the feature and
 bug pipelines): the model resolves the ticket's parameters (effort, ticket,
-subtype, ticket and bug paths, plus runtime context pointers as `extra`: a
-recorded resolution, prior-attempt outputs) and launches it once with those
+subtype, the optional separate bug and reproduction paths, plus runtime
+context pointers as `extra`: a recorded resolution, prior-attempt outputs)
+and launches it once with those
 `args`; the script owns the preconditions gate, step order, ok-gates, and
 output bindings, and returns a structured `{ ok, failed, step, refs }`
 result. Child tasks carry identity and pointers only; procedure lives in

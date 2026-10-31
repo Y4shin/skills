@@ -1,6 +1,6 @@
 ---
 name: implement-preconditions
-description: Read-only gate that verifies a ticket chain's preconditions before any worker launches. Confirms the ticket doc exists and matches the dispatched effort, subtype, and mode; for bugs also the bug doc and reproduction. Refuses (fails) on any mismatch. Never edits anything.
+description: Read-only gate that verifies a ticket chain's preconditions before any worker launches. Confirms the ticket doc exists and matches the dispatched effort, subtype, and mode; for bugs also that the ticket carries its reproduction evidence. Refuses (fails) on any mismatch. Never edits anything.
 tools: read, submit_feedback
 inheritProjectContext: true
 defaultContext: fresh
@@ -22,10 +22,16 @@ tool, and reading a missing path is itself the existence check.
    back to `type` for legacy artifacts, defaulting to `feature` when both
    are absent) and compare it to the subtype in your task. A mismatch is a
    refusal.
-5. **Bug tickets reference their evidence** (bug subtype only): read the
-   bug doc path and the reproduction path given in your task, confirming the
-   ticket body references both. A path that cannot be read is a refusal, as
-   is a body that references neither.
+5. **Bug tickets carry their reproduction** (bug subtype only). Schema 5
+   retires `docs/bugs/` as a live substrate: a bug ticket's own body is the
+   defect record, so a self-contained body passes this check, and a separate
+   bug doc or reproduction path is an optional pointer rather than a
+   requirement. Pass when the
+   body carries how to reproduce the defect (steps, or expected versus
+   actual, or a named reproduction command). When your task names a bug doc
+   path or a reproduction path, that path must be readable and the body must
+   reference it; an unreadable named path is a refusal. Your task may name
+   neither, which is normal for a schema-5 ticket.
 
 ## Verdict protocol
 
@@ -48,8 +54,8 @@ writing files.
 ## On success
 
 Reply with one line per check confirming what was verified: the path read,
-the frontmatter `type`, the mode, the subtype, and for bugs the two
-evidence paths.
+the frontmatter `type`, the mode, the subtype, and for bugs where the
+reproduction evidence sits (the ticket body, or the named path).
 
 ## Workflow feedback
 

@@ -25,8 +25,10 @@
 //   ticket      required   ticket slug
 //   ticketPath  required   path to the ticket's ticket.md
 //   subtype     optional   "feature" (default) or "bug"
-//   bugPath     bug only   path to the bug doc, read from the ticket body
-//   reproPath   bug only   path to the reproduction, read from the ticket body
+//   bugPath     optional   path to a separate bug doc, only when one exists
+//                          (schema 5 retires docs/bugs as a live substrate)
+//   reproPath   optional   path to a separate reproduction, only when one
+//                          exists; the ticket body is the defect record
 //   extra       optional   pointers to runtime context for the tdd step
 //                          (the recorded resolution, prior-attempt outputs);
 //                          appended as "Additional context, read before
@@ -64,12 +66,14 @@
 
 const subtype = args.subtype === "bug" ? "bug" : "feature";
 
+// A bug ticket's evidence lives in its own body: schema 5 makes docs/bugs a
+// static archive, so a separate bug doc and reproduction are optional
+// pointers, never required args. Requiring them refused every schema-5 bug
+// ticket at the preconditions gate.
 const missing = [];
 if (!args.effort) missing.push("effort");
 if (!args.ticket) missing.push("ticket");
 if (!args.ticketPath) missing.push("ticketPath");
-if (subtype === "bug" && !args.bugPath) missing.push("bugPath");
-if (subtype === "bug" && !args.reproPath) missing.push("reproPath");
 if (missing.length > 0) {
   return {
     ok: false,
@@ -84,9 +88,8 @@ function gateTask() {
     "",
     "Ticket doc: " + args.ticketPath
   ];
-  if (subtype === "bug") {
-    lines.push("Bug doc: " + args.bugPath, "Reproduction: " + args.reproPath);
-  }
+  if (subtype === "bug" && args.bugPath) lines.push("Bug doc: " + args.bugPath);
+  if (subtype === "bug" && args.reproPath) lines.push("Reproduction: " + args.reproPath);
   return lines.join("\n");
 }
 
@@ -111,10 +114,10 @@ function bugTddTask() {
   const lines = [
     'Implement ticket "' + args.ticket + '" for bug effort "' + args.effort + '".',
     "",
-    "Ticket doc: " + args.ticketPath,
-    "Bug doc: " + args.bugPath,
-    "Reproduction: " + args.reproPath
+    "Ticket doc: " + args.ticketPath
   ];
+  if (args.bugPath) lines.push("Bug doc: " + args.bugPath);
+  if (args.reproPath) lines.push("Reproduction: " + args.reproPath);
   if (args.extra) lines.push("", "Additional context, read before starting: " + args.extra);
   return lines.join("\n");
 }

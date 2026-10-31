@@ -2654,7 +2654,12 @@ describe("chain agents v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/type: ticket/);
     expect(content).toMatch(/mode: human/);
     expect(content).toMatch(/subtype/);
-    expect(content).toMatch(/bug\s+doc\s+path and the reproduction\s+path/i);
+    // Schema 5 keeps the defect record in the bug ticket body: the gate must
+    // accept a self-contained body and treat separate evidence paths as
+    // optional (see lifecycle finding: bug tickets refused at the gate).
+    expect(content).toMatch(/defect record/i);
+    expect(content).toMatch(/self-contained/i);
+    expect(content).toMatch(/optional/i);
     // The refusal is the gate's job; submit_feedback is for workflow
     // friction, not the refusal itself.
     expect(content).toMatch(/not.*for the refusal itself|NOT use it for the refusal itself/i);
