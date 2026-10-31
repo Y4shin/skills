@@ -9,7 +9,6 @@ title: docs/tasks
 ## Live
 
 - build-eval-creator-skill
-- enforced-workflow-v5
 
 ## Archived
 
@@ -29,6 +28,7 @@ title: docs/tasks
 - build-task-workflow-doctor-skill
 - build-tdd-reference-skill
 - compare-to-mp-skills
+- enforced-workflow-v5
 - fix-integration-harness-auth-storage
 - fold-bundle-templates-into-refs
 - gate-detection-helper
