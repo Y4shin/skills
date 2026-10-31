@@ -67,6 +67,13 @@ title: Task Changelog
   skill-review skill, wired into skill-creator phase 7. Adds a 'Cut meta-level
   narrative' core principle. 28 promoted skills.
 
+
+## 2026-11-01, Validate advisory review disposition targets (advisory-disposition-target-check)
+
+`tw_write_review` now validates every disposition target in both review passes. The finalize pass already refused a `ticket` disposition naming no ticket in the effort and a `follow-up` naming no live effort stamped `origin_effort`; the advisory pass, where the finalize triage records its dispositions of the end-of-effort findings, did not. A typo'd or invented slug therefore recorded "ticketed to X" for a ticket that never existed, and because `tw_archive_effort` deliberately skips `pass: end-of-effort` artifacts, the effort still archived with a dangling pointer and the finding was silently stranded.
+
+The check is now one `validateReviewTargets` helper called from both branches, so the two passes cannot drift apart again. The existing finalize refusals keep their message, and `tests/lifecycle-hardening.test.ts` gains a case for the advisory pass. Both typechecks and `npx vitest run` were green after the landing.
+
 ## 2026-11-01, Give the effort close a living-architecture reconcile (finalize-architecture-reconcile)
 
 The effort close now owns the living architecture document. `finalize-effort` discloses `tw_write_architecture` and its SKILL gains a "Reconcile the living architecture first" step, which reads the deviation reports, the ticket notes, and the diff and records the corrected document before the holistic review; the docs page states the same contract. The gap it closes: every end-of-effort reconcile runs inside a ticket chain, so nothing reconciled a landing made after the last ticket, and this effort's own five post-landing fix commits left `arch-spec.md` describing behaviour the tooling no longer had.
