@@ -7,6 +7,34 @@
   `type: module`), and `tsc -p tsconfig.test.json` for the test sources
   (`tsconfig.test.json` extends the base config and adds `tests/**/*.ts`).
 
+## Provider schema validation
+
+The suite drives the `faux` provider, which does not validate tool schemas the
+way a real API does, and it injects the extension through
+`extensionFactories`, which bypasses both ambient discovery and pi-subagents'
+launch resolution. Two classes of defect therefore pass every gate: a schema a
+strict provider rejects, and an agent or child that only works when a
+particular package happens to be installed. `tw_open`'s bare union shipped
+broken on DeepSeek for exactly this reason.
+
+Verify both against a real provider and a real child. List this package in a
+throwaway agent directory, which is the only configuration where the agent
+definitions and the extension code come from the same tree: an `-e <path>`
+argument loads the extension in the parent only, never in a subagent's session.
+
+```bash
+mkdir -p /tmp/probe/agent
+cat > /tmp/probe/agent/settings.json <<'JSON'
+{ "packages": ["npm:pi-subagents", "/abs/path/to/this/package"] }
+JSON
+cp ~/.pi/agent/auth.json /tmp/probe/agent/
+PI_CODING_AGENT_DIR=/tmp/probe/agent pi -p "<a prompt that calls the tool or dispatches the agent>"
+```
+
+Run the probe from a throwaway repo holding the fixture tree the tool needs, and
+put the agent under test in `/tmp/probe/agent/agents/`. Drop this package from
+the list to reproduce a failure that only appears when it is missing.
+
 ## Test protocol
 
 The task-workflow `test-runner` agent reads this section. "Run these always"

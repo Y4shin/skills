@@ -691,11 +691,22 @@ exports to the tickets that depend on it.
       and `deviation-reports/` (the deviation evidence). The ticket doc's
       implementation notes get a named writer, `tw_write_ticket_note` (replace
       or append the `## Implementation notes` section; refuses a non-ticket, an
-      empty note, and an archived effort), disclosed to `implement-ticket` and
-      named in `land-worker`'s `tools:` allowlist, because a subagent's session
-      has no phase open and reaches a gated tool through its own allowlist. A
-      refusal still names the exemption and the named tool that would have
-      worked.
+      empty note, and an archived effort), disclosed to `implement-ticket`, and
+      the phase writes the note from the landing worker's report rather than
+      the worker writing it. An agent's `tools:` allowlist does not load the
+      extension that registers a tool, so a worker could only reach the writer
+      when this package also loaded in its child session; keeping the write in
+      the phase removes that dependency. A refusal still names the exemption
+      and the named tool that would have worked.
+    - **Tool schemas must be object-typed at the top level.** `tw_open`'s
+      parameters are one object schema carrying the per-skill `anyOf`, not a
+      bare union: a bare TypeBox union serializes to `anyOf` with no `type`, and
+      a strict OpenAI-compatible provider rejects a function whose schema omits
+      it. Because `tw_open` is declared in every state, one such schema fails
+      every request rather than one call. Two pins hold it: every registered
+      tool's top-level parameters are object-shaped, either an explicit schema
+      or the `args` record pi turns into one, and `tw_open` keeps one `anyOf`
+      member per registry entry so the union cannot be flattened away.
     - **The ticket loop is serial.** Level concurrency was settled and is not
       implemented; the skill, both resources, and the concurrency bullet above
       say one ticket at a time in level order, with the levels as strict
