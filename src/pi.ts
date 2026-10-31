@@ -804,6 +804,8 @@ interface EffortRootWriteOptions {
   kind: "spec" | "architecture";
   /** The per-kind tail of the empty-body refusal. */
   emptyBody: string;
+  /** Per-kind check on an artifact found in place; may throw its refusal. */
+  validateExisting?: (art: Artifact) => void;
   /** Per-kind checks run before a creation; may throw its own refusal. */
   validateCreation?: (effortDir: string, effortName: string) => void;
   /** Per-kind side effect after the write; returns a suffix for the result. */
@@ -824,6 +826,7 @@ function writeEffortRootArtifact(o: EffortRootWriteOptions): string {
   } catch { /* the effort may exist without the artifact yet: create it */ }
 
   if (hit !== null) {
+    o.validateExisting?.(hit.art);
     hit.doc.body = body;
     if (publish) hit.doc.data.status = "stable";
     writeFileSync(hit.path, dump(hit.doc), "utf-8");
@@ -849,14 +852,13 @@ function writeEffortRootArtifact(o: EffortRootWriteOptions): string {
   return `wrote ${relative(root, path)} (created, status: ${publish ? "stable" : "draft"})${suffix}`;
 }
 
+/** The ticket-doc section the implementation-notes writer owns. */
+const IMPLEMENTATION_NOTES_SECTION = "Implementation notes";
+
 // ─── Review artifact helpers (finalize-effort) ─────────────────────────────
 
 /** The tool-owned body section the review writer replaces on every pass. */
 const REVIEW_DISPOSITIONS_SECTION = "Dispositions";
-// ─── The implementation-notes writer's section name ────────────────────────
-
-/** The ticket-doc section the implementation-notes writer owns. */
-const IMPLEMENTATION_NOTES_SECTION = "Implementation notes";
 
 /** The three dispositions a finding can carry; absent means untriaged. */
 const REVIEW_DISPOSITIONS = ["ticket", "follow-up", "informational"] as const;
@@ -1715,26 +1717,18 @@ export function createTools(): Record<string, Tool> {
         title: OptStr("Title used only when the write creates the spec"),
         publish: OptBool,
       },
-      async (p, ctx) => {
-        const root = findRoot(ctx.directory);
-        const existing = (() => {
-          try {
-            return resolveArt(root, p.selector, "spec");
-          } catch {
-            return null;
-          }
-        })();
-        if (existing !== null) requireV4Shape(existing.art);
-        return writeEffortRootArtifact({
-          root,
+      async (p, ctx) =>
+        writeEffortRootArtifact({
+          root: findRoot(ctx.directory),
           selector: p.selector,
           content: p.content,
           title: p.title,
           publish: p.publish === true,
           kind: "spec",
           emptyBody: "a spec write needs a body",
-        });
-      },
+          // A v3-shape spec is a migration job: refused wherever it is found.
+          validateExisting: requireV4Shape,
+        }),
     ),
 
     tw_write_architecture: def(
