@@ -53,9 +53,12 @@ import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 const FALLBACK_GATED_SKILL_NAMES = [
   "task-workflow-overview",
   "setup-workflow",
+  "intake",
   "wayfinder",
-  "implement-task",
-  "finalize-task",
+  "to-spec",
+  "to-tickets",
+  "implement-ticket",
+  "finalize-effort",
 ];
 
 function loadGatedSkillNames(): { names: string[]; diagnostics: string[] } {

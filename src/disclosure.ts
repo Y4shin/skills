@@ -90,14 +90,17 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // through the map-section writer, marks planning tasks done and blocked,
     // records deferred work in the out-of-scope KB, and runs the reconcile,
     // which sets ready_for_spec through tw_finalize_map. tw_write_section is
-    // its signature tool.
+    // its signature tool. tw_state_set and tw_dependency_levels are disclosed
+    // because the phase sets the state pointers and layers the effort itself.
     toolset: [
       "tw_write_section",
       "tw_finalize_map",
       "tw_frontier",
+      "tw_dependency_levels",
       "tw_mark_done",
       "tw_mark_blocked",
       "tw_record_out_of_scope",
+      "tw_state_set",
       "tw_get",
       "tw_list",
     ],
@@ -133,6 +136,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
       "tw_add_ticket",
       "tw_split_ticket",
       "tw_dependency_levels",
+      "tw_frontier",
       "tw_map_finalizable",
       "tw_get",
       "tw_list",
@@ -149,16 +153,22 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // The implementation phase: owns the ticket frontier and levels, creates
     // and splits tickets, marks tickets done (after the changelog entry),
     // resolves uncertainties, and writes the per-ticket changelog entry.
-    // tw_write_changelog is its signature tool.
+    // tw_write_changelog is its signature tool. tw_finalizable and
+    // tw_state_set are disclosed because the close-out checks finalizability
+    // and moves the state pointer. tw_context stays setup-workflow's, so the
+    // CI command is read from the repo rather than through that profile.
+    // tw_mark_blocked is not disclosed here: it marks planning tasks and
+    // refuses tickets, so it stays in wayfinder's toolset only.
     toolset: [
       "tw_frontier",
       "tw_dependency_levels",
       "tw_add_ticket",
       "tw_split_ticket",
       "tw_mark_done",
-      "tw_mark_blocked",
       "tw_write_changelog",
       "tw_resolve_uncertainty",
+      "tw_finalizable",
+      "tw_state_set",
       "tw_get",
       "tw_list",
     ],
@@ -175,12 +185,15 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // not here: a refused archive still has the triage tools declared, so the
     // triage can complete inside the open phase.
     // tw_archive_effort is its signature tool; tw_write_review is the review
-    // artifact's only writer.
+    // artifact's only writer. tw_create_effort is disclosed here because an
+    // accepted follow-up is created inside this phase, and intake (the other
+    // discloser) is mutually exclusive with it.
     toolset: [
       "tw_archive_effort",
       "tw_finalizable",
       "tw_write_review",
       "tw_add_ticket",
+      "tw_create_effort",
       "tw_get",
       "tw_list",
     ],

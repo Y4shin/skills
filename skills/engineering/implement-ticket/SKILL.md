@@ -172,9 +172,9 @@ separate bash block.
    git merge <effort-branch> 2>/dev/null || true
    ```
 
-   Run the project's CI command (from the `tw_context` profile or detected
-   from repo tooling: package.json scripts, Makefile, CI config; ask the
-   user when ambiguous). If it fails: STOP. Fix forward on the landing
+   Run the project's CI command, detected from repo tooling: package.json
+   scripts, Makefile, CI config, or the `docs/testing.md` protocol; ask the
+   user when ambiguous. If it fails: STOP. Fix forward on the landing
    branch. Do not merge a red branch.
 
    Fix-forward is a designed-for adjustment, record that it fired so its

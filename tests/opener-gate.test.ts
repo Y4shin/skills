@@ -11,7 +11,7 @@
  * opener refuse or open, and does a refusal name the legal next calls.
  */
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -37,6 +37,19 @@ import { fromFrontmatter } from "../src/core/art.js";
 function parseArtifactFile(path: string): { art: ReturnType<typeof fromFrontmatter>; doc: ReturnType<typeof frontmatterParse> } {
   const doc = frontmatterParse(readFileSync(path, "utf-8"));
   return { art: fromFrontmatter(doc.data, path), doc };
+}
+
+/** Every markdown file under a skill directory, excluding its bundled scripts. */
+function markdownFilesUnder(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name !== "scripts") markdownFilesUnder(path, out);
+    } else if (entry.name.endsWith(".md")) {
+      out.push(path);
+    }
+  }
+  return out;
 }
 
 // ─── Fixture tree ─────────────────────────────────────────────────────────────
@@ -666,6 +679,7 @@ describe("the phase-to-toolset registry", () => {
       intake: ["tw_add_task", "tw_add_ticket", "tw_create_effort", "tw_get", "tw_list", "tw_state", "tw_state_set"],
       "setup-workflow": ["tw_context", "tw_get", "tw_list"],
       wayfinder: [
+        "tw_dependency_levels",
         "tw_finalize_map",
         "tw_frontier",
         "tw_get",
@@ -673,30 +687,35 @@ describe("the phase-to-toolset registry", () => {
         "tw_mark_blocked",
         "tw_mark_done",
         "tw_record_out_of_scope",
+        "tw_state_set",
         "tw_write_section",
       ],
       "to-spec": ["tw_get", "tw_list", "tw_write_spec"],
       // The signature tool is the architecture writer: to-tickets-architecture
       // rotated it here from the interim tw_map_finalizable when the writer
       // landed. tw_map_finalizable stays disclosed as the graph-state read.
-      "to-tickets": ["tw_add_ticket", "tw_dependency_levels", "tw_get", "tw_list", "tw_map_finalizable", "tw_split_ticket", "tw_write_architecture"],
+      "to-tickets": ["tw_add_ticket", "tw_dependency_levels", "tw_frontier", "tw_get", "tw_list", "tw_map_finalizable", "tw_split_ticket", "tw_write_architecture"],
       "implement-ticket": [
         "tw_add_ticket",
         "tw_dependency_levels",
+        "tw_finalizable",
         "tw_frontier",
         "tw_get",
         "tw_list",
-        "tw_mark_blocked",
         "tw_mark_done",
         "tw_resolve_uncertainty",
         "tw_split_ticket",
+        "tw_state_set",
         "tw_write_changelog",
       ],
       // tw_archive_effort stays the private signature tool; the review writer
-      // joined the toolset when finalize-effort-skill landed.
+      // joined the toolset when finalize-effort-skill landed, and the effort
+      // creator joined it because an accepted follow-up is created inside this
+      // phase (intake, the other discloser, is mutually exclusive with it).
       "finalize-effort": [
         "tw_add_ticket",
         "tw_archive_effort",
+        "tw_create_effort",
         "tw_finalizable",
         "tw_get",
         "tw_list",
@@ -704,6 +723,28 @@ describe("the phase-to-toolset registry", () => {
       ],
       "skill-creator": ["skill_discover", "skill_scaffold", "skill_validate", "tw_show"],
     });
+  });
+
+  test("discloses every tool a phase's prose instructs, so no documented step is unreachable", () => {
+    // The reverse invariant of the test above: a skill's own prose must not
+    // instruct a tool its toolset never declares. Without it a phase can
+    // document a step the opener leaves unreachable (finalize-effort once told
+    // the model to create a follow-up with tw_create_effort, which only intake
+    // declares). The opener pair is exempt: it is declared in every state.
+    const exempt = new Set<string>([...ALWAYS_DECLARED, CLOSER]);
+    const offenders: string[] = [];
+    for (const entry of SKILL_REGISTRY) {
+      const dir = join(process.cwd(), "skills", "engineering", entry.name);
+      if (!existsSync(dir)) continue;
+      for (const file of markdownFilesUnder(dir)) {
+        const prose = readFileSync(file, "utf-8");
+        for (const [name] of prose.matchAll(/\btw_[a-z_]+\b/g)) {
+          if (exempt.has(name) || entry.toolset.includes(name)) continue;
+          offenders.push(`${entry.name}: ${name} (${file.slice(process.cwd().length + 1)})`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 
   test("discloses every registered workflow tool through some phase toolset", () => {

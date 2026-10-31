@@ -52,7 +52,7 @@ Scaffold everything a repo needs to use the task-workflow:
 
 3. Write `docs/tasks/index.md` carrying `okf_version: "0.2"` and a listing of
    the tree. The migration regenerates it; wayfinder refreshes it on map
-   create and the archive move (`tw_archive_effort`) refreshes it on archive.
+   create and the effort close refreshes it on archive.
 
 4. Write `docs/tasks/CHANGELOG.md` with conformant frontmatter:
    ```markdown

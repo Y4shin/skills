@@ -20,7 +20,8 @@ and its non-negotiables grilling task), then `/skill:wayfinder` (the planning
 frontier and the reconcile), `/skill:to-spec` (the specification),
 `/skill:to-tickets` (the architecture document and the ticket graph),
 `/skill:implement-ticket` (per-ticket agent chains plus the inlined
-per-ticket close-out: CI gate, changelog, done-marking, merge to main), and
+per-ticket close-out: CI gate, changelog, done-marking, merge to the effort
+branch), and
 `/skill:finalize-effort` (the holistic review, finding triage, and archive).
 `/skill:setup-workflow` initializes or migrates a repo once. On-ramps merge
 onto it: `/skill:diagnosing-bugs` for something broken,

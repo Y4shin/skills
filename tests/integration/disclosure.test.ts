@@ -121,7 +121,7 @@ describe("disclosure core: the three-way flip", () => {
     for (const name of ["tw_close", "tw_frontier", "tw_list", "tw_write_section", "tw_get"]) {
       expect(opened, `${name} must be declared once wayfinder is open`).toContain(name);
     }
-    for (const name of ["tw_show", "tw_state", "tw_dependency_levels", "tw_finalizable"]) {
+    for (const name of ["tw_show", "tw_state", "tw_context", "tw_write_spec"]) {
       expect(opened, `${name} belongs to no open skill`).not.toContain(name);
     }
 

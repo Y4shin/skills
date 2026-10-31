@@ -3,11 +3,11 @@
  * progressive-disclosure work depends on (effort enforced-workflow-v5,
  * ticket bump-dependencies):
  *
- *   - `exposure`      — registerTool option choosing the disclosure level
- *   - `defaultActive` — registerTool option keeping a direct tool off until
- *                       an opener activates it
- *   - `setActiveTools`— the activation lever (with getActiveTools)
- *   - `tool_search`   — the built-in deferred-tool discovery tool
+ *   - `exposure`: registerTool option choosing the disclosure level
+ *   - `defaultActive`: registerTool option keeping a direct tool off until
+ *     an opener activates it
+ *   - `setActiveTools`: the activation lever (with getActiveTools)
+ *   - `tool_search`: the built-in deferred-tool discovery tool
  *
  * The repo must resolve pi-coding-agent 1.0.0 or later; 0.80.x has none of
  * these APIs, so every assertion below fails on the old toolchain.

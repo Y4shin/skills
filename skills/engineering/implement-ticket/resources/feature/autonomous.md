@@ -182,8 +182,9 @@ binaries; wrapping them in a `set -e` block makes them fail with
 and run the shell steps in a separate bash block.
 
 1. **CI gate**: checkout `task/<ticket-slug>`, `git merge <effort-branch>
-   2>/dev/null || true`, run the project's CI command (from the `tw_context` profile or
-   detected from repo tooling; ask the user when ambiguous). A red branch
+   2>/dev/null || true`, run the project's CI command, detected from repo
+   tooling or the `docs/testing.md` protocol; ask the user when ambiguous.
+   A red branch
    is never merged: fix forward on the landing branch, and record that
    fix-forward fired with `submit_feedback({ kind: "expected", data })`.
 2. **Knowledge harvest**: read the ticket doc, all deviation reports from
