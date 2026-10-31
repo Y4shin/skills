@@ -19,10 +19,11 @@ naming the legal next calls.
 
 **The ticket frontier and the level loop:** the ready edge comes from
 `tw_frontier <effort-slug>` and the waves from
-`tw_dependency_levels <effort-slug>`. Tickets within one dependency level
-may run concurrently; tickets across levels serialize on the level
-boundary. Running tickets from different levels at once is out of scope
-unless the human asks for it explicitly.
+`tw_dependency_levels <effort-slug>`. Tickets run one at a time, in level
+order; the levels stay strict barriers. Concurrency inside a level is not
+implemented: every chain shares the one repo working directory, so two at
+once would checkout different landing branches in the same tree. Worktree
+isolation is a recorded follow-up, not current behaviour.
 
 **The per-ticket chain** is one pre-canned workflow script,
 `scripts/ticket-chain.js` in the skill directory (shared by the feature and

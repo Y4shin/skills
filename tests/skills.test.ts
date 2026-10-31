@@ -2302,13 +2302,17 @@ describe("feature chain v4 (overhaul-execution-skills)", () => {
     expect(content).toMatch(/timeoutMs/);
   });
 
-  test("chains run per ticket per dependency level; the level boundary serializes", () => {
+  test("tickets run one at a time in level order; the levels stay strict barriers", () => {
     expect(content).toContain("tw_dependency_levels <effort-slug>");
-    // Tickets within one level may run concurrently; across levels the
-    // boundary serializes (strict barriers).
-    expect(content).toMatch(/may run \*\*concurrently\*\*/i);
+    // The loop is serial: the levels are still barriers, and level concurrency
+    // is documented behaviour that nothing implements (no worktree mechanism
+    // exists; every chain shares the repo working directory).
+    expect(content).toMatch(/one at a time/i);
     expect(content).toMatch(/strict barriers/i);
-    expect(content).toMatch(/level N\+1 starts only after every ticket in level N has landed/i);
+    expect(content).toMatch(/level N\+1 starts only after every ticket in level N has\s+landed/i);
+    expect(content, "the concurrency claim is retired: nothing implements it").not.toMatch(/concurrent/i);
+    // The gap is named, not silent: worktree isolation is the follow-up seed.
+    expect(content).toMatch(/worktree/i);
   });
 
   test("the chain dispatches tdd, then verify plus deviation gated, then land", () => {
@@ -3368,5 +3372,47 @@ describe("documentation re-sync (docs-resync)", () => {
     for (const skill of promoted.filter((s) => s.name !== "task-workflow-overview")) {
       expect(overview, `the overview never names /skill:${skill.name}`).toContain(`/skill:${skill.name}`);
     }
+  });
+});
+
+// ─── End-of-effort reconciliation (end-of-effort-reconciliation) ─────────────
+//
+// The end-of-effort review found claims the shipped code does not support. The
+// effort documents are the record, so they are amended surgically: the claims
+// that are now false change, and the reconciliation itself is recorded as
+// arch-spec entry 21. These pins hold the amendments in place.
+
+describe("end-of-effort reconciliation: the effort documents match the shipped code", () => {
+  const archSpec = readFile("docs/tasks/enforced-workflow-v5/arch-spec.md");
+  const spec = readFile("docs/tasks/enforced-workflow-v5/spec.md");
+  const implement = readFile("skills/engineering/implement-ticket/SKILL.md");
+  const featureResource = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
+  const bugResource = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
+
+  test("the ticket loop is documented as serial in the skill and both resources", () => {
+    for (const [label, content] of [
+      ["implement-ticket SKILL.md", implement],
+      ["the feature resource", featureResource],
+      ["the bug resource", bugResource],
+    ] as const) {
+      expect(content, `${label} never says tickets run one at a time`).toMatch(/one at a time/i);
+      expect(content, `${label} still claims ticket concurrency`).not.toMatch(/concurrent/i);
+    }
+  });
+
+  test("the arch spec records the serial loop and the worktree gap as a follow-up seed", () => {
+    // The settled "Ticket concurrency" bullet is amended, not restated.
+    expect(archSpec).not.toMatch(/Tickets within one dependency level may run\s+concurrently/);
+    expect(archSpec).toMatch(/tickets run one at a time|Tickets run one at a time/i);
+    // The reconciliation is entry 21, and it carries the follow-up seed.
+    expect(archSpec).toMatch(/^21\. \*\*`end-of-effort-reconciliation`\*\*/m);
+    const entry = archSpec.slice(archSpec.indexOf("21. **`end-of-effort-reconciliation`**"));
+    expect(entry).toMatch(/worktree/i);
+    expect(entry.slice(0, 4000)).toMatch(/follow-up/i);
+  });
+
+  test("the spec's concurrency story no longer promises an uncorrupted working directory", () => {
+    expect(spec).not.toMatch(/shared repo working\s+directory is never corrupted/);
+    expect(spec).toMatch(/one ticket at a time/i);
   });
 });

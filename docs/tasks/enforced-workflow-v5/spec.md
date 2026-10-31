@@ -143,14 +143,20 @@ while the transition completes.
     architecture rather than draft it, so that the double seam interview is
     gone for good.
 26. As a human operator, I want `implement-ticket` to work the ticket
-    frontier in dependency levels, so that concurrent tickets inside a level
-    and serial barriers across levels are supervised by one owner.
+    frontier in dependency levels, one ticket at a time, so that the levels
+    stay strict barriers and one owner supervises the whole graph. (Amended at
+    `end-of-effort-reconciliation`: the loop is serial, not concurrent inside
+    a level.)
 27. As a human operator, I want each landed ticket to be closed out in the
     same autonomous run (CI gate, knowledge harvest, changelog, done mark,
     merge to main), so that I never wait to type `/skill:finalize-task`.
-28. As a human operator, I want ticket concurrency inside a level and
-    serialization across levels by default, so that the shared repo working
-    directory is never corrupted by cross-level writes.
+28. As a human operator, I want tickets to run one at a time in level order,
+    so that the shared repo working directory is never caught by two chains
+    checking out different landing branches at once. (Amended at
+    `end-of-effort-reconciliation`: level concurrency was the settled story but
+    nothing implements it, because no worktree mechanism exists and every
+    chain shares the one working directory. Worktree isolation is the seed of
+    a follow-up effort.)
 29. As a human operator, I want the announcement of one settled grilling to
     end a Wayfinder pass, so that two grillings can never blur together.
 30. As a human operator, I want to see only the tools the current phase

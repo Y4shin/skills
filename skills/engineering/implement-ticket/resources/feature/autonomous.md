@@ -38,9 +38,9 @@ fold it in at the level close.
 
 > **Async dispatch (hard rule):** launch every chain with `async: true`. Never
 > block on a foreground subagent. After dispatching a ticket's chain, return
-> control; Pi wakes this session when each one completes, so no wait call is
-> needed. Tickets within a level may run at the same time; each run stays
-> tracked, interruptible, and steerable.
+> control; Pi wakes this session when it completes, so no wait call is needed.
+> One chain runs at a time; each run stays tracked, interruptible, and
+> steerable.
 
 The effort's tickets form a **ticket graph** with blocking relationships: each
 ticket declares its `blocked_by` dependencies, and the **frontier** is the set
@@ -63,10 +63,14 @@ primarily through context pointers (to the architecture document, ticket
 docs, research notes, previous commits). Do not duplicate information
 already available via pointers; pass the pointer, not the content.
 
-Tickets within a level may run **concurrently**; tickets across levels
-**serialize on the level boundary**: levels remain **strict barriers**,
-level N+1 starts only after every ticket in level N has landed and closed
-out.
+**Tickets run one at a time, in level order.** The dependency levels remain
+**strict barriers**: level N+1 starts only after every ticket in level N has
+landed and closed out, one ticket at a time. Nothing implements level concurrency: every chain
+shares the repo working directory, so two chains at once would checkout
+different landing branches in one tree and the per-ticket `tw_state_set task`
+would be last-writer-wins. Worktree isolation is the follow-up effort's seed,
+recorded in the effort's architecture document, not behaviour this pipeline
+claims.
 
 Each ticket runs as a **sequential chain** that shares the repo working
 directory: `tdd-worker → (slice-verifier ∥ deviation-reporter) → land-worker`,
@@ -89,7 +93,7 @@ output references gathered before the failure.
 levels = JSON.parse(tw_dependency_levels(effortSlug)).levels
 
 for each level in levels:
-    for each ticket in level:   // concurrent within the level; levels serialize
+    for each ticket in level:   // one at a time; the level boundary is a strict barrier
         // Budgets come from the ticket's size; absent means m, never an error.
         size = tw_get(ticketPath, "size") || "m"
         budgetMinutes = { s: 15, m: 30, l: 45, xl: 60 }
@@ -117,9 +121,9 @@ for each level in levels:
             }
         })
 
-        // Tickets within a level may run concurrently; across levels the
-        // boundary serializes. Return control after dispatching: Pi wakes
-        // this session with the chain's result.
+        // One ticket at a time in level order; the level boundary is a
+        // strict barrier. Return control after dispatching: Pi wakes this
+        // session with the chain's result.
         result = <the chain's return: { ok, failed?, step?, refs }>
 
         // Process the chain result

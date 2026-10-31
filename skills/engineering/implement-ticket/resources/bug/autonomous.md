@@ -25,9 +25,11 @@ const reproPath = <from the ticket body>
 
 ## Step 1  --  Single chain dispatch
 
-Run one sequential chain that shares the repo working directory:
+Tickets run one at a time, in level order, and each ticket runs one
+sequential chain that shares the repo working directory:
 `tdd-worker → slice-verifier → land-worker`, with an ok-gate blocking landing
-on verify. The chain ships as a pre-canned workflow script,
+on verify. Two chains at once would collide in the one working directory, so
+they never run at once. The chain ships as a pre-canned workflow script,
 `scripts/ticket-chain.js` in this skill's directory (shared with the feature
 pipeline): resolve its path against this skill's directory, launch it once
 with `async: true` and the ticket's parameters as `args`, and it returns

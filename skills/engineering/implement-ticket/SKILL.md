@@ -50,9 +50,12 @@ graph with `tw_dependency_levels <effort-slug>` (BFS levels). A level is a
 wave of tickets whose blockers are all done; levels are strict barriers:
 level N+1 starts only after every ticket in level N has landed.
 
-Ticket concurrency: tickets within one dependency level may run concurrently;
-tickets across levels serialize on the level boundary. Running tickets from
-different levels at once is out of scope unless the human asks explicitly.
+**The loop is serial: tickets run one at a time, in level order.** The levels
+stay barriers, and no two chains ever run at once. Every chain shares the one
+repo working directory, so a second chain at the same time would `git
+checkout` a different `task/<ticket-slug>` branch in the same tree, and the
+per-ticket `tw_state_set task <slug>` would be last-writer-wins. Worktree
+isolation is the follow-up effort's seed, not behaviour this skill claims.
 
 ## Step 1 -- Per-ticket chain dispatch
 
@@ -132,9 +135,9 @@ runId = subagent({
     }
 })
 
-// Tickets within a level may run concurrently; tickets across levels
-// serialize on the level boundary. Return control after dispatching:
-// Pi wakes this session with the chain's result.
+// Tickets run one at a time in level order; the level boundary stays a
+// strict barrier. Return control after dispatching: Pi wakes this session
+// with the chain's result.
 result = <the chain's return: { ok, failed?, step?, refs }>
 ```
 
