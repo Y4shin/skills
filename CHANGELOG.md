@@ -1,5 +1,22 @@
 # task-workflow
 
+## 5.0.2
+
+### Patch Changes
+
+- 0025c20: Declare the pi-telemetry version this package is tested against.
+  
+  The optional peer was `*`, which said nothing. It is now `^0.4.2`, the first
+  version published to npm, and the first that follows the pi 1.4 SDK event
+  shape this package runs against.
+  
+  The requirement stays optional: a missing extension warns at session start and
+  starts nothing else, which is what the ticket chains need.
+- 2b5fecf: The pi-telemetry install hint names the npm package.
+  
+  - The missing-dependency warning, and the two tests that pin its wording, now read `pi install npm:@y4shin/pi-telemetry` instead of pointing at the git repository, which no longer needs a clone and follows the published versions.
+  - `package.json` declares `@y4shin/pi-telemetry` as an optional peer dependency. The requirement is now machine-visible, and optional keeps the install clean when the extension is absent, which is what the session warning is for.
+
 ## 5.0.1
 
 ### Patch Changes
