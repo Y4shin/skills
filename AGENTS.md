@@ -62,3 +62,11 @@ No em-dashes anywhere in this repo's prose (`SKILL.md` files, docs,
 for one, rewrite it instead with a comma, colon, period, parentheses, or a
 conjunction, whichever the sentence actually wants; never do a blind
 character substitution.
+
+Never write into pi's installed package trees: `~/.pi/agent/npm/**` and
+`~/.pi/agent/git/**` belong to `pi install` and the operator. To test a local
+change, declare the checkout in a project `.pi/settings.json`
+(`pi install --local /path/to/checkout`), or load it for one run with
+`pi -e /path/to/extension`. If neither reaches what you need to test, ask the
+operator before writing to those directories. Approval to release, or to make
+a change live, is not approval for this.
