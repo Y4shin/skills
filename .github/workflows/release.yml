@@ -202,7 +202,11 @@ jobs:
             echo "$spec is already published; nothing to stage."
             exit 0
           fi
-          npm stage publish dist/*.tgz
+          # The leading `./` is load-bearing. npm reads a bare `owner/repo`
+          # argument as a GitHub shorthand, so `dist/<tarball>` was resolved as
+          # `github:dist/<tarball>` and handed to git, which is how the v5.1.0
+          # run failed with `git ls-remote ssh://git@github.com/dist/...`.
+          npm stage publish ./dist/*.tgz
           {
             echo "### $spec is staged, not live"
             echo
