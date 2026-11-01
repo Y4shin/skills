@@ -69,8 +69,7 @@ explicitly reclassified as a feature or bug by Wayfinder.
 
 > **Feedback:** if the manual task hits a snag, a prerequisite you couldn't
 > verify, a checklist that was vague, an external state change that fought
-> back, or something that worked notably well, call
-> `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
-> short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
-> two specific, actionable sentences about the *workflow*, not the task.
-> Requires the `pi-telemetry` extension (`submit_feedback` tool).
+> back, or something that worked notably well, call `tw_feedback({ kind, data
+> })` autonomously to record it. `kind` is one of `good`, `bad`, `friction`,
+> `architecture`; `data` is one or two specific, actionable sentences about
+> the *workflow*, not the task. Requires the `pi-telemetry` extension.

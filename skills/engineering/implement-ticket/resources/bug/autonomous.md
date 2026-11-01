@@ -156,22 +156,21 @@ Hard rule: on subagent failure the parent never implements. Its only moves are r
 
 Hard rule: the parent context is large and expensive; routing through workers is always cheaper than pulling the fix into the parent. The parent never writes code or edits files as a fix.
 
-Each toolbelt step is a designed-for adjustment, not a snag  --  but record
-which one fired so its frequency can be correlated. Each time you take a
-toolbelt action, call `submit_feedback({ kind: "expected", data })` with `data`
-naming the step, e.g. `"bug: split ticket <slug> after first failure"` or
-`"bug: retry +50% on ticket <slug>"` or `"bug: escalate ticket <slug> (two
-retries failed)"`. One call per action, right when you take it.
+Each toolbelt step is a designed-for adjustment, not a snag -- but record which
+one fired so its frequency can be correlated. Each time you take a toolbelt
+action, call `tw_feedback({ kind: "expected", data })` with `data` naming the
+step, e.g. `"bug: split ticket <slug> after first failure"` or `"bug: retry +50%
+on ticket <slug>"` or `"bug: escalate ticket <slug> (two retries failed)"`. One
+call per action, right when you take it.
 
 ## Workflow feedback
 
-When the *workflow itself* snags  --  the bug chain failing for a workflow reason,
-a reproduction that didn't line up with the ticket doc, a regression test the test rule
-made hard to write, or something that worked notably well  --  call
-`submit_feedback({ kind, data })` autonomously to record it. `kind` is a
-short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
-two specific, actionable sentences about the *workflow*, not the bug. The
-tdd-worker, slice-verifier, and land-worker agents also call this tool
-themselves; you don't need to relay their friction, only record what you
-observe at the orchestration level. Requires the `pi-telemetry`
-extension (`submit_feedback` tool).
+When the *workflow itself* snags -- the bug chain failing for a workflow reason,
+a reproduction that didn't line up with the ticket doc, a regression test the
+test rule made hard to write, or something that worked notably well -- call
+`tw_feedback({ kind, data })` autonomously to record it. `kind` is one of
+`good`, `bad`, `friction`, `architecture`; `data` is one or two specific,
+actionable sentences about the *workflow*, not the bug. The tdd-worker,
+slice-verifier, and land-worker agents also call this tool themselves; you don't
+need to relay their friction, only record what you observe at the orchestration
+level. Requires the `pi-telemetry` extension.

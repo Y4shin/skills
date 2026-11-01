@@ -687,10 +687,11 @@ describe("the phase-to-toolset registry", () => {
   test("maps every skill to its real phase toolset", () => {
     const toolsetOf = Object.fromEntries(SKILL_REGISTRY.map((e) => [e.name, e.toolset.sort()]));
     expect(toolsetOf).toEqual({
-      intake: ["tw_add_task", "tw_add_ticket", "tw_create_effort", "tw_get", "tw_list", "tw_state", "tw_state_set"],
-      "setup-workflow": ["tw_context", "tw_get", "tw_list"],
+      intake: ["tw_add_task", "tw_add_ticket", "tw_create_effort", "tw_feedback", "tw_get", "tw_list", "tw_state", "tw_state_set"],
+      "setup-workflow": ["tw_context", "tw_feedback", "tw_get", "tw_list"],
       wayfinder: [
         "tw_dependency_levels",
+        "tw_feedback",
         "tw_finalize_map",
         "tw_frontier",
         "tw_get",
@@ -704,14 +705,15 @@ describe("the phase-to-toolset registry", () => {
         "tw_write_section",
         "tw_write_task_note",
       ],
-      "to-spec": ["tw_get", "tw_list", "tw_write_spec"],
+      "to-spec": ["tw_feedback", "tw_get", "tw_list", "tw_write_spec"],
       // The signature tool is the architecture writer: to-tickets-architecture
       // rotated it here from the interim tw_map_finalizable when the writer
       // landed. tw_map_finalizable stays disclosed as the graph-state read.
-      "to-tickets": ["tw_add_ticket", "tw_dependency_levels", "tw_frontier", "tw_get", "tw_list", "tw_map_finalizable", "tw_split_ticket", "tw_write_architecture"],
+      "to-tickets": ["tw_add_ticket", "tw_dependency_levels", "tw_feedback", "tw_frontier", "tw_get", "tw_list", "tw_map_finalizable", "tw_split_ticket", "tw_write_architecture"],
       "implement-ticket": [
         "tw_add_ticket",
         "tw_dependency_levels",
+        "tw_feedback",
         "tw_finalizable",
         "tw_frontier",
         "tw_get",
@@ -734,13 +736,14 @@ describe("the phase-to-toolset registry", () => {
         "tw_add_ticket",
         "tw_archive_effort",
         "tw_create_effort",
+        "tw_feedback",
         "tw_finalizable",
         "tw_get",
         "tw_list",
         "tw_write_architecture",
         "tw_write_review",
       ],
-      "skill-creator": ["skill_discover", "skill_scaffold", "skill_validate", "tw_show"],
+      "skill-creator": ["skill_discover", "skill_scaffold", "skill_validate", "tw_feedback", "tw_show"],
     });
   });
 

@@ -46,6 +46,7 @@ import {
 import { toObject, fromObject, freshState, isPointerName, POINTER_NAMES, type WorkflowState } from "./core/state.js";
 import { OKF_VERSION } from "./core/migrate.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
+import { FEEDBACK_KINDS, WORKFLOW_SOURCE, feedbackCall } from "./core/feedback.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 
 // ─── Gated skill names (shared by strip + invocation gate) ─────────────────────
@@ -1217,6 +1218,17 @@ interface ToolContext {
   getActiveTools?(): string[];
   setActiveTools?(toolNames: string[]): void;
   executeTool?(name: string, args: unknown): Promise<unknown>;
+  /**
+   * The tools `executeTool` can call, as the session reports them. Their
+   * `parameters` schema is how a nested call adapts to the installed version
+   * of a sibling extension's tool (see `feedbackCall`).
+   */
+  tools?: readonly ToolInfo[];
+}
+
+interface ToolInfo {
+  name: string;
+  parameters?: unknown;
 }
 
 function def(description: string, args: Record<string, unknown>, exec: (args: any, ctx: any) => Promise<string>): Tool {
@@ -1604,6 +1616,13 @@ function refusedOuttext(reason: string, legalNext: string[]): string {
     ? `Refused: ${reason}. Legal next: ${legalNext.join("; ")}.`
     : `Refused: ${reason}.`;
 }
+
+/**
+ * The pi-telemetry tool `tw_feedback` routes to. Named once: the adaptation to
+ * its parameter schema (with or without `source`) is what the wrapper exists
+ * for, so the name is not spelled out at the call site too.
+ */
+const FEEDBACK_TOOL = "submit_feedback";
 
 export function createTools(): Record<string, Tool> {
   return {
@@ -3186,6 +3205,60 @@ export function createTools(): Record<string, Tool> {
       },
       { activeByDefault: true },
     ),
+
+    // ── workflow feedback: the labelled route into the telemetry store ──
+
+    tw_feedback: defStructured(
+      "Record feedback about *this workflow*: friction in a phase, a step that fought back, or " +
+        "something that worked notably well. Not for project findings. The row reaches the pi-telemetry " +
+        "`submit_feedback` tool labelled as workflow feedback: as source 'workflow' when the installed " +
+        "tool takes a source, else as a 'workflow.' kind prefix. Requires the pi-telemetry extension.",
+      Type.Object({
+        kind: Type.Union(FEEDBACK_KINDS.map((kind) => Type.Literal(kind))),
+        data: Type.Union([Type.String(), Type.Record(Type.String(), Type.Unknown())]),
+      }),
+      async (p, ctx) => {
+        if (!ctx.executeTool) {
+          throw new Error(
+            "tw_feedback needs a session-bound tool executor; the pi-telemetry `submit_feedback` tool cannot be reached",
+          );
+        }
+        // The sibling tool is inspected, not assumed: the installed version may
+        // predate the `source` parameter, and the row has to be labelled
+        // correctly under either shape. `ctx.tools` can omit a callable tool
+        // (a session's custom tools are not in it), so an absent entry is not
+        // a rejection: it only means the shape cannot be read, and a failure
+        // from the call itself is where a missing store is diagnosed.
+        const target = ctx.tools?.find((tool) => tool.name === FEEDBACK_TOOL);
+        const call = feedbackCall(p.kind, p.data, target?.parameters);
+        const result = (await ctx.executeTool(FEEDBACK_TOOL, call.args)) as
+          | { isError?: boolean; content?: Array<{ text?: string }> }
+          | undefined;
+        if (result?.isError) {
+          const detail = (result.content ?? [])
+            .map((part) => part.text ?? "")
+            .filter((text) => text !== "")
+            .join(" ");
+          const unlisted = ctx.tools !== undefined && target === undefined;
+          throw new Error(
+            `the workflow feedback was not recorded: ${detail === "" ? "no reason given" : detail}` +
+              (unlisted
+                ? ". pi-telemetry is not installed, so nothing stores feedback; " +
+                  "install it with: pi install npm:@y4shin/pi-telemetry"
+                : ""),
+          );
+        }
+        const label = call.namespaced
+          ? `kind '${String(call.args.kind)}'`
+          : `source '${WORKFLOW_SOURCE}' with kind '${p.kind}'`;
+        return outcome(`Recorded workflow feedback as ${label}.`, {
+          recorded: true,
+          kind: p.kind,
+          namespaced: call.namespaced,
+          args: call.args,
+        });
+      },
+    ),
   };
 }
 
@@ -3343,6 +3416,7 @@ export default function (pi: ExtensionAPI) {
             getActiveTools: () => pi.getActiveTools(),
             setActiveTools: (toolNames: string[]) => pi.setActiveTools(toolNames),
             ...(ctx.executeTool ? { executeTool: (n: string, a: unknown) => ctx.executeTool(n, a) } : {}),
+            ...(Array.isArray(ctx.tools) ? { tools: ctx.tools } : {}),
           });
           if (typeof result === "string") {
             return { content: [{ type: "text", text: result }], details: {} };

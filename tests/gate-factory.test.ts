@@ -77,6 +77,7 @@ const GATED_NAMES = [
   "tw_write_review",
   "tw_write_task_note",
   "tw_write_ticket_note",
+  "tw_feedback",
   "notify_user",
 ];
 
@@ -324,8 +325,9 @@ describe("factory gate", () => {
     const messages = stub.notifications.map((n) => n.message);
     expect(messages).toContain("pi-subagents is not installed. Install it with: pi install npm:pi-subagents");
     // The warning names why the chain cannot run without it: the shipped
-    // agents list submit_feedback, and an allowlisted-but-unavailable tool
-    // fails the child at launch.
+    // agents list
+    // tw_feedback, and an allowlisted-but-unavailable tool fails the child at
+    // launch.
     const telemetry = messages.find((m) => m.startsWith("pi-telemetry is not installed."));
     expect(telemetry).toBeDefined();
     expect(telemetry).toContain("pi install npm:@y4shin/pi-telemetry");

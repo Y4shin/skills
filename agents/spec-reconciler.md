@@ -1,7 +1,7 @@
 ---
 name: spec-reconciler
 description: Reconcile the effort's architecture document with what actually landed. Reads deviation reports and updates docs/tasks/<effort>/architecture.md where real API surfaces diverged from the plan, so pending tickets build against reality and the final record reads as what was built. Never touches code.
-tools: read, edit, submit_feedback
+tools: read, edit, submit_feedback, tw_feedback
 inheritProjectContext: true
 defaultContext: fresh
 ---
@@ -57,11 +57,11 @@ flagged for the user instead of editing, with the reason.
 
 ## Workflow feedback
 
-You have `submit_feedback({ kind, data })`. Use it autonomously, without
-prompting, when the *workflow itself* snags: deviation reports that
-contradict each other, a spec whose structure does not fit the divergence
-you must record, or something that worked notably well.
+You have `tw_feedback({ kind, data })`. Use it autonomously, without prompting,
+when the *workflow itself* snags: deviation reports that contradict each other,
+a spec whose structure does not fit the divergence you must record, or something
+that worked notably well.
 
-Do NOT use it for the divergences themselves: those are project findings.
-Keep `data` to one or two specific, actionable sentences. Suggested `kind`
-values: `good`, `bad`, `friction`, `architecture`.
+Do NOT use it for the divergences themselves: those are project findings. Keep
+`data` to one or two specific, actionable sentences. `kind` is one of `good`,
+`bad`, `friction`, `architecture`.

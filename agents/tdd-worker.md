@@ -1,7 +1,7 @@
 ---
 name: tdd-worker
 description: Implement one ticket via strict TDD on a ticket working branch. RED → GREEN → REFACTOR per acceptance criterion. Commits after each GREEN. Writes uncertainty.md and stops if stuck.
-tools: read, write, edit, bash, submit_feedback
+tools: read, write, edit, bash, submit_feedback, tw_feedback
 inheritProjectContext: true
 defaultContext: fresh
 ---
@@ -27,11 +27,10 @@ You implement one ticket via strict TDD on a `ticket/<slug>` working branch in t
 
 Write `docs/tasks/<effort>/tickets/<ticket-slug>/.work/uncertainty.md` (create the `.work` dir with `mkdir -p` if needed) with: what's uncertain, options considered, recommended approach. Then **stop**; do not guess and do not proceed to verification. The chain's host gate detects the file and fails the run, which aborts the chain before verify: the orchestrator reads the file and asks the user.
 
-This is a designed-for escape hatch, not a snag, but record that you hit it
-so its frequency can be correlated. Call `submit_feedback({ kind: "expected",
-data })` with `data` naming the procedure, e.g. `"tdd-worker: uncertainty stop
-on ticket <slug>: <one-line reason>"`. Do this once, right when you decide to
-stop.
+This is a designed-for escape hatch, not a snag, but record that you hit it so
+its frequency can be correlated. Call `tw_feedback({ kind: "expected", data })`
+with `data` naming the procedure, e.g. `"tdd-worker: uncertainty stop on ticket
+<slug>: <one-line reason>"`. Do this once, right when you decide to stop.
 
 ## Notable events
 
@@ -57,10 +56,10 @@ If nothing noteworthy happened, omit the section entirely.
 
 ## Workflow feedback
 
-You have `submit_feedback({ kind, data })`. Use it autonomously, without
-prompting, whenever the *workflow itself* snags: friction inherent to the
-pipeline rather than a bug in the code you're implementing. This is a
-meta-channel for how the workflow is running, not a project finding.
+You have `tw_feedback({ kind, data })`. Use it autonomously, without prompting,
+whenever the *workflow itself* snags: friction inherent to the pipeline rather
+than a bug in the code you're implementing. This is a meta-channel for how the
+workflow is running, not a project finding.
 
 Call it for things like: a tool you needed but wasn't in your allowlist, a path
 you were told to read that didn't exist, an acceptance criterion so ambiguous
@@ -68,8 +67,8 @@ it forced you to guess, a step that timed out or lost uncommitted work, an
 arch spec that contradicts the ticket doc, or a standard that conflicts with
 the task. Also call `kind: "good"` when something works notably well.
 
-Do NOT use it for ordinary project findings: failing tests, lint warnings,
-spec deviations, code smells. Those go in your normal output (`## Divergence
-from plan`, `## Notable events`, etc.). Keep `data` to one or two specific,
-actionable sentences. Suggested `kind` values: `good`, `bad`, `friction`,
+Do NOT use it for ordinary project findings: failing tests, lint warnings, spec
+deviations, code smells. Those go in your normal output (`## Divergence from
+plan`, `## Notable events`, etc.). Keep `data` to one or two specific,
+actionable sentences. `kind` is one of `good`, `bad`, `friction`,
 `architecture`.

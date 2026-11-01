@@ -172,7 +172,10 @@ End the turn with the completion report in
 tuned for this skill. A refusal, failure, or escalation is the same shape.
 
 > **Feedback:** any of these skills can hit a snag. When that happens, call
-> `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
-> short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
-> two specific, actionable sentences about the *workflow*, not the project
-> work. Requires the `pi-telemetry` extension (`submit_feedback` tool).
+> `tw_feedback({ kind, data })` autonomously to record it. `tw_feedback` is
+> the one route into the telemetry store that labels a row as feedback about
+> *this* workflow, so it stays separable from every other kind of feedback.
+> The signals are `good`, `bad`, `friction`, and `architecture`, plus
+> `expected` for a designed-for escape hatch that fired. `data` is one or two
+> specific, actionable sentences about the *workflow*, not the project work.
+> Requires the `pi-telemetry` extension.

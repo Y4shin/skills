@@ -39,8 +39,7 @@ description: Initialize a repository for the task-workflow. Creates docs/tasks/,
 
 > **Feedback:** if onboarding hits a snag, a template that didn't fit the
 > project, a gate that misfired, a step that fought back, or something that
-> worked notably well, call `submit_feedback({ kind, data })` autonomously to
-> record it. `kind` is a short category (`good`, `bad`, `friction`,
-> `architecture`); `data` is one or two specific, actionable sentences about
-> the *workflow*, not the project. Requires the `pi-telemetry` extension
-> (`submit_feedback` tool).
+> worked notably well, call `tw_feedback({ kind, data })` autonomously to
+> record it. `kind` is one of `good`, `bad`, `friction`, `architecture`;
+> `data` is one or two specific, actionable sentences about the *workflow*,
+> not the project. Requires the `pi-telemetry` extension.

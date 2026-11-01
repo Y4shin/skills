@@ -216,6 +216,14 @@ clone of an external repo. It is not part of the bundle: the migration moves it
 outside and leaves a pointer file behind.
 _Avoid_: submodule (that is a git mechanism; this is a directory of foreign files)
 
+**Workflow feedback**:
+A note about how the workflow itself is running (friction in a phase, a step that
+fought back, a designed-for escape hatch that fired, something that worked
+notably well), as opposed to a finding about the project work. It reaches the
+telemetry store through `tw_feedback`, which labels it `workflow` so it stays
+separable from every other kind of feedback.
+_Avoid_: friction log (that names one signal, not the channel)
+
 ## Relationships
 
 - An **effort** holds one **map**, zero or one specification, zero or one

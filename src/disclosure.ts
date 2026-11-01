@@ -55,6 +55,11 @@ export interface SkillEntry {
  * every registered workflow tool exactly where the workflow uses it, and
  * every entry keeps one private signature tool, which the open-set
  * derivation requires (see signatureToolOf).
+ *
+ * `tw_feedback` is the one cross-phase tool: the workflow-feedback wrapper is
+ * disclosed by every phase, because friction in any phase is worth recording
+ * and a phase that cannot declare it cannot report it. It is shared, like
+ * tw_show, so it is never a signature tool.
  */
 export const SKILL_REGISTRY: SkillEntry[] = [
   {
@@ -74,6 +79,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
       "tw_state_set",
       "tw_list",
       "tw_get",
+      "tw_feedback",
     ],
     conflicts: ["setup-workflow", "wayfinder", "to-spec", "to-tickets", "implement-ticket", "finalize-effort"],
   },
@@ -84,7 +90,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // Bootstrap and migration: it reads the tree and the artifact schema and
     // runs the migration CLI through the shell. tw_context is its signature
     // tool.
-    toolset: ["tw_context", "tw_get", "tw_list"],
+    toolset: ["tw_context", "tw_get", "tw_list", "tw_feedback"],
     conflicts: ["intake", "wayfinder", "to-spec", "to-tickets", "implement-ticket", "finalize-effort"],
   },
   {
@@ -117,6 +123,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
       "tw_show",
       "tw_get",
       "tw_list",
+      "tw_feedback",
     ],
     conflicts: ["intake", "setup-workflow", "to-spec", "to-tickets", "implement-ticket", "finalize-effort"],
   },
@@ -130,7 +137,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // The spec phase: synthesizes the specification from the settled record
     // and writes it through the spec writer. tw_write_spec is its signature
     // tool.
-    toolset: ["tw_write_spec", "tw_get", "tw_list"],
+    toolset: ["tw_write_spec", "tw_get", "tw_list", "tw_feedback"],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-tickets", "implement-ticket", "finalize-effort"],
   },
   {
@@ -157,6 +164,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
       "tw_map_finalizable",
       "tw_get",
       "tw_list",
+      "tw_feedback",
     ],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-spec", "implement-ticket", "finalize-effort"],
   },
@@ -200,6 +208,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
       // writer), and its advisory review needs a home in the effort tree.
       "tw_write_architecture",
       "tw_write_review",
+      "tw_feedback",
     ],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-spec", "to-tickets", "finalize-effort"],
   },
@@ -228,6 +237,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
       "tw_create_effort",
       "tw_get",
       "tw_list",
+      "tw_feedback",
     ],
     conflicts: ["intake", "setup-workflow", "wayfinder", "to-spec", "to-tickets", "implement-ticket"],
   },
@@ -243,7 +253,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // keys on is the first of its private tools, a script tool
     // (skill_validate): tw_show is a shared artifact read, disclosed to
     // wayfinder as well, so it is not this entry's private tool.
-    toolset: ["tw_show", "skill_validate", "skill_scaffold", "skill_discover"],
+    toolset: ["tw_show", "skill_validate", "skill_scaffold", "skill_discover", "tw_feedback"],
     conflicts: [],
   },
 ];

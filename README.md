@@ -22,9 +22,11 @@ pi install npm:@y4shin/pi-telemetry
 For a local checkout, use `pi install /path/to/this/repo`.
 
 Both packages are necessary. The ticket chains use pi-subagents. Each shipped
-subagent lists `submit_feedback` in its tool allowlist, and pi-subagents fails
-a child that cannot reach a listed tool. Without pi-telemetry, the chain stops
-at its first gate. The session start shows a warning when a package is missing.
+subagent lists `tw_feedback` and `submit_feedback` in its tool allowlist: the
+wrapper labels the row and then calls the store, and a nested call reaches only
+a tool the child has active. pi-subagents fails a child that cannot reach a
+listed tool, so without pi-telemetry the chain stops at its first gate. The
+session start shows a warning when a package is missing.
 
 Run this command one time in each repo:
 

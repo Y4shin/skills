@@ -121,9 +121,8 @@ End the run with the completion report in
 tuned for this skill. A refusal, failure, or escalation is the same shape.
 
 > **Feedback:** if the phase hits a snag (a spec write the tools could not
-> express, or something that worked notably well), call
-> `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
-> short category (`good`, `bad`, `friction`, `architecture`); `data` is one
-> or two specific, actionable sentences about the *workflow*, not the
-> project work. Requires the `pi-telemetry` extension (`submit_feedback`
-> tool).
+> express, or something that worked notably well), call `tw_feedback({ kind,
+> data })` autonomously to record it. `kind` is one of `good`, `bad`,
+> `friction`, `architecture`; `data` is one or two specific, actionable
+> sentences about the *workflow*, not the project work. Requires the
+> `pi-telemetry` extension.

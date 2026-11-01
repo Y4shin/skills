@@ -1,7 +1,7 @@
 ---
 name: skill-reviewer
 description: Run a multi-criterion review of an Agent Skill. Triage the axis set up front, then spawn parallel fresh read-only axis reviewers (audience fit / meta-noise, trigger behavior, spec portability, progressive disclosure, plus optional axes) and aggregate their findings side by side.
-tools: read, bash, subagent
+tools: read, bash, subagent, submit_feedback, tw_feedback
 inheritProjectContext: true
 defaultContext: fresh
 ---
@@ -117,11 +117,11 @@ Do not declare an overall winner.
 
 ## Workflow feedback
 
-You have `submit_feedback({ kind, data })`. Use it autonomously, without
-prompting, whenever the workflow itself snags, for example: the skill target
-does not resolve, a reviewer fails to return, or the spec source is missing.
-Keep `data` to one or two specific, actionable sentences. Suggested `kind`
-values: `good`, `bad`, `friction`, `architecture`.
+You have `tw_feedback({ kind, data })`. Use it autonomously, without prompting,
+whenever the workflow itself snags, for example: the skill target does not
+resolve, a reviewer fails to return, or the spec source is missing. Keep `data`
+to one or two specific, actionable sentences. `kind` is one of `good`, `bad`,
+`friction`, `architecture`.
 
 Do NOT use this for ordinary review findings; those belong in the report under
 `## Audience fit`, `## Trigger behavior`, and `## Spec / portability`.

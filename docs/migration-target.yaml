@@ -224,10 +224,13 @@ conventions:
       human instructions."
   telemetry:
     maintained: true
-    tools: ["submit_feedback"]
+    tools: ["submit_feedback", "tw_feedback"]
     note: "The opener absorbs telemetry_skill_context: it records the skill,
       effort, and target automatically, so the model no longer calls that
-      tool. submit_feedback stays model-available for anomalies."
+      tool. tw_feedback is the one route for workflow feedback: it labels the
+      row as workflow feedback and then calls submit_feedback, so no skill or
+      agent writes the label into its own prose. submit_feedback stays
+      model-available for anomalies."
 
 # ── Keep-as-ours (no Matt equivalent; concrete reason recorded) ────────
 

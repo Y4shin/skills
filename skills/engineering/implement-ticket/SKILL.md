@@ -186,9 +186,9 @@ separate bash block.
    branch. Do not merge a red branch.
 
    Fix-forward is a designed-for adjustment, record that it fired so its
-   frequency can be correlated. Call `submit_feedback({ kind: "expected",
-   data })` with `data` e.g. `"implement-ticket: CI gate red on
-   <ticket-slug>, fixing forward"`.
+   frequency can be correlated. Call `tw_feedback({ kind: "expected", data })`
+   with `data` e.g. `"implement-ticket: CI gate red on <ticket-slug>, fixing
+   forward"`.
 
 2. **Knowledge harvest.** Read the ticket doc, all deviation reports from
    `docs/tasks/<effort>/tickets/<ticket-slug>/deviation-reports/`, and the
@@ -392,24 +392,22 @@ Hard rule: the parent context is large and expensive; routing through
 workers is always cheaper than pulling the fix into the parent. The parent
 never writes code or edits files as a fix.
 
-Each toolbelt step is a designed-for adjustment, not a snag -- but record
-which one fired so its frequency can be correlated. Each time you take a
-toolbelt action, call `submit_feedback({ kind: "expected", data })` with
-`data` naming the step, e.g. `"feature: split ticket <slug> after first
-failure"` or `"feature: retry +50% on ticket <slug>"` or
-`"feature: escalate ticket <slug> (two retries failed)"`. One call per
-action, right when you take it.
+Each toolbelt step is a designed-for adjustment, not a snag -- but record which
+one fired so its frequency can be correlated. Each time you take a toolbelt
+action, call `tw_feedback({ kind: "expected", data })` with `data` naming the
+step, e.g. `"feature: split ticket <slug> after first failure"` or `"feature:
+retry +50% on ticket <slug>"` or `"feature: escalate ticket <slug> (two retries
+failed)"`. One call per action, right when you take it.
 
 ## Workflow feedback
 
 When the *workflow itself* snags -- a chain that keeps failing for the same
-reason, a ticket that will not split, a worker that lacked a tool it needed,
-a dependency level that blocked unnecessarily, an architecture document that
+reason, a ticket that will not split, a worker that lacked a tool it needed, a
+dependency level that blocked unnecessarily, an architecture document that
 contradicted a ticket doc, or something that worked notably well -- call
-`submit_feedback({ kind, data })` autonomously, without prompting. `kind`
-is a short category (`good`, `bad`, `friction`, `architecture`); `data` is
-one or two specific, actionable sentences about the *workflow*, not the
-code. The tdd-worker, slice-verifier, deviation-reporter, and land-worker
-agents also call this tool themselves; you do not need to relay their
-friction, only record what you observe at the orchestration level.
-Requires the `pi-telemetry` extension (`submit_feedback` tool).
+`tw_feedback({ kind, data })` autonomously, without prompting. `kind` is one of
+`good`, `bad`, `friction`, `architecture`; `data` is one or two specific,
+actionable sentences about the *workflow*, not the code. The tdd-worker,
+slice-verifier, deviation-reporter, and land-worker agents also call this tool
+themselves; you do not need to relay their friction, only record what you
+observe at the orchestration level. Requires the `pi-telemetry` extension.

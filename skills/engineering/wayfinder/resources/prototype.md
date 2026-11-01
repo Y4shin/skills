@@ -64,10 +64,9 @@ The result must contain:
 
 Do not quietly turn a prototype into production code.
 
-> **Feedback:** if prototyping hits a snag, a question the prototype couldn't
-> answer, an alternative that was hard to compare, a throwaway artifact that
-> leaked, or something that worked notably well, call
-> `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
-> short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
-> two specific, actionable sentences about the *workflow*, not the prototype.
-> Requires the `pi-telemetry` extension (`submit_feedback` tool).
+**Feedback:** if prototyping hits a snag, a question the prototype couldn't
+answer, an alternative that was hard to compare, a throwaway artifact that
+leaked, or something that worked notably well, call `tw_feedback({ kind, data
+})` autonomously to record it. `kind` is one of `good`, `bad`, `friction`,
+`architecture`; `data` is one or two specific, actionable sentences about the
+*workflow*, not the prototype. Requires the `pi-telemetry` extension .

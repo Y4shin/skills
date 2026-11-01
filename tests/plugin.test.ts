@@ -204,6 +204,7 @@ describe("task-workflow tools", () => {
         "tw_context",
         "tw_create_effort",
         "tw_dependency_levels",
+        "tw_feedback",
         "tw_finalizable",
         "tw_finalize_map",
         "tw_frontier",

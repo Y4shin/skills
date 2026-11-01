@@ -405,7 +405,10 @@ describe("disclosure core: telemetry absorption", () => {
 // foreground child loads none, and a path given only by the parent's `-e` flag
 // is not replayed into either. This repo keeps every `docs/tasks/**` write in
 // the phase that owns the named writer, so no agent depends on child extension
-// loading at all; `tests/skills.test.ts` pins the agent side.
+// loading for a write; `tests/skills.test.ts` pins the agent side. The one gated
+// tool an agent does allowlist is `tw_feedback`, which writes telemetry rather
+// than the tree, and every shipped chain dispatches with `async: true`, so its
+// children are the background kind that load ambient extensions.
 
 describe("disclosure core: a session's tool allowlist activates a gated writer", () => {
   let sessions: TaskSession[] = [];

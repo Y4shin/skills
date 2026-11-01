@@ -156,7 +156,7 @@ function landTask(tddRef, verifyRef) {
 }
 
 // Step 0: preconditions gate. implement-preconditions is read-only
-// (tools: read, submit_feedback); it refuses when the ticket doc does not
+// (tools: read, tw_feedback); it refuses when the ticket doc does not
 // exist or does not match these args. Enforcement is layered: the child's
 // first line must be VERDICT: PASS (anything else, including a run
 // failure, refuses), and a host-run test -f fails the run outright when

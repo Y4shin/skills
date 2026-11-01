@@ -81,15 +81,28 @@ describe("agent frontmatter", () => {
         expect(fm["description"].length).toBeGreaterThan(10);
       });
 
-      test("names no gated tw_* tool in its allowlist", () => {
-        // Policy, not a platform limit: an agent CAN reach a gated tool when
-        // the registering extension loads in its child (ambient discovery for a
-        // background child). This repo keeps every docs/tasks/** write in the
-        // phase that owns the named writer, so an agent's capability never
-        // depends on which packages a child happens to load, and a landing in a
-        // session that lacks the package fails loudly here instead of quietly
-        // losing its write.
-        expect(fm["tools"], `${file} claims a gated tool CI cannot give it`).not.toMatch(/\btw_[a-z_]+/);
+      test("allows only tw_feedback among the gated tw_* tools", () => {
+        // Policy, not a platform limit. Feedback is telemetry: it never writes
+        // docs/tasks/**, so a child that cannot reach the wrapper loses a note,
+        // not a write. Every shipped chain is dispatched with `async: true`, so
+        // its children are background children, which load ambient extensions;
+        // that is what makes a gated wrapper reachable in a child at all. A
+        // writer of the tree stays out of every allowlist: those writes belong
+        // to the phase that owns the writer, so an agent's capability never
+        // depends on which packages a child happens to load.
+        const gated = (String(fm["tools"] ?? "").match(/\btw_[a-z_]+/g) ?? []).filter(
+          (tool: string) => tool !== "tw_feedback",
+        );
+        expect(gated, `${file} claims a gated tool CI cannot give it`).toEqual([]);
+        // A nested call reaches only an active tool, and a child's allowlist is
+        // its whole active set: the store has to be named beside the wrapper.
+        if (gated.length === 0 && String(fm["tools"] ?? "").includes("tw_feedback")) {
+          expect(String(fm["tools"]), `${file} can call the wrapper but not the store`).toContain("submit_feedback");
+        }
+      });
+
+      test("frontmatter is valid YAML for the real parser", () => {
+        expect(() => parse(content)).not.toThrow();
       });
     });
   }
@@ -712,7 +725,7 @@ describe("human-mode integration coverage", () => {
   test("verification agent permissions are read-only while landing remains separate", () => {
     const verifier = parseFrontmatter(readFile("agents/slice-verifier.md"));
     const reviewer = parseFrontmatter(readFile("agents/code-reviewer.md"));
-    expect(verifier.tools).toBe("read, bash, submit_feedback");
+    expect(verifier.tools).toBe("read, bash, submit_feedback, tw_feedback");
     expect(reviewer.tools).not.toMatch(/edit|write|land-worker/);
 
     for (const kind of taskKinds) {
@@ -1265,7 +1278,10 @@ const OLD_WILDCARD_PATTERN = new RegExp(`${OLD_PREFIX}\\*`);
 // build output, e.g. Python deps under smoke-py/build, is not package
 // surface and can coincidentally match old tool names like the anyio
 // `task` + `_state` variable).
-const CORPUS_SKIP_DIRS = new Set(["node_modules", ".git", "archive", "prototype-bundle"]);
+// Gitignored local working directories hold tooling output, not prose this
+// repo ships: a subagent transcript or a `.work/` scratch file can carry any
+// character and any retired identifier without anything of ours being wrong.
+const CORPUS_SKIP_DIRS = new Set(["node_modules", ".git", "archive", "prototype-bundle", ".pi-subagents", ".work"]);
 function corpusFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
@@ -1397,6 +1413,48 @@ const DEAD_SURFACE_EXEMPT_PREFIXES = [
   "docs/tasks/enforced-workflow-v5/",
 ];
 
+describe("workflow feedback routes through tw_feedback", () => {
+  // `tw_feedback` is the one place the workflow label is applied: it reads the
+  // installed `submit_feedback` schema and passes either a `workflow` source or
+  // a `workflow.` kind. A file that still sends the model to `submit_feedback`
+  // for workflow feedback bypasses that, and a file that gives `kind` guidance
+  // without naming `tw_feedback` documents a call the phase does not make. This
+  // file names the banned forms on purpose, the same exemption the dead-surface
+  // check takes.
+  const ROUTING_EXEMPT = new Set(["tests/skills.test.ts"]);
+  // Pending release notes and the migration target describe the surface they
+  // replace, the same historical record class the dead-surface check exempts.
+  const ROUTING_EXEMPT_PREFIXES = [".changeset/"];
+  const BYPASS = /submit_feedback\(\{\s*kind:|`submit_feedback\(\{ kind/;
+
+  const corpus = (): { rel: string; text: string }[] =>
+    corpusFiles(PROJECT)
+      .map((file) => file.slice(PROJECT.length + 1))
+      .filter((rel) => !ROUTING_EXEMPT.has(rel))
+      .filter((rel) => !ROUTING_EXEMPT_PREFIXES.some((p) => rel.startsWith(p)))
+      .map((rel) => {
+        try {
+          return { rel, text: readFileSync(join(PROJECT, rel), "utf-8") };
+        } catch {
+          return { rel, text: "" }; // a binary file cannot carry prose
+        }
+      });
+
+  test("no file sends the model to submit_feedback for workflow feedback", () => {
+    const offenders = corpus()
+      .filter(({ text }) => BYPASS.test(text))
+      .map(({ rel }) => rel);
+    expect(offenders).toEqual([]);
+  });
+
+  test("every file that gives kind guidance names tw_feedback", () => {
+    const offenders = corpus()
+      .filter(({ text }) => text.includes("`kind` is") && !text.includes("tw_feedback"))
+      .map(({ rel }) => rel);
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("dead surface deletion (corpus check)", () => {
   test("no deleted tool or guidelines machinery identifier remains outside the historical exemptions", () => {
     const offenders: string[] = [];
@@ -1475,6 +1533,9 @@ const SURVIVING_TOOLS = new Set([
   // lifecycle-hardening: the planning task's record writer, the named
   // replacement for the shell append the grilling resource needed.
   "tw_write_task_note",
+  // tw-feedback: the labelled route into the telemetry store, disclosed by
+  // every phase, so the feedback prose names it rather than submit_feedback.
+  "tw_feedback",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -2549,7 +2610,7 @@ describe("end-of-effort agents", () => {
   test("coherence-refactorer fixes the listed inconsistencies and stops at boundaries", () => {
     const content = readFile("agents/coherence-refactorer.md");
     const fm = parseFrontmatter(content);
-    expect(String(fm.tools)).toBe("read, write, edit, bash, submit_feedback");
+    expect(String(fm.tools)).toBe("read, write, edit, bash, submit_feedback, tw_feedback");
     expect(content).toMatch(/listed inconsistencies/i);
     expect(content).toMatch(/Do NOT change API surfaces/i);
     expect(content).toMatch(/REFACTORED/);
@@ -2560,7 +2621,7 @@ describe("end-of-effort agents", () => {
   test("test-runner runs the docs/testing.md protocol and never fixes", () => {
     const content = readFile("agents/test-runner.md");
     const fm = parseFrontmatter(content);
-    expect(String(fm.tools)).toBe("read, bash, submit_feedback");
+    expect(String(fm.tools)).toBe("read, bash, submit_feedback, tw_feedback");
     expect(content).toMatch(/run these always/i);
     expect(content).toMatch(/run if asked/i);
     expect(content).toMatch(/SUITE: GREEN/);
@@ -2572,7 +2633,7 @@ describe("end-of-effort agents", () => {
   test("spec-reconciler edits exactly one file: the architecture document", () => {
     const content = readFile("agents/spec-reconciler.md");
     const fm = parseFrontmatter(content);
-    expect(String(fm.tools)).toBe("read, edit, submit_feedback");
+    expect(String(fm.tools)).toBe("read, edit, submit_feedback, tw_feedback");
     expect(content).toMatch(/architecture\.md/);
     expect(content).toMatch(/exactly one file/i);
     expect(content).toMatch(/Pending update/i);
@@ -2663,7 +2724,7 @@ describe("chain agents v4 (overhaul-execution-skills)", () => {
     const content = readFile("agents/implement-preconditions.md");
     const fm = parseFrontmatter(content);
     // Strict read-only ceiling: file reads plus workflow telemetry only.
-    expect(String(fm.tools)).toBe("read, submit_feedback");
+    expect(String(fm.tools)).toBe("read, submit_feedback, tw_feedback");
     expect(content).toMatch(/read-only/i);
     expect(content).toMatch(/VERDICT: PASS/);
     expect(content).toMatch(/VERDICT: REFUSE/);

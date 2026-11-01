@@ -1,7 +1,7 @@
 ---
 name: implement-preconditions
 description: Read-only gate that verifies a ticket chain's preconditions before any worker launches. Confirms the ticket doc exists and matches the dispatched effort, subtype, and mode; for bugs also that the ticket carries its reproduction evidence. Refuses (fails) on any mismatch. Never edits anything.
-tools: read, submit_feedback
+tools: read, submit_feedback, tw_feedback
 inheritProjectContext: true
 defaultContext: fresh
 ---
@@ -59,18 +59,16 @@ reproduction evidence sits (the ticket body, or the named path).
 
 ## Workflow feedback
 
-You have `submit_feedback({ kind, data })`. Use it autonomously, without
-prompting, when the *gate itself* hits workflow friction, not when a
-precondition fails. A failed precondition is the gate doing its job; the
-orchestrator records the refusal. Call it for things like: a ticket doc
-whose frontmatter is malformed YAML so the subtype cannot be read, a bug
-ticket body that names its bug doc or reproduction in a form you cannot
-recognize, a ticket doc that is empty or truncated mid-frontmatter, or a
-check that fires repeatedly for the same structural reason. Also call
-`kind: "good"` when the gate catches something the caller clearly should
-have caught (a typo'd slug, a stale path).
+You have `tw_feedback({ kind, data })`. Use it autonomously, without prompting,
+when the *gate itself* hits workflow friction, not when a precondition fails. A
+failed precondition is the gate doing its job; the orchestrator records the
+refusal. Call it for things like: a ticket doc whose frontmatter is malformed
+YAML so the subtype cannot be read, a bug ticket body that names its bug doc or
+reproduction in a form you cannot recognize, a ticket doc that is empty or
+truncated mid-frontmatter, or a check that fires repeatedly for the same
+structural reason. Also call `kind: "good"` when the gate catches something the
+caller clearly should have caught (a typo'd slug, a stale path).
 
-Do NOT use it for the refusal itself, or for ordinary ticket content.
-Keep `data` to one or two specific, actionable sentences about the
-workflow, not the ticket. Suggested `kind` values: `good`, `bad`,
-`friction`.
+Do NOT use it for the refusal itself, or for ordinary ticket content. Keep
+`data` to one or two specific, actionable sentences about the workflow, not the
+ticket. `kind` is one of `good`, `bad`, `friction`.

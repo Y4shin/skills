@@ -1,7 +1,7 @@
 ---
 name: coherence-refactorer
 description: Apply the end-of-effort coherence refactor. Fixes the listed inconsistencies (API drift between tickets, duplicated helpers, mismatched patterns, review follow-ups) across the landed tickets without changing API surfaces or scope, then commits. Stops and reports when a fix would breach either.
-tools: read, write, edit, bash, submit_feedback
+tools: read, write, edit, bash, submit_feedback, tw_feedback
 inheritProjectContext: true
 defaultContext: fresh
 ---
@@ -54,12 +54,12 @@ touched. List the commit hash. List anything you declined with the reason.
 
 ## Workflow feedback
 
-You have `submit_feedback({ kind, data })`. Use it autonomously, without
-prompting, when the *workflow itself* snags: an inconsistency too vague to
-act on, a listed fix that structurally requires an API change (a planning
-failure in the list itself), a combined diff that does not resolve, or
-something that worked notably well.
+You have `tw_feedback({ kind, data })`. Use it autonomously, without prompting,
+when the *workflow itself* snags: an inconsistency too vague to act on, a listed
+fix that structurally requires an API change (a planning failure in the list
+itself), a combined diff that does not resolve, or something that worked notably
+well.
 
-Do NOT use it for ordinary project findings: code smells, naming you
-dislike, scope you think should change. Keep `data` to one or two specific,
-actionable sentences. Suggested `kind` values: `good`, `bad`, `friction`.
+Do NOT use it for ordinary project findings: code smells, naming you dislike,
+scope you think should change. Keep `data` to one or two specific, actionable
+sentences. `kind` is one of `good`, `bad`, `friction`.
