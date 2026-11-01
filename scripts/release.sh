@@ -64,6 +64,10 @@ echo
 # --------------------------------------------------------------------------
 "$CHANGESET_BIN" version
 
+# changesets bumps package.json but leaves the lockfile's own root version
+# stale, which `npm ci` then reports as a mismatch at release time.
+npm install --package-lock-only --ignore-scripts >/dev/null 2>&1
+
 new_version="$(node -p "require('./package.json').version")"
 
 if [ "$new_version" = "$current_version" ]; then
@@ -80,10 +84,12 @@ echo "Bumped ${current_version} -> ${new_version}"
 # `changeset version` writes the released version's section to the repo-root
 # CHANGELOG.md. If that file did not move, the release notes would go missing
 # from npm, so treat it as a hard failure rather than publishing silently.
-if ! git diff --quiet -- CHANGELOG.md; then
+# Content, not `git diff`: a release that creates CHANGELOG.md for the first
+# time leaves an untracked file, which `git diff` reports as no change at all.
+if [ -f CHANGELOG.md ] && grep -qF "## ${new_version}" CHANGELOG.md; then
   echo "CHANGELOG.md carries the ${new_version} entry"
 else
-  echo "Error: changeset version left CHANGELOG.md unchanged. Aborting." >&2
+  echo "Error: CHANGELOG.md has no ${new_version} section. Aborting." >&2
   exit 1
 fi
 
