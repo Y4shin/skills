@@ -3464,7 +3464,7 @@ describe("documentation re-sync (docs-resync)", () => {
 // archives, which is what happened when this effort closed.
 
 describe("end-of-effort reconciliation: the effort documents match the shipped code", () => {
-  const archSpec = readFile("docs/tasks/archive/enforced-workflow-v5/arch-spec.md");
+  const archSpec = readFile("docs/tasks/archive/enforced-workflow-v5/architecture.md");
   const spec = readFile("docs/tasks/archive/enforced-workflow-v5/spec.md");
   const implement = readFile("skills/engineering/implement-ticket/SKILL.md");
   const featureResource = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
