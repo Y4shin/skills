@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Release helper: changeset version -> commit -> tag -> push. CI publishes the tag.
 #
-# Usage: ./scripts/release.sh
+# Usage: ./scripts/release.sh [--yes]
+#
+#   --yes  skip the confirmation prompt (for a non-interactive run)
 #
 # Changesets is the source of truth for the version bump and the changelog
 # entry: each .changeset/<name>.md declares a level (major/minor/patch) and a
@@ -22,6 +24,14 @@ set -euo pipefail
 
 # Always operate from the repository root, regardless of cwd.
 cd "$(git rev-parse --show-toplevel)"
+
+# --yes skips the prompt. Without it, the script asks before it commits.
+assume_yes=0
+case "${1:-}" in
+  -y|--yes) assume_yes=1 ;;
+  "") ;;
+  *) echo "Error: unknown argument '${1}'. Usage: $0 [--yes]" >&2; exit 2 ;;
+esac
 
 # --------------------------------------------------------------------------
 # 1. Clean-worktree guard (pending/staged changes)
@@ -66,7 +76,7 @@ echo
 
 # changesets bumps package.json but leaves the lockfile's own root version
 # stale, which `npm ci` then reports as a mismatch at release time.
-npm install --package-lock-only --ignore-scripts >/dev/null 2>&1
+npm install --package-lock-only --ignore-scripts < /dev/null >/dev/null 2>&1
 
 new_version="$(node -p "require('./package.json').version")"
 
@@ -77,6 +87,26 @@ fi
 
 echo
 echo "Bumped ${current_version} -> ${new_version}"
+
+# The migration target spec declares the package version that ships schema 5,
+# and a test pins it to package.json. A release that skips it leaves the suite
+# red at the tag, so move it here rather than after the fact.
+target="docs/migration-target.yaml"
+if [ -f "$target" ]; then
+  sed -i -E 's/^(package_version:[[:space:]]*")[^"]*(")/\1'"$new_version"'\2/' "$target"
+  if ! grep -qF "package_version: \"${new_version}\"" "$target"; then
+    echo "Error: could not set package_version in ${target}. Aborting." >&2
+    exit 1
+  fi
+  echo "${target} names ${new_version}"
+fi
+
+# The npm page is the README, so a release that drops it from the tarball is a
+# broken release.
+if ! npm pack --dry-run 2>&1 | grep -q 'README.md'; then
+  echo "Error: the tarball does not include README.md. Aborting." >&2
+  exit 1
+fi
 
 # --------------------------------------------------------------------------
 # 5. Confirm changesets wrote the changelog entry, and that the tag is free
@@ -106,10 +136,14 @@ echo
 echo "Staged for release v${new_version}:"
 git status --short
 echo
-read -r -p "Proceed with commit, tag v${new_version}, and push to origin? (y/N) " confirm
-if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-  echo "Aborted. Working tree has the changeset version bump + changelog; unstage or reset manually." >&2
-  exit 0
+if [ "$assume_yes" -eq 1 ]; then
+  echo "Proceeding without a prompt (--yes)."
+else
+  read -r -p "Proceed with commit, tag v${new_version}, and push to origin? (y/N) " confirm
+  if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+    echo "Aborted. Working tree has the changeset version bump + changelog; unstage or reset manually." >&2
+    exit 0
+  fi
 fi
 
 # --------------------------------------------------------------------------
