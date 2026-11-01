@@ -141,7 +141,15 @@ once:
 2. **The Trusted Publisher.** On npmjs.com, open the package, then Settings,
    then Trusted publishing, and add a GitHub Actions publisher: owner
    `Y4shin`, repository `skills`, workflow `release.yml`, environment blank.
-   Every release after that runs token-free.
+   Under allowed actions, also tick `npm publish`: `npm stage publish` is
+   granted automatically, direct publishing is opt-in, and this workflow
+   publishes directly.
+
+   Two constraints on that connection: it must complete its first successful
+   publish within two days or it expires, and it cannot be edited afterwards,
+   only deleted and recreated. So check the four field values before saving,
+   and cut a real release rather than an already-published version, which the
+   publish step skips. Every release after that runs token-free.
 
 To confirm a release landed: `npm view @y4shin/pi-task-workflow version`, and
 the provenance badge on the package page should name this repository and
