@@ -1,5 +1,5 @@
 ---
-type: arch spec
+type: architecture
 title: arch-spec, run-adoption-migration
 status: stable
 ---

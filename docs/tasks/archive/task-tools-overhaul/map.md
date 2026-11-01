@@ -224,7 +224,7 @@ user direction: prefer OKF counterparts, revisit on the landed
 schema), full vocabulary sweep beyond the tool prefix. The map hands
 off to `/skill:to-spec task-tools-overhaul`.
 
-## Out of scope
+## Non-goals
 
 - Implementing the overhaul (the to-spec/to-tickets and implement-task
   that follow are separate flows consuming this map's plan).
@@ -234,3 +234,5 @@ off to `/skill:to-spec task-tools-overhaul`.
   audited, never finished or reverted here).
 - Post-hoc telemetry analysis (owned by the telemetry-eval skills).
 - Migrating skills of other harnesses or packages.
+
+## Non-negotiable facts

@@ -1,5 +1,5 @@
 ---
-type: arch spec
+type: architecture
 title: Enforced workflow v5 architecture
 status: stable
 ---

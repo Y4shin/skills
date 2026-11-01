@@ -1,3 +1,8 @@
+---
+type: deviation report
+title: "Deviation report: to-tickets-architecture (effort enforced-workflow-v5)"
+status: stable
+---
 # Deviation report: to-tickets-architecture (effort enforced-workflow-v5)
 
 Verified against the re-verification run: branch `ticket/to-tickets-architecture`

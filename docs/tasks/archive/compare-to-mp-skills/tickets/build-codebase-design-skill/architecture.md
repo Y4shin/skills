@@ -1,5 +1,5 @@
 ---
-type: arch spec
+type: architecture
 title: Architecture specification — codebase-design skill
 status: stable
 ---

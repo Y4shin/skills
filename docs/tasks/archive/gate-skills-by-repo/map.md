@@ -102,7 +102,7 @@ repos and this personal repo showing the behaviour matches the matrix above.
   work/personal switch re-runs the factory. Confirm the detection runs once
   per repo per session, not per turn.
 
-## Out of scope
+## Non-goals
 
 - The mirror gate in pi-aura (`engineering-workflow` package hiding its 14
   skills outside anwalt.de repos). Same detection, opposite default, separate
@@ -115,3 +115,5 @@ repos and this personal repo showing the behaviour matches the matrix above.
   global settings.
 - Gating other global packages (pi-subagents, pi-telemetry, browser-goblin,
   etc.). Each package gates itself; this is only the `task-workflow` side.
+
+## Non-negotiable facts

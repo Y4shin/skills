@@ -1,5 +1,5 @@
 ---
-type: arch spec
+type: architecture
 title: Architecture specification — human-owned implementation mode
 status: stable
 ---

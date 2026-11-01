@@ -178,10 +178,12 @@ married to our repo's *automation depth and structural enforcement*.
 - What about the remaining deferred utility skills (wait-what,
   to-questionnaire, teach), are they worth a dedicated grilling?
 
-## Out of scope
+## Non-goals
 
 - Porting any mp-skills skill verbatim without adapting its invocation model
   (Claude Code plugin, skills.sh) to Pi's package system.
 - Replacing the existing task type system or dependency graph, these are
   structural advantages, not gaps.
 - Removing telemetry or feedback instrumentation.
+
+## Non-negotiable facts

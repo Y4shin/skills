@@ -46,9 +46,11 @@ Enable a workflow mode in which the human implements each feature or bug slice, 
 - How commits, worktrees, retries, deviations, and finalization change under human ownership.
 - Whether existing autonomous mode remains available and how the two modes coexist.
 
-## Out of scope
+## Non-goals
 
 - Redesigning unrelated task types or replacing the existing dependency graph.
 - Automatically fixing implementation defects without explicit human collaboration.
 - Replacing the existing autonomous behavior; it remains available through the routers' fallback path.
 - Making implementation tasks complete from Wayfinder; completion remains the responsibility of execution/finalization.
+
+## Non-negotiable facts

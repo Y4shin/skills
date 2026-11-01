@@ -141,7 +141,7 @@ blocking implementation.
   upgrade-2-to-3 step 7 must consult the user before rewriting the `grilling`
   skill text. This is a constraint on implementation, not a blocking fog.
 
-## Out of scope
+## Non-goals
 
 - Porting Matt's CI/build tooling, release automation, or harness-specific
   packaging (Claude Code plugin manifest, skills.sh), extraction is skills +
@@ -152,3 +152,5 @@ blocking implementation.
   confirms are still aligned with Matt's current way.
 - Adopting Matt's skills verbatim without adapting their invocation model to
   Pi (a Claude Code plugin skill is not a drop-in Pi skill).
+
+## Non-negotiable facts

@@ -1,5 +1,5 @@
 ---
-type: arch spec
+type: architecture
 title: Architecture spec — build-task-workflow-doctor-skill
 status: stable
 ---

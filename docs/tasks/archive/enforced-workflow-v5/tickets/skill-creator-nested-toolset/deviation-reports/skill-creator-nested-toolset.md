@@ -1,3 +1,8 @@
+---
+type: deviation report
+title: "Deviation report: skill-creator-nested-toolset (effort enforced-workflow-v5)"
+status: stable
+---
 # Deviation report: skill-creator-nested-toolset (effort enforced-workflow-v5)
 
 Verified against branch `ticket/skill-creator-nested-toolset` (three wip

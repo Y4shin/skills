@@ -1,5 +1,5 @@
 ---
-type: arch spec
+type: architecture
 title: "Architecture spec: gate-tools-and-injection"
 status: stable
 ---

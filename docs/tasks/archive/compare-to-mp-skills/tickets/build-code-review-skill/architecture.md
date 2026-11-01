@@ -1,5 +1,5 @@
 ---
-type: arch spec
+type: architecture
 title: Architecture spec — build-code-review-skill
 status: stable
 ---

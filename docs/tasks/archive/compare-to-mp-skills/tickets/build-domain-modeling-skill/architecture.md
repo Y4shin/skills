@@ -1,5 +1,5 @@
 ---
-type: arch spec
+type: architecture
 title: Architecture specification — domain-modeling skill
 status: stable
 ---

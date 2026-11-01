@@ -1,5 +1,5 @@
 ---
-type: arch spec
+type: architecture
 title: Architecture specification — improve-codebase-architecture
 status: stable
 ---

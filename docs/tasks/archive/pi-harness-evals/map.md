@@ -174,7 +174,7 @@ Done looks like:
   release or a follow-up; depends on how clean the copy-paste simulator
   resource proves in practice.
 
-## Out of scope
+## Non-goals
 
 - Docker/bridge runner mode and a container image with pi baked in;
   documented as a future strict A/B option only.
@@ -187,3 +187,5 @@ Done looks like:
   `evals/` chosen instead).
 - CI integration of eval suites into pipelines.
 - Evaluating skills of harnesses other than pi.
+
+## Non-negotiable facts

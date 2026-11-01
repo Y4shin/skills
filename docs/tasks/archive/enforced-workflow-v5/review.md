@@ -2,6 +2,7 @@
 type: review
 title: Review of enforced-workflow-v5 (second close pass)
 dispositioned: true
+status: stable
 ---
 
 ## What this pass read and ran

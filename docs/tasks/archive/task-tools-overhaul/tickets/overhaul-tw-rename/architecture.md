@@ -1,5 +1,5 @@
 ---
-type: arch spec
+type: architecture
 title: "Architecture spec: overhaul-tw-rename"
 status: stable
 ---

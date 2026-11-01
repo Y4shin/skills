@@ -79,10 +79,12 @@ rewired to drive the CLI end-to-end, and an eval harness discovers the full
 - D8x full update set, discovered by the eval at execution time, not a
   planning decision.
 
-## Out of scope
+## Non-goals
 
 - Headless / non-TUI fallback (D4), deferred until grilling-in-headless becomes
   real.
 - A live SSE push transport, polling ~1-2s is sufficient for round cadence.
 - A `finalizing` intermediate page state, `finalize` is a CLI call, not a page
   state.
+
+## Non-negotiable facts

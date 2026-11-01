@@ -229,7 +229,7 @@ generalization review) is complete.
   task, blocked on `build-skill-creator-skill`'s `references-support-scripts`
   slice. Until then, slice 5 ships policy-level guidance + a pointer.
 
-## Out of scope
+## Non-goals
 
 - Porting or wholesale-copying the sentient-agi or DeepAgents `skill-creator`.
 - A per-brand reference file for each of the ~45 Agent-Skills clients (broad
@@ -247,3 +247,5 @@ generalization review) is complete.
 - Authoring skills in a non-Agent-Skills format (e.g. a Claude Code "plugin"
   or a Custom GPT). `skill-creator` authors Agent-Skills-format skills that
   install into any supporting client.
+
+## Non-negotiable facts
