@@ -435,3 +435,18 @@ describe("the architecture section writer", () => {
     ).rejects.toThrow(/single '##' heading name/);
   });
 });
+
+describe("the printed artifact schema names every schema-5 type", () => {
+  test("tw_context names architecture and review, and marks arch spec legacy", async () => {
+    const t = tools();
+    const schema = (await t.tw_context.execute({}, ctx([...ALWAYS_DECLARED]))) as string;
+    expect(schema).toContain("### Architecture (`docs/tasks/<effort>/architecture.md`)");
+    expect(schema).toContain("type: architecture");
+    expect(schema).toContain("### Review (");
+    expect(schema).toContain("type: review");
+    expect(schema).toMatch(/arch spec \(legacy, pre-migration\)/);
+    // The migration moved every tree artifact; the printed contract must not
+    // still offer the old type as a current one.
+    expect(schema).not.toMatch(/^type: arch spec \|/m);
+  });
+});
