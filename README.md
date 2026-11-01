@@ -26,7 +26,7 @@
 ## Install
 
 ```bash
-pi install npm:@yashin/pi-task-workflow
+pi install npm:@y4shin/pi-task-workflow
 pi install git:github.com/Y4shin/pi-telemetry@v0.4.0
 ```
 
@@ -126,25 +126,24 @@ both typechecks and the suite, refuses a tag that disagrees with
 Trusted Publishing over OIDC, so the repo holds no `NPM_TOKEN` secret and the
 workflow carries no long-lived credential.
 
-Two steps are human-only, and both happen once:
+The scope `@y4shin` is the npm username, so the account owns it outright and
+there is no organization to create. Two steps are human-only, and both happen
+once:
 
-1. **The scope.** `@yashin/pi-task-workflow` needs the `yashin` npm
-   organization. Create it at <https://www.npmjs.com/org/create> (free for
-   public packages) or, if the name is taken, change `name` in `package.json`
-   to `@y4shin/pi-task-workflow` and use `@y4shin` everywhere below.
-2. **The first publish.** npm only accepts a Trusted Publisher for a package
-   that already exists. So publish the first version by hand, once:
+1. **The first publish.** npm only accepts a Trusted Publisher for a package
+   that already exists, so the first version goes out by hand:
 
    ```bash
    npm login
    npm publish --access public
    ```
 
-   Then open the package's settings on npmjs.com, add a Trusted Publisher with
-   owner `Y4shin`, repository `skills`, workflow `release.yml`, and leave the
-   environment blank. Every release after that runs token-free.
+2. **The Trusted Publisher.** On npmjs.com, open the package, then Settings,
+   then Trusted publishing, and add a GitHub Actions publisher: owner
+   `Y4shin`, repository `skills`, workflow `release.yml`, environment blank.
+   Every release after that runs token-free.
 
-To confirm a release landed: `npm view @yashin/pi-task-workflow version`, and
+To confirm a release landed: `npm view @y4shin/pi-task-workflow version`, and
 the provenance badge on the package page should name this repository and
 `release.yml`.
 
