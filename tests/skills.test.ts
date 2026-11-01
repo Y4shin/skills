@@ -153,6 +153,10 @@ describe("skill files", () => {
         expect(content).not.toContain("subagent_supervisor");
         expect(content).not.toContain("contact_supervisor");
       });
+
+      test("frontmatter is valid YAML for the real parser", () => {
+        expect(() => parse(content)).not.toThrow();
+      });
     });
   }
 });

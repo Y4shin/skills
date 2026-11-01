@@ -1,6 +1,6 @@
 ---
 name: wayfinder
-description: The single planning-phase skill. Each invocation is one bounded pass over a shared map of planning tasks (research, prototype, grilling, manual): work the ready frontier, write results back to the map, and reconcile when the frontier empties. Produces decisions, not deliverables; hands off to to-spec and to-tickets for implementation.
+description: "The single planning-phase skill. Each invocation is one bounded pass over a shared map of planning tasks (research, prototype, grilling, manual): work the ready frontier, write results back to the map, and reconcile when the frontier empties. Produces decisions, not deliverables; hands off to to-spec and to-tickets for implementation."
 disable-model-invocation: true
 ---
 
@@ -248,11 +248,11 @@ phase executes. Looping the map straight into implementation skips that
 collapse and throws the linked detail away, so go to the implementation phase
 directly only when the effort turned out genuinely small.
 
-If implementation exposes uncertainty, stop that task with a clear discovery
-and return to Wayfinder for a **new planning task** (not a re-open of the old
-one). This is a designed-for escape hatch: record that it fired by calling
-`submit_feedback({ kind: "expected", data })` with `data` e.g.
-`"wayfinder: task <slug> returned with unresolved uncertainty"`.
+If implementation exposes uncertainty, stop that task with a clear discovery and
+return to Wayfinder for a **new planning task** (not a re-open of the old one).
+This is a designed-for escape hatch: record that it fired by calling
+`tw_feedback({ kind: "expected", data })` with `data` e.g. `"wayfinder: task
+<slug> returned with unresolved uncertainty"`.
 
 Do not improvise a hidden plan. Do not silently expand a task's acceptance
 criteria. Add a task instead.
@@ -282,8 +282,8 @@ tuned for this skill. A refusal, failure, or escalation is the same shape.
 
 > **Feedback:** if planning hits a snag (a grilling loop that circled, a
 > dependency that wouldn't wire, a task type that didn't fit, a frontier that
-> stalled, or something that worked notably well), call
-> `submit_feedback({ kind, data })` autonomously to record it. `kind` is a
-> short category (`good`, `bad`, `friction`, `architecture`); `data` is one or
-> two specific, actionable sentences about the *workflow*, not the project
-> work. Requires the `pi-telemetry` extension (`submit_feedback` tool).
+> stalled, or something that worked notably well), call `tw_feedback({ kind,
+> data })` autonomously to record it. `kind` is one of `good`, `bad`,
+> `friction`, `architecture`; `data` is one or two specific, actionable
+> sentences about the *workflow*, not the project work. Requires the
+> `pi-telemetry` extension.

@@ -1,6 +1,6 @@
 ---
 name: intake
-description: The single front door to the workflow, for both the phase and the skill. Every request becomes an effort: intake runs bounded sanity checks, records the intake facts, and creates the effort with a map and exactly one non-negotiables grilling task through the named tools. Replaces triage.
+description: "The single front door to the workflow, for both the phase and the skill. Every request becomes an effort: intake runs bounded sanity checks, records the intake facts, and creates the effort with a map and exactly one non-negotiables grilling task through the named tools. Replaces triage."
 disable-model-invocation: true
 ---
 
@@ -122,8 +122,7 @@ tuned for this skill. A refusal, failure, or escalation is the same shape.
 
 > **Feedback:** if intake hits a snag (a duplicate check that missed, a
 > classification that stayed ambiguous, or something that worked notably
-> well), call `submit_feedback({ kind, data })` autonomously to record it.
-> `kind` is a short category (`good`, `bad`, `friction`, `architecture`);
-> `data` is one or two specific, actionable sentences about the *workflow*,
-> not the project work. Requires the `pi-telemetry` extension
-> (`submit_feedback` tool).
+> well), call `tw_feedback({ kind, data })` autonomously to record it. `kind`
+> is one of `good`, `bad`, `friction`, `architecture`; `data` is one or two
+> specific, actionable sentences about the *workflow*, not the project work.
+> Requires the `pi-telemetry` extension.
