@@ -160,6 +160,9 @@ npm run changeset        # declare the bump
 ./scripts/release.sh     # version, commit, tag, push
 ```
 
+Cut the release from `main`. The script refuses any other branch, so merge
+your work first, and it refuses a `main` that is behind `origin/main`.
+
 The tag starts `.github/workflows/release.yml`. That workflow tests the code
 and stages the version through npm Trusted Publishing (OIDC, no token). A
 maintainer approves the staged version with 2FA. The version goes live only
