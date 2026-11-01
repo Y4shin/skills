@@ -845,6 +845,7 @@ function writeEffortRootArtifact(o: EffortRootWriteOptions): string {
   } catch { /* the effort may exist without the artifact yet: create it */ }
 
   if (hit !== null) {
+    refuseArchivedArtifact(root, hit.path);
     o.validateExisting?.(hit.art);
     if (o.section !== undefined) {
       hit.doc.body = writeMapSection(hit.doc.body, o.section, body);
@@ -1118,6 +1119,22 @@ function registerLiveEffort(root: string, effort: string): void {
 }
 
 /** True when a path sits strictly inside a directory. */
+/**
+ * An artifact under `docs/tasks/archive/` is the record of a finished effort:
+ * history, not a document to amend. The writers refuse it explicitly so the
+ * error says that, instead of the gate's misleading "no live effort" (no phase
+ * opens for an archived effort, so no writer is reachable there anyway).
+ */
+function refuseArchivedArtifact(root: string, path: string): void {
+  const rel = relative(taskRoot(root), path);
+  const segments = rel.split(/[\\/]/).filter((s) => s !== "" && s !== ".");
+  if (segments[0] !== "archive") return;
+  throw new Error(
+    `'${relative(root, path)}' belongs to an archived effort: the archive is the record of what was ` +
+      `settled, not a document to amend. A correction to what was built belongs to a new effort`,
+  );
+}
+
 function isInside(dir: string, path: string): boolean {
   const rel = relative(dir, path);
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
@@ -1787,6 +1804,7 @@ export function createTools(): Record<string, Tool> {
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         const { path, art, doc } = resolveArt(root, p.selector, "map");
+        refuseArchivedArtifact(root, path);
         requireV4Shape(art);
         const section = typeof p.section === "string" ? p.section.trim() : "";
         if (section === "") throw new Error("section name is empty");

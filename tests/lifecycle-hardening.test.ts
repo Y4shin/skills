@@ -450,3 +450,38 @@ describe("the printed artifact schema names every schema-5 type", () => {
     expect(schema).not.toMatch(/^type: arch spec \|/m);
   });
 });
+
+describe("archived artifacts are history, and the writers say so", () => {
+  test("the architecture writer refuses an archived document with the archive reason", async () => {
+    const t = tools();
+    const archived = join(repo, "docs", "tasks", "archive", "closed-effort");
+    mkdirSync(archived, { recursive: true });
+    writeFileSync(
+      join(archived, "architecture.md"),
+      dump({ data: { type: "architecture", title: "Closed", status: "deprecated" }, body: "\n## Seams\n\nOld.\n" }),
+      "utf-8",
+    );
+    await expect(
+      t.tw_write_architecture.execute(
+        { selector: "docs/tasks/archive/closed-effort/architecture.md", section: "Seams", content: "New." },
+        ctx([...ALWAYS_DECLARED]),
+      ),
+    ).rejects.toThrow(/archived effort: the archive is the record/);
+  });
+
+  test("the map writer refuses an archived map for the same reason", async () => {
+    const t = tools();
+    const archived = join(repo, "docs", "tasks", "archive", "closed-effort");
+    writeFileSync(
+      join(archived, "map.md"),
+      dump({ data: { type: "map", title: "Closed", status: "deprecated" }, body: "\n## Non-goals\n\n- x\n" }),
+      "utf-8",
+    );
+    await expect(
+      t.tw_write_section.execute(
+        { selector: "docs/tasks/archive/closed-effort/map.md", section: "Non-goals", content: "- y" },
+        ctx([...ALWAYS_DECLARED]),
+      ),
+    ).rejects.toThrow(/archived effort: the archive is the record/);
+  });
+});
