@@ -1,71 +1,103 @@
 # task-workflow
 
-> Intake → Wayfinder → specification → architecture and ticket graph → implementation → effort close, a gated planning workflow for `docs/tasks/`.
-> Pi package. One `pi install` away.
+A Pi package for planned, checked, long-running work. It turns one request into
+one effort in your repository. It writes the plan, orders the work by
+dependency, builds each part, and closes the effort with a review.
 
-## What v5 enforces
+An effort is one directory under `docs/tasks/`. It holds the map, the
+specification, the tickets, and the review for one piece of work.
 
-- **One front door.** `/skill:intake` turns every request, bugs included,
-  into an effort with a map and exactly one non-negotiables grilling task.
-  There is no separate bug queue and no rejection path.
-- **The opener is the gate.** Every phase opens with `tw_open` and closes
-  with `tw_close`. A phase opened out of turn is refused by the tool with
-  the legal next call, not by prose.
-- **Two graph kinds.** Planning tasks under `tasks/` and implementation
-  tickets under `tickets/`, with kind-scoped `blocked_by` edges; the
-  frontier and the dependency levels are computed per kind.
-- **One living architecture document.** `/skill:to-tickets` produces
-  `architecture.md` alongside the ticket graph, and the specification's
-  architecture content becomes archival.
-- **Close-out is inlined.** Each landed ticket gets its CI gate, changelog,
-  done-marking, and merge in the same run; `/skill:finalize-effort` runs the
-  holistic review, the finding triage, and the archive.
-- **The tools own the rules.** The named `tw_*` tools are the only writers
-  of `docs/tasks/**`, and `write` and `edit` are refused on that tree.
+The skills come from Matt Pocock's skills repository. This package adapts them
+to the Pi agent, and adds a stronger workflow enforcement. The phase gates and
+the file writers are tools, not instructions. See
+[ADR 0001](./docs/adr/0001-largely-adopt-mp-skills.md) for the decision record.
 
 ## Install
 
 ```bash
 pi install npm:@y4shin/pi-task-workflow
-pi install git:github.com/Y4shin/pi-telemetry@v0.4.0
+pi install npm:@y4shin/pi-telemetry
 ```
 
-Or from a local checkout: `pi install /path/to/this/repo`.
+For a local checkout, use `pi install /path/to/this/repo`.
 
-Both packages are required. pi-subagents drives every ticket chain, and
-every shipped subagent lists `submit_feedback` in its `tools` allowlist;
-pi-subagents treats that allowlist as strict and fails a child whose tool is
-unavailable, so without pi-telemetry the chain stops at its first gate. The
-session start prints a warning when either package is missing.
+Both packages are necessary. The ticket chains use pi-subagents. Each shipped
+subagent lists `submit_feedback` in its tool allowlist, and pi-subagents fails
+a child that cannot reach a listed tool. Without pi-telemetry, the chain stops
+at its first gate. The session start shows a warning when a package is missing.
 
-Then once per repo:
+Run this command one time in each repo:
 
 ```
-/skill:setup-workflow    # scaffold docs/tasks/ at schema 5, or migrate an older tree
+/skill:setup-workflow
 ```
 
-## Workflow
+This command writes `docs/tasks/` at schema 5. It can also migrate an older
+tree.
 
-Every request enters as an effort through `/skill:intake`, the single front
-door, which creates the effort's map and its exactly one non-negotiables
-grilling task. `/skill:wayfinder` works the planning frontier in bounded passes
-and hands off when the effort is ready for the spec. `/skill:to-spec` writes the
-specification from the settled record, `/skill:to-tickets` produces
-`architecture.md` and the ticket graph, and `/skill:implement-ticket` implements
-the ready frontier in dependency levels with the per-ticket close-out inline.
-`/skill:finalize-effort` reviews the whole effort, dispositions every finding,
-and archives it.
+## How a request moves
 
-`docs/tasks/` is an OKF bundle: one directory per effort holding `map.md`, an
-optional `spec.md`, `architecture.md` when the ticket graph needs interface
-contracts, a `tasks/` directory of planning tasks, and a `tickets/` directory of
-implementation tickets. A finished effort moves to `docs/tasks/archive/`.
+Seven skills move a request to a closed effort, in this order.
+
+1. `/skill:intake` makes the effort. It records the request, writes the map,
+   and adds one grilling task about the non-negotiables.
+2. `/skill:wayfinder` asks the questions and writes each decision into the
+   map. It stops when the planning frontier is empty. The frontier is the set
+   of planning tasks that no other task blocks.
+3. `/skill:to-spec` writes `spec.md` from the settled decisions.
+4. `/skill:to-tickets` writes `architecture.md` and the ticket graph.
+5. `/skill:implement-ticket` builds the tickets in dependency levels. It
+   closes each ticket in the same run: CI gate, changelog, done mark, merge.
+6. `/skill:finalize-effort` reviews the full effort, gives each finding one
+   disposition, and archives the effort.
+
+Each phase opens with `tw_open` and closes with `tw_close`. The tool refuses a
+phase that opens out of order, and it names the correct next phase. Run
+`tw_next` when you are not sure what comes next.
+
+Keep the planning phases (intake to to-tickets) in one session. Each
+`/skill:implement-ticket` run starts with a new context.
+
+## What the repo holds
+
+```
+docs/tasks/
+  state.yaml          schema version, and the state pointers
+  <effort>/
+    map.md            destination, constraints, decisions, fog, non-goals
+    spec.md           the settled statement of the work
+    architecture.md   interface contracts, when the tickets need them
+    tasks/<slug>/     planning tasks
+    tickets/<slug>/   implementation tickets
+    review.md         the effort review, and each finding's disposition
+  archive/<effort>/   the closed effort, still readable
+```
+
+The `tw_*` tools are the only writers of this tree. The extension refuses
+`write` and `edit` on `docs/tasks/**`. The plan is part of your diff, so a
+reviewer can read it.
+
+## When to skip it
+
+This workflow has a cost. A small change takes less time without it. Use it
+when the work continues across sessions, needs a review, or passes between
+people. For small work, use only the disciplines: `/skill:tdd`,
+`/skill:code-review`, `/skill:diagnosing-bugs`.
+
+## Work repos
+
+The package installs for all repos. It disables itself in a work repo, based
+on the git origin. You do not configure each repo. Read
+[`docs/repo-gating.md`](docs/repo-gating.md).
+
+One known limitation: the skills still show in `/help` in a work repo. An
+explicit `/skill:<name>` call is blocked.
 
 ## Skills
 
-The package ships exactly the promoted set in `package.json`'s `pi.skills`.
-A user-invoked skill is reachable only when you type `/skill:<name>`; a
-model-invoked skill is model- or user-reachable.
+`package.json`'s `pi.skills` is the set that ships. A user-invoked skill runs
+only when you type `/skill:<name>`. A model-invoked skill runs on a model
+decision, or when you type it.
 
 ### User-invoked
 
@@ -102,76 +134,53 @@ model-invoked skill is model- or user-reachable.
 - [to-questionnaire](./skills/productivity/to-questionnaire/SKILL.md)
 - [writing-for-agents](./skills/productivity/writing-for-agents/SKILL.md)
 
+## Where to read next
+
+- [task-workflow-overview](./skills/engineering/task-workflow-overview/SKILL.md)
+  is the router. It names the skill for your situation.
+- [`CONTEXT.md`](./CONTEXT.md) is the vocabulary: effort, map, frontier,
+  planning task, implementation ticket.
+- [`docs/repo-gating.md`](docs/repo-gating.md) is the gate in full.
+
 ## Development
 
 ```bash
 npm install
 npm test
 npm run typecheck
+npm run typecheck:tests
 ```
 
 ## Releasing
 
-Releases are tag-triggered. The tag is the consent: a plain merge to `main`
-publishes nothing.
+Push a `vX.Y.Z` tag to start a release. A merge to `main` releases nothing.
 
 ```bash
-npm run changeset        # declare the bump for the work you just did
-./scripts/release.sh     # version, commit, tag vX.Y.Z, push commit and tag
+npm run changeset        # declare the bump
+./scripts/release.sh     # version, commit, tag, push
 ```
 
-Pushing the tag starts `.github/workflows/release.yml`, which installs, runs
-both typechecks and the suite, refuses a tag that disagrees with
-`package.json`, prints the tarball contents, and **stages** the version. It
-cannot make that version live. A maintainer approves the staged version with
-2FA, on npmjs.com under the package's Staged Packages tab or with
-`npm stage approve <stage-id>`, and only then does the version reach the
-registry. Auth is npm Trusted Publishing over OIDC, so the repo holds no
-`NPM_TOKEN` secret and the workflow carries no long-lived credential.
+The tag starts `.github/workflows/release.yml`. That workflow tests the code
+and stages the version through npm Trusted Publishing (OIDC, no token). A
+maintainer approves the staged version with 2FA. The version goes live only
+after the approval.
 
-The split is deliberate: a mistaken or malicious tag push cannot put an
-installable version on npm, because the run ends in the staging area. The
-cost is one approval per release. Direct publishing instead would mean
-ticking `npm publish` on the trusted publisher and trusting tag permissions
-alone, since it holds even when the tag push is the compromise.
+Two steps are manual, and they run one time:
 
-The scope `@y4shin` is the npm username, so the account owns it outright and
-there is no organization to create. Two steps are human-only, and both happen
-once:
-
-1. **The first publish.** npm only accepts a Trusted Publisher for a package
-   that already exists, so the first version goes out by hand:
+1. Publish the first version by hand, because npm accepts a Trusted Publisher
+   only for an existing package:
 
    ```bash
    npm login
    npm publish --access public
    ```
 
-2. **The Trusted Publisher.** On npmjs.com, open the package, then Settings,
-   then Trusted publishing, and add a GitHub Actions publisher: owner
-   `Y4shin`, repository `skills`, workflow `release.yml`, environment blank.
-   Under allowed actions leave both boxes unticked. `npm stage publish` is
-   granted automatically and is all this workflow needs; `npm publish` is
-   opt-in, and granting it would let a tag push publish without review.
+2. On npmjs.com, open the package settings and add a GitHub Actions trusted
+   publisher. Use owner `Y4shin`, repository `skills`, workflow `release.yml`,
+   and no environment. Leave both allowed-action boxes empty. The connection
+   expires after two days when its first publish fails, and you cannot edit it
+   later.
 
-   Two constraints on that connection: it must complete its first successful
-   publish within two days or it expires, and it cannot be edited afterwards,
-   only deleted and recreated. So check the four field values before saving,
-   and cut a real release promptly: a tag whose version is already published
-   is skipped, and staging a version nobody approves does not validate the
-   connection either. Every release after that runs token-free.
+## License
 
-To confirm a release landed: approve the staged version, then
-`npm view @y4shin/pi-task-workflow version`. The provenance badge on the
-package page should name this repository and `release.yml`.
-
-## Repo gating (auto-disable in work repos)
-
-This package is **global**, so it would load in every repo, including work
-repos where it doesn't belong. The gate auto-disables all of the package's
-resources in work repos based on the repo's `git origin`, with **zero
-per-repo config**. See [`docs/repo-gating.md`](docs/repo-gating.md) for the
-full truth table, detection rules, and the one known limitation (the package's
-skills still appear on `/help` in a work repo, because pi has no hook to
-suppress them there; explicit `/skill:<name>` is blocked via the `input`
-event instead).
+MIT. See [`LICENSE`](./LICENSE).
