@@ -1,10 +1,33 @@
 {
-  "name": "task-workflow",
+  "name": "@yashin/pi-task-workflow",
   "version": "5.0.1",
   "description": "Wayfinder grilling \u2192 task frontier \u2192 type-specific execution: a planning workflow for docs/tasks/. Pi extension.",
   "keywords": [
     "pi-package"
   ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Y4shin/skills.git"
+  },
+  "homepage": "https://github.com/Y4shin/skills#readme",
+  "files": [
+    "src",
+    "skills",
+    "agents",
+    "CHANGELOG.md",
+    "CONTEXT.md",
+    "docs/engineering",
+    "docs/productivity",
+    "docs/adr",
+    "docs/repo-gating.md",
+    "docs/dev-env.md",
+    "docs/testing.md",
+    "docs/migration-target.yaml"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "scripts": {
     "test": "vitest run",

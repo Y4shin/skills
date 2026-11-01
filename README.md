@@ -26,9 +26,11 @@
 ## Install
 
 ```bash
-pi install /path/to/task-workflow
+pi install npm:@yashin/pi-task-workflow
 pi install git:github.com/Y4shin/pi-telemetry@v0.4.0
 ```
+
+Or from a local checkout: `pi install /path/to/this/repo`.
 
 Both packages are required. pi-subagents drives every ticket chain, and
 every shipped subagent lists `submit_feedback` in its `tools` allowlist;
@@ -107,6 +109,44 @@ npm install
 npm test
 npm run typecheck
 ```
+
+## Releasing
+
+Releases are tag-triggered. The tag is the consent: a plain merge to `main`
+publishes nothing.
+
+```bash
+npm run changeset        # declare the bump for the work you just did
+./scripts/release.sh     # version, commit, tag vX.Y.Z, push commit and tag
+```
+
+Pushing the tag starts `.github/workflows/release.yml`, which installs, runs
+both typechecks and the suite, refuses a tag that disagrees with
+`package.json`, prints the tarball contents, and publishes. Auth is npm
+Trusted Publishing over OIDC, so the repo holds no `NPM_TOKEN` secret and the
+workflow carries no long-lived credential.
+
+Two steps are human-only, and both happen once:
+
+1. **The scope.** `@yashin/pi-task-workflow` needs the `yashin` npm
+   organization. Create it at <https://www.npmjs.com/org/create> (free for
+   public packages) or, if the name is taken, change `name` in `package.json`
+   to `@y4shin/pi-task-workflow` and use `@y4shin` everywhere below.
+2. **The first publish.** npm only accepts a Trusted Publisher for a package
+   that already exists. So publish the first version by hand, once:
+
+   ```bash
+   npm login
+   npm publish --access public
+   ```
+
+   Then open the package's settings on npmjs.com, add a Trusted Publisher with
+   owner `Y4shin`, repository `skills`, workflow `release.yml`, and leave the
+   environment blank. Every release after that runs token-free.
+
+To confirm a release landed: `npm view @yashin/pi-task-workflow version`, and
+the provenance badge on the package page should name this repository and
+`release.yml`.
 
 ## Repo gating (auto-disable in work repos)
 

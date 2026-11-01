@@ -1,0 +1,92 @@
+name: Release
+
+# Tag-triggered publish. Pushing a `vX.Y.Z` tag is the explicit consent to
+# release: a plain merge to main publishes nothing. The tag is checked against
+# package.json before anything reaches the registry, so a mistyped tag fails
+# the job instead of publishing the wrong version.
+#
+# Auth is npm Trusted Publishing (OIDC): there is no NPM_TOKEN secret anywhere.
+# npm verifies that the publish came from this repository's release.yml, so the
+# package must first be registered as a Trusted Publisher on npmjs.com (see
+# README, "Releasing"); that registration only works once the package exists,
+# which is why the very first version is published by hand.
+#
+# Local flow (./scripts/release.sh does steps 2 to 5):
+#   1. accumulate `.changeset/*.md` entries in normal commits
+#   2. `npm run version`        # bumps package.json, writes CHANGELOG.md
+#   3. commit the bump and CHANGELOG.md
+#   4. tag `vX.Y.Z`
+#   5. push the commit and the tag; this workflow verifies and publishes
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Least privilege: the job reads the repo, and id-token: write is what makes
+# the OIDC exchange with npm possible. No contents: write, because this
+# workflow creates no tags and pushes no commits.
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Verify and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Typecheck tests
+        run: npm run typecheck:tests
+
+      - name: Test
+        run: npm test
+
+      - name: Check the tag matches the package version
+        id: pkg
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          tag="${GITHUB_REF_NAME#v}"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package version $version"
+            exit 1
+          fi
+          echo "Publishing $name@$version"
+
+      - name: Inspect the tarball
+        run: npm pack --dry-run
+
+      - name: Publish
+        # A version that is already on the registry is not an error: re-running
+        # the job after a partial failure must not try to publish twice.
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+        run: |
+          set -euo pipefail
+          spec="${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}"
+          if npm view "$spec" version >/dev/null 2>&1; then
+            echo "$spec is already published; nothing to do."
+            exit 0
+          fi
+          npm publish --access public --provenance

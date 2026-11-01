@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# Release helper: changeset version -> fold changelog -> commit -> tag -> push.
+# Release helper: changeset version -> commit -> tag -> push. CI publishes the tag.
 #
 # Usage: ./scripts/release.sh
 #
 # Changesets is the source of truth for the version bump and the changelog
 # entry: each .changeset/<name>.md declares a level (major/minor/patch) and a
 # summary; `changeset version` consumes them, bumps package.json, and writes a
-# changelog entry to the repo-root CHANGELOG.md. This script then folds that
-# generated entry into docs/tasks/CHANGELOG.md (where this repo keeps its
-# changelog), commits the version bump + changelog, tags, and pushes.
+# changelog entry to the repo-root CHANGELOG.md (the file npm consumers see;
+# docs/tasks/CHANGELOG.md is the older in-repo history and is no longer
+# updated). This script commits the bump and changelog, tags vX.Y.Z, and
+# pushes commit and tag. The tag triggers .github/workflows/release.yml, which
+# verifies and publishes to npm; nothing publishes from this machine.
 #
 # Preconditions:
 #   - No pending or staged changes in the worktree.
@@ -73,49 +75,25 @@ echo
 echo "Bumped ${current_version} -> ${new_version}"
 
 # --------------------------------------------------------------------------
-# 5. Fold the generated root CHANGELOG.md into docs/tasks/CHANGELOG.md
+# 5. Confirm changesets wrote the changelog entry, and that the tag is free
 # --------------------------------------------------------------------------
-# changesets writes/appends to ./CHANGELOG.md (the default formatter). This
-# repo keeps its changelog at docs/tasks/CHANGELOG.md, so fold the generated
-# entry in and remove the root file to avoid a second source of truth.
-#
-# docs/tasks/CHANGELOG.md may carry OKF frontmatter (a leading `---` fence,
-# which this repo's own v4 migration backfills) above a `# <title>` heading
-# and the `# <package>` heading changesets emits. The generated entry is
-# inserted above the previous newest version section: its own package heading
-# is dropped, so the changelog carries exactly one.
-if [ -f CHANGELOG.md ]; then
-  dst="docs/tasks/CHANGELOG.md"
-  if [ -f "$dst" ]; then
-    # The generated entry without its leading `# <package>` heading.
-    entry="$(sed -e '1{/^# /d;}' -e '/./,$!d' CHANGELOG.md)"
-    tmp="$(mktemp)"
-    # Insert above the previous newest version section when one exists.
-    at="$(awk '/^## [0-9]+\.[0-9]+\.[0-9]+[[:space:]]*$/ {print NR; exit}' "$dst")"
-    if [ -n "$at" ]; then
-      { sed -n "1,$((at - 1))p" "$dst"; printf '%s\n\n' "$entry"; tail -n "+$at" "$dst"; } > "$tmp"
-    else
-      # No version section yet: insert below the frontmatter block (when the
-      # changelog carries one) and its title heading.
-      head_end=0
-      if [ "$(head -1 "$dst")" = "---" ]; then
-        head_end="$(awk 'NR>1 && $0=="---" {print NR; exit}' "$dst")"
-      fi
-      title_at="$((head_end + 1))"
-      while [ "$(sed -n "${title_at}p" "$dst")" = "" ]; do
-        title_at="$((title_at + 1))"
-      done
-      { sed -n "1,${title_at}p" "$dst"; printf '\n%s\n\n' "$entry"; tail -n "+$((title_at + 1))" "$dst" | sed -e '/./,$!d'; } > "$tmp"
-    fi
-    mv "$tmp" "$dst"
-  else
-    mv CHANGELOG.md docs/tasks/CHANGELOG.md
-  fi
-  rm -f CHANGELOG.md
-  echo "Folded changesets changelog into docs/tasks/CHANGELOG.md"
+# `changeset version` writes the released version's section to the repo-root
+# CHANGELOG.md. If that file did not move, the release notes would go missing
+# from npm, so treat it as a hard failure rather than publishing silently.
+if ! git diff --quiet -- CHANGELOG.md; then
+  echo "CHANGELOG.md carries the ${new_version} entry"
+else
+  echo "Error: changeset version left CHANGELOG.md unchanged. Aborting." >&2
+  exit 1
 fi
 
-# --------------------------------------------------------------------------
+# The tag is what triggers the publish workflow, so a tag that already exists
+# would either publish the wrong version or publish nothing at all.
+if git rev-parse -q --verify "refs/tags/v${new_version}" >/dev/null; then
+  echo "Error: tag v${new_version} already exists. Aborting." >&2
+  exit 1
+fi
+
 # 6. Confirm before committing/tagging/pushing
 # --------------------------------------------------------------------------
 echo
@@ -131,7 +109,7 @@ fi
 # --------------------------------------------------------------------------
 # 7. Stage, commit, tag
 # --------------------------------------------------------------------------
-git add package.json docs/tasks/CHANGELOG.md .changeset
+git add package.json CHANGELOG.md package-lock.json .changeset
 git commit -q -m "chore(release): releasing v${new_version}"
 git tag "v${new_version}" -m "v${new_version}"
 echo "Tagged v${new_version}"
@@ -144,4 +122,6 @@ git push origin "$branch"
 git push origin "v${new_version}"
 
 echo
-echo "Released v${new_version}"
+echo "Tagged v${new_version} and pushed."
+echo "The release workflow now verifies and publishes ${new_version} to npm:"
+echo "  gh run watch \$(gh run list --workflow=release.yml --limit=1 --json databaseId --jq '.[0].databaseId')"
