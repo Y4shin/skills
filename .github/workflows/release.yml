@@ -6,17 +6,25 @@ name: Release
 # the job instead of publishing the wrong version.
 #
 # Auth is npm Trusted Publishing (OIDC): there is no NPM_TOKEN secret anywhere.
-# npm verifies that the publish came from this repository's release.yml, so the
+# npm verifies that the request came from this repository's release.yml, so the
 # package must first be registered as a Trusted Publisher on npmjs.com (see
 # README, "Releasing"); that registration only works once the package exists,
 # which is why the very first version is published by hand.
+#
+# This job STAGES the release; it cannot make a version live. The trusted
+# publisher is registered without the `npm publish` permission, so the only
+# publishing call available to it is `npm stage publish`. A maintainer then
+# approves the staged version with 2FA, which is what puts it on the registry.
+# OIDC supports `npm publish`, `npm stage publish`, and dist-tags, but not
+# `stage approve`, so the approval cannot be automated away here.
 #
 # Local flow (./scripts/release.sh does steps 2 to 5):
 #   1. accumulate `.changeset/*.md` entries in normal commits
 #   2. `npm run version`        # bumps package.json, writes CHANGELOG.md
 #   3. commit the bump and CHANGELOG.md
 #   4. tag `vX.Y.Z`
-#   5. push the commit and the tag; this workflow verifies and publishes
+#   5. push the commit and the tag; this workflow verifies and stages
+#   6. approve the staged version with 2FA (npmjs.com, or npm stage approve)
 
 on:
   push:
@@ -77,16 +85,31 @@ jobs:
       - name: Inspect the tarball
         run: npm pack --dry-run
 
-      - name: Publish
-        # A version that is already on the registry is not an error: re-running
-        # the job after a partial failure must not try to publish twice.
+      - name: Stage the release for approval
+        # Staging, not publishing: the trusted publisher has no `npm publish`
+        # permission, and a maintainer's 2FA approval is what makes the version
+        # live. A version already on the registry is not an error, so a re-run
+        # after a partial failure stays safe.
         env:
           NPM_CONFIG_PROVENANCE: "true"
         run: |
           set -euo pipefail
           spec="${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}"
           if npm view "$spec" version >/dev/null 2>&1; then
-            echo "$spec is already published; nothing to do."
+            echo "$spec is already published; nothing to stage."
             exit 0
           fi
-          npm publish --access public --provenance
+          npm stage publish
+          {
+            echo "### $spec is staged, not live"
+            echo
+            echo "Approve it with 2FA to publish:"
+            echo
+            echo '```'
+            echo "npm stage list ${{ steps.pkg.outputs.name }}"
+            echo "npm stage approve <stage-id>"
+            echo '```'
+            echo
+            echo "Or approve it under the Staged Packages tab of"
+            echo "<https://www.npmjs.com/package/${{ steps.pkg.outputs.name }}>."
+          } >> "$GITHUB_STEP_SUMMARY"

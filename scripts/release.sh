@@ -123,5 +123,10 @@ git push origin "v${new_version}"
 
 echo
 echo "Tagged v${new_version} and pushed."
-echo "The release workflow now verifies and publishes ${new_version} to npm:"
+echo "The release workflow verifies and STAGES ${new_version}; it does not go live."
 echo "  gh run watch \$(gh run list --workflow=release.yml --limit=1 --json databaseId --jq '.[0].databaseId')"
+echo
+echo "Once it is green, approve the staged version with 2FA:"
+echo "  npm stage list $(node -p "require('./package.json').name")"
+echo "  npm stage approve <stage-id>"
+echo "or approve it on the package's Staged Packages tab at npmjs.com."

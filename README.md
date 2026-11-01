@@ -122,9 +122,18 @@ npm run changeset        # declare the bump for the work you just did
 
 Pushing the tag starts `.github/workflows/release.yml`, which installs, runs
 both typechecks and the suite, refuses a tag that disagrees with
-`package.json`, prints the tarball contents, and publishes. Auth is npm
-Trusted Publishing over OIDC, so the repo holds no `NPM_TOKEN` secret and the
-workflow carries no long-lived credential.
+`package.json`, prints the tarball contents, and **stages** the version. It
+cannot make that version live. A maintainer approves the staged version with
+2FA, on npmjs.com under the package's Staged Packages tab or with
+`npm stage approve <stage-id>`, and only then does the version reach the
+registry. Auth is npm Trusted Publishing over OIDC, so the repo holds no
+`NPM_TOKEN` secret and the workflow carries no long-lived credential.
+
+The split is deliberate: a mistaken or malicious tag push cannot put an
+installable version on npm, because the run ends in the staging area. The
+cost is one approval per release. Direct publishing instead would mean
+ticking `npm publish` on the trusted publisher and trusting tag permissions
+alone, since it holds even when the tag push is the compromise.
 
 The scope `@y4shin` is the npm username, so the account owns it outright and
 there is no organization to create. Two steps are human-only, and both happen
@@ -141,19 +150,20 @@ once:
 2. **The Trusted Publisher.** On npmjs.com, open the package, then Settings,
    then Trusted publishing, and add a GitHub Actions publisher: owner
    `Y4shin`, repository `skills`, workflow `release.yml`, environment blank.
-   Under allowed actions, also tick `npm publish`: `npm stage publish` is
-   granted automatically, direct publishing is opt-in, and this workflow
-   publishes directly.
+   Under allowed actions leave both boxes unticked. `npm stage publish` is
+   granted automatically and is all this workflow needs; `npm publish` is
+   opt-in, and granting it would let a tag push publish without review.
 
    Two constraints on that connection: it must complete its first successful
    publish within two days or it expires, and it cannot be edited afterwards,
    only deleted and recreated. So check the four field values before saving,
-   and cut a real release rather than an already-published version, which the
-   publish step skips. Every release after that runs token-free.
+   and cut a real release promptly: a tag whose version is already published
+   is skipped, and staging a version nobody approves does not validate the
+   connection either. Every release after that runs token-free.
 
-To confirm a release landed: `npm view @y4shin/pi-task-workflow version`, and
-the provenance badge on the package page should name this repository and
-`release.yml`.
+To confirm a release landed: approve the staged version, then
+`npm view @y4shin/pi-task-workflow version`. The provenance badge on the
+package page should name this repository and `release.yml`.
 
 ## Repo gating (auto-disable in work repos)
 
