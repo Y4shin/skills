@@ -5,6 +5,9 @@ description: Review changes since a fixed point along two axes - Standards (is i
 
 # /code-review - Two-axis change review
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 Review the diff between `HEAD` and a pinned fixed point along two independent
 axes:
 

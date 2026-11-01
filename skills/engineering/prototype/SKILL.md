@@ -5,6 +5,9 @@ description: Build a throwaway prototype to answer a design question. Use when t
 
 # Prototype
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 A prototype is **throwaway code that answers a question**. The question decides the shape.
 
 ## Pick a branch

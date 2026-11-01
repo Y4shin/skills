@@ -135,6 +135,7 @@ decision, or when you type it.
 - [wizard](./skills/engineering/wizard/SKILL.md)
 - [to-questionnaire](./skills/productivity/to-questionnaire/SKILL.md)
 - [writing-for-agents](./skills/productivity/writing-for-agents/SKILL.md)
+- [operator-communication](./skills/productivity/operator-communication/SKILL.md)
 
 ## Where to read next
 

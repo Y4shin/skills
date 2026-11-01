@@ -6,6 +6,9 @@ disable-model-invocation: true
 
 # /grill-me: stateless grilling
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 Use this user-invoked skill when you want to stress-test a plan, design, or
 idea through a relentless interview, and you are **not** working in a
 repository. It runs the same grilling primitive as `/grilling` but saves

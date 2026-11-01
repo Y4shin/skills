@@ -5,6 +5,9 @@ description: Model-invoked, Pi-native reference for relentlessly stress-testing 
 
 # /grilling - shared-understanding decision interviews
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 Interview the user relentlessly until you reach a shared understanding. Map
 this as a **design tree**: every decision branches into the decisions that
 depend on it.

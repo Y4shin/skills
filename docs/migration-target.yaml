@@ -80,6 +80,7 @@ promoted_skills:
     - to-questionnaire
     - teach
     - writing-for-agents
+    - operator-communication
     - grill-me
 
 # ── Deprecated skills (kept, not shipped) ──────────────────────────────

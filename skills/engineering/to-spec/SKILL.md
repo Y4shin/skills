@@ -6,6 +6,9 @@ disable-model-invocation: true
 
 # To Spec
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 `to-spec` synthesizes the effort's specification from the settled record: the
 map and the planning tasks' recorded results. No phase-owned question round
 runs here, and nothing new is asked that planning already settled. The

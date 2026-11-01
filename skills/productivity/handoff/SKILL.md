@@ -8,6 +8,9 @@ metadata:
 
 # Handoff
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 User-invoked. Reachable only when the human types `/skill:handoff`. The model
 will not auto-invoke it.
 

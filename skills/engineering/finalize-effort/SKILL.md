@@ -5,6 +5,9 @@ description: "The effort close: one holistic whole-effort review, a triage of ev
 
 # Finalize Effort
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 `finalize-effort` is the effort close. It runs one holistic review of the
 whole effort, triages every finding, and archives the effort once nothing is
 left to resolve. The review is read-only toward the code: this phase never
@@ -164,6 +167,14 @@ updates the root index.
 End the run with the completion report in
 [resources/report.md](resources/report.md): the fixed five-part shape,
 tuned for this skill. A refusal, failure, or escalation is the same shape.
+
+Keep the report in the operator's terms. Three checks it must pass:
+
+- Every term you coined or read during this run is defined in the sentence
+  that first uses it, or it is left out.
+- The first sentence gives the state of the work now.
+- Nothing is labelled before it is explained: no heading, bold lead-in, or
+  bullet label names something the operator has not already seen.
 
 > **Feedback:** if the phase hits a snag (an archive refusal the triage could
 > not clear, a review write the tool could not express, or something that

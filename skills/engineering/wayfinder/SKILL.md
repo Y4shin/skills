@@ -6,6 +6,9 @@ disable-model-invocation: true
 
 # Wayfinder
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 Wayfinder is the single planning-phase skill. It creates the map and the
 planning tasks, works the planning frontier (delegating `research` and
 `prototype`, running `grilling` and `manual` itself), writes results back, and
@@ -279,6 +282,14 @@ unclear question by pretending it is a feature ticket.
 End the pass with the completion report in
 [resources/report.md](resources/report.md): the fixed five-part shape,
 tuned for this skill. A refusal, failure, or escalation is the same shape.
+
+Keep the report in the operator's terms. Three checks it must pass:
+
+- Every term you coined or read during this run is defined in the sentence
+  that first uses it, or it is left out.
+- The first sentence gives the state of the work now.
+- Nothing is labelled before it is explained: no heading, bold lead-in, or
+  bullet label names something the operator has not already seen.
 
 > **Feedback:** if planning hits a snag (a grilling loop that circled, a
 > dependency that wouldn't wire, a task type that didn't fit, a frontier that

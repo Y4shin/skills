@@ -5,6 +5,9 @@ description: Diagnose and debug hard bugs, failures, crashes, and performance re
 
 # /diagnosing-bugs, Six-phase debugging discipline
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 A feedback-loop-first discipline for locking down and fixing bugs.
 Delivered to the **tdd-worker** via `skill: "diagnosing-bugs"` on `type: bug` tasks; may also be invoked standalone.
 

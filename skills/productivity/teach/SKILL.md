@@ -6,6 +6,9 @@ disable-model-invocation: true
 
 # Teach
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 The user has asked you to teach them something. This is a stateful request:
 they intend to learn the topic over multiple sessions. Treat the current
 directory as a teaching workspace.

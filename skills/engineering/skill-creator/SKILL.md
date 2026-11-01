@@ -5,6 +5,9 @@ description: Create, make, build, or scaffold a new Agent Skill from a workflow,
 
 # /skill-creator, Agent Skill Authoring Helper
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 Create, review, update, and improve other Agent Skills. Produces small,
 spec-conformant, well-triggered skills that load wherever the Agent Skills
 format is supported.

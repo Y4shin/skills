@@ -5,6 +5,9 @@ description: "Autonomous. Owns the implementation phase: reads the effort's arch
 
 # Implement Ticket
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 `implement-ticket` is the implementation phase. It replaces the ticket half
 of the retired implementation router and all of the retired close-out skill:
 one skill dispatches every
@@ -357,6 +360,14 @@ cheaper.
 End the run with the completion report in
 [resources/report.md](resources/report.md): the fixed five-part shape,
 tuned for this skill. A refusal, failure, or escalation is the same shape.
+
+Keep the report in the operator's terms. Three checks it must pass:
+
+- Every term you coined or read during this run is defined in the sentence
+  that first uses it, or it is left out.
+- The first sentence gives the state of the work now.
+- Nothing is labelled before it is explained: no heading, bold lead-in, or
+  bullet label names something the operator has not already seen.
 
 ## Failure toolbelt (parent never implements)
 

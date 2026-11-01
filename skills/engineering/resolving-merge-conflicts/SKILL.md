@@ -3,6 +3,9 @@ name: resolving-merge-conflicts
 description: Resolve an in-progress git merge or rebase conflict. Use when you need to resolve a merge or rebase conflict, or the user reports a conflict during a merge or rebase.
 ---
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 1. **See the current state** of the merge/rebase. Check git history, and the
    conflicting files.
 

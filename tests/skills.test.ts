@@ -187,7 +187,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(29);
+    expect(pkg.pi.skills.length).toBe(30);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
@@ -221,6 +221,26 @@ describe("package.json", () => {
     for (const entry of top) {
       expect(["engineering", "productivity", "misc", "in-progress", "deprecated"]).toContain(entry);
     }
+  });
+});
+
+describe("wait-what references", () => {
+  const content = readFile("skills/productivity/wait-what/SKILL.md");
+
+  test("stays user-invoked: only the human notices that an answer failed", () => {
+    expect(content).toMatch(/^disable-model-invocation: true$/m);
+  });
+
+  test("records every invocation under one fixed feedback kind", () => {
+    // The count of "the operator had to intervene" is a feedback row, not a
+    // reading of the prose. A drifting kind silently breaks the series.
+    expect(content).toContain("submit_feedback");
+    expect(content).toContain('kind: "wait-what"');
+    expect(content).toMatch(/always that literal string/i);
+  });
+
+  test("delegates the rewrite to operator-communication instead of restating it", () => {
+    expect(content).toContain("`operator-communication` skill");
   });
 });
 
@@ -495,11 +515,11 @@ describe("triage is retired (intake-skill)", () => {
     expect(source).toContain('"intake"');
   });
 
-  test("the skill surface stays the promoted set: intake in, triage out, count unchanged", () => {
+  test("the skill surface stays the promoted set: intake in, triage out", () => {
     const pkg = JSON.parse(readFile("package.json"));
     expect(pkg.pi.skills).toContain("./skills/engineering/intake");
     expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
-    expect(pkg.pi.skills.length).toBe(29);
+    expect(pkg.pi.skills.length).toBe(30);
     expect(pkg.pi.skills.filter((s: string) => s.includes("intake") || s.includes("triage"))).toEqual([
       "./skills/engineering/intake",
     ]);

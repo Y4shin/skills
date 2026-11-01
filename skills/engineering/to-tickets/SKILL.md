@@ -6,6 +6,9 @@ disable-model-invocation: true
 
 # To Tickets
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 `to-tickets` turns a settled specification into two artifacts: the **living
 architecture document** and the **ticket graph**. The architecture is
 produced from the spec, not invented fresh.

@@ -5,6 +5,9 @@ description: Diagnose a broken task workflow and route to the right skill. Use w
 
 # /task-workflow-doctor, Task Workflow Doctor
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 The doctor **diagnoses** a reported task-workflow symptom and **routes** you
 to the right skill or manual step. It is not a fixer.
 
@@ -90,3 +93,11 @@ missing or unstable architecture document) and their routes are in
 End the diagnosis with the completion report in
 [resources/report.md](resources/report.md): the fixed five-part shape,
 tuned for this skill. A refusal, failure, or escalation is the same shape.
+
+Keep the report in the operator's terms. Three checks it must pass:
+
+- Every term you coined or read during this run is defined in the sentence
+  that first uses it, or it is left out.
+- The first sentence gives the state of the work now.
+- Nothing is labelled before it is explained: no heading, bold lead-in, or
+  bullet label names something the operator has not already seen.

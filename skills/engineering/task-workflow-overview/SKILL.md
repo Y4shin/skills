@@ -5,6 +5,9 @@ description: Entry point. Ask which skill or flow fits your situation, or which 
 
 # Working with Tasks
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 **Fast track.** Ask `tw_next` for the live answer. Outside a workflow skill
 it names the next phase to open through `tw_open`; inside one it tells you to
 finish the current work first and ask again after `tw_close`. The live answer
@@ -90,7 +93,7 @@ A starting situation that generates work, then merges onto the main flow.
 
 ## References underneath
 
-Four model-invoked references that run *beneath* the other skills, each the
+Five model-invoked references that run *beneath* the other skills, each the
 single source of truth for its vocabulary or its discipline.
 
 - **`/skill:domain-modeling`**: sharpen the project's *domain* language:
@@ -104,6 +107,9 @@ single source of truth for its vocabulary or its discipline.
   reach for when test quality or a seam is in question.
 - **`/skill:code-review`** reviews changes since a fixed point along two axes,
   Standards and Spec, and reports what it finds rather than fixing it.
+- **`/skill:operator-communication`** is the discipline of the *message*: what
+  every reply to the operator must define, lead with, and leave out. It is the
+  one reference that applies to every other skill, not only to code work.
 
 ## Standalone
 
@@ -170,6 +176,14 @@ and the call.
 End the turn with the completion report in
 [resources/report.md](resources/report.md): the fixed five-part shape,
 tuned for this skill. A refusal, failure, or escalation is the same shape.
+
+Keep the report in the operator's terms. Three checks it must pass:
+
+- Every term you coined or read during this run is defined in the sentence
+  that first uses it, or it is left out.
+- The first sentence gives the state of the work now.
+- Nothing is labelled before it is explained: no heading, bold lead-in, or
+  bullet label names something the operator has not already seen.
 
 > **Feedback:** any of these skills can hit a snag. When that happens, call
 > `tw_feedback({ kind, data })` autonomously to record it. `tw_feedback` is

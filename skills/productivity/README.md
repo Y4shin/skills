@@ -14,8 +14,8 @@ Reachable only when you type them (`disable-model-invocation: true`).
   document so a fresh agent can pick the work up.
 - **[teach](./teach/SKILL.md)**: Learn a new skill or concept over multiple
   sessions, using the current directory as a stateful teaching workspace.
-- **[wait-what](./wait-what/SKILL.md)**: Stop. That last message did not
-  land: re-pitch it.
+- **[wait-what](./wait-what/SKILL.md)**: The last answer did not land:
+  rewrite it under `operator-communication`.
 
 ## Model-invoked
 
@@ -25,3 +25,5 @@ Model- or user-reachable.
   cannot answer alone into a questionnaire for someone else.
 - **[writing-for-agents](./writing-for-agents/SKILL.md)**: The reference for
   writing documents agents consume.
+- **[operator-communication](./operator-communication/SKILL.md)**: The rules
+  for every message an agent sends the operator.

@@ -6,6 +6,9 @@ disable-model-invocation: true
 
 # /improve-codebase-architecture
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 Run this periodic, user-invoked survey without changing application code.
 
 ## Survey

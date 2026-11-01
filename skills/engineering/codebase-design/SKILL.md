@@ -5,6 +5,9 @@ description: Map an existing codebase's architecture, boundaries, dependencies, 
 
 # /codebase-design, Codebase design reference
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 Use this model-invoked reference before designing a change in an unfamiliar or
 substantive repository. It is a shared vocabulary and investigation procedure,
 not an autonomous implementation pipeline. It complements (and does not

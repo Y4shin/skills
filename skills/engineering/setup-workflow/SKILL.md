@@ -6,6 +6,9 @@ disable-model-invocation: true
 
 # Setup Workflow
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 One skill for two lifecycle events: **onboarding** a fresh repo onto the
 task-workflow, and **migrating** an existing repo from an older schema to the
 current one. It auto-detects which by reading `docs/tasks/state.yaml`'s

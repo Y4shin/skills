@@ -6,6 +6,9 @@ disable-model-invocation: true
 
 # Intake
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 Intake is the single front door to the workflow, for both the phase and the
 skill. It replaces `triage`: there is no parallel bug substrate and no
 rejection path. Every request that enters through this door becomes an

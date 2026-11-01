@@ -5,6 +5,9 @@ description: Investigate a question against high-trust primary sources and captu
 
 # Research
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
 Spin up a **background subagent** to do the research, so you keep working
 while it reads.
 
