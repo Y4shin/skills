@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Release helper: changeset version -> commit -> tag -> push. CI publishes the tag.
 #
+# The whole flow, including what CI does with the tag and how the staged
+# version gets approved, is documented in docs/releasing.md.
+#
 # Usage: ./scripts/release.sh [--yes]
 #
 #   --yes  skip the confirmation prompt (for a non-interactive run)

@@ -143,6 +143,7 @@ decision, or when you type it.
 - [`CONTEXT.md`](./CONTEXT.md) is the vocabulary: effort, map, frontier,
   planning task, implementation ticket.
 - [`docs/repo-gating.md`](docs/repo-gating.md) is the gate in full.
+- [`docs/releasing.md`](docs/releasing.md) is the release flow in full.
 
 ## Development
 
@@ -156,6 +157,9 @@ npm run typecheck:tests
 ## Releasing
 
 Push a `vX.Y.Z` tag to start a release. A merge to `main` releases nothing.
+[`docs/releasing.md`](docs/releasing.md) explains the flow in full: what a
+changeset is, what the script refuses, the two-job workflow, and the 2FA
+approval that is what puts a version live.
 
 ```bash
 npm run changeset        # declare the bump

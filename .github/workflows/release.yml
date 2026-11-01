@@ -5,6 +5,9 @@ name: Release
 # package.json before anything reaches the registry, so a mistyped tag fails
 # the job instead of staging the wrong version.
 #
+# The flow as a whole, written for a maintainer rather than for this file, is
+# docs/releasing.md.
+#
 # Two jobs, split by privilege:
 #
 #   build  runs the repository's code: install, typecheck, tests, pack. It has
