@@ -34,7 +34,14 @@
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc -p tsconfig.test.json",
     "changeset": "changeset",
-    "version": "changeset version"
+    "version": "changeset version",
+    "evals:corpus": "node evals/corpus.ts",
+    "evals:score": "node evals/score.ts",
+    "evals:report": "node evals/report.ts",
+    "evals:spend": "node evals/spend.ts",
+    "typecheck:evals": "tsc -p evals/tsconfig.json",
+    "evals:calibrate": "node evals/calibrate.ts",
+    "evals:regenerate": "node evals/regenerate.ts"
   },
   "dependencies": {
     "yaml": "^2.9.1"

@@ -15,3 +15,6 @@ docs/tasks/mp-skills-current-state-report/matt-skills/
 
 # Throwaway bundle-script-template prototype (code is not committed; only findings).
 prototype-bundle/
+
+# Eval harness outputs and spend ledger.
+evals/out/
