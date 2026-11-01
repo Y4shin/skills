@@ -23,6 +23,12 @@ close holds `tw_write_architecture` and records the corrected document. On a
 schema-4 tree the v5 writer refuses the legacy `arch-spec.md`, so the gap is
 recorded in the review instead.
 
+The outcome is recorded through `tw_write_review`'s `reconcile` argument as
+`done: <what changed>`, `none: <why nothing needed reconciling>`, or
+`unavailable: <reason>`, and `tw_archive_effort` refuses a finalize review
+without it. The reconcile is otherwise prose discipline with no output of its
+own, so this record is what makes a silent skip impossible.
+
 The phase opens through `tw_open` with the effort. The review artifact is
 `docs/tasks/<effort>/review.md`, written through `tw_write_review`, the only
 writer of it. Every finding is dispositioned exactly one way:

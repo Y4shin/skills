@@ -200,7 +200,14 @@ beforeAll(() => {
   writeEffort("review-dispositioned", {
     "map.md": { data: { type: "map", title: "Reviewed", ready_for_spec: true } },
     "spec.md": { data: { type: "spec", title: "Reviewed spec", status: "stable" } },
-    "review.md": { data: { type: "review", title: "Reviewed review", dispositioned: true } },
+    "review.md": {
+      data: {
+        type: "review",
+        title: "Reviewed review",
+        dispositioned: true,
+        reconcile: "none: the fixture ships no architecture document",
+      },
+    },
     ...doneTickets(["done-a"]),
   });
   writeEffort("review-superseded", {
@@ -322,6 +329,7 @@ describe("the finalize-effort archive gate", () => {
         selector: "writer-pending",
         content: "## Findings\n\n1. Something to triage.",
         findings: [{ finding: "Something to triage", disposition: "informational" }],
+        reconcile: "none: the fixture ships no architecture document",
       },
       { directory: repo },
     );
@@ -350,6 +358,7 @@ describe("the finalize-effort archive gate", () => {
       {
         selector: "writer-origin",
         content: "## Findings\n\n1. Too large for this effort.",
+        reconcile: "none: the fixture ships no architecture document",
         findings: [
           { finding: "Too large for this effort", disposition: "follow-up", target: "writer-child" },
         ],

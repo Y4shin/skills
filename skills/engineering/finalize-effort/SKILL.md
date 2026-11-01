@@ -34,10 +34,17 @@ reports, the ticket notes, and the diff, and record the corrected document
 through `tw_write_architecture` (this phase holds the writer). This
 reconciles the record; it never fixes code.
 
+Record the outcome when you write the review: `tw_write_review` takes a
+`reconcile` argument, and `tw_archive_effort` refuses a finalize review
+without one. The three legal shapes are `done: <what changed>`,
+`none: <why nothing needed reconciling>`, and `unavailable: <reason>`. The
+record is the only proof the step ran, so an omitted one is a close that
+never reconciled.
+
 On a schema-4 tree the v5 architecture writer refuses the legacy
-`arch-spec.md`, so the reconcile is unavailable until the repo migrates. Say
-so in the review and treat the stale legacy document as a recorded gap
-rather than rewriting it by hand.
+`arch-spec.md`, so the reconcile is unavailable until the repo migrates.
+Record it as `unavailable: <the migration is the prerequisite>` and treat the
+stale legacy document as a recorded gap rather than rewriting it by hand.
 
 ## One holistic review pass
 

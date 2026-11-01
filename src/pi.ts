@@ -880,6 +880,30 @@ const REVIEW_DISPOSITIONS_SECTION = "Dispositions";
 const REVIEW_DISPOSITIONS = ["ticket", "follow-up", "informational"] as const;
 type ReviewDisposition = (typeof REVIEW_DISPOSITIONS)[number];
 
+/**
+ * The close reconcile record's legal shapes. The reconcile step is prose
+ * discipline; this makes it a tool-owned statement the archive can refuse
+ * without. `unavailable` is the narrow escape for a tree whose architecture
+ * the v5 writer cannot touch (the schema-4 legacy leaf).
+ */
+const RECONCILE_PREFIXES = ["done", "none", "unavailable"] as const;
+
+function normalizeReconcile(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || raw.trim() === "") return undefined;
+  const value = raw.trim().replace(/\s+/g, " ");
+  const head = value.split(":")[0].trim().toLowerCase();
+  if (!(RECONCILE_PREFIXES as readonly string[]).includes(head)) {
+    throw new Error(
+      `invalid reconcile record '${value}': start it with one of ` +
+        `${RECONCILE_PREFIXES.map((p) => `'${p}: <reason>'`).join(", ")}`,
+    );
+  }
+  if (value === head || value === `${head}:`) {
+    throw new Error(`reconcile record '${head}:' needs a reason after the colon`);
+  }
+  return value;
+}
+
 interface ReviewFinding {
   finding: string;
   disposition?: ReviewDisposition;
@@ -1786,8 +1810,15 @@ export function createTools(): Record<string, Tool> {
         const fogLines = (fog ?? []).map((line) => line.trim()).filter((line) => line !== "");
         if (fogLines.length > 0) {
           const preview = fogLines.slice(0, 3).join(" | ");
+          // A placeholder sentence is the common case and reads as a bug in
+          // the refusal unless it is named: the section is empty when it has
+          // no lines, and "Nothing open." is a line.
+          const placeholder =
+            fogLines.length === 1 && /^(nothing|none|n\/a|tbd)\b[^a-z]*$/i.test(fogLines[0])
+              ? ` (the section holds only the placeholder '${fogLines[0]}': leave '## Fog' literally empty)`
+              : "";
           missing.push(
-            `'## Fog' still holds ${fogLines.length} open question(s): ${preview}` +
+            `'## Fog' still holds ${fogLines.length} open question(s): ${preview}${placeholder}` +
               `; promote each to a planning task, fold it into a canonical section, or record it out of scope`,
           );
         }
@@ -1944,6 +1975,14 @@ export function createTools(): Record<string, Tool> {
         follow_up: Type.Optional(
           Type.String({ description: "The accepted follow-up effort the findings move into" }),
         ),
+        reconcile: Type.Optional(
+          Type.String({
+            description:
+              "The close reconcile record, finalize pass only: 'done: <what changed>', " +
+              "'none: <why nothing needed reconciling>', or 'unavailable: <reason>'. The archive " +
+              "refuses a finalize review without it.",
+          }),
+        ),
         pass: Type.Optional(
           Type.Union([Type.Literal("finalize"), Type.Literal("end-of-effort")], {
             description:
@@ -1973,6 +2012,9 @@ export function createTools(): Record<string, Tool> {
           // triage's dispositions of them. It never moves findings to a
           // follow-up and it never sets the archive flag: the finalize
           // review owns that.
+          if (p.reconcile !== undefined) {
+            throw new Error("the reconcile record belongs to the finalize review, not the advisory pass");
+          }
           if (p.follow_up !== undefined) {
             throw new Error(
               "the end-of-effort review pass is advisory: its findings are dispositioned here but moved " +
@@ -2085,10 +2127,19 @@ export function createTools(): Record<string, Tool> {
           writeFileSync(childPath, dump(childDoc), "utf-8");
         }
 
-        const doc: Document = {
-          data: { ...(existing?.data ?? {}), type: "review", title, dispositioned },
-          body: originBody,
+        // The reconcile record survives a triage rewrite that omits it: the
+        // reconcile happened before the findings were dispositioned.
+        const reconcile =
+          normalizeReconcile(p.reconcile) ??
+          (typeof existing?.data.reconcile === "string" ? existing.data.reconcile : undefined);
+        const docData: Record<string, unknown> = {
+          ...(existing?.data ?? {}),
+          type: "review",
+          title,
+          dispositioned,
         };
+        if (reconcile !== undefined) docData.reconcile = reconcile;
+        const doc: Document = { data: docData, body: originBody };
         writeFileSync(reviewPath, dump(doc), "utf-8");
         const movedNote = followUp !== undefined ? `; findings moved to ${followUp}` : "";
         return outcome(
@@ -2581,6 +2632,25 @@ export function createTools(): Record<string, Tool> {
             `cannot archive '${effortKey}': ${unDispositioned.map((h) => relative(root, h.path)).join(", ")} ` +
               `carry undispositioned findings; disposition every finding (in-scope: an implementation ticket, ` +
               `out-of-scope: a follow-up effort after a human yes, informational: accepted) before archiving`,
+          );
+        }
+        // The close reconcile is a prose step with no output of its own, so
+        // the review artifact carries the tool-owned record of it. Without
+        // this gate a close can archive a stale design record silently.
+        const unreconciled = scanMemo(root)().hits.filter(
+          (h) =>
+            isInside(liveDir, h.path) &&
+            h.art.type === "review" &&
+            h.art.status !== "deprecated" &&
+            h.art.data.pass !== "end-of-effort" &&
+            typeof h.art.data.reconcile !== "string",
+        );
+        if (unreconciled.length > 0) {
+          throw new Error(
+            `cannot archive '${effortKey}': ${unreconciled.map((h) => relative(root, h.path)).join(", ")} ` +
+              `carries no reconcile record; reconcile the living architecture against what landed, then record ` +
+              `the outcome through tw_write_review with reconcile: 'done: <what changed>', 'none: <why>' or ` +
+              `'unavailable: <reason>'`,
           );
         }
         const destDir = join(taskRoot(root), "archive", effortKey);

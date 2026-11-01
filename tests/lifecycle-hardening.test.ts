@@ -269,6 +269,7 @@ describe("the advisory review does not block the archive", () => {
         selector: "records",
         content: "## Findings\n\n- A docs detail.",
         findings: [{ finding: "A docs detail.", disposition: "informational" }],
+        reconcile: "none: no architecture document in the fixture",
       },
       ctx([...ALWAYS_DECLARED]),
     );
@@ -296,5 +297,78 @@ describe("advisory dispositions are validated like finalize ones", () => {
         ctx([...ALWAYS_DECLARED]),
       ),
     ).rejects.toThrow(/not an existing ticket/);
+  });
+});
+
+describe("the close reconcile is recorded and gated", () => {
+  test("the archive refuses a finalize review with no reconcile record", async () => {
+    const t = tools();
+    await t.tw_write_review.execute(
+      {
+        selector: "ticketready",
+        content: "## Findings\n\n- nothing",
+        findings: [{ finding: "nothing", disposition: "informational" }],
+      },
+      ctx([...ALWAYS_DECLARED]),
+    );
+    // Finalizable: the one ticket is ready, so mark it done for the gate.
+    const ticketPath = join(repo, "docs", "tasks", "ticketready", "tickets", "one", "ticket.md");
+    const ticket = parse(readFileSync(ticketPath, "utf-8"));
+    ticket.data.workflow_state = "done";
+    writeFileSync(ticketPath, dump(ticket), "utf-8");
+    await expect(
+      t.tw_archive_effort.execute({ selector: "ticketready" }, ctx([...ALWAYS_DECLARED])),
+    ).rejects.toThrow(/carries no reconcile record/);
+  });
+
+  test("each legal reconcile record is accepted, and an illegal one is refused", async () => {
+    const t = tools();
+    for (const record of ["done: rewrote the ticket loop section", "none: no architecture change", "unavailable: schema-4 legacy leaf"]) {
+      const out = (await t.tw_write_review.execute(
+        {
+          selector: "published",
+          content: "## Findings\n\n- nothing",
+          findings: [{ finding: "nothing", disposition: "informational" }],
+          reconcile: record,
+        },
+        ctx([...ALWAYS_DECLARED]),
+      )) as ToolResult;
+      expect(out.text).toContain("wrote");
+      const written = readFileSync(join(repo, "docs", "tasks", "published", "review.md"), "utf-8");
+      expect(written).toContain(`reconcile: "${record}"`);
+    }
+    await expect(
+      t.tw_write_review.execute(
+        {
+          selector: "published",
+          content: "## Findings\n\n- nothing",
+          reconcile: "reconciled",
+        },
+        ctx([...ALWAYS_DECLARED]),
+      ),
+    ).rejects.toThrow(/invalid reconcile record/);
+  });
+
+  test("the reconcile record survives a triage rewrite that omits it", async () => {
+    const t = tools();
+    await t.tw_write_review.execute(
+      {
+        selector: "published",
+        content: "## Findings\n\n- nothing",
+        findings: [{ finding: "nothing", disposition: "informational" }],
+        reconcile: "none: no architecture change",
+      },
+      ctx([...ALWAYS_DECLARED]),
+    );
+    await t.tw_write_review.execute(
+      {
+        selector: "published",
+        content: "## Findings\n\n- nothing at all",
+        findings: [{ finding: "nothing at all", disposition: "informational" }],
+      },
+      ctx([...ALWAYS_DECLARED]),
+    );
+    const written = readFileSync(join(repo, "docs", "tasks", "published", "review.md"), "utf-8");
+    expect(written).toContain("reconcile: \"none: no architecture change\"");
   });
 });

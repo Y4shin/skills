@@ -87,7 +87,8 @@ The body is the canonical low-resolution map:
 
 ## Fog
 
-- questions that are in scope but not yet sharp enough to become tasks
+<!-- questions that are in scope but not yet sharp enough to become tasks
+     go here, one bullet each. -->
 
 ## Non-goals
 
@@ -224,7 +225,9 @@ is non-empty, `## Non-negotiable facts` exists, is non-empty, and opens
 with the bolded effort-level success-test line, and `## Fog` is empty. The
 fog check is the one that keeps the hand-off honest: a question still sitting
 in `## Fog` is a decision the spec phase would have to settle, and its
-boundary forbids that. Before finalizing, promote each fog line into a
+boundary forbids that. Leave the section literally empty when there is
+nothing left: a placeholding sentence such as "Nothing open." counts as an
+open question, because the tool cannot tell prose from a decision. Before finalizing, promote each fog line into a
 planning task, fold it into a canonical section, or record it through
 `tw_record_out_of_scope`. When the tool refuses, fix what it
 names and call it again. Never set the flag any other way: `to-spec` checks
