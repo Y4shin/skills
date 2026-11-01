@@ -3797,14 +3797,17 @@ describe("the gates and hygiene (end-of-effort-reconciliation)", () => {
     expect(always).toContain("npm run typecheck:tests");
   });
 
-  test("the release consumed its changesets and shipped no retired skill entry", () => {
-    const entries = readdirSync(join(PROJECT, ".changeset")).filter((name) => name.endsWith(".md"));
-    // README.md is the folder's own documentation, not an entry. The v5 entry
-    // was consumed by the release, so nothing is pending.
-    const releases = entries.filter((name) => name !== "README.md");
-    expect(releases).toEqual([]);
+  test("the release note landed in the changelog and no retired entry is pending", () => {
+    // Pending changesets are the normal state between releases, so this test
+    // does not require the folder to be empty: it requires that no entry the
+    // v5 release consumed is still sitting there unconsumed.
     for (const name of ["end-of-effort-workflow", "quiet-chain-dispatch", "scoped-uncertainty-tool", "shipped-ticket-chain"]) {
       expect(existsSync(join(PROJECT, ".changeset", `${name}.md`)), name).toBe(false);
+    }
+    // Every pending entry names this package, so a release consumes it.
+    const entries = readdirSync(join(PROJECT, ".changeset")).filter((name) => name.endsWith(".md") && name !== "README.md");
+    for (const name of entries) {
+      expect(readFile(`.changeset/${name}`), name).toContain(`"${pkg.name}"`);
     }
     // The release note landed in the changelog, and the version is the major
     // the changeset declared.

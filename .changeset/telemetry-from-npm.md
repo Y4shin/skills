@@ -1,5 +1,5 @@
 ---
-"task-workflow": patch
+"@y4shin/pi-task-workflow": patch
 ---
 
 The pi-telemetry install hint names the npm package.
