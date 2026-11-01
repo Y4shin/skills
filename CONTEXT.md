@@ -105,8 +105,16 @@ The whole-effort review at `docs/tasks/<effort>/review.md`, written by
 `tw_write_review` during `finalize-effort`: the findings a later reader would
 trip over, plus the disposition record for each one. It carries no workflow
 state; its `dispositioned` flag says every finding has been dispositioned, and
-the archive gate reads that flag.
+its `reconcile` record says whether the living architecture was reconciled at
+the close. The archive gate reads both.
 _Avoid_: audit, report card
+
+**Advisory review**:
+The second review artifact, `docs/tasks/<effort>/end-of-effort-review.md`,
+written by `tw_write_review` with `pass: "end-of-effort"` when the last ticket
+lands. Its findings are an input to the close: the disposition pass records
+one for each, in place. It is never a gate, so the archive ignores it.
+_Avoid_: pre-review, draft review
 
 **Disposition**:
 The recorded fate of one review finding: an implementation ticket in the same

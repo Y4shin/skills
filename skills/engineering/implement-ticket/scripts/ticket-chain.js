@@ -171,11 +171,12 @@ const gate = await runs.run("gate", {
   task: gateTask()
 });
 let gateReceipt = gate;
-if (gate.ok === true && !verdict(gate, "VERDICT: PASS")) {
-  // The child finished but did not state its verdict line. One re-dispatch is
-  // the designed move (a gate refusal is not a worker failure and the failure
+if (gate.ok === true && !verdict(gate, "VERDICT: PASS") && !verdict(gate, "VERDICT: REFUSE")) {
+  // The child finished and stated no verdict at all. One re-dispatch is the
+  // designed move (a gate refusal is not a worker failure and the failure
   // toolbelt never applies), and it keeps a single stray completion from
-  // stopping the phase while the caller digs through harness internals.
+  // stopping the phase while the caller digs through harness internals. A
+  // stated refusal is never re-dispatched: the refusal is the answer.
   gateReceipt = await runs.run("gate-retry", {
     agent: "implement-preconditions",
     label: "Re-check " + args.ticket + " preconditions",
@@ -202,7 +203,8 @@ const tdd = await runs.run("tdd", {
   output: "tdd-" + args.ticket + "/result.md",
   gate: "test ! -f " + args.ticketPath.replace(/ticket\.md$/, "") + ".work/uncertainty.md && git rev-parse --verify refs/heads/ticket/" + args.ticket,
   task: subtype === "bug" ? bugTddTask() : featureTddTask()
-});const refs = { tdd: tdd.outputReference || tdd.output };
+});
+const refs = { tdd: tdd.outputReference || tdd.output };
 if (!tdd.ok) {
   return { ok: false, ticket: args.ticket, subtype, failed: "tdd", step: tdd, refs };
 }

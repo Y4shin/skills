@@ -145,7 +145,6 @@ if (args.reconcile !== false) {
     task: specTask()
   });
   refs.spec = spec.outputReference || spec.output;
-  refs.specText = typeof spec.output === "string" ? spec.output : undefined;
   if (!verdict(spec, "RECONCILED")) {
     return { ok: false, effort: args.effort, failed: "spec", step: spec, reviewOk, refs };
   }
@@ -180,10 +179,11 @@ const suite = await runs.run("suite", {
 });
 refs.suite = suite.outputReference || suite.output;
 let suiteReceipt = suite;
-if (suite.ok === true && !verdict(suite, "SUITE: GREEN")) {
+if (suite.ok === true && !verdict(suite, "SUITE: GREEN") && !verdict(suite, "SUITE: RED")) {
   // A green suite whose verdict line did not survive the child's final message
   // is a reporting miss, not a red suite. One re-run is idempotent and much
-  // cheaper than sending the caller back to the harness.
+  // cheaper than sending the caller back to the harness. A stated red suite is
+  // never re-run: the failure is the answer.
   suiteReceipt = await runs.run("suite-retry", {
     agent: "test-runner",
     label: "Re-run " + args.effort + " suite gate",

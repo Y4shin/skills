@@ -3843,3 +3843,12 @@ describe("the gates and hygiene (end-of-effort-reconciliation)", () => {
     }
   });
 });
+
+describe("the verdict retry does not re-dispatch a stated refusal", () => {
+  test("the chain retries the gate only when no verdict line was stated", () => {
+    const chain = readFile("skills/engineering/implement-ticket/scripts/ticket-chain.js");
+    expect(chain).toMatch(/"VERDICT: PASS"\)\s*&&\s*!verdict\(gate, "VERDICT: REFUSE"\)/);
+    const end = readFile("skills/engineering/implement-ticket/scripts/end-of-effort.js");
+    expect(end).toMatch(/"SUITE: GREEN"\)\s*&&\s*!verdict\(suite, "SUITE: RED"\)/);
+  });
+});
