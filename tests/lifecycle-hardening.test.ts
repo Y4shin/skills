@@ -372,3 +372,66 @@ describe("the close reconcile is recorded and gated", () => {
     expect(written).toContain("reconcile: \"none: no architecture change\"");
   });
 });
+
+describe("the architecture section writer", () => {
+  test("replaces one section and leaves the rest byte for byte", async () => {
+    const t = tools();
+    const path = join(repo, "docs", "tasks", "ticketready", "architecture.md");
+    writeFileSync(
+      path,
+      dump({
+        data: { type: "architecture", title: "Section fixture", status: "stable" },
+        body: "\n## Contracts\n\nOld contract text.\n\n## Seams\n\nSeam text stays.\n",
+      }),
+      "utf-8",
+    );
+    const out = (await t.tw_write_architecture.execute(
+      { selector: "ticketready", section: "Contracts", content: "New contract text." },
+      ctx([...ALWAYS_DECLARED]),
+    )) as string;
+    expect(out).toContain("wrote '## Contracts'");
+    const written = readFileSync(path, "utf-8");
+    expect(written).toContain("New contract text.");
+    expect(written).not.toContain("Old contract text.");
+    expect(written).toContain("Seam text stays.");
+    expect(written).toContain("## Seams");
+  });
+
+  test("appends a section that does not exist yet", async () => {
+    const t = tools();
+    await t.tw_write_architecture.execute(
+      { selector: "ticketready", section: "Known gaps", content: "One gap." },
+      ctx([...ALWAYS_DECLARED]),
+    );
+    const written = readFileSync(join(repo, "docs", "tasks", "ticketready", "architecture.md"), "utf-8");
+    expect(written).toContain("## Known gaps");
+    expect(written).toContain("One gap.");
+    expect(written).toContain("Seam text stays.");
+  });
+
+  test("refuses a section write when there is no document to correct", async () => {
+    const t = tools();
+    await expect(
+      t.tw_write_architecture.execute(
+        { selector: "published", section: "Contracts", content: "x" },
+        ctx([...ALWAYS_DECLARED]),
+      ),
+    ).rejects.toThrow(/a section write corrects an existing document/);
+  });
+
+  test("refuses an empty or multi-line section name", async () => {
+    const t = tools();
+    await expect(
+      t.tw_write_architecture.execute(
+        { selector: "ticketready", section: "  ", content: "x" },
+        ctx([...ALWAYS_DECLARED]),
+      ),
+    ).rejects.toThrow(/section name is empty/);
+    await expect(
+      t.tw_write_architecture.execute(
+        { selector: "ticketready", section: "A\nB", content: "x" },
+        ctx([...ALWAYS_DECLARED]),
+      ),
+    ).rejects.toThrow(/single '##' heading name/);
+  });
+});

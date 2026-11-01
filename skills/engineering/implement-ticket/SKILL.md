@@ -322,8 +322,10 @@ result = <the workflow's return: { ok, failed?, step?, reviewOk?, refs }>
 - The reconcile's output is `result.refs.spec`; the reconciler child cannot
   write `docs/tasks/`, so record the reconciled document through
   `tw_write_architecture` (this phase holds the writer) before the close-out
-  report. A reconcile that is never recorded leaves the living architecture
-  document stale.
+  report. Use `section: "<heading>"` per corrected section when only parts of
+  the document moved; resend the whole body only when the design changed
+  throughout. A reconcile that is never recorded leaves the living
+  architecture document stale.
 - On `result.failed == "suite"`: emergent cross-ticket breakage. Add the
   failures to the inconsistencies list and relaunch the workflow with
   `review: false` (the review already ran). Large, ambiguous, or

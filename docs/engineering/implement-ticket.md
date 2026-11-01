@@ -68,7 +68,8 @@ never refactors or runs the suite itself.
 
 Two results become artifacts, because a child cannot write `docs/tasks/`:
 the reconciled architecture document comes back as `result.refs.spec` and
-the phase records it through `tw_write_architecture`, and the advisory
+the phase records it through `tw_write_architecture`, section by section
+through its `section` argument when only parts moved, and the advisory
 review comes back as `result.refs.review` and the phase records it through
 `tw_write_review` with `pass: "end-of-effort"`, which writes
 `docs/tasks/<effort>/end-of-effort-review.md`. That file is what

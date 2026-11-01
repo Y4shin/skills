@@ -811,6 +811,14 @@ interface EffortRootWriteOptions {
   validateCreation?: (effortDir: string, effortName: string) => void;
   /** Per-kind side effect after the write; returns a suffix for the result. */
   afterWrite?: (path: string, effortDir: string) => string;
+  /**
+   * Write one `##` section instead of the whole body. The name is validated by
+   * the caller; the write replaces that section in place (or appends it) and
+   * leaves every other byte of the document alone. Refused when the document
+   * does not exist: a partial write cannot invent the sections it is not told
+   * about.
+   */
+  section?: string;
 }
 
 function writeEffortRootArtifact(o: EffortRootWriteOptions): string {
@@ -828,13 +836,24 @@ function writeEffortRootArtifact(o: EffortRootWriteOptions): string {
 
   if (hit !== null) {
     o.validateExisting?.(hit.art);
-    hit.doc.body = body;
+    if (o.section !== undefined) {
+      hit.doc.body = writeMapSection(hit.doc.body, o.section, body);
+    } else {
+      hit.doc.body = body;
+    }
     if (publish) hit.doc.data.status = "stable";
     writeFileSync(hit.path, dump(hit.doc), "utf-8");
     const suffix = o.afterWrite ? o.afterWrite(hit.path, dirname(hit.path)) : "";
-    return `wrote ${relative(root, hit.path)}${publish ? " (status: stable)" : ""}${suffix}`;
+    const where = o.section !== undefined ? `wrote '## ${o.section}' in ${relative(root, hit.path)}` : `wrote ${relative(root, hit.path)}`;
+    return `${where}${publish ? " (status: stable)" : ""}${suffix}`;
   }
 
+  if (o.section !== undefined) {
+    throw new Error(
+      `no ${kind} document for '${o.selector}': a section write corrects an existing document; ` +
+        `write the whole body once to create it`,
+    );
+  }
   const effortDir = liveEffortDir(root, o.selector);
   if (effortDir === null) {
     throw new Error(
@@ -1873,12 +1892,23 @@ export function createTools(): Record<string, Tool> {
         "legacy shape).",
       {
         selector: Str("Effort slug, or the effort's architecture or map path"),
-        content: Str("The architecture body (markdown after the frontmatter)"),
+        content: Str("The architecture body (markdown after the frontmatter), or one section's body"),
         title: OptStr("Title used only when the write creates the document"),
         publish: OptBool,
+        section: OptStr(
+          "Write only this '##' section (name without the marks): the rest of the document is left " +
+            "byte for byte, so a correction does not resend the whole body. Requires an existing document",
+        ),
       },
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
+        const section = typeof p.section === "string" ? p.section.trim() : undefined;
+        if (section !== undefined) {
+          if (section === "") throw new Error("section name is empty");
+          if (/\n/.test(section)) {
+            throw new Error(`section name '${section.replace(/\n.*/s, "")}' must be a single '##' heading name`);
+          }
+        }
         return writeEffortRootArtifact({
           root,
           selector: p.selector,
@@ -1887,6 +1917,10 @@ export function createTools(): Record<string, Tool> {
           publish: p.publish === true,
           kind: "architecture",
           emptyBody: "an architecture write needs a body",
+          // A v3-shape architecture is a migration job, like the spec: the
+          // whole-body path rewrote one before this guard existed.
+          validateExisting: requireV4Shape,
+          ...(section !== undefined ? { section } : {}),
           // The architecture consumes the architecture content already
           // recorded in the spec: no spec, nothing to produce it from.
           validateCreation: (effortDir, effortName) => {

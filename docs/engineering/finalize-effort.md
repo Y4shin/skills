@@ -19,7 +19,8 @@ never a gate: `tw_archive_effort` ignores it.
 
 Before the review, the phase reconciles the living architecture against what
 landed: every end-of-effort reconcile runs before the last landing, so the
-close holds `tw_write_architecture` and records the corrected document. On a
+close holds `tw_write_architecture` and records the corrected document, section by
+section through its `section` argument when only parts moved. On a
 schema-4 tree the v5 writer refuses the legacy `arch-spec.md`, so the gap is
 recorded in the review instead.
 

@@ -31,8 +31,10 @@ Every end-of-effort reconcile runs before the last landing, so the design
 record can be stale exactly where the close matters most. Before the review,
 reconcile `architecture.md` against what actually landed: read the deviation
 reports, the ticket notes, and the diff, and record the corrected document
-through `tw_write_architecture` (this phase holds the writer). This
-reconciles the record; it never fixes code.
+through `tw_write_architecture` (this phase holds the writer). Correct the
+sections that changed with `section: "<heading>"` rather than resending the
+whole body; the whole-body form is for creating the document or a rewrite that
+really does touch everything. This reconciles the record; it never fixes code.
 
 Record the outcome when you write the review: `tw_write_review` takes a
 `reconcile` argument, and `tw_archive_effort` refuses a finalize review
