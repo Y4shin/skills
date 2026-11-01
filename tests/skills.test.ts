@@ -3797,7 +3797,7 @@ describe("the gates and hygiene (end-of-effort-reconciliation)", () => {
     expect(always).toContain("npm run typecheck:tests");
   });
 
-  test("the v5 release consumed its changeset and shipped no retired skill entry", () => {
+  test("the release consumed its changesets and shipped no retired skill entry", () => {
     const entries = readdirSync(join(PROJECT, ".changeset")).filter((name) => name.endsWith(".md"));
     // README.md is the folder's own documentation, not an entry. The v5 entry
     // was consumed by the release, so nothing is pending.
@@ -3809,11 +3809,12 @@ describe("the gates and hygiene (end-of-effort-reconciliation)", () => {
     // The release note landed in the changelog, and the version is the major
     // the changeset declared.
     const changelog = readFile("CHANGELOG.md");
-    expect(changelog).toMatch(/^## 5\.0\.0/m);
-    expect(changelog).toMatch(/### Major Changes/);
-    expect(pkg.version).toBe("5.0.0");
+    // The changelog carries the released version's own section, whatever it is.
+    expect(changelog).toContain(`## ${pkg.version}`);
+    expect(changelog).toMatch(/### (Major|Minor|Patch) Changes/);
+    // The migration target spec tracks the package version it belongs to.
     const target = readFile("docs/migration-target.yaml");
-    expect(target).toMatch(/package_version: "5\.0\.0"/);
+    expect(target).toContain(`package_version: "${pkg.version}"`);
   });
 
   test("the orphaned flow map and the stale handoff are gone", () => {

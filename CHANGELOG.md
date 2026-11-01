@@ -1,5 +1,16 @@
 # task-workflow
 
+## 5.0.1
+
+### Patch Changes
+
+- Dev tooling only; nothing a consumer installs changes.
+  
+  - `pi-subagents` moves to `^0.84.0`, the version the host already runs, so the ticket-chain and end-of-effort scripts are no longer typed against an API the runtime does not execute.
+  - `@earendil-works/pi-coding-agent` moves to `^1.4.0` and `pi-ai` to 1.4.0, so the typecheck runs against the SDK the host loads.
+  - `typebox` 1.4.3, `vitest` 5.0.5, and `@types/node` 24.19.2, plus an `overrides.undici` pin at `^8.12.3`.
+  - `npm audit` drops from 6 advisories (3 high) to 3 moderate, all one upstream `minimatch` entry inside the pi SDK; `npm audit --omit=dev` remains 0, and the only runtime dependency is still `yaml`.
+
 ## 5.0.0
 
 ### Major Changes
