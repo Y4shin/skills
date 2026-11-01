@@ -3797,24 +3797,23 @@ describe("the gates and hygiene (end-of-effort-reconciliation)", () => {
     expect(always).toContain("npm run typecheck:tests");
   });
 
-  test("the changesets hold one major entry for v5 and no retired skill entry", () => {
+  test("the v5 release consumed its changeset and shipped no retired skill entry", () => {
     const entries = readdirSync(join(PROJECT, ".changeset")).filter((name) => name.endsWith(".md"));
-    // README.md is the folder's own documentation, not an entry.
+    // README.md is the folder's own documentation, not an entry. The v5 entry
+    // was consumed by the release, so nothing is pending.
     const releases = entries.filter((name) => name !== "README.md");
-    expect(releases.length).toBe(1);
-    // The one entry is the v5 release note: no pending entry describes a
-    // retired skill (three of the four swept entries described
-    // `implement-task`, so the next release would have published notes for a
-    // skill that no longer exists).
-    expect(releases[0]).toBe("enforced-workflow-v5.md");
-    const content = readFile(join(".changeset", releases[0]!));
-    expect(content).toMatch(/"task-workflow":\s*major/);
-    expect(content).toMatch(/v5|schema 5|schema_version 5/i);
+    expect(releases).toEqual([]);
     for (const name of ["end-of-effort-workflow", "quiet-chain-dispatch", "scoped-uncertainty-tool", "shipped-ticket-chain"]) {
       expect(existsSync(join(PROJECT, ".changeset", `${name}.md`)), name).toBe(false);
     }
-    // The version bump is a release action, not this ticket's.
-    expect(pkg.version).toBe("4.0.0");
+    // The release note landed in the changelog, and the version is the major
+    // the changeset declared.
+    const changelog = readFile("CHANGELOG.md");
+    expect(changelog).toMatch(/^## 5\.0\.0/m);
+    expect(changelog).toMatch(/### Major Changes/);
+    expect(pkg.version).toBe("5.0.0");
+    const target = readFile("docs/migration-target.yaml");
+    expect(target).toMatch(/package_version: "5\.0\.0"/);
   });
 
   test("the orphaned flow map and the stale handoff are gone", () => {
