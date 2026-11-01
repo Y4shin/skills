@@ -149,8 +149,13 @@ fi
 # --------------------------------------------------------------------------
 # 7. Stage, commit, tag
 # --------------------------------------------------------------------------
-git add package.json CHANGELOG.md package-lock.json .changeset
+git add package.json package-lock.json CHANGELOG.md docs/migration-target.yaml .changeset
 git commit -q -m "chore(release): releasing v${new_version}"
+if ! git diff --quiet; then
+  echo "Error: the release left uncommitted changes. Aborting before the tag." >&2
+  git status --short >&2
+  exit 1
+fi
 git tag "v${new_version}" -m "v${new_version}"
 echo "Tagged v${new_version}"
 
