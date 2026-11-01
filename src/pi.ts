@@ -3422,7 +3422,7 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.notify(
         "pi-telemetry is not installed. The shipped subagents list submit_feedback in their tools allowlist, " +
           "and pi-subagents fails a child whose allowlisted tool is unavailable, so the ticket chain will not " +
-          "launch. Install it with: pi install git:github.com/Y4shin/pi-telemetry@v0.4.0",
+          "launch. Install it with: pi install npm:@y4shin/pi-telemetry",
         "warning",
       );
     }

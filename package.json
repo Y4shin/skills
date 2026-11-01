@@ -41,6 +41,7 @@
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
+    "@y4shin/pi-telemetry": "*",
     "pi-subagents": "*",
     "typebox": "*"
   },
@@ -96,6 +97,11 @@
       "agents": [
         "./agents"
       ]
+    }
+  },
+  "peerDependenciesMeta": {
+    "@y4shin/pi-telemetry": {
+      "optional": true
     }
   }
 }

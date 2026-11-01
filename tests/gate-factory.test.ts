@@ -306,7 +306,7 @@ describe("factory gate", () => {
     const messages = stub.notifications.map((n) => n.message);
     expect(messages).toContain("task-workflow gate active: work repo matched disableOnRepo pattern");
     expect(messages).not.toContain("pi-subagents is not installed. Install it with: pi install npm:pi-subagents");
-    expect(messages).not.toContain("pi-telemetry is not installed. Install it with: pi install git:github.com/Y4shin/pi-telemetry@v0.4.0");
+    expect(messages).not.toContain("pi-telemetry is not installed. Install it with: pi install npm:@y4shin/pi-telemetry");
   });
 
   test("personal repo emits session_start peer warnings", async () => {
@@ -328,7 +328,7 @@ describe("factory gate", () => {
     // fails the child at launch.
     const telemetry = messages.find((m) => m.startsWith("pi-telemetry is not installed."));
     expect(telemetry).toBeDefined();
-    expect(telemetry).toContain("pi install git:github.com/Y4shin/pi-telemetry@v0.4.0");
+    expect(telemetry).toContain("pi install npm:@y4shin/pi-telemetry");
     expect(telemetry).toMatch(/allowlist/);
   });
 
