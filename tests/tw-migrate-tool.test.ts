@@ -123,6 +123,8 @@ describe("tw_migrate through the public tool factory", () => {
 
   test("a needs-human fixture yields a report that separates the items from the changes", async () => {
     const dir = tracked(makeV3TreeWithSlices);
+    const slicePath = join(dir, "docs/tasks/login/slices/1-do-thing.md");
+    const sliceBefore = readFileSync(slicePath, "utf-8");
     const tools = createTools();
     const result = (await tools.tw_migrate.execute({}, { directory: dir })) as ToolResult;
 
@@ -136,7 +138,7 @@ describe("tw_migrate through the public tool factory", () => {
     const human = result.text.slice(result.text.indexOf(" item(s) needing human eyes"));
     expect(human).toContain("slice-dir docs/tasks/login/slices");
     // The reported slice file is left in place, byte for byte.
-    expect(readFileSync(join(dir, "docs/tasks/login/slices/1-do-thing.md"), "utf-8")).toMatch(/^kind: slice/);
+    expect(readFileSync(slicePath, "utf-8")).toBe(sliceBefore);
   });
 
   test("an already-current tree returns the no-op answer and nothing is written", async () => {
