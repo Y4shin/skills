@@ -1331,6 +1331,27 @@ describe("migration CLI removal (remove-migration-cli)", () => {
       expect(existsSync(join(PROJECT, gone)), gone).toBe(false);
     }
   });
+
+  test("no living file references the removed migration CLI files", () => {
+    // An import or an instruction to run the removed CLI must name one of
+    // its files. The sweep mirrors the dead-surface corpus check: this file
+    // is its own exemption (the guards above must name the removed files to
+    // assert their absence), and the migration-tool effort's own record
+    // keeps the names that were live when written, the same class as an
+    // archived tree.
+    const removed = /migrate-cli|ts-resolve|migrate\.mjs/;
+    const self = "tests/skills.test.ts";
+    const offenders: string[] = [];
+    for (const file of corpusFiles(PROJECT)) {
+      const rel = file.slice(PROJECT.length + 1);
+      if (rel === self) continue;
+      if (rel.startsWith("docs/tasks/migration-tool/")) continue;
+      if (removed.test(readFileSync(file, "utf-8"))) {
+        offenders.push(rel);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
 });
 
 // ─── Skill-review wiring ─────────────────────────────────────────────
