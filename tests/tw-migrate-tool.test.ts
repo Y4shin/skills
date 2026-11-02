@@ -161,7 +161,7 @@ describe("tw_migrate disclosure", () => {
     }
 
     const closed = (await tools.tw_close.execute({ skill: "setup-workflow" }, ctx)) as ToolResult;
-    expect(closed.details.closed ?? true).toBe(true);
+    expect(closed.details.closed).toBe(true);
     expect(active).not.toContain("tw_migrate");
     expect(active).toEqual(expect.arrayContaining(["tw_open", "tw_next", "tw_close"]));
   });
