@@ -133,6 +133,7 @@ const WORKFLOW_SKILLS = [
   "setup-workflow",
   "task-workflow-overview",
   "task-workflow-doctor",
+  "workflow-failure",
 ];
 
 // The fixed, ordered report shape from the effort's report contract:
