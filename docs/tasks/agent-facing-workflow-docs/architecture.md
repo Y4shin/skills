@@ -67,7 +67,8 @@ The specification's architecture content, recorded verbatim:
 Every promoted `SKILL.md` except `workflow-failure`, and every subagent
 profile in `agents/`, carries this exact sentence, placed directly after the
 operator-communication preamble where one exists (else at the top of the
-body):
+body, interpreted as the first prose paragraph after the H1 title for
+titled, no-preamble files such as `operator-communication`):
 
 > If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise
 > surprises you, invoke the `workflow-failure` skill before improvising.
@@ -88,6 +89,14 @@ One new resource under the task-workflow-overview skill:
   `stateDiagram-v2`), (5) the `tw_*` tools by phase and disclosure scope,
   (6) the refusal shapes and their legal routes, (7) the escalation ladder
   and what escalation means.
+  As built, two documented resolutions shape the content: the artifact-tree
+  section states the scanner's slug rule generically and names only the
+  live container directories (the end-of-effort-reconciliation vocabulary
+  test bans the `slices/` and `docs/tasks/maps/` path tokens in live
+  prose, so the tolerated legacy scope is described without those tokens),
+  and mermaid edge labels use the pipe form (`-->|"label"|`) because the
+  quoted dash form fails the only available independent parser
+  (grok-mermaid). Both edge-label forms are valid mermaid.
 
 Referenced from: the workflow-failure SKILL.md (rung 2), the
 task-workflow-overview SKILL.md (a short "Internals" pointer), and nothing
@@ -98,7 +107,14 @@ the ladder.
 
 - `create-workflow-failure-skill` creates the new skill directory and its
   SKILL.md, owns `CONTEXT.md`, `package.json`, the top-level `README.md`,
-  the engineering bucket `README.md`, and the new docs page.
+  the engineering bucket `README.md`, and the new docs page. As built it
+  additionally touched, under existing seams and repo conventions:
+  `docs/migration-target.yaml` (one `promoted_skills` line, forced by the
+  pi.skills/migration-target seam), a minor changeset (repo convention for
+  skill-adding features), and test-manifest maintenance (`SKILL_FILES`,
+  manifest-count bumps, the `WORKFLOW_SKILLS` entry in
+  `tests/skill-rewire.test.ts`, and a `CORPUS_SKIP_DIRS` extension with
+  `.agents` and `dist` in `tests/skills.test.ts`).
 - `workflow-internals-reference` owns
   `skills/engineering/task-workflow-overview/` in full during
   implementation: the new resource, the SKILL.md edit (Internals pointer,
@@ -183,9 +199,11 @@ the ladder.
 
 ## Per-ticket interface contracts
 
-- **create-workflow-failure-skill** must land with the full test suite green
-  against an updated promoted set: docs page, README references, bucket
-  grouping (model-invoked). It must not edit
+- **create-workflow-failure-skill** lands with one designed red test
+  mid-effort: `task-workflow-overview names every user-reachable skill`
+  fails until workflow-internals-reference adds the router row (the
+  ownership division requires it; the "full suite green" criterion holds
+  only after that hand-off). It must not edit
   `task-workflow-overview/SKILL.md`; the router row for the new skill
   belongs to workflow-internals-reference (the repo convention that the
   router mentions every user-reachable skill is satisfied there, so that
@@ -195,11 +213,23 @@ the ladder.
   and every claimed behavior traceable to the skills, tests, or extension
   source it documents. Where source and common understanding disagree, the
   source wins and the confusion becomes a review finding.
-- **thread-reference-everywhere** must insert the canonical sentence
-  verbatim and change nothing else in the touched files (no drive-by
-  edits).
+- **thread-reference-everywhere** inserts the canonical sentence verbatim
+  and changes nothing else in the touched files (no drive-by edits). As
+  built: 29 promoted SKILL.md files and all 11 `agents/` profiles carry
+  the sentence exactly once (additions-only diff, 40 files / 80 insertions
+  / 0 deletions). Its red-green gate ran against a ticket-local checker in
+  the ticket's `.work/` directory rather than new tests under `tests/`,
+  honoring reference-coverage-suite's ownership of `tests/`; that checker
+  is not part of the shipped tree.
 - **reference-coverage-suite** must fail when: a promoted SKILL.md (minus
   workflow-failure) or an agent profile lacks the sentence, when the
   internals resource is missing or unreferenced, or when a new promoted
   skill ships without coverage. It must pass on the tree as the other
-  tickets left it; it never relaxes the canonical string.
+  tickets left it; it never relaxes the canonical string. As built it is
+  one describe block (`canonical reference coverage
+  (reference-coverage-suite)`) in `tests/skills.test.ts` with a single
+  `CANONICAL_REFERENCE_SENTENCE` constant compared verbatim; it also
+  asserts the workflow-failure exemption explicitly (the ladder skill must
+  NOT carry the sentence) and enumerates agent profiles by directory
+  listing (`agents/*.md`) rather than a hardcoded list, so a future profile
+  without the sentence fails CI.
