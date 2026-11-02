@@ -312,13 +312,14 @@ The shapes, by surface:
 
 - **Gate refusals** (an `opened: false` with `reason` and `legal_next`).
   The routes this package produces today: no live effort, run intake; the
-  map not ready for the spec, run wayfinder; the spec missing or not
-  stable, run to-spec; a spec but no tickets, run to-tickets; the
+  map not ready for the spec, run wayfinder; the spec missing, run to-spec,
+  and a drafted but not stable spec, publish the spec through to-spec; a
+  spec but no tickets, run to-tickets; the
   architecture document missing or unstable, run to-tickets (a bug-only
   effort has none by design); every ticket done, run finalize-effort; a
   missing target, retry with the target ticket slug; an unknown, done,
   blocked, or not-ready target, the ready tickets named or the blockers to
-  land first.
+  land first, with the retry hint when the ready frontier is empty.
 - **Exclusivity refusals.** Already open: the work is open, and the legal
   next list is empty on purpose. Conflicting open: `tw_close` the named
   skill, then reopen.
