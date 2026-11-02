@@ -53,3 +53,7 @@ the line.
   overview sentence).
 - `thread-reference-everywhere` (creates the sentence coverage the test
   asserts).
+
+## Implementation notes
+
+Knowledge harvest: coverage contracts are strongest when the canonical string lives in exactly one constant and every check compares verbatim (includes/toContain), never a relaxed pattern; asserting the exemption's direction (the ladder must not carry the sentence) removes a silent pass-through where an inverted edit would stay green. Deriving the covered file list from the package manifest and from directory scans makes the suite self-extending: a newly promoted skill or agent profile is auto-covered without test edits, so failures name placement gaps rather than test staleness. When a test ticket's scope is tests/ only, commit scope discipline keeps RED/GREEN evidence reproducible from the ticket branch alone.
