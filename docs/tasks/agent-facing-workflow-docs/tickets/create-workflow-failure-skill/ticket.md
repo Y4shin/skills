@@ -69,3 +69,7 @@ sentence tests.
 ## Blocked by
 
 - None (can start immediately).
+
+## Implementation notes
+
+Knowledge harvest: creating a promoted skill in this repo carries two convention surfaces beyond the documented list (`pi.skills`, READMEs, docs page, router): `docs/migration-target.yaml` has a promoted-skills section and the repo practices a changeset per release-relevant change; both landed here and should be folded into the skill-creator runbook rather than rediscovered. Sequencing lesson: the derived test 'task-workflow-overview names every user-reachable skill' fires in the gap between a skill-creation ticket and the ticket owning the router row; the architecture's file-ownership assignment makes the CI gate red by exactly one designed test between close-outs. Operator-approved protocol for this effort: close out designed-red and re-green at the owning ticket's close-out.
