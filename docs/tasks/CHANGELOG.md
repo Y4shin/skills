@@ -71,6 +71,11 @@ title: Task Changelog
 
 
 
+
+## 2026-11-02, Reference coverage tests (reference-coverage-suite)
+
+Made the workflow-failure reference contract load-bearing: five mechanical coverage tests in the existing structural suite assert the canonical sentence verbatim on every promoted SKILL.md (with workflow-failure the sole, explicitly asserted exemption) and every agents/ profile, plus existence and dual referencing of the WORKFLOW-INTERNALS.md resource. The covered set derives from the package manifest and directory scans, so future skills and profiles are auto-covered; failures name the offending file. Suite now 1309 passed, 0 failed; the effort's docs-complete success state is fully wired.
+
 ## 2026-11-02, Thread the reference sentence through skills and agent profiles (thread-reference-everywhere)
 
 Threaded the canonical workflow-failure reference sentence verbatim through all 40 promoted surfaces: 29 SKILL.md files across both buckets (excluding the two design exclusions) and all 11 agents/ subagent profiles. Placement follows one rule, directly after the operator-communication preamble or in the first prose slot of the body, with exactly two added lines per file and zero other edits. Every skill and chain worker an agent loads now names the same escalation route when the workflow misbehaves, ahead of the mechanical coverage suite that makes it load-bearing.

@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Reference coverage tests
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - write-workflow-internals
 - thread-reference-everywhere
@@ -57,3 +57,5 @@ the line.
 ## Implementation notes
 
 Knowledge harvest: coverage contracts are strongest when the canonical string lives in exactly one constant and every check compares verbatim (includes/toContain), never a relaxed pattern; asserting the exemption's direction (the ladder must not carry the sentence) removes a silent pass-through where an inverted edit would stay green. Deriving the covered file list from the package manifest and from directory scans makes the suite self-extending: a newly promoted skill or agent profile is auto-covered without test edits, so failures name placement gaps rather than test staleness. When a test ticket's scope is tests/ only, commit scope discipline keeps RED/GREEN evidence reproducible from the ticket branch alone.
+
+Landed: five coverage tests in tests/skills.test.ts (one CANONICAL_REFERENCE_SENTENCE constant, verbatim comparison only) assert promoted SKILL.md presence with workflow-failure the sole asserted exemption, agents/ profile coverage via directory scan, internals resource existence, and dual referencing from the overview and workflow-failure SKILL.md files. RED/GREEN demonstrated per criterion (sentence removal, paraphrase, resource rename, reference deletion, planted promotion). Full suite 1309 passed, 0 failed; typechecks clean.
