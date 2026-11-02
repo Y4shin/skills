@@ -3345,6 +3345,17 @@ describe("workflow-failure skill (create-workflow-failure-skill)", () => {
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });
+
+  test("CONTEXT.md gains the ladder vocabulary, each entry with an Avoid line", () => {
+    const context = readFile("CONTEXT.md");
+    for (const term of ["Ladder", "Escalation rung"]) {
+      const at = context.indexOf(`**${term}**:`);
+      expect(at, `CONTEXT.md is missing '${term}'`).toBeGreaterThan(-1);
+      const next = context.indexOf("\n## ", at);
+      const entry = context.slice(at, next === -1 ? context.length : next);
+      expect(entry, `CONTEXT.md entry '${term}' has no _Avoid_ line`).toContain("_Avoid_:");
+    }
+  });
 });
 
 // ─── finalize-effort: the effort close (finalize-effort-skill) ──────
