@@ -1188,6 +1188,17 @@ describe("setup-workflow v5", () => {
     expect(skill).toMatch(/MigrateReport/);
   });
 
+  test("the dry-run section describes the tool parameter, not a CLI flag", () => {
+    const start = skill.indexOf("### Dry-run mode");
+    const end = skill.indexOf("###", start + 3);
+    const dryRun = skill.slice(start, end === -1 ? undefined : end);
+    expect(dryRun).toMatch(/tw_migrate/);
+    expect(dryRun).toMatch(/dryRun/);
+    expect(dryRun).not.toMatch(/--dry-run/);
+    // The flag is gone from the skill everywhere: the parameter replaced it.
+    expect(skill).not.toMatch(/--dry-run/);
+  });
+
   test("the onboard branch writes the v5 scaffold", () => {
     expect(skill).toMatch(/schema_version: 5/);
     expect(skill).toMatch(/okf_version/);

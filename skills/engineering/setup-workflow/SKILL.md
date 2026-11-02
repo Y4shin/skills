@@ -173,9 +173,10 @@ branch is touched only at the end. The branch choreography is explicit:
 
 ### Dry-run mode
 
-If the user asks for a dry run (or passes `--dry-run`), the CLI prints the
-planned steps and the files each step will add, remove, or rewrite, without
-writing anything. Report the full plan, then stop.
+If the user asks for a dry run, call `tw_migrate` with the `dryRun` parameter
+set (`{ dryRun: true }`): the tool computes the report (the plan, every
+change with its action, path, and detail, and every item needing human
+attention) and writes nothing. Report the full plan, then stop.
 
 ### Idempotence
 
