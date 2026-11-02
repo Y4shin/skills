@@ -119,6 +119,7 @@ const SKILL_FILES = [
   "skills/engineering/tdd/SKILL.md",
   "skills/engineering/code-review/SKILL.md",
   "skills/engineering/task-workflow-doctor/SKILL.md",
+  "skills/engineering/workflow-failure/SKILL.md",
   "skills/engineering/diagnosing-bugs/SKILL.md",
   "skills/engineering/codebase-design/SKILL.md",
   "skills/engineering/grilling/SKILL.md",
@@ -187,7 +188,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(30);
+    expect(pkg.pi.skills.length).toBe(31);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
@@ -527,7 +528,7 @@ describe("triage is retired (intake-skill)", () => {
     const pkg = JSON.parse(readFile("package.json"));
     expect(pkg.pi.skills).toContain("./skills/engineering/intake");
     expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
-    expect(pkg.pi.skills.length).toBe(30);
+    expect(pkg.pi.skills.length).toBe(31);
     expect(pkg.pi.skills.filter((s: string) => s.includes("intake") || s.includes("triage"))).toEqual([
       "./skills/engineering/intake",
     ]);
@@ -1309,7 +1310,10 @@ const OLD_WILDCARD_PATTERN = new RegExp(`${OLD_PREFIX}\\*`);
 // Gitignored local working directories hold tooling output, not prose this
 // repo ships: a subagent transcript or a `.work/` scratch file can carry any
 // character and any retired identifier without anything of ours being wrong.
-const CORPUS_SKIP_DIRS = new Set(["node_modules", ".git", "archive", "prototype-bundle", ".pi-subagents", ".work"]);
+// `.agents` (a vendored skills checkout) and `dist` (build output) are the
+// same class as prototype-bundle: local, gitignored, never shipped (the
+// package `files` set ships neither).
+const CORPUS_SKIP_DIRS = new Set(["node_modules", ".git", "archive", "prototype-bundle", ".pi-subagents", ".work", ".agents", "dist"]);
 function corpusFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
@@ -3245,6 +3249,111 @@ describe("task-workflow-doctor v5 (overview-doctor-rescope)", () => {
     for (const text of [content, page]) {
       expect(text).not.toMatch(/docs\/bugs/);
       expect(text).not.toMatch(/cannot create.*bugs|bugs cannot be created/i);
+    }
+  });
+});
+
+// ─── workflow-failure: the escalation ladder (create-workflow-failure-skill) ──
+
+// The one place that owns the workflow escalation ladder. The rung order is
+// the behavior contract the architecture document fixes: the refusal's own
+// answer first, reorientation or doctor routing second, the tw_feedback note
+// third, the escalation report last. The canonical-sentence coverage is the
+// reference-coverage-suite's seam; this block pins the ladder itself.
+describe("workflow-failure skill (create-workflow-failure-skill)", () => {
+  const content = readFile("skills/engineering/workflow-failure/SKILL.md");
+  const fm = parseFrontmatter(content);
+  const report = readFile("skills/engineering/workflow-failure/resources/report.md");
+
+  test("is model-invoked with a trigger-tuned description", () => {
+    expect(fm["name"]).toBe("workflow-failure");
+    // Model-invoked: a stuck agent auto-invokes it mid-run.
+    expect(fm["disable-model-invocation"]).toBeUndefined();
+    const description = String(fm["description"]);
+    expect(description).toMatch(/workflow/);
+    expect(description).toMatch(/refus/i);
+    expect(description).toMatch(/stuck/i);
+    expect(description).toMatch(/escalat/i);
+  });
+
+  test("the ladder walks the four rungs in the fixed order", () => {
+    const ladderStart = content.indexOf("## The ladder");
+    const ladderEnd = content.indexOf("## Forbidden", ladderStart);
+    expect(ladderStart).toBeGreaterThan(-1);
+    expect(ladderEnd).toBeGreaterThan(ladderStart);
+    const ladder = content.slice(ladderStart, ladderEnd);
+    // Rung markers in order, each rung carrying its own contract.
+    const rungs = [
+      { marker: "1. ", words: ["reason", "legal_next"] },
+      { marker: "2. ", words: ["WORKFLOW-INTERNALS.md", "task-workflow-doctor"] },
+      { marker: "3. ", words: ["tw_feedback"] },
+      { marker: "4. ", words: ["resources/report.md", "ends the run"] },
+    ];
+    const ats = rungs.map((r) => ladder.indexOf(r.marker));
+    for (const at of ats) expect(at).toBeGreaterThan(-1);
+    expect(ats).toEqual([...ats].sort((a, b) => a - b));
+    for (const [i, rung] of rungs.entries()) {
+      // Prose wraps: squeeze whitespace before matching.
+      const body = ladder.slice(ats[i], i + 1 < rungs.length ? ats[i + 1] : undefined).replace(/\s+/g, " ");
+      for (const word of rung.words) {
+        expect(body, `rung ${i + 1} never says '${word}'`).toContain(word);
+      }
+    }
+  });
+
+  test("escalation ends the run; it never blocks mid-run on a question", () => {
+    expect(content).toMatch(/never blocks mid-run/i);
+    expect(content).not.toMatch(/ask_user_question/);
+  });
+
+  test("the forbidden moves are stated", () => {
+    const start = content.indexOf("## Forbidden");
+    expect(start).toBeGreaterThan(-1);
+    const forbidden = content.slice(start).toLowerCase();
+    expect(forbidden).toContain("hand-editing");
+    expect(forbidden).toContain("skipping a gate");
+    expect(forbidden).toContain("workaround");
+  });
+
+  test("routes to the internals reference and the doctor, and records the snag with tw_feedback", () => {
+    expect(content).toContain("WORKFLOW-INTERNALS.md");
+    expect(content).toContain("task-workflow-doctor");
+    expect(content).toContain("tw_feedback");
+    // The wrapper is the one workflow-feedback route; the store's own name
+    // stays out of the prose.
+    expect(content).not.toContain("submit_feedback");
+  });
+
+  test("does not carry the canonical sentence: the ladder never references itself", () => {
+    expect(content).not.toContain("invoke the `workflow-failure` skill before improvising");
+  });
+
+  test("is registered in the promoted set", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).toContain("./skills/engineering/workflow-failure");
+  });
+
+  test("ships the five-part report resource", () => {
+    const parts = [
+      "1. What is now true",
+      "2. What needs the human",
+      "3. What to run next",
+      "4. What is broken or blocked",
+      "5. One pointer to the detail",
+    ];
+    const positions = parts.map((part) => report.indexOf(`## ${part}`));
+    expect(positions.every((p) => p >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  test("CONTEXT.md gains the ladder vocabulary, each entry with an Avoid line", () => {
+    const context = readFile("CONTEXT.md");
+    for (const term of ["Ladder", "Escalation rung"]) {
+      const at = context.indexOf(`**${term}**:`);
+      expect(at, `CONTEXT.md is missing '${term}'`).toBeGreaterThan(-1);
+      const next = context.indexOf("\n## ", at);
+      const entry = context.slice(at, next === -1 ? context.length : next);
+      expect(entry, `CONTEXT.md entry '${term}' has no _Avoid_ line`).toContain("_Avoid_:");
     }
   });
 });

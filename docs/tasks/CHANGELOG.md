@@ -68,6 +68,11 @@ title: Task Changelog
   narrative' core principle. 28 promoted skills.
 
 
+
+## 2026-11-02, Create the workflow-failure skill (create-workflow-failure-skill)
+
+Created the promoted, model-invoked engineering skill `workflow-failure`, the single owner of the workflow escalation ladder: act on a refusal's own reason and legal_next, reorient from the internals reference or route to task-workflow-doctor, record the snag with tw_feedback, then stop and escalate with the five-part completion report that ends the run. Hand-editing the tree, skipping a gate, and invented workarounds are forbidden at every rung. Shipped with full convention sync (package skill list, READMEs, four-section docs page, CONTEXT.md glossary, migration target, changeset) and structural tests. The agent-facing fallback for stuck runs now exists; the escalation ladders it documents land in the remaining tickets of the effort.
+
 ## 2026-11-01, Validate advisory review disposition targets (advisory-disposition-target-check)
 
 `tw_write_review` now validates every disposition target in both review passes. The finalize pass already refused a `ticket` disposition naming no ticket in the effort and a `follow-up` naming no live effort stamped `origin_effort`; the advisory pass, where the finalize triage records its dispositions of the end-of-effort findings, did not. A typo'd or invented slug therefore recorded "ticketed to X" for a ticket that never existed, and because `tw_archive_effort` deliberately skips `pass: end-of-effort` artifacts, the effort still archived with a dangling pointer and the finding was silently stranded.

@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Create the workflow-failure skill
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: m
 ---
@@ -69,3 +69,9 @@ sentence tests.
 ## Blocked by
 
 - None (can start immediately).
+
+## Implementation notes
+
+Knowledge harvest: creating a promoted skill in this repo carries two convention surfaces beyond the documented list (`pi.skills`, READMEs, docs page, router): `docs/migration-target.yaml` has a promoted-skills section and the repo practices a changeset per release-relevant change; both landed here and should be folded into the skill-creator runbook rather than rediscovered. Sequencing lesson: the derived test 'task-workflow-overview names every user-reachable skill' fires in the gap between a skill-creation ticket and the ticket owning the router row; the architecture's file-ownership assignment makes the CI gate red by exactly one designed test between close-outs. Operator-approved protocol for this effort: close out designed-red and re-green at the owning ticket's close-out.
+
+Landed: `workflow-failure` is the promoted, model-invoked engineering skill owning the workflow escalation ladder: refusal reason/legal_next first; reorient from WORKFLOW-INTERNALS.md or route to task-workflow-doctor; tw_feedback snag recording; stop and escalate with the five-part report (in resources/report.md) that ends the run. Ships SKILL.md with the ladder, the forbidden moves (hand-editing the artifact tree, skipping a gate, inventing a workaround), routing notes, and the feedback note. Convention sync: package skill list (30 to 31), top-level and engineering README references (model-invoked), the four-section docs page, CONTEXT.md glossary entries (Ladder, Escalation rung), docs/migration-target.yaml promoted-skills entry, and a minor changeset. Tests: new describe block in tests/skills.test.ts, WORKFLOW_SKILLS entry in tests/skill-rewire.test.ts. Suite: 1303 passed, 1 intentionally red (task-workflow-overview router-row test), owned by workflow-internals-reference per the architecture; the gate re-greens at that ticket's close-out.
