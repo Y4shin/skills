@@ -9,32 +9,9 @@
  * The repo root defaults to the current working directory.
  */
 
-import { migrate, type MigrateReport } from "./core/migrate.js";
+import { migrate } from "./core/migrate.js";
 import { FsPort } from "./core/fs-port.js";
-
-function render(report: MigrateReport, dryRun: boolean): string {
-  const lines: string[] = [];
-  if (report.noop) {
-    lines.push("already on schema_version 5, nothing to do.");
-    return lines.join("\n");
-  }
-  lines.push(
-    `${dryRun ? "dry run: would migrate" : "migrated"} from schema_version ${report.from} to ${report.to}`,
-  );
-  lines.push("");
-  lines.push(`${report.changes.length} change(s):`);
-  for (const c of report.changes) {
-    lines.push(`  ${c.action} ${c.path}: ${c.detail}`);
-  }
-  if (report.needsHuman.length > 0) {
-    lines.push("");
-    lines.push(`${report.needsHuman.length} item(s) needing human eyes:`);
-    for (const h of report.needsHuman) {
-      lines.push(`  ${h.kind} ${h.path}: ${h.detail}`);
-    }
-  }
-  return lines.join("\n");
-}
+import { renderMigrationReport } from "./migrate-report.js";
 
 function main(argv: string[]): number {
   const dryRun = argv.includes("--dry-run");
@@ -44,7 +21,7 @@ function main(argv: string[]): number {
   try {
     const port = new FsPort(root);
     const report = migrate(port, { dryRun });
-    process.stdout.write(render(report, dryRun) + "\n");
+    process.stdout.write(renderMigrationReport(report, dryRun) + "\n");
     return 0;
   } catch (e) {
     process.stderr.write(`migration failed: ${(e as Error).message}\n`);

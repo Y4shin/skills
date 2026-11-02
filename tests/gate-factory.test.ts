@@ -63,6 +63,7 @@ const GATED_NAMES = [
   "tw_state",
   "tw_state_set",
   "tw_context",
+  "tw_migrate",
   "tw_finalize_map",
   "tw_write_section",
   "tw_write_spec",

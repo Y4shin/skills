@@ -213,6 +213,7 @@ describe("task-workflow tools", () => {
         "tw_map_finalizable",
         "tw_mark_blocked",
         "tw_mark_done",
+        "tw_migrate",
         "tw_next",
         "tw_open",
         "tw_record_out_of_scope",

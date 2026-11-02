@@ -158,9 +158,10 @@ _Avoid_: version (too generic)
 **Migration**:
 The one idempotent hop that takes a tree from any older vintage to schema 5: it
 renames the architecture artifact, rewrites the map body sections, stamps the
-state file, and covers archives as well as live trees. It is a tested unit run by
-`setup-workflow`, not a tool in the registered surface. Every rewrite is verified
-before it lands, a failure leaves the tree untouched, and a second run is a no-op.
+state file, and covers archives as well as live trees. It is a tested unit; the
+setup-workflow phase discloses `tw_migrate` in the registered surface as its
+executor. Every rewrite is verified before it lands, a failure leaves the tree
+untouched, and a second run is a no-op.
 _Avoid_: transform, conversion (too generic)
 
 **Invocation model**:
