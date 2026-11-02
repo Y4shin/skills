@@ -8,8 +8,9 @@
  * `renameSync`/`writeFileSync`/`rmSync` failures, and assert the tree is
  * byte-identical afterwards.
  *
- * `FsPort` lives outside `migrate-cli.ts` precisely so it can be imported here;
- * the CLI entry point calls `process.exit`, which would kill the test process.
+ * `FsPort` lives in its own module precisely so it can be imported here; the
+ * production port is drivable from a test process with no process-level side
+ * effects.
  */
 
 import { describe, expect, test } from "vitest";

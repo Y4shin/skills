@@ -1,9 +1,9 @@
 /**
  * The production `TreePort`: a real filesystem, with an atomic commit.
  *
- * This lives in its own module (not in `migrate-cli.ts`) so tests can drive it
- * against a real directory on disk. The CLI entry point calls `process.exit`,
- * which would kill a test process that imported it.
+ * This lives in its own module so tests can drive it against a real
+ * directory on disk, and so the `tw_migrate` tool can instantiate it
+ * directly; the migration core stays a pure function over the port.
  *
  * Atomicity is the migration's core non-negotiable ("on any failure leave the
  * tree untouched"), so `commit()` is a genuine all-or-nothing boundary:

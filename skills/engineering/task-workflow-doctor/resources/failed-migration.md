@@ -2,9 +2,9 @@
 
 ## Symptom
 
-- `/skill:setup-workflow`'s migrate branch stopped partway: the migration CLI
-  errored, the tree is half-transformed, or both the old and the new path
-  exist for the same artifact.
+- `/skill:setup-workflow`'s migrate branch stopped partway: the `tw_migrate`
+  tool errored, the tree is half-transformed, or both the old and the new
+  path exist for the same artifact.
 - The migration report lists failures, or `tw_frontier` cannot read the tree
   after the run.
 - `docs/tasks/state.yaml` still names an older schema version while some

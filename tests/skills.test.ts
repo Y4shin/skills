@@ -1316,6 +1316,61 @@ describe("setup-workflow v5", () => {
     expect(content).toMatch(/rebuilt state\.yaml at schema_version 5/);
   });
 });
+// ─── Migration CLI removal (remove-migration-cli) ────────────────────
+
+describe("migration CLI removal (remove-migration-cli)", () => {
+  test("the three migration CLI files no longer exist", () => {
+    // The package ships exactly one migration executor: the disclosed
+    // `tw_migrate` tool. The argv wrapper, the shim script, and the shim's
+    // resolve hook are gone.
+    for (const gone of [
+      "src/migrate-cli.ts",
+      "skills/engineering/setup-workflow/scripts/migrate.mjs",
+      "skills/engineering/setup-workflow/scripts/ts-resolve.mjs",
+    ]) {
+      expect(existsSync(join(PROJECT, gone)), gone).toBe(false);
+    }
+  });
+
+  test("no living file references the removed migration CLI files", () => {
+    // An import or an instruction to run the removed CLI must name one of
+    // its files. The sweep mirrors the dead-surface corpus check: this file
+    // is its own exemption (the guards above must name the removed files to
+    // assert their absence), and the migration-tool effort's own record
+    // keeps the names that were live when written, the same class as an
+    // archived tree.
+    const removed = /migrate-cli|ts-resolve|migrate\.mjs/;
+    const self = "tests/skills.test.ts";
+    const offenders: string[] = [];
+    for (const file of corpusFiles(PROJECT)) {
+      const rel = file.slice(PROJECT.length + 1);
+      if (rel === self) continue;
+      if (rel.startsWith("docs/tasks/migration-tool/")) continue;
+      if (removed.test(readFileSync(file, "utf-8"))) {
+        offenders.push(rel);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("no living skill, docs, or resource prose names the migration CLI", () => {
+    // The reroute guards cover the setup-workflow pages and upgrade
+    // resources; this sweep covers the remaining instructing surface: skill
+    // prose, the promoted docs tree, and resources. A symptom that names a
+    // CLI the package does not ship routes the reader to a tool that is not
+    // there.
+    const proseOffenders: string[] = [];
+    for (const dir of ["skills", "docs/engineering", "docs/productivity"]) {
+      for (const file of corpusFiles(join(PROJECT, dir))) {
+        if (/migration CLI/i.test(readFileSync(file, "utf-8"))) {
+          proseOffenders.push(file.slice(PROJECT.length + 1));
+        }
+      }
+    }
+    expect(proseOffenders).toEqual([]);
+  });
+});
+
 // ─── Skill-review wiring ─────────────────────────────────────────────
 
 describe("skill-review wiring", () => {
