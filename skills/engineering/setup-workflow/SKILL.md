@@ -198,10 +198,10 @@ byte lands. A failure mid-migration leaves the tree untouched.
 
 - [upgrade-4-to-5](resources/upgrade-4-to-5.md): the v5 hop (the
   `architecture` type and filename rename, the map body sections, the
-  schema-5 state stamp), executed by the migration CLI.
+  schema-5 state stamp), executed by the disclosed tool `tw_migrate`.
 - [upgrade-3-to-4](resources/upgrade-3-to-4.md): the v4 hop (effort-grouped
   layout, OKF frontmatter, state rebuild, slice reporting, vendored-tree
-  relocation, root index), executed by the migration CLI.
+  relocation, root index), executed by the disclosed tool `tw_migrate`.
 - [upgrade-2-to-3](resources/upgrade-2-to-3.md): the largely-adopt-Matt
   adoption (v2.x bucket layout, two-phase planning, 12 new skills, repo-root
   docs, changesets, no-em-dashes). Repos still on 2 run this first.

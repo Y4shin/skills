@@ -3,14 +3,9 @@
 > This resource encodes the ordered step list of the schema_version 3 to 4
 > hop. It traces each step to the effort spec's Migration section
 > (`docs/tasks/task-tools-overhaul/spec.md`, section **Migration**). The
-> **executor** is the migration CLI:
->
-> ```
-> node skills/engineering/setup-workflow/scripts/migrate.mjs
-> ```
->
-> The CLI runs `migrate()` (`src/core/migrate.ts`) over the repo's own tree
-> and prints a `MigrateReport`. The steps below are what it does, in order;
+> **executor** is the disclosed `tw_migrate` tool, which runs `migrate()`
+> (`src/core/migrate.ts`) over the repo's own tree in-process and returns a
+> `MigrateReport`. The steps below are what it does, in order;
 > the skill reads this list to explain the run, it does not perform the steps
 > by hand.
 >
