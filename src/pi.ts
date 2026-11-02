@@ -3120,8 +3120,8 @@ export function createTools(): Record<string, Tool> {
     tw_migrate: defStructured(
       "Migrate this repo's task-workflow bundle to schema 5, in-process: the whole any-vintage-to-5 " +
         "transformation (the effort-grouped layout reorganization, the frontmatter unification, the aux " +
-        "backfill, the archive reshape, the state rebuild, the legacy slice reporting, the vendored-tree " +
-        "relocation, the schema-5 renames, the map body reshape, and the root index write) over the target " +
+        "backfill, the archive reshape, the state rebuild, the vendored-tree relocation, the schema-5 " +
+        "renames, the map body reshape, and the root index write) over the target " +
         "tree, with every rewrite verified before it lands. Returns the migration report: the from and to " +
         "schema versions, every change, every item needing human attention, or the already-current no-op " +
         "answer. Read and surface the report; every rewrite is verified, a failure leaves the tree " +

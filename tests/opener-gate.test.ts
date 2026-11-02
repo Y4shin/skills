@@ -795,26 +795,39 @@ describe("tw_request_tool", () => {
   });
 
   test("refuses a grant that would make another skill look open", async () => {
-    // setup-workflow declares tw_context plus three tools wayfinder already
-    // has, so granting it would complete that toolset and derive an open skill
-    // nobody opened. The open set stays exact, and the refusal names the skill.
+    // setup-workflow declares tw_context and tw_migrate, the two tools no
+    // other phase declares. Granting the first while wayfinder and the nested
+    // skill-creator are open is allowed (the toolset is still incomplete);
+    // granting the second completes setup-workflow's toolset and derives an
+    // open skill nobody opened, so it is refused and the refusal names the
+    // skill. The open set stays exact.
     const tools = createTools();
     const active: string[] = [...ALWAYS_DECLARED];
     const executed: Array<{ name: string; args: Record<string, unknown> }> = [];
     const ctx = requestCtx(active, true, executed);
     await tools.tw_open.execute({ skill: "wayfinder", effort: "ready-effort" }, ctx);
+    await tools.tw_open.execute({ skill: "skill-creator", effort: "ready-effort" }, ctx);
     const before = [...active];
 
-    const result = (await tools.tw_request_tool.execute(
+    const allowed = (await tools.tw_request_tool.execute(
       { tool: "tw_context", reason: "read the project profile" },
+      ctx,
+    )) as ToolResult;
+    expect(allowed.details.granted).toBe(true);
+    expect(active).toContain("tw_context");
+
+    const result = (await tools.tw_request_tool.execute(
+      { tool: "tw_migrate", reason: "migrate the tree" },
       ctx,
     )) as ToolResult;
     expect(result.details.granted).toBe(false);
     expect(result.details.reason).toBe("would open another skill");
-    expect(active).toEqual(before);
+    expect(active).not.toContain("tw_migrate");
     const feedback = executed.filter((call) => call.name === "submit_feedback");
-    expect(JSON.stringify(feedback[0]?.args.data)).toContain("blocked");
-    expect(JSON.stringify(feedback[0]?.args.data)).toContain("setup-workflow");
+    const blocked = feedback.filter((call) => JSON.stringify(call.args.data).includes("blocked"));
+    expect(JSON.stringify(blocked[0]?.args.data)).toContain("setup-workflow");
+    // The earlier, allowed grant is untouched by the refusal.
+    expect(active).toEqual(expect.arrayContaining([...before, "tw_context"]));
   });
 
   test("refuses without an interactive UI and records why, instead of assuming a decision", async () => {
@@ -845,7 +858,7 @@ describe("the phase-to-toolset registry", () => {
     const toolsetOf = Object.fromEntries(SKILL_REGISTRY.map((e) => [e.name, e.toolset.sort()]));
     expect(toolsetOf).toEqual({
       intake: ["tw_add_task", "tw_add_ticket", "tw_create_effort", "tw_feedback", "tw_get", "tw_list", "tw_state", "tw_state_set"],
-      "setup-workflow": ["tw_context", "tw_feedback", "tw_get", "tw_list"],
+      "setup-workflow": ["tw_context", "tw_feedback", "tw_get", "tw_list", "tw_migrate"],
       wayfinder: [
         "tw_add_task",
         "tw_dependency_levels",

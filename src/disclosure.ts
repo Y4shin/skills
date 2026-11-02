@@ -96,7 +96,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // Bootstrap and migration: it reads the tree and the artifact schema and
     // runs the migration CLI through the shell. tw_context is its signature
     // tool.
-    toolset: ["tw_context", "tw_get", "tw_list", "tw_feedback"],
+    toolset: ["tw_context", "tw_migrate", "tw_get", "tw_list", "tw_feedback"],
     conflicts: ["intake", "wayfinder", "to-spec", "to-tickets", "implement-ticket", "finalize-effort"],
   },
   {

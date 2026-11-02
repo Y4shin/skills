@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { createTools } from "../src/pi.js";
+import { ALWAYS_DECLARED, SKILL_REGISTRY } from "../src/disclosure.js";
 
 interface ToolResult {
   text: string;
@@ -109,6 +110,51 @@ function tracked(make: () => string): string {
   dirs.push(dir);
   return dir;
 }
+
+describe("tw_migrate disclosure", () => {
+  /** A tool context with an in-memory active set standing in for the session. */
+  function disclosureCtx(active: string[]) {
+    return {
+      directory: tmpdir(),
+      getActiveTools: () => [...active],
+      setActiveTools: (names: string[]) => {
+        active.splice(0, active.length, ...names);
+      },
+    };
+  }
+
+  test("opening the setup-workflow phase discloses tw_migrate; the close withdraws it", async () => {
+    const tools = createTools();
+    const active: string[] = ["tw_open", "tw_next", "tw_close"];
+    const ctx = disclosureCtx(active);
+
+    const opened = (await tools.tw_open.execute(
+      { skill: "setup-workflow", effort: "e" },
+      ctx,
+    )) as ToolResult & { details: { opened?: boolean } };
+    expect(opened.details.opened).toBe(true);
+    for (const tool of ["tw_context", "tw_migrate", "tw_get", "tw_list", "tw_feedback", "tw_close"]) {
+      expect(active, `${tool} must be declared once setup-workflow is open`).toContain(tool);
+    }
+
+    const closed = (await tools.tw_close.execute({ skill: "setup-workflow" }, ctx)) as ToolResult;
+    expect(closed.details.closed ?? true).toBe(true);
+    expect(active).not.toContain("tw_migrate");
+    expect(active).toEqual(expect.arrayContaining(["tw_open", "tw_next", "tw_close"]));
+  });
+
+  test("the idle default set never declares it", () => {
+    // Not an always-declared tool, and registered inactive: only the phase
+    // opener can activate it.
+    expect(ALWAYS_DECLARED).not.toContain("tw_migrate");
+    const tools = createTools();
+    const registration = tools.tw_migrate as unknown as { activeByDefault?: boolean };
+    expect(registration.activeByDefault ?? false).toBe(false);
+    // Exactly one phase declares it: setup-workflow's.
+    const declaring = SKILL_REGISTRY.filter((entry) => entry.toolset.includes("tw_migrate"));
+    expect(declaring.map((entry) => entry.name)).toEqual(["setup-workflow"]);
+  });
+});
 
 describe("tw_migrate through the public tool factory", () => {
   test("with the dry-run flag set, returns the plan and the tree stays byte-identical", async () => {
