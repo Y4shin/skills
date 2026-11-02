@@ -137,6 +137,17 @@ A single test file, for manual use only (not part of the gated protocol):
   check that changes what the live tree sees needs one test driving the
   tool against the live tree's actual shape (status-only frontmatter), not
   only against fixtures.
+- **Executor swaps with a frozen text contract: freeze the old executor's
+  output as golden literals before changing code, and pin the in-process
+  requirement with a spawn guard.** When a ticket redirects an executor
+  while freezing its report text, capture the live output first (run the
+  old executor over fixture trees before touching any source: the parity
+  oracle) and assert the new executor returns it verbatim, so a wording
+  drift in either the rendering or the core fails loudly. When the fix is
+  "run it in-process", mock the child-process module so any spawn throws:
+  the test then proves the no-spawn property itself instead of trusting the
+  code review. See `tests/tw-migrate-tool.test.ts` (golden report literals
+  captured from the CLI shim before the redirect, plus the spawn guard).
 
 ## Integration harness (tests/integration/)
 

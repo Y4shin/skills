@@ -4,14 +4,10 @@
 > hop. It traces each step to the enforced-workflow-v5 effort's settled
 > decisions (`docs/tasks/enforced-workflow-v5/arch-spec.md`, section
 > **Vocabulary and schema 5**, and the `migrate-v4-to-v5` ticket that
-> implemented them). The **executor** is the migration CLI:
->
-> ```
-> node skills/engineering/setup-workflow/scripts/migrate.mjs
-> ```
->
-> The CLI runs `migrate()` (`src/core/migrate.ts`) over the repo's own tree
-> and prints a `MigrateReport` whose `to` field is `5`. The steps below are
+> implemented them). The **executor** is the disclosed `tw_migrate` tool,
+> which runs `migrate()` (`src/core/migrate.ts`) over the repo's own tree
+> in-process and returns a `MigrateReport` whose `to` field is `5`. The
+> steps below are
 > what it does to an already-v4 tree, in order; the skill reads this list to
 > explain the run, it does not perform the steps by hand.
 >
@@ -90,7 +86,7 @@ is what makes the next `setup-workflow` run report the no-op.
   references, and dead `/skill:task-overview` pointers are reported for
   human eyes when present, never rewritten by the migration.
 
-## What the CLI prints
+## What the tool returns
 
 A real v4 run reports the v5 renames (this transcript is from a fixture with
 a live effort and an archived one, both carrying `arch-spec.md`):
@@ -115,7 +111,7 @@ already on schema_version 5, nothing to do.
 
 ## After the run
 
-- Read the printed `MigrateReport` (its `to` field is `5`) and surface every
+- Read the returned `MigrateReport` (its `to` field is `5`) and surface every
   needs-human item.
 - Run the full test suite (`npm test` + `npm run typecheck`) and verify green.
 - Commit: `chore: migrate task-workflow schema 4 to 5`.

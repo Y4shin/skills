@@ -45,6 +45,7 @@ const GATED_WORKFLOW_TOOLS = [
   "tw_state",
   "tw_state_set",
   "tw_context",
+  "tw_migrate",
 ];
 
 /** The declared set idle: exactly the dispatcher pair on the workflow surface. */
