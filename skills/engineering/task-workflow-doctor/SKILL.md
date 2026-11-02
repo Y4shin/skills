@@ -8,6 +8,8 @@ description: Diagnose a broken task workflow and route to the right skill. Use w
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 The doctor **diagnoses** a reported task-workflow symptom and **routes** you
 to the right skill or manual step. It is not a fixer.
 

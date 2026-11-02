@@ -6,6 +6,8 @@ description: Resolve an in-progress git merge or rebase conflict. Use when you n
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 1. **See the current state** of the merge/rebase. Check git history, and the
    conflicting files.
 

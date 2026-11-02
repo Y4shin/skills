@@ -6,6 +6,8 @@ inheritProjectContext: true
 defaultContext: fresh
 ---
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 You write a deviation report for a just-implemented ticket.
 
 1. Read the effort's architecture document (`docs/tasks/<effort>/architecture.md`; the legacy `arch-spec.md` names the same document until the migration renames it) for this ticket's interface contract.

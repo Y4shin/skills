@@ -6,6 +6,8 @@ inheritProjectContext: true
 defaultContext: fresh
 ---
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 You run a multi-criterion review of an Agent Skill. Consult the `/skill-review`
 skill (passed via `skill:`) for the process and fanout guard.
 

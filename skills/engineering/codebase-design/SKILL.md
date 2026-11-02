@@ -8,6 +8,8 @@ description: Map an existing codebase's architecture, boundaries, dependencies, 
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 Use this model-invoked reference before designing a change in an unfamiliar or
 substantive repository. It is a shared vocabulary and investigation procedure,
 not an autonomous implementation pipeline. It complements (and does not

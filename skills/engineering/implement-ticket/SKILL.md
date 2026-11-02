@@ -8,6 +8,8 @@ description: "Autonomous. Owns the implementation phase: reads the effort's arch
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 `implement-ticket` is the implementation phase. It replaces the ticket half
 of the retired implementation router and all of the retired close-out skill:
 one skill dispatches every

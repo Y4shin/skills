@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Thread the reference sentence through skills and agent profiles
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - create-workflow-failure-skill
 size: m
@@ -48,3 +48,9 @@ restating the ladder, no reformatted prose.
 
 - `create-workflow-failure-skill` (the sentence names a skill that must
   exist and ship).
+
+## Implementation notes
+
+Knowledge harvest: 'top of the body' needs one interpretation for titled files without the standard preamble: the first prose paragraph after the H1, never above the document title (slot ruled in by the coherence criterion; the mechanical contract is unaffected because it asserts verbatim presence only). A seam collision between the TDD red-green discipline and 'tests/' ownership assigned to a later ticket resolves cleanly with an untracked ticket-local checker inside the ticket's .work/ directory: the loop gets its executable seam, the source tree keeps its ownership split untouched. When threading one canonical sentence across ~40 files, a single enumerated-touchpoint checker (derived from the promoted-set manifest) doubles as both the RED condition and the GREEN proof.
+
+Landed: the canonical reference sentence is threaded verbatim through all 40 owned surfaces (29 promoted SKILL.md files minus the two exclusions, plus all 11 agents/ profiles), exactly two added lines and zero deletions per file, placement after the preamble or in the first prose slot. Verified independently by file-by-file scan and the ticket-local checker; full suite 1304 passed, 0 failed. Chained off main at the finalize merge of workflow-internals-reference.

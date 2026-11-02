@@ -70,6 +70,11 @@ title: Task Changelog
 
 
 
+
+## 2026-11-02, Thread the reference sentence through skills and agent profiles (thread-reference-everywhere)
+
+Threaded the canonical workflow-failure reference sentence verbatim through all 40 promoted surfaces: 29 SKILL.md files across both buckets (excluding the two design exclusions) and all 11 agents/ subagent profiles. Placement follows one rule, directly after the operator-communication preamble or in the first prose slot of the body, with exactly two added lines per file and zero other edits. Every skill and chain worker an agent loads now names the same escalation route when the workflow misbehaves, ahead of the mechanical coverage suite that makes it load-bearing.
+
 ## 2026-11-02, Write the workflow internals reference (workflow-internals-reference)
 
 Shipped WORKFLOW-INTERNALS.md under task-workflow-overview: the agent-facing internals reference carrying the big picture, the ASCII artifact tree, mermaid flow charts for the main flow and the phase-gate state machine, the tw_* tools by disclosure scope, the refusal shapes and their legal routes, and the escalation ladder in brief. The overview SKILL.md now links the resource, carries the router row for /skill:workflow-failure, and holds the canonical reference sentence. The previously designed-red router test is green again; the full suite stands at 1304 passed, 0 failed.

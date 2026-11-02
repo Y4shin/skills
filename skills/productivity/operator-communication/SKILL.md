@@ -5,6 +5,8 @@ description: How to write every message you send the operator, including status 
 
 # Operator communication
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 The operator reads your message without your context. They did not watch the
 tool calls, did not read the subagent receipts, and do not hold the names you
 coined during the run. Every rule below serves one test:

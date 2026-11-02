@@ -9,6 +9,8 @@ disable-model-invocation: true
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 Intake is the single front door to the workflow, for both the phase and the
 skill. It replaces `triage`: there is no parallel bug substrate and no
 rejection path. Every request that enters through this door becomes an
