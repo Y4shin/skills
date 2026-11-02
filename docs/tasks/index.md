@@ -8,6 +8,7 @@ title: docs/tasks
 
 ## Live
 
+- agent-facing-workflow-docs
 - build-eval-creator-skill
 - eval-scorer-feedback
 
