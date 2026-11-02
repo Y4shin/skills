@@ -1352,6 +1352,23 @@ describe("migration CLI removal (remove-migration-cli)", () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  test("no living skill, docs, or resource prose names the migration CLI", () => {
+    // The reroute guards cover the setup-workflow pages and upgrade
+    // resources; this sweep covers the remaining instructing surface: skill
+    // prose, the promoted docs tree, and resources. A symptom that names a
+    // CLI the package does not ship routes the reader to a tool that is not
+    // there.
+    const proseOffenders: string[] = [];
+    for (const dir of ["skills", "docs/engineering", "docs/productivity"]) {
+      for (const file of corpusFiles(join(PROJECT, dir))) {
+        if (/migration CLI/i.test(readFileSync(file, "utf-8"))) {
+          proseOffenders.push(file.slice(PROJECT.length + 1));
+        }
+      }
+    }
+    expect(proseOffenders).toEqual([]);
+  });
 });
 
 // ─── Skill-review wiring ─────────────────────────────────────────────

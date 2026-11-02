@@ -1,12 +1,12 @@
 /**
  * Executor-seam coverage for the `tw_migrate` tool: the migration driven
  * through the public tool factory (`createTools()` in src/pi.ts) over fixture
- * trees on disk, replacing the spawn-based shim tests
- * (tests/setup-workflow-scripts.test.ts) as the executor coverage.
+ * trees on disk. This is the migration's executor coverage; the suite drives
+ * the migration only through the tool, never through a spawned process.
  *
- * The expected report texts are the frozen CLI rendering (the parity
- * decision): the same characters the migration CLI printed, pinned as
- * literals so the tool and the wrapper cannot drift apart.
+ * The expected report texts are the frozen rendering (the parity decision),
+ * pinned as literals so the report cannot drift from the shape the migration
+ * has always printed.
  */
 
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
