@@ -3358,6 +3358,50 @@ describe("workflow-failure skill (create-workflow-failure-skill)", () => {
   });
 });
 
+// ─── Reference coverage (reference-coverage-suite) ───────────────────
+
+// The reference contract is load-bearing: every promoted SKILL.md and every
+// subagent profile carries the one standardized sentence that routes workflow
+// trouble to the ladder skill. This constant is the single source of truth
+// for the sentence; every check below holds covered text against it verbatim,
+// never through a relaxed or paraphrase-tolerant pattern. The sentence
+// belongs to the architecture document; the test only mirrors it.
+const CANONICAL_REFERENCE_SENTENCE =
+  "If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.";
+
+// The internals reference (workflow-internals-reference) and the surfaces
+// that must point at it. Skinned by exact path and name, so a rename or a
+// deleted reference fails with the file named.
+const INTERNALS_RESOURCE = "skills/engineering/task-workflow-overview/WORKFLOW-INTERNALS.md";
+const INTERNALS_RESOURCE_NAME = "WORKFLOW-INTERNALS.md";
+
+describe("canonical reference coverage (reference-coverage-suite)", () => {
+  // The manifest is the promoted set (promoted-set seam): a newly promoted
+  // skill enters this loop the moment it ships, so shipping without the
+  // sentence fails here by construction.
+  const promoted = (JSON.parse(readFile("package.json")).pi.skills as string[]).map(promotedSkill);
+
+  test("every promoted SKILL.md except workflow-failure carries the canonical sentence verbatim", () => {
+    const offenders: string[] = [];
+    for (const { bucket, name } of promoted) {
+      if (name === "workflow-failure") continue; // the one exemption: the ladder never references itself
+      const rel = join("skills", bucket, name, "SKILL.md");
+      if (!readFile(rel).includes(CANONICAL_REFERENCE_SENTENCE)) offenders.push(rel);
+    }
+    expect(offenders, "these promoted SKILL.md files lost or paraphrased the canonical reference sentence").toEqual([]);
+  });
+
+  test("every subagent profile carries the canonical sentence verbatim", () => {
+    const offenders: string[] = [];
+    for (const entry of readdirSync(join(PROJECT, "agents"), { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+      const rel = join("agents", entry.name);
+      if (!readFile(rel).includes(CANONICAL_REFERENCE_SENTENCE)) offenders.push(rel);
+    }
+    expect(offenders, "these agent profiles lost or paraphrased the canonical reference sentence").toEqual([]);
+  });
+});
+
 // ─── finalize-effort: the effort close (finalize-effort-skill) ──────
 
 // The effort close is a model-invoked phase skill: it opens through tw_open,
