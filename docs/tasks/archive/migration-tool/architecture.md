@@ -69,9 +69,11 @@ effort); nothing new is settled here.
    because it is dangling and no history is lost; (f) close the phase
    (`tw_close setup-workflow`) and end the run on the integration branch. A
    `--ff-only` that refuses because the integration branch moved mid-run
-   fails loudly with both branches surviving; the prose instructs no
-   recovery step. The dry-run prose moves from a CLI flag to the tool
-   parameter, and the backup-branch safety prose follows the new
+   fails loudly with both branches surviving; the recovery step (landed by the
+   end-of-effort coherence pass) deletes the superseded migration branch,
+   creates a fresh one from the moved tip, and repeats from the tool call,
+   never forcing the fast-forward. The dry-run prose moves from a CLI flag to
+   the tool parameter, and the backup-branch safety prose follows the new
    choreography.
 7. **Skill prose, other branches.** The onboard and no-op branches of the
    skill are untouched.
@@ -198,14 +200,16 @@ call contract, plus its tests.
   refusal test in `tests/opener-gate.test.ts` (wayfinder plus the nested
   skill-creator open, `tw_context` granted, `tw_migrate` refused; the guard's
   semantics are unchanged, the reachable path moved). The tool's failure
-  path is not pinned at the tool level; the core-level failure coverage (a
+  path is pinned at the tool level (added by the end-of-effort coherence
+  pass: a failure throws the wrapped `migration failed: <reason>` line and
+  leaves the tree untouched), on top of the core-level failure coverage (a
   mid-migration failure leaves the tree byte-identical, a malformed staged
-  rewrite throws before anything lands) carries the semantics.
+  rewrite throws before anything lands).
 
 `reroute-migrate-branch` writes prose against this call contract only, and
 `remove-migration-cli` relies on these tests as the executor coverage that
-replaces the deleted shim tests (the deleted shim failure test has no
-tool-level twin; see the test contract's failure-path note).
+replaces the deleted shim tests, with the shim failure test's twin added by
+the end-of-effort coherence pass.
 
 ### `reroute-migrate-branch` (feature, m; blocked by `tw-migrate-tool`)
 
@@ -220,10 +224,12 @@ and no-op branches untouched.
   effort label) plus the tool call; the approval gate before the fast-forward
   when the integration branch is not `main` or `master`; the fast-forward is
   `git merge --ff-only`, which refuses loudly if the integration branch moved
-  mid-run (no recovery step is instructed; both branches survive); the
-  migration-branch deletion (`git branch -d`) after the fast-forward; the
-  phase is closed (`tw_close setup-workflow`) and the run ends on the
-  integration branch.
+  mid-run (both branches survive; the recovery step landed by the
+  end-of-effort coherence pass deletes the superseded migration branch,
+  re-creates it from the moved tip, and repeats from the tool call, never
+  forcing the fast-forward); the migration-branch deletion (`git branch -d`)
+  after the fast-forward; the phase is closed (`tw_close setup-workflow`) and
+  the run ends on the integration branch.
 - Docs contract: no living page instructs the shell command. This is
   `remove-migration-cli`'s precondition.
 

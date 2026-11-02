@@ -11,7 +11,7 @@ title: docs/tasks
 - agent-facing-workflow-docs
 - build-eval-creator-skill
 - eval-scorer-feedback
-- migration-tool
+- migration-surface-polish
 
 ## Archived
 
@@ -40,6 +40,7 @@ title: docs/tasks
 - gate-tools-and-injection
 - grilling-visualizer
 - human-implementation-mode
+- migration-tool
 - overhaul-artifact-model
 - overhaul-dead-surface
 - overhaul-execution-skills

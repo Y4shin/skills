@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Add tw_migrate to the registered surface
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 size: m

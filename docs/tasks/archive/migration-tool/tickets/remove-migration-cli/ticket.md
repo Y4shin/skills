@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Remove the migration CLI from the package
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - reroute-migrate-branch

@@ -1,7 +1,7 @@
 ---
 type: map
 title: Run the schema migration through a disclosed tool
-status: stable
+status: deprecated
 ready_for_spec: true
 ---
 # Run the schema migration through a disclosed tool

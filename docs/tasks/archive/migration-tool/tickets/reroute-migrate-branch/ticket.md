@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Reroute the migrate branch through the tool, with the branch choreography
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - tw-migrate-tool

@@ -2,7 +2,7 @@
 type: task
 subtype: grilling
 title: Settle the non-goals and non-negotiable facts for running the schema migration through a disclosed tool
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 ---
