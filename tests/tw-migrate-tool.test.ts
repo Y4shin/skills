@@ -17,6 +17,8 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { createTools } from "../src/pi.js";
 import { ALWAYS_DECLARED, SKILL_REGISTRY } from "../src/disclosure.js";
 
+const PROJECT = process.cwd();
+
 // The migration must run in the extension host's own process: any spawn of a
 // Node child fails loudly here instead of silently re-creating the CLI shim's
 // spawn path (whose module-loading restriction is what the tool exists to
@@ -174,6 +176,14 @@ describe("tw_migrate disclosure", () => {
     // Exactly one phase declares it: setup-workflow's.
     const declaring = SKILL_REGISTRY.filter((entry) => entry.toolset.includes("tw_migrate"));
     expect(declaring.map((entry) => entry.name)).toEqual(["setup-workflow"]);
+  });
+
+  test("the registry entry's comment names the disclosed tool, not the shell", () => {
+    const source = readFileSync(join(PROJECT, "src", "disclosure.ts"), "utf-8");
+    const entry = source.slice(source.indexOf("name: \"setup-workflow\""), source.indexOf("name: \"wayfinder\""));
+    expect(entry).not.toMatch(/runs the migration CLI through the shell/);
+    expect(entry).toMatch(/tw_migrate/);
+    expect(entry).toMatch(/disclosed tool/);
   });
 });
 
