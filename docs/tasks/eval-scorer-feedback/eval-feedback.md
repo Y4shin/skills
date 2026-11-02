@@ -1,3 +1,9 @@
+---
+type: findings
+title: "Review: the operator-communication scoring harness and its calibration workflow"
+status: stable
+---
+
 # Evaluation System Improvements and Calibration Workflows
 
 ## Objective

@@ -9,6 +9,7 @@ title: docs/tasks
 ## Live
 
 - build-eval-creator-skill
+- eval-scorer-feedback
 
 ## Archived
 
