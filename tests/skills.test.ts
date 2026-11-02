@@ -1316,6 +1316,23 @@ describe("setup-workflow v5", () => {
     expect(content).toMatch(/rebuilt state\.yaml at schema_version 5/);
   });
 });
+// ─── Migration CLI removal (remove-migration-cli) ────────────────────
+
+describe("migration CLI removal (remove-migration-cli)", () => {
+  test("the three migration CLI files no longer exist", () => {
+    // The package ships exactly one migration executor: the disclosed
+    // `tw_migrate` tool. The argv wrapper, the shim script, and the shim's
+    // resolve hook are gone.
+    for (const gone of [
+      "src/migrate-cli.ts",
+      "skills/engineering/setup-workflow/scripts/migrate.mjs",
+      "skills/engineering/setup-workflow/scripts/ts-resolve.mjs",
+    ]) {
+      expect(existsSync(join(PROJECT, gone)), gone).toBe(false);
+    }
+  });
+});
+
 // ─── Skill-review wiring ─────────────────────────────────────────────
 
 describe("skill-review wiring", () => {
