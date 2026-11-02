@@ -119,6 +119,7 @@ const SKILL_FILES = [
   "skills/engineering/tdd/SKILL.md",
   "skills/engineering/code-review/SKILL.md",
   "skills/engineering/task-workflow-doctor/SKILL.md",
+  "skills/engineering/workflow-failure/SKILL.md",
   "skills/engineering/diagnosing-bugs/SKILL.md",
   "skills/engineering/codebase-design/SKILL.md",
   "skills/engineering/grilling/SKILL.md",
@@ -187,7 +188,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(30);
+    expect(pkg.pi.skills.length).toBe(31);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
@@ -527,7 +528,7 @@ describe("triage is retired (intake-skill)", () => {
     const pkg = JSON.parse(readFile("package.json"));
     expect(pkg.pi.skills).toContain("./skills/engineering/intake");
     expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
-    expect(pkg.pi.skills.length).toBe(30);
+    expect(pkg.pi.skills.length).toBe(31);
     expect(pkg.pi.skills.filter((s: string) => s.includes("intake") || s.includes("triage"))).toEqual([
       "./skills/engineering/intake",
     ]);
@@ -3325,6 +3326,11 @@ describe("workflow-failure skill (create-workflow-failure-skill)", () => {
 
   test("does not carry the canonical sentence: the ladder never references itself", () => {
     expect(content).not.toContain("invoke the `workflow-failure` skill before improvising");
+  });
+
+  test("is registered in the promoted set", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).toContain("./skills/engineering/workflow-failure");
   });
 
   test("ships the five-part report resource", () => {
