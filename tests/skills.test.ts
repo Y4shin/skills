@@ -3400,6 +3400,22 @@ describe("canonical reference coverage (reference-coverage-suite)", () => {
     }
     expect(offenders, "these agent profiles lost or paraphrased the canonical reference sentence").toEqual([]);
   });
+
+  test("the internals resource exists under the task-workflow-overview skill", () => {
+    expect(
+      existsSync(join(PROJECT, INTERNALS_RESOURCE)),
+      `${INTERNALS_RESOURCE} is missing: the internals reference was removed or renamed`,
+    ).toBe(true);
+  });
+
+  test("the overview and the ladder reference the internals resource by name", () => {
+    for (const rel of ["skills/engineering/task-workflow-overview/SKILL.md", "skills/engineering/workflow-failure/SKILL.md"]) {
+      expect(
+        readFile(rel),
+        `${rel} no longer references ${INTERNALS_RESOURCE_NAME} by name`,
+      ).toContain(INTERNALS_RESOURCE_NAME);
+    }
+  });
 });
 
 // ─── finalize-effort: the effort close (finalize-effort-skill) ──────
