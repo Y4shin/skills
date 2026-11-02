@@ -11,6 +11,7 @@ title: docs/tasks
 - agent-facing-workflow-docs
 - build-eval-creator-skill
 - eval-scorer-feedback
+- migration-tool
 
 ## Archived
 
