@@ -111,7 +111,7 @@ already on schema_version 5, nothing to do.
 
 ## After the run
 
-- Read the printed `MigrateReport` (its `to` field is `5`) and surface every
+- Read the returned `MigrateReport` (its `to` field is `5`) and surface every
   needs-human item.
 - Run the full test suite (`npm test` + `npm run typecheck`) and verify green.
 - Commit: `chore: migrate task-workflow schema 4 to 5`.

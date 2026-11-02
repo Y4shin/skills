@@ -132,6 +132,6 @@ does not own.
 
 ## After the run
 
-- Read the printed `MigrateReport` and surface every needs-human item.
+- Read the returned `MigrateReport` and surface every needs-human item.
 - Run the full test suite (`npm test` + `npm run typecheck`) and verify green.
 - Commit: `chore: migrate task-workflow schema 3 to 4`.
