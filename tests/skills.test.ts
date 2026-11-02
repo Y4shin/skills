@@ -3391,6 +3391,15 @@ describe("canonical reference coverage (reference-coverage-suite)", () => {
     expect(offenders, "these promoted SKILL.md files lost or paraphrased the canonical reference sentence").toEqual([]);
   });
 
+  test("the one exemption holds: workflow-failure does not carry the sentence", () => {
+    // The ladder never references itself; the presence loop above skips it,
+    // so the absence is asserted here rather than left implicit.
+    expect(
+      readFile("skills/engineering/workflow-failure/SKILL.md"),
+      "the ladder skill must not reference itself through the canonical sentence",
+    ).not.toContain(CANONICAL_REFERENCE_SENTENCE);
+  });
+
   test("every subagent profile carries the canonical sentence verbatim", () => {
     const offenders: string[] = [];
     for (const entry of readdirSync(join(PROJECT, "agents"), { withFileTypes: true })) {
