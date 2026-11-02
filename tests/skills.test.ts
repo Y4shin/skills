@@ -1132,6 +1132,10 @@ describe("setup-workflow / migration skill references", () => {
 
 describe("setup-workflow v5", () => {
   const skill = readFile("skills/engineering/setup-workflow/SKILL.md");
+  // The migrate branch is the section between its heading and the upgrade
+  // resources list; the dry-run/idempotence/corruption subsections live in it.
+  const migrateBranch = (text: string): string =>
+    text.slice(text.indexOf("## Migrate (old repo)"), text.indexOf("## Available upgrade resources"));
 
   test("keys detection on schema_version 5 as current", () => {
     expect(skill).toMatch(/current schema version is \*\*5\*\*/);
@@ -1151,8 +1155,14 @@ describe("setup-workflow v5", () => {
     expect(skill).toMatch(/no-op|already on schema_version/i);
   });
 
-  test("the migrate branch invokes the CLI", () => {
-    expect(skill).toMatch(/scripts\/migrate\.mjs/);
+  test("the migrate branch opens the phase and calls the disclosed tool, never a shell command", () => {
+    // The executor step opens the phase (the opener discloses the tool) and
+    // calls the tool; the migration is never a shell command.
+    const migrate = migrateBranch(skill);
+    expect(migrate).toMatch(/tw_open/);
+    expect(migrate).toMatch(/tw_migrate/);
+    expect(skill).not.toMatch(/scripts\/migrate\.mjs/);
+    expect(skill).not.toMatch(/node skills\/engineering\/setup-workflow\/scripts/);
   });
 
   test("the migrate branch mentions the MigrateReport", () => {

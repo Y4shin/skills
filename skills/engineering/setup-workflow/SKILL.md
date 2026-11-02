@@ -108,19 +108,20 @@ Scaffold everything a repo needs to use the task-workflow:
 > the *destination*. When an upgrade resource's steps diverge from the spec,
 > the spec records the deviation as the truth.
 
-The repo is on an older schema. Create a backup branch, then run the
-migration CLI, which owns the whole any-vintage-to-5 transformation:
+The repo is on an older schema. The migration runs through the disclosed
+`tw_migrate` tool, never a shell command:
 
 1. Create a backup git branch: `git checkout -b migrate/schema-${from}-to-5`.
    This is the safety net; the migration is reversible by checking out the
    previous branch.
 
-2. Run the migration CLI from the repo root:
-   ```
-   node skills/engineering/setup-workflow/scripts/migrate.mjs
-   ```
-   The shim spawns `src/migrate-cli.ts`, which runs `migrate()` over the
-   repo's own tree. It performs the effort-grouped layout reorganization,
+2. Run the migration through the disclosed tool. Open the phase first: call
+   `tw_open` with `{ skill: "setup-workflow", effort: "setup-workflow" }` (the
+   phase is not effort-scoped, so the effort argument is only the non-empty
+   label the opener requires; it names nothing and creates nothing), then
+   call `tw_migrate`. The tool performs the whole any-vintage-to-5
+   transformation in-process over the repo's own tree. It performs the
+   effort-grouped layout reorganization,
    the frontmatter unification, the aux backfill, the archive reshape, the
    state rebuild, the legacy slice reporting, the vendored-tree relocation,
    the schema-5 renames (`arch-spec.md` to `architecture.md`,
@@ -129,7 +130,7 @@ migration CLI, which owns the whole any-vintage-to-5 transformation:
    placeholder when missing), and the root index write, as one
    transformation.
 
-3. Read the printed **MigrateReport**. It lists every change and every item
+3. Read the returned **MigrateReport**. It lists every change and every item
    needing human eyes: normalized status/workflow_state combinations, legacy
    slice directories found (reported, never deleted), vendored trees moved
    outside the bundle, and unresolvable `blocked_by` references. Surface
@@ -149,7 +150,7 @@ migration CLI, which owns the whole any-vintage-to-5 transformation:
 
 6. Commit: `chore: migrate task-workflow schema ${from} to 5`.
 
-The ordered step lists the CLI executes are encoded in
+The ordered step lists the tool executes are encoded in
 `resources/upgrade-3-to-4.md` and `resources/upgrade-4-to-5.md`, tracing each
 step to the owning effort's spec.
 
