@@ -224,6 +224,22 @@ telemetry store through `tw_feedback`, which labels it `workflow` so it stays
 separable from every other kind of feedback.
 _Avoid_: friction log (that names one signal, not the channel)
 
+**Ladder**:
+The fixed escalation order a stuck run walks when the workflow misbehaves, a
+tool refuses, or a gate will not open: act on the refusal's own `reason` and
+`legal_next`, reorient from the shipped internals reference (or route to the
+doctor when the tree is the problem), record the snag as workflow feedback,
+then stop and escalate with the completion report. The workflow-failure skill
+owns it; the rungs never move, none is skipped, and escalation ends the run
+instead of blocking on a question.
+_Avoid_: retry loop (the ladder is ordered, not a loop), escalation path (names no order)
+
+**Escalation rung**:
+One numbered step of the ladder, four in all. The walk stops at the first rung
+that resolves the snag; rung four is the stop-and-escalate rung whose report
+ends the run.
+_Avoid_: phase (a gated workflow segment, not a ladder step), level (that is a dependency level of the graph)
+
 ## Relationships
 
 - An **effort** holds one **map**, zero or one specification, zero or one
@@ -252,6 +268,9 @@ _Avoid_: friction log (that names one signal, not the channel)
   pointer file left at its old location.
 - The **invocation model** splits the **promoted skills**, and a **skill bucket**
   decides what is promoted at all.
+- The **ladder** is the workflow-failure skill's behavior contract: each
+  **escalation rung** is one fixed step of it, and the last rung ends the run
+  with a **report**.
 
 ## Flagged ambiguities
 

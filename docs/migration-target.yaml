@@ -58,6 +58,7 @@ promoted_skills:
     - implement-ticket        # the implementation phase; retires implement-task
     - finalize-effort         # effort close, review triage, archive gate
     - task-workflow-doctor    # only what the tools cannot self-diagnose
+    - workflow-failure        # the escalation ladder; the one place that owns it
     # Discipline and vocabulary skills (unchanged in scope)
     - tdd
     - code-review

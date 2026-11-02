@@ -140,6 +140,7 @@ decision, or when you type it.
 - [task-workflow-overview](./skills/engineering/task-workflow-overview/SKILL.md)
 - [tdd](./skills/engineering/tdd/SKILL.md)
 - [wizard](./skills/engineering/wizard/SKILL.md)
+- [workflow-failure](./skills/engineering/workflow-failure/SKILL.md)
 - [to-questionnaire](./skills/productivity/to-questionnaire/SKILL.md)
 - [writing-for-agents](./skills/productivity/writing-for-agents/SKILL.md)
 - [operator-communication](./skills/productivity/operator-communication/SKILL.md)

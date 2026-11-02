@@ -41,6 +41,10 @@ Model- or user-reachable.
 - **[task-workflow-doctor](./task-workflow-doctor/SKILL.md)**: Diagnose what
   the tools cannot self-diagnose: a legacy or unversioned tree, missing
   scaffolding, a failed migration, an opener refusal.
+- **[workflow-failure](./workflow-failure/SKILL.md)**: The escalation ladder
+  for a stuck run: the refusal's own answer first, then reorientation or
+  doctor routing, a `tw_feedback` note, and the escalation report that ends
+  the run.
 - **[tdd](./tdd/SKILL.md)**: Test-driven development reference.
 - **[code-review](./code-review/SKILL.md)**: Two-axis review (Standards +
   Spec) of changes since a fixed point.
