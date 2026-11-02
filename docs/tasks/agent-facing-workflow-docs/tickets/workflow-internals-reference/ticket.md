@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Write the workflow internals reference
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - create-workflow-failure-skill
 size: l
@@ -67,3 +67,9 @@ touches that directory.
 
 - `create-workflow-failure-skill` (the router row and reference name a
   skill that must exist and ship).
+
+## Implementation notes
+
+Knowledge harvest: writing authoritative prose about shipped behavior is self-testing documentation if the content stays literal; the verifier diffed the tool-by-phase table verbatim against SKILL_REGISTRY, which is the quality bar this kind of reference needs (drift is caught by reading the source, not by a generator). Retired-vocabulary tests constrain what a resource may name: the artifact-tree section could not enumerate the retired slices/ and maps/ container shapes because the em-dash/vocabulary corpus bans the path strings; documenting legacy shapes requires reopening that ban deliberately, not working around it with near-spellings. Mermaid edge labels in this repo's shipped prose use the pipe form (-->|label|) for maximum parser compatibility.
+
+Landed: WORKFLOW-INTERNALS.md (364 lines) ships with the seven mandated sections in order, from the big picture through the escalation ladder in brief. The overview SKILL.md carries the canonical reference sentence verbatim directly after the operator-communication preamble, an Internals pointer in the main-flow section, and the Actions-table router row for /skill:workflow-failure. Full suite 1304 passed, 0 failed (the designed-red router test re-greened). Diagrams verified parseable mermaid both positive and negative. Two non-blocking findings recorded: the artifact-tree section cannot enumerate the retired slices/ and maps/ path shapes without reopening the retired-vocabulary ban (review finding), and mermaid edge labels use the pipe form for parser compatibility.
