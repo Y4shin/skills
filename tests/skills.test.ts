@@ -1204,6 +1204,25 @@ describe("setup-workflow v5", () => {
     expect(skill).toMatch(/okf_version/);
   });
 
+  test("the docs page matches the rerouted migrate branch", () => {
+    const page = readFile("docs/engineering/setup-workflow.md");
+    // Executor: the disclosed tool, never the shell command.
+    expect(page).toMatch(/tw_migrate/);
+    expect(page).not.toMatch(/scripts\/migrate\.mjs/);
+    expect(page).not.toMatch(/migration CLI/);
+    // Choreography: the migration branch, the fast-forward with the
+    // approval gate, the deletion, and the run ends on the integration
+    // branch.
+    expect(page).toMatch(/migrate\/schema/);
+    expect(page).toMatch(/integration branch/i);
+    expect(page).toMatch(/fast-forward/i);
+    expect(page).toMatch(/approval/i);
+    expect(page).toMatch(/delet/i);
+    // The dry run is the tool parameter.
+    expect(page).toMatch(/dryRun/);
+    expect(page).not.toMatch(/--dry-run/);
+  });
+
   test("references the upgrade-3-to-4 resource", () => {
     expect(skill).toMatch(/upgrade-3-to-4/);
   });
@@ -1604,6 +1623,10 @@ const SURVIVING_TOOLS = new Set([
   // lifecycle-hardening: the planning task's record writer, the named
   // replacement for the shell append the grilling resource needed.
   "tw_write_task_note",
+  // migration-tool (tw-migrate-tool): the migration executor the
+  // setup-workflow phase discloses; the skill prose and its docs page name
+  // it from reroute-migrate-branch on.
+  "tw_migrate",
   // tw-feedback: the labelled route into the telemetry store, disclosed by
   // every phase, so the feedback prose names it rather than submit_feedback.
   "tw_feedback",
