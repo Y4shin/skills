@@ -3255,6 +3255,13 @@ describe("task-workflow-doctor v5 (overview-doctor-rescope)", () => {
 
 // ─── workflow-failure: the escalation ladder (create-workflow-failure-skill) ──
 
+// The internals reference (workflow-internals-reference) and the surfaces
+// that must point at it. Shared by the workflow-failure block below and the
+// reference-coverage-suite further down: one constant names the resource, so
+// a rename or a deleted reference fails with the file named.
+const INTERNALS_RESOURCE = "skills/engineering/task-workflow-overview/WORKFLOW-INTERNALS.md";
+const INTERNALS_RESOURCE_NAME = "WORKFLOW-INTERNALS.md";
+
 // The one place that owns the workflow escalation ladder. The rung order is
 // the behavior contract the architecture document fixes: the refusal's own
 // answer first, reorientation or doctor routing second, the tw_feedback note
@@ -3285,7 +3292,7 @@ describe("workflow-failure skill (create-workflow-failure-skill)", () => {
     // Rung markers in order, each rung carrying its own contract.
     const rungs = [
       { marker: "1. ", words: ["reason", "legal_next"] },
-      { marker: "2. ", words: ["WORKFLOW-INTERNALS.md", "task-workflow-doctor"] },
+      { marker: "2. ", words: [INTERNALS_RESOURCE_NAME, "task-workflow-doctor"] },
       { marker: "3. ", words: ["tw_feedback"] },
       { marker: "4. ", words: ["resources/report.md", "ends the run"] },
     ];
@@ -3316,7 +3323,7 @@ describe("workflow-failure skill (create-workflow-failure-skill)", () => {
   });
 
   test("routes to the internals reference and the doctor, and records the snag with tw_feedback", () => {
-    expect(content).toContain("WORKFLOW-INTERNALS.md");
+    expect(content).toContain(INTERNALS_RESOURCE_NAME);
     expect(content).toContain("task-workflow-doctor");
     expect(content).toContain("tw_feedback");
     // The wrapper is the one workflow-feedback route; the store's own name
@@ -3324,9 +3331,9 @@ describe("workflow-failure skill (create-workflow-failure-skill)", () => {
     expect(content).not.toContain("submit_feedback");
   });
 
-  test("does not carry the canonical sentence: the ladder never references itself", () => {
-    expect(content).not.toContain("invoke the `workflow-failure` skill before improvising");
-  });
+  // The sentence exemption is pinned once, by the reference-coverage-suite
+  // below, which asserts both directions against the shared
+  // CANONICAL_REFERENCE_SENTENCE constant; this block pins the ladder itself.
 
   test("is registered in the promoted set", () => {
     const pkg = JSON.parse(readFile("package.json"));
@@ -3369,11 +3376,10 @@ describe("workflow-failure skill (create-workflow-failure-skill)", () => {
 const CANONICAL_REFERENCE_SENTENCE =
   "If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.";
 
-// The internals reference (workflow-internals-reference) and the surfaces
-// that must point at it. Skinned by exact path and name, so a rename or a
-// deleted reference fails with the file named.
-const INTERNALS_RESOURCE = "skills/engineering/task-workflow-overview/WORKFLOW-INTERNALS.md";
-const INTERNALS_RESOURCE_NAME = "WORKFLOW-INTERNALS.md";
+// Placement is position-heterogeneous by design (the architecture fixes the
+// sentence, not its slot): after the operator-communication preamble where
+// one exists, else at the top of the body. The suite pins verbatim presence,
+// never position, so do not "normalize" placements across files.
 
 describe("canonical reference coverage (reference-coverage-suite)", () => {
   // The manifest is the promoted set (promoted-set seam): a newly promoted
