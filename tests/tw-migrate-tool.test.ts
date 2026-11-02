@@ -121,6 +121,37 @@ describe("tw_migrate through the public tool factory", () => {
     expect(snapshot(dir)).toEqual(before);
   });
 
+  test("a needs-human fixture yields a report that separates the items from the changes", async () => {
+    const dir = tracked(makeV3TreeWithSlices);
+    const tools = createTools();
+    const result = (await tools.tw_migrate.execute({}, { directory: dir })) as ToolResult;
+
+    expect(result.text).toBe(REPORT_NEEDS_HUMAN);
+    // The two sections are distinct: the change lines under "change(s)", the
+    // slice directory under "needing human eyes".
+    const changes = result.text.slice(0, result.text.indexOf(" item(s) needing human eyes"));
+    expect(changes).toContain("5 change(s):");
+    expect(changes).toContain("move docs/tasks/effort/tickets/effort-task/ticket.md");
+    expect(changes).not.toContain("slice-dir");
+    const human = result.text.slice(result.text.indexOf(" item(s) needing human eyes"));
+    expect(human).toContain("slice-dir docs/tasks/login/slices");
+    // The reported slice file is left in place, byte for byte.
+    expect(readFileSync(join(dir, "docs/tasks/login/slices/1-do-thing.md"), "utf-8")).toMatch(/^kind: slice/);
+  });
+
+  test("an already-current tree returns the no-op answer and nothing is written", async () => {
+    const dir = tracked(makeV3Tree);
+    const tools = createTools();
+    // First run migrates; the tree is then already current.
+    await tools.tw_migrate.execute({}, { directory: dir });
+    const before = snapshot(dir);
+
+    const result = (await tools.tw_migrate.execute({}, { directory: dir })) as ToolResult;
+    expect(result.text).toBe(REPORT_NOOP);
+    expect(result.details.noop).toBe(true);
+    expect(snapshot(dir)).toEqual(before);
+  });
+
   test("migrates an old-vintage tree and returns the frozen report", async () => {
     const dir = tracked(makeV3Tree);
     const tools = createTools();
