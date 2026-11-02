@@ -23,8 +23,10 @@ The opener is the gate: it checks the effort's work state (ticket generation
 ran, work remains), the architecture document (a missing or unstable one is
 refused here and is never drafted below), and the target ticket's readiness
 (a ticket that is done, blocked, or not yet ready is refused with the legal
-next calls). It activates the toolset only when they pass. Work only through
-the tools the opener discloses, and close the phase with
+next calls). It activates the toolset only when they pass. Work only through the tools the
+opener discloses. When a step genuinely needs a tool this phase does not
+disclose, call `tw_request_tool` and let the operator decide: never close the
+phase early to reopen another one for its tools. Close the phase with
 `tw_close implement-ticket` when the run releases.
 
 The opener reads `docs/tasks/<effort>/architecture.md` (or the legacy

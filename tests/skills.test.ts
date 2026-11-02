@@ -450,6 +450,14 @@ describe("intake skill (intake-skill)", () => {
     expect(content).toMatch(/tw_add_ticket/);
   });
 
+  test("the named creator owns the map and the root index registration", () => {
+    // Registration belongs to the front door that creates the effort, so the
+    // detail lives here rather than in the planning phase's prose.
+    expect(content).toContain("docs/tasks/index.md");
+    expect(content).toMatch(/## Live/);
+    expect(content).toMatch(/sorted/i);
+  });
+
   test("records the intake facts", () => {
     expect(content).toMatch(/raw request/i);
     expect(content).toMatch(/destination/i);
@@ -1550,12 +1558,18 @@ const SURVIVING_TOOLS = new Set([
   // end-of-effort-reconciliation: the ticket doc's implementation-notes
   // writer, the named replacement for the built-in edit on a ticket.
   "tw_write_ticket_note",
+  // intake-skill: task creation is the front door's and the planning phase's
+  // shared tool, and the planning prose names it for the fog promotion.
+  "tw_add_task",
   // lifecycle-hardening: the planning task's record writer, the named
   // replacement for the shell append the grilling resource needed.
   "tw_write_task_note",
   // tw-feedback: the labelled route into the telemetry store, disclosed by
   // every phase, so the feedback prose names it rather than submit_feedback.
   "tw_feedback",
+  // request-tool-approval: the sanctioned route to a tool a phase does not
+  // disclose. Always declared, so phase prose names it where it states the rule.
+  "tw_request_tool",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -1659,10 +1673,13 @@ describe("wayfinder v4 (overhaul-planning-skills)", () => {
     expect(content).toContain("tw_state_set task <task-slug>");
   });
 
-  test("regenerates the root index on map creation", () => {
-    expect(content).toContain("docs/tasks/index.md");
-    expect(content).toMatch(/## Live/);
-    expect(content).toMatch(/sorted/i);
+  test("names intake as the owner of the effort and the root index", () => {
+    // The front door creates the map and registers the effort; the planning
+    // phase fills the map. Prose that tells wayfinder to create or register an
+    // effort sends it to a tool it does not hold (and should not hold).
+    expect(content).toContain("`intake` creates the");
+    expect(content).not.toMatch(/Register the effort in the root index/);
+    expect(content).not.toMatch(/Create the map at/);
   });
 
   test("frontier prose runs tw_frontier over the effort", () => {

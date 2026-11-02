@@ -22,8 +22,9 @@ import {
   ALWAYS_DECLARED,
   CLOSER,
   SKILL_REGISTRY,
+  assertDerivableOpenSets,
   openSkillsIn,
-  signatureToolOf,
+  privateToolOf,
 } from "../src/disclosure.js";
 import {
   MAP_SECTION_NON_GOALS,
@@ -223,14 +224,36 @@ afterAll(() => {
 });
 
 /** A tool context with an in-memory active set standing in for the session. */
-function disclosureCtx(active: string[]) {
+function disclosureCtx(active: string[], extra: Record<string, unknown> = {}) {
   return {
     directory: repo,
     getActiveTools: () => [...active],
     setActiveTools: (names: string[]) => {
       active.splice(0, active.length, ...names);
     },
+    ...extra,
   };
+}
+
+/**
+ * A context that can answer a tool request: the operator's decision, the
+ * nested calls it recorded, and the sibling feedback tool's schema so the
+ * row takes the `source` shape.
+ */
+function requestCtx(
+  active: string[],
+  decision: boolean | undefined,
+  executed: Array<{ name: string; args: Record<string, unknown> }>,
+) {
+  return disclosureCtx(active, {
+    hasUI: decision !== undefined,
+    ...(decision === undefined ? {} : { confirm: async () => decision }),
+    executeTool: async (name: string, args: unknown) => {
+      executed.push({ name, args: (args ?? {}) as Record<string, unknown> });
+      return { isError: false };
+    },
+    tools: [{ name: "submit_feedback", parameters: { properties: { source: {}, kind: {}, data: {} } } }],
+  });
 }
 
 interface ToolResult {
@@ -238,6 +261,9 @@ interface ToolResult {
   details: {
     opened?: boolean;
     closed?: boolean;
+    granted?: boolean;
+    tool?: string;
+    removed?: string[];
     reason?: string;
     legal_next?: string[];
     open?: string[];
@@ -681,6 +707,137 @@ describe("the opener gate", () => {
   });
 });
 
+// ─── Requesting a tool a phase does not disclose ──────────────────────────────
+
+describe("tw_request_tool", () => {
+  test("grants on approval, records the outcome as feedback, and the next close revokes it", async () => {
+    const tools = createTools();
+    const active: string[] = [...ALWAYS_DECLARED];
+    const executed: Array<{ name: string; args: Record<string, unknown> }> = [];
+    const ctx = requestCtx(active, true, executed);
+    await tools.tw_open.execute({ skill: "wayfinder", effort: "ready-effort" }, ctx);
+
+    const granted = (await tools.tw_request_tool.execute(
+      { tool: "tw_add_ticket", reason: "record the follow-up this phase found" },
+      ctx,
+    )) as ToolResult;
+    expect(granted.details.granted).toBe(true);
+    expect(granted.details.tool).toBe("tw_add_ticket");
+    expect(active).toContain("tw_add_ticket");
+
+    const feedback = executed.filter((call) => call.name === "submit_feedback");
+    expect(feedback).toHaveLength(1);
+    expect(feedback[0].args.kind).toBe("friction");
+    expect(JSON.stringify(feedback[0].args.data)).toContain("granted");
+
+    // The grant is scoped to the phase: closing it takes the tool back.
+    const closed = (await tools.tw_close.execute({ skill: "wayfinder" }, ctx)) as ToolResult;
+    expect(closed.details.removed).toContain("tw_add_ticket");
+    expect(active).not.toContain("tw_add_ticket");
+  });
+
+  test("leaves the tool set alone when the operator denies, and records the denial", async () => {
+    const tools = createTools();
+    const active: string[] = [...ALWAYS_DECLARED];
+    const executed: Array<{ name: string; args: Record<string, unknown> }> = [];
+    const ctx = requestCtx(active, false, executed);
+    await tools.tw_open.execute({ skill: "wayfinder", effort: "ready-effort" }, ctx);
+    const before = [...active];
+
+    const denied = (await tools.tw_request_tool.execute(
+      { tool: "tw_add_ticket", reason: "record the follow-up this phase found" },
+      ctx,
+    )) as ToolResult;
+    expect(denied.details.granted).toBe(false);
+    expect(denied.details.reason).toBe("operator denied");
+    expect(active).toEqual(before);
+    const feedback = executed.filter((call) => call.name === "submit_feedback");
+    expect(feedback).toHaveLength(1);
+    expect(JSON.stringify(feedback[0].args.data)).toContain("denied");
+  });
+
+  test("refuses with the legal next call when there is nothing to grant to", async () => {
+    const tools = createTools();
+    const ctx = requestCtx([...ALWAYS_DECLARED], true, []);
+    const result = (await tools.tw_request_tool.execute(
+      { tool: "tw_add_ticket", reason: "no phase is open" },
+      ctx,
+    )) as ToolResult;
+    expect(result.details.granted).toBe(false);
+    expect(result.details.reason).toBe("no open skill");
+    expect(result.details.legal_next).toEqual(["tw_open"]);
+  });
+
+  test("refuses an unknown tool, an always-declared tool, and one already active", async () => {
+    const tools = createTools();
+    const active: string[] = [...ALWAYS_DECLARED];
+    const ctx = requestCtx(active, true, []);
+    await tools.tw_open.execute({ skill: "wayfinder", effort: "ready-effort" }, ctx);
+
+    const unknown = (await tools.tw_request_tool.execute(
+      { tool: "bash", reason: "read a file" },
+      ctx,
+    )) as ToolResult;
+    expect(unknown.details.reason).toBe("unknown tool");
+
+    const declared = (await tools.tw_request_tool.execute(
+      { tool: "tw_open", reason: "open another phase" },
+      ctx,
+    )) as ToolResult;
+    expect(declared.details.reason).toBe("already declared");
+
+    const present = (await tools.tw_request_tool.execute(
+      { tool: "tw_add_task", reason: "add a planning task" },
+      ctx,
+    )) as ToolResult;
+    expect(present.details.reason).toBe("already active");
+    expect(active).not.toContain("tw_add_ticket");
+  });
+
+  test("refuses a grant that would make another skill look open", async () => {
+    // setup-workflow declares tw_context plus three tools wayfinder already
+    // has, so granting it would complete that toolset and derive an open skill
+    // nobody opened. The open set stays exact, and the refusal names the skill.
+    const tools = createTools();
+    const active: string[] = [...ALWAYS_DECLARED];
+    const executed: Array<{ name: string; args: Record<string, unknown> }> = [];
+    const ctx = requestCtx(active, true, executed);
+    await tools.tw_open.execute({ skill: "wayfinder", effort: "ready-effort" }, ctx);
+    const before = [...active];
+
+    const result = (await tools.tw_request_tool.execute(
+      { tool: "tw_context", reason: "read the project profile" },
+      ctx,
+    )) as ToolResult;
+    expect(result.details.granted).toBe(false);
+    expect(result.details.reason).toBe("would open another skill");
+    expect(active).toEqual(before);
+    const feedback = executed.filter((call) => call.name === "submit_feedback");
+    expect(JSON.stringify(feedback[0]?.args.data)).toContain("blocked");
+    expect(JSON.stringify(feedback[0]?.args.data)).toContain("setup-workflow");
+  });
+
+  test("refuses without an interactive UI and records why, instead of assuming a decision", async () => {
+    const tools = createTools();
+    const active: string[] = [...ALWAYS_DECLARED];
+    const executed: Array<{ name: string; args: Record<string, unknown> }> = [];
+    const ctx = requestCtx(active, undefined, executed);
+    await tools.tw_open.execute({ skill: "wayfinder", effort: "ready-effort" }, ctx);
+    const before = [...active];
+
+    const result = (await tools.tw_request_tool.execute(
+      { tool: "tw_add_ticket", reason: "record the follow-up this phase found" },
+      ctx,
+    )) as ToolResult;
+    expect(result.details.granted).toBe(false);
+    expect(result.details.reason).toBe("no interactive UI");
+    expect(active).toEqual(before);
+    const feedback = executed.filter((call) => call.name === "submit_feedback");
+    expect(feedback).toHaveLength(1);
+    expect(JSON.stringify(feedback[0].args.data)).toContain("unavailable");
+  });
+});
+
 // ─── The phase-to-toolset registry ─────────────────────────────────────────────
 
 describe("the phase-to-toolset registry", () => {
@@ -690,6 +847,7 @@ describe("the phase-to-toolset registry", () => {
       intake: ["tw_add_task", "tw_add_ticket", "tw_create_effort", "tw_feedback", "tw_get", "tw_list", "tw_state", "tw_state_set"],
       "setup-workflow": ["tw_context", "tw_feedback", "tw_get", "tw_list"],
       wayfinder: [
+        "tw_add_task",
         "tw_dependency_levels",
         "tw_feedback",
         "tw_finalize_map",
@@ -787,17 +945,19 @@ describe("the phase-to-toolset registry", () => {
     // as the nested discipline's tree read.
     const wayfinder = SKILL_REGISTRY.find((e) => e.name === "wayfinder")!;
     expect(wayfinder.toolset).toContain("tw_show");
-    // The corrected claim: skill-creator's signature tool is one of its own
-    // script tools, not the shared tree read.
+    // The bundled script tools stay the discipline's own: no other phase
+    // declares them.
     const creator = SKILL_REGISTRY.find((e) => e.name === "skill-creator")!;
-    expect(signatureToolOf(creator)).toMatch(/^skill_/);
+    expect(creator.toolset).toContain("skill_validate");
+    expect(privateToolOf(creator)).toMatch(/^skill_/);
   });
 
-  test("finalize-effort's private signature tool stays the archive move", () => {
-    // The open-set derivation keys on the signature tool: the review writer
-    // joining the toolset must not rotate it away from tw_archive_effort.
+  test("the archive move stays unique to finalize-effort", () => {
+    // The effort close is the only phase that may archive, so its writer
+    // cannot drift into another toolset unnoticed.
     const entry = SKILL_REGISTRY.find((e) => e.name === "finalize-effort")!;
-    expect(signatureToolOf(entry)).toBe("tw_archive_effort");
+    expect(entry.toolset).toContain("tw_archive_effort");
+    expect(privateToolOf(entry)).toBe("tw_archive_effort");
   });
 
   test("a phase that sets a state pointer can read it back", () => {
@@ -810,15 +970,22 @@ describe("the phase-to-toolset registry", () => {
     }
   });
 
-  test("keeps one private signature tool per skill, so the open-set derivation stays exact", () => {
+  test("the open set derives from whole toolsets, so a shared tool opens nothing extra", () => {
+    expect(() => assertDerivableOpenSets()).not.toThrow();
     for (const entry of SKILL_REGISTRY) {
-      expect(() => signatureToolOf(entry)).not.toThrow();
-      // The derivation is exact: the signature tool is active precisely when
-      // the skill is open.
       const active = [...entry.toolset, CLOSER];
-      expect(openSkillsIn(active).has(entry.name), `${entry.name} derives from its signature tool`).toBe(true);
+      // A toolset derives as open when it is active, and a shared tool alone
+      // never opens the phase that also declares it.
+      expect(openSkillsIn(active).has(entry.name), `${entry.name} derives from its own toolset`).toBe(true);
     }
     expect(openSkillsIn([...ALWAYS_DECLARED]).size).toBe(0);
+    // The regression: tw_add_task is intake's creator and wayfinder's charter
+    // tool, so it is shared. Each derives as itself and only itself.
+    for (const name of ["intake", "wayfinder"]) {
+      const entry = SKILL_REGISTRY.find((e) => e.name === name)!;
+      expect(entry.toolset, `${name} keeps task creation`).toContain("tw_add_task");
+      expect(openSkillsIn([...entry.toolset, CLOSER])).toEqual(new Set([name]));
+    }
   });
 
   test("the opener serves the registry: a legal open discloses exactly the entry's toolset plus the closer", async () => {
@@ -971,6 +1138,46 @@ describe("the intake creation tools", () => {
     expect(art.status).toBe("stable");
     expect(art.workflow_state).toBe("ready");
     expect(art.blocked_by).toEqual([]);
+  });
+
+  test("tw_add_task writes the blocked_by edges it was given", async () => {
+    const out = (await tools.tw_add_task.execute(
+      {
+        effort: "fresh-request",
+        slug: "research-the-open-question",
+        subtype: "research",
+        title: "Research the open question",
+        blocked_by: ["grill-non-negotiables"],
+      },
+      { directory: repo },
+    )) as unknown as string;
+    expect(out).toContain("task.md");
+    const taskPath = join(repo, "docs", "tasks", "fresh-request", "tasks", "research-the-open-question", "task.md");
+    const { art } = parseArtifactFile(taskPath);
+    expect(art.blocked_by).toEqual(["grill-non-negotiables"]);
+    expect(art.workflow_state).toBe("ready");
+  });
+
+  test("tw_add_task refuses a dangling edge, a self edge, and an edge that crosses the kind", async () => {
+    await expect(
+      tools.tw_add_task.execute(
+        { effort: "fresh-request", slug: "orphan-edge", subtype: "research", title: "Orphan edge", blocked_by: ["nope"] },
+        { directory: repo },
+      ),
+    ).rejects.toThrow(/not an existing planning task/);
+    await expect(
+      tools.tw_add_task.execute(
+        { effort: "fresh-request", slug: "self-edge", subtype: "research", title: "Self edge", blocked_by: ["self-edge"] },
+        { directory: repo },
+      ),
+    ).rejects.toThrow(/cannot block on itself/);
+    // 'stuck' is a ticket of gated-effort, so the edge crosses the kind.
+    await expect(
+      tools.tw_add_task.execute(
+        { effort: "gated-effort", slug: "cross-kind-edge", subtype: "research", title: "Cross kind", blocked_by: ["stuck"] },
+        { directory: repo },
+      ),
+    ).rejects.toThrow(/not an existing planning task/);
   });
 
   test("tw_add_task refuses a planning subtype outside the schema and an unsafe slug", async () => {

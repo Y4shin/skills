@@ -14,8 +14,12 @@
 
 import { Type, type TSchema } from "typebox";
 
-/** Tools declared in every state, independent of the open set. */
-export const ALWAYS_DECLARED = ["tw_open", "tw_next", "tw_close"] as const;
+/**
+ * Tools declared in every state, independent of the open set. The tool
+ * requester rides along because a phase can need a tool its own toolset does
+ * not disclose, and asking for it must never depend on having it.
+ */
+export const ALWAYS_DECLARED = ["tw_open", "tw_next", "tw_request_tool", "tw_close"] as const;
 
 /**
  * The closer: declared in every state too, so a session that lost track of its
@@ -52,14 +56,16 @@ export interface SkillEntry {
  * the single source of the phase toolsets and of the opener's preconditions
  * (which gate applies); the gate evaluation itself reads the artifact tree in
  * src/pi.ts through the art.ts/graph.ts seams. The toolsets below disclose
- * every registered workflow tool exactly where the workflow uses it, and
- * every entry keeps one private signature tool, which the open-set
- * derivation requires (see signatureToolOf).
+ * every registered workflow tool exactly where the workflow uses it. A skill
+ * is open when every tool of its toolset is active: that is the literal
+ * definition, and it lets two phases share a tool (the planning phase and the
+ * front door share task creation, for instance) instead of forcing a private
+ * tool per entry. `assertDerivableOpenSets` guards the containment property
+ * that derivation needs.
  *
  * `tw_feedback` is the one cross-phase tool: the workflow-feedback wrapper is
  * disclosed by every phase, because friction in any phase is worth recording
- * and a phase that cannot declare it cannot report it. It is shared, like
- * tw_show, so it is never a signature tool.
+ * and a phase that cannot declare it cannot report it.
  */
 export const SKILL_REGISTRY: SkillEntry[] = [
   {
@@ -97,11 +103,15 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     name: "wayfinder",
     takesTarget: false,
     gate: "effort",
-    // The planning phase: works the planning frontier, writes results back
-    // through the map-section writer, marks planning tasks done and blocked,
-    // records deferred work in the out-of-scope KB, and runs the reconcile,
-    // which sets ready_for_spec through tw_finalize_map. tw_write_section is
-    // its signature tool. tw_state_set and tw_dependency_levels are disclosed
+    // The planning phase: creates planning tasks (its Boundary names task
+    // creation, and the reconcile promotes each fog line into one), works the
+    // planning frontier, writes results back through the map-section writer,
+    // marks planning tasks done and blocked, records deferred work in the
+    // out-of-scope KB, and runs the reconcile, which sets ready_for_spec
+    // through tw_finalize_map. tw_add_task is disclosed for exactly that,
+    // including its blocked_by edges at creation, so a graph never needs a
+    // second wiring pass; feature and bug creation stays to-tickets'.
+    // tw_state_set and tw_dependency_levels are disclosed
     // because the phase sets the state pointers and layers the effort itself,
     // and tw_state because a phase that writes a pointer must be able to read
     // both back.
@@ -111,6 +121,7 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // the recorded artifacts behind it.
     toolset: [
       "tw_write_section",
+      "tw_add_task",
       "tw_write_task_note",
       "tw_finalize_map",
       "tw_frontier",
@@ -264,28 +275,60 @@ export function skillEntry(name: string): SkillEntry | undefined {
 }
 
 /**
- * A tool only this skill's toolset contains. The open-set derivation keys on
- * signature tools, so a skill is open exactly when its signature tool is
- * active; that keeps the derivation exact even when toolsets share tools.
- * Every skill must have one: the first derivation over a registry that
- * breaks the rule throws and names the skill, so the gap cannot pass
- * silently.
+ * A tool only this skill's toolset contains, or undefined when every tool it
+ * declares is shared. Kept for the uniqueness claims a test makes about one
+ * writer; the open-set derivation does not need it.
  */
-export function signatureToolOf(entry: SkillEntry): string {
-  const others = new Set<string>();
-  for (const skill of SKILL_REGISTRY) {
-    if (skill.name === entry.name) continue;
-    for (const tool of skill.toolset) others.add(tool);
-  }
-  const signature = entry.toolset.find((tool) => !others.has(tool));
-  if (signature === undefined) {
-    throw new Error(
-      `disclosure registry: skill '${entry.name}' has no private tool; ` +
-        `every skill's toolset needs a tool no other skill's toolset contains`,
-    );
-  }
-  return signature;
+export function privateToolOf(entry: SkillEntry, tables: readonly SkillEntry[] = SKILL_REGISTRY): string | undefined {
+  return entry.toolset.find(
+    (tool) => !tables.some((other) => other.name !== entry.name && other.toolset.includes(tool)),
+  );
 }
+
+/**
+ * The containment property the open-set derivation needs, checked once per
+ * process at the first derivation.
+ *
+ * A skill derives as open when every tool of its toolset is active. That is
+ * exact only while no toolset sits inside another skill's toolset, and no
+ * toolset sits inside the union of two skills that can be open at the same
+ * time (which includes the nested discipline, whose `conflicts` list is
+ * empty). Either shape would make a closed skill look open, so this refuses
+ * loudly rather than deriving a wrong open set.
+ */
+export function assertDerivableOpenSets(tables: readonly SkillEntry[] = SKILL_REGISTRY): void {
+  const covers = (outer: Iterable<string>, inner: readonly string[]): boolean => {
+    const set = new Set(outer);
+    return inner.every((tool) => set.has(tool));
+  };
+  for (const skill of tables) {
+    for (const other of tables) {
+      if (other.name !== skill.name && covers(other.toolset, skill.toolset)) {
+        throw new Error(
+          `disclosure registry: '${other.name}' declares every tool of '${skill.name}', so the open-set ` +
+            `derivation cannot tell them apart`,
+        );
+      }
+    }
+    for (let i = 0; i < tables.length; i++) {
+      for (let k = i + 1; k < tables.length; k++) {
+        const a = tables[i];
+        const b = tables[k];
+        if (a.name === skill.name || b.name === skill.name) continue;
+        if (a.conflicts.includes(b.name) || b.conflicts.includes(a.name)) continue;
+        if (covers([...a.toolset, ...b.toolset], skill.toolset)) {
+          throw new Error(
+            `disclosure registry: '${a.name}' and '${b.name}' can be open together, and together they declare ` +
+              `every tool of '${skill.name}', so the derivation cannot tell them apart`,
+          );
+        }
+      }
+    }
+  }
+}
+
+/** Memo: the containment guard runs once, at the first derivation. */
+let registryChecked = false;
 
 /**
  * The open skills implied by an active tool set. Stateless on purpose: the
@@ -294,11 +337,15 @@ export function signatureToolOf(entry: SkillEntry): string {
  * free and the two can never disagree.
  */
 export function openSkillsIn(active: Iterable<string>): Set<string> {
+  if (!registryChecked) {
+    assertDerivableOpenSets();
+    registryChecked = true;
+  }
   const names = new Set(active);
   for (const tool of OPEN_CLOSE_TOOLS) names.delete(tool);
   const open = new Set<string>();
   for (const skill of SKILL_REGISTRY) {
-    if (names.has(signatureToolOf(skill))) open.add(skill.name);
+    if (skill.toolset.every((tool) => names.has(tool))) open.add(skill.name);
   }
   return open;
 }

@@ -49,6 +49,7 @@ const GATED_NAMES = [
   "skill_validate",
   "tw_open",
   "tw_next",
+  "tw_request_tool",
   "tw_close",
   "tw_show",
   "tw_get",
@@ -589,20 +590,20 @@ describe("factory gate", () => {
   });
 
   describe("disclosure registration", () => {
-    test("the dispatcher trio registers always-declared; every other workflow tool registers gated", () => {
+    test("the dispatcher quartet registers always-declared; every other workflow tool registers gated", () => {
       setupPersonalRepo();
       const stub = createStub();
       factory(stub);
 
       const byName = new Map(stub.tools.map((t: any) => [t.name, t]));
-      for (const name of ["tw_open", "tw_next", "tw_close"]) {
+      for (const name of ["tw_open", "tw_next", "tw_request_tool", "tw_close"]) {
         expect(byName.get(name)?.defaultActive, `${name} is declared in every state`).toBe(true);
         expect(byName.get(name)?.exposure, `${name} is direct`).toBe("direct");
       }
       // The bypass-free combination the prototype proved: direct (never
       // reachable through tool_search) and off until the opener activates it.
       for (const name of GATED_NAMES.filter(
-        (n) => n.startsWith("tw_") && !["tw_open", "tw_next", "tw_close"].includes(n),
+        (n) => n.startsWith("tw_") && !["tw_open", "tw_next", "tw_request_tool", "tw_close"].includes(n),
       )) {
         expect(byName.get(name)?.defaultActive, `${name} is off until an opener activates it`).toBe(false);
         expect(byName.get(name)?.exposure, `${name} is direct, never deferred`).toBe("direct");

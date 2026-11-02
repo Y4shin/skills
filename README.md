@@ -57,6 +57,13 @@ Each phase opens with `tw_open` and closes with `tw_close`. The tool refuses a
 phase that opens out of order, and it names the correct next phase. Run
 `tw_next` when you are not sure what comes next.
 
+When a phase needs a tool its own toolset does not disclose, it calls
+`tw_request_tool` with the tool and a reason. That puts a confirmation in
+front of you: approval adds the tool for the rest of the phase, and the next
+`tw_close` takes it back. Denials and grants are both recorded as workflow
+feedback, so a phase that keeps asking for the same tool shows up in the store
+instead of quietly working around the toolset.
+
 Keep the planning phases (intake to to-tickets) in one session. Each
 `/skill:implement-ticket` run starts with a new context.
 

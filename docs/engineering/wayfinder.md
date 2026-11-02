@@ -2,8 +2,8 @@
 
 ## What it does
 
-`wayfinder` is the single planning-phase skill. It creates the effort's map
-and planning tasks, then works the planning frontier one bounded pass at a
+`wayfinder` is the single planning-phase skill. It creates the effort's
+planning tasks, then works the planning frontier one bounded pass at a
 time: each `/skill:wayfinder` invocation snapshots the frontier once, works
 the non-grilling ready tasks, runs at most one grilling, and releases. It
 never rolls into the next frontier. Planning work is serialized per kind:
@@ -13,15 +13,20 @@ concurrently. It produces **decisions, not deliverables**: when the pull to
 time to hand off.
 
 The map lives at `docs/tasks/<effort>/map.md` and carries Destination,
-Constraints, Decisions so far, Fog, Non-goals, and Non-negotiable facts. Its
-planning tasks live at `docs/tasks/<effort>/tasks/<task-slug>/task.md`; the
-directory is the registration, there is no list to update. Each task carries
-one planning subtype: `research` (gather high-trust evidence), `prototype`
-(throwaway code answering one design question), `grilling` (resolve a human
-decision through conversation), or `manual` (a human or environment
-prerequisite). Research and prototype delegate to their standalone skills;
-grilling delegates to the `grilling` skill; manual runs here. The per-subtype
-resources live at `skills/engineering/wayfinder/resources/`.
+Constraints, Decisions so far, Fog, Non-goals, and Non-negotiable facts.
+`intake` creates it and registers the effort in the root index; wayfinder
+fills it and never creates or registers an effort.
+
+Its planning tasks live at `docs/tasks/<effort>/tasks/<task-slug>/task.md`.
+The directory is the registration, there is no list to update, and
+`tw_add_task` creates one with its `blocked_by` edges at creation, so the
+graph never needs a second wiring pass. Each task carries one planning
+subtype: `research` (gather high-trust evidence), `prototype` (throwaway code
+answering one design question), `grilling` (resolve a human decision through
+conversation), or `manual` (a human or environment prerequisite). Research
+and prototype delegate to their standalone skills; grilling delegates to the
+`grilling` skill; manual runs here. The per-subtype resources live at
+`skills/engineering/wayfinder/resources/`.
 
 Every planning task writes its own results back to the map through
 `tw_write_section` as its final step, before it marks itself done with
@@ -50,7 +55,8 @@ phase), and for implementation work already ticketed.
 
 **Why does every map start with a grilling session?**
 The first grilling establishes destination, constraints, scope boundary, and
-the first precise questions before anything is written. A small idea may
+the first precise questions before any planning task is created beyond the
+seeded one. A small idea may
 produce one task, but it still gets the alignment pass, and it counts as that
 pass's one grilling.
 

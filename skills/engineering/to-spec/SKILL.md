@@ -23,8 +23,10 @@ Every run starts by opening the skill: call `tw_open` with
 directory name under `docs/tasks/`). The opener is the gate: it checks the
 phase preconditions against the artifact tree, refuses with the legal next
 calls when they fail, and activates the toolset only when they pass. Work only
-through the tools the opener discloses, and close the phase with
-`tw_close to-spec` when it releases.
+through the tools the opener discloses. When a step genuinely needs a tool this
+phase does not disclose, call `tw_request_tool` and let the operator decide:
+never close the phase early to reopen another one for its tools. Close the
+phase with `tw_close to-spec` when it releases.
 
 ## Synthesize from the settled record
 

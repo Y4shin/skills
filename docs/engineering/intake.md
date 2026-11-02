@@ -11,13 +11,13 @@ One intake run runs a bounded, time-boxed round of sanity checks (active
 and archived efforts for a duplicate or fold-in target, related efforts for
 links, the feature-versus-bug classification, and a capped reach into the
 code only when genuinely useful), asks only the facts it cannot derive, and
-always creates the effort through the named transition tools: the map with
-`## Non-goals` and `## Non-negotiable facts` seeded as empty placeholders,
-and exactly one non-negotiables grilling task that Wayfinder later runs to
-determine the effort's non-goals and its non-negotiable facts (including
-the effort-level success test). A bug report becomes an effort with a
-`subtype: bug` implementation ticket inside it. "Don't know" is a valid
-constraint answer.
+always creates the effort through the named transition tools: the map, with
+`## Non-goals` and `## Non-negotiable facts` seeded as empty placeholders and
+the effort registered in `docs/tasks/index.md`, plus exactly one
+non-negotiables grilling task that Wayfinder later runs to determine the
+effort's non-goals and its non-negotiable facts (including the effort-level
+success test). A bug report becomes an effort with a `subtype: bug`
+implementation ticket inside it. "Don't know" is a valid constraint answer.
 
 ## When to reach for it
 

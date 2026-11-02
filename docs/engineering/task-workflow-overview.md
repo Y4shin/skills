@@ -33,6 +33,13 @@ directly; `tw_finalizable`, `tw_list`, `tw_show`, `tw_state`, and
 `tw_dependency_levels` / `tw_frontier` are called inside the phase the row
 names) and actions to skills.
 
+A phase works through the tools its opener discloses. When a step genuinely
+needs a tool the phase does not declare, it calls `tw_request_tool`, which puts
+a confirmation to you: approval adds the tool until the next `tw_close`,
+denial leaves the tool set unchanged, and either outcome is recorded as
+workflow feedback. That is the sanctioned path, so a phase never has to close
+early and reopen another one to borrow a tool.
+
 The explainer is layered so a reader can stop at any depth: the `tw_next`
 fast track, then a short narrative of the arc, then the main flow, then the skill's `PHASE-BOUNDARIES.md` reference for the
 context-management decisions at each phase boundary.

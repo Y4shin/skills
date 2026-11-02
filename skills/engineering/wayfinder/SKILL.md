@@ -25,8 +25,10 @@ Every pass starts by opening the skill: call `tw_open` with
 directory name under `docs/tasks/`). The opener is the gate: it checks the
 phase preconditions against the artifact tree, refuses with the legal next
 calls when they fail, and activates the planning toolset only when they pass.
-Work only through the tools the opener discloses, and close the pass with
-`tw_close wayfinder` when it releases.
+Work only through the tools the opener discloses. When a step genuinely needs
+a tool this phase does not disclose, call `tw_request_tool` and let the
+operator decide: never close the phase early to reopen another one for its
+tools. Close the pass with `tw_close wayfinder` when it releases.
 
 ## Plan, don't do
 
@@ -56,13 +58,15 @@ step inside Wayfinder.
 
 ## The map
 
-Every map starts with one mandatory grilling session. Start from the user's
-idea, inspect the repository, existing `CONTEXT.md`, ADRs, active efforts, and
-project profile, then run the grilling loop before creating the map or any
-child tasks. That initial grilling is the first pass's one grilling.
+Every map starts with one mandatory grilling task. `intake` creates the
+effort: it writes the map at `docs/tasks/<effort>/map.md` with `## Non-goals`
+and `## Non-negotiable facts` seeded empty, registers the effort in the root
+index, and adds that one grilling task. Wayfinder never creates an effort or
+registers one. Start from the seed task, inspect the repository, existing
+`CONTEXT.md`, ADRs, active efforts, and project profile, then run that
+grilling. It is the first pass's one grilling.
 
-Create the map at `docs/tasks/<effort>/map.md` (the effort slug is the
-directory name):
+The map body takes this shape (the effort slug is the directory name):
 
 ```yaml
 ---
@@ -112,20 +116,18 @@ section. `## Non-negotiable facts` opens with the bolded success-test line;
 Chart the initial graph:
 
 1. Explore the codebase and existing project documents.
-2. Run one mandatory grilling session to establish and confirm the destination,
-   constraints, scope boundary, and first task frontier.
-3. Create the map only after that grilling has produced shared understanding.
-4. Set the state pointers: `tw_state_set map <effort-slug>`, and clear a stale
+2. Run the effort's non-negotiables grilling task. Add another grilling task
+   only when the destination needs a decision it cannot answer, and remember
+   that a pass runs at most one grilling.
+3. Set the state pointers: `tw_state_set map <effort-slug>`, and clear a stale
    task pointer with `tw_state_set task null`.
-5. Register the effort in the root index: add `<effort-slug>` to the `## Live`
-   list of `docs/tasks/index.md`, keeping the list sorted. When the index file
-   does not exist yet, create it with frontmatter `type: index`,
-   `okf_version: "0.2"`, `title: docs/tasks`, and body sections `# docs/tasks`,
-   `## Live` (the sorted live effort list), and `## Archived`.
-6. Create only tasks whose question or outcome is precise enough to state now.
-7. Put the rest in `## Fog` rather than inventing speculative tasks.
-8. Wire dependencies after all initial task slugs exist.
-9. Show the user the destination, task graph, dependencies, and fog. Ask for
+4. Create only the tasks whose question or outcome is precise enough to state
+   now, with `tw_add_task` and its planning subtype.
+5. Put the rest in `## Fog` rather than inventing speculative tasks.
+6. Wire dependencies at creation: `tw_add_task` takes `blocked_by`, and edges
+   are kind-scoped to planning tasks of the same effort, so create tasks in
+   dependency order instead of a second wiring pass.
+7. Show the user the destination, task graph, dependencies, and fog. Ask for
    confirmation before beginning execution.
 
 ## The planning tasks

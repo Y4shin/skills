@@ -31,6 +31,9 @@ that graph queryable. No external issue tracker, everything in git.
 The route most work travels, one phase at a time. Every phase opens with
 `tw_open` (the gate that checks the tree before disclosing the phase tools)
 and closes with `tw_close`; each phase's own `SKILL.md` carries the detail.
+When a step needs a tool the phase does not disclose, the phase asks for it
+with `tw_request_tool`, which puts the decision to the operator; approval
+lasts until the next `tw_close`, and the outcome is recorded as feedback.
 
 1. **`/skill:intake`** is the front door. It records the request verbatim,
    classifies it (feature or bug), and creates the effort: a map with its

@@ -191,7 +191,7 @@ describe("task-workflow tools", () => {
   beforeAll(() => { tools = createTools(); });
 
   describe("registration", () => {
-    test("registers exactly the disclosed surface: the gated workflow tools plus the dispatcher trio", () => {
+    test("registers exactly the disclosed surface: the gated workflow tools plus the dispatcher quartet", () => {
       const names = Object.keys(tools).sort();
       expect(names).toEqual([
         "skill_discover",
@@ -216,6 +216,7 @@ describe("task-workflow tools", () => {
         "tw_next",
         "tw_open",
         "tw_record_out_of_scope",
+        "tw_request_tool",
         "tw_resolve_uncertainty",
         "tw_show",
         "tw_split_ticket",

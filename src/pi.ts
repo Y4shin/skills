@@ -23,7 +23,9 @@ import YAML from "yaml";
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
 import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, readMapSection, writeMapSection, effortDirOf, MAP_SECTION_NON_GOALS, MAP_SECTION_NON_NEGOTIABLE_FACTS, TICKET_SUBTYPES, TASK_SUBTYPES, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
 import {
+  ALWAYS_DECLARED,
   CLOSER,
+  SKILL_REGISTRY,
   buildOpenParameters,
   conflictReason,
   duplicateReason,
@@ -648,19 +650,20 @@ function outcome(text: string, details: Record<string, unknown>): ToolOutcome {
 }
 
 /**
- * Compute the active set after closing one open skill: the skill's tools that
- * no remaining open skill still needs leave the set, and the closer itself
- * leaves when nothing stays open.
+ * Compute the active set after closing one open skill: every workflow tool
+ * that no remaining open skill declares leaves the set, which covers the
+ * closing skill's own tools and any tool the opener granted by request. A
+ * grant lasts until the next close, then it goes with the phase that asked
+ * for it. Tools from other extensions (feedback, telemetry, browser) are never
+ * in a registry toolset, so they are left alone.
  */
 function activeAfterClose(active: string[], closing: SkillEntry, remaining: Set<string>): string[] {
   const stillNeeded = new Set<string>();
   for (const name of remaining) {
     for (const tool of skillEntry(name)?.toolset ?? []) stillNeeded.add(tool);
   }
-  const removed = new Set(closing.toolset.filter((tool) => !stillNeeded.has(tool)));
-  // The closer stays declared in every state, including idle: closing is how
-  // a lost open set is diagnosed, so the tool itself must never disappear.
-  return active.filter((tool) => !removed.has(tool));
+  const workflow = new Set(SKILL_REGISTRY.flatMap((entry) => entry.toolset));
+  return active.filter((tool) => (workflow.has(tool) ? stillNeeded.has(tool) : true));
 }
 
 /**
@@ -1224,6 +1227,10 @@ interface ToolContext {
    * of a sibling extension's tool (see `feedbackCall`).
    */
   tools?: readonly ToolInfo[];
+  /** True when the session has dialog-capable UI (interactive or RPC mode). */
+  hasUI?: boolean;
+  /** Put a yes/no question to the operator. Absent when the session has no UI. */
+  confirm?(title: string, message: string): Promise<boolean>;
 }
 
 interface ToolInfo {
@@ -1623,6 +1630,71 @@ function refusedOuttext(reason: string, legalNext: string[]): string {
  * for, so the name is not spelled out at the call site too.
  */
 const FEEDBACK_TOOL = "submit_feedback";
+
+/** Every tool this package registers, by name: the requestable surface. */
+let workflowToolNamesCache: Set<string> | undefined;
+function workflowToolNames(): Set<string> {
+  workflowToolNamesCache ??= new Set(Object.keys(createTools()));
+  return workflowToolNamesCache;
+}
+
+/**
+ * Send one workflow-feedback row through the pi-telemetry `submit_feedback`
+ * tool, adapting to the installed version's parameters. Throws with the
+ * store's own reason when the row was not recorded.
+ */
+async function sendWorkflowFeedback(
+  ctx: ToolContext,
+  kind: string,
+  data: unknown,
+): Promise<{ namespaced: boolean; args: Record<string, unknown> }> {
+  if (!ctx.executeTool) {
+    throw new Error(
+      "workflow feedback needs a session-bound tool executor; the pi-telemetry `submit_feedback` tool cannot be reached",
+    );
+  }
+  // The sibling tool is inspected, not assumed: the installed version may
+  // predate the `source` parameter, and the row has to be labelled correctly
+  // under either shape. `ctx.tools` can omit a callable tool (a session's
+  // custom tools are not in it), so an absent entry is not a rejection: it
+  // only means the shape cannot be read, and a failure from the call itself
+  // is where a missing store is diagnosed.
+  const target = ctx.tools?.find((tool) => tool.name === FEEDBACK_TOOL);
+  const call = feedbackCall(kind, data, target?.parameters);
+  const result = (await ctx.executeTool(FEEDBACK_TOOL, call.args)) as
+    | { isError?: boolean; content?: Array<{ text?: string }> }
+    | undefined;
+  if (result?.isError) {
+    const detail = (result.content ?? [])
+      .map((part) => part.text ?? "")
+      .filter((text) => text !== "")
+      .join(" ");
+    const unlisted = ctx.tools !== undefined && target === undefined;
+    throw new Error(
+      `the workflow feedback was not recorded: ${detail === "" ? "no reason given" : detail}` +
+        (unlisted
+          ? ". pi-telemetry is not installed, so nothing stores feedback; " +
+            "install it with: pi install npm:@y4shin/pi-telemetry"
+          : ""),
+    );
+  }
+  return { namespaced: call.namespaced, args: call.args };
+}
+
+/**
+ * Record a request outcome through `sendWorkflowFeedback` without ever
+ * failing the request itself: a missing telemetry store must not undo a grant
+ * the operator just approved. Returns the sentence to append to the result.
+ */
+async function recordRequestFeedback(ctx: ToolContext, data: Record<string, unknown>): Promise<string> {
+  try {
+    await sendWorkflowFeedback(ctx, "friction", data);
+    return " Recorded as workflow feedback.";
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return ` ${detail}`;
+  }
+}
 
 export function createTools(): Record<string, Tool> {
   return {
@@ -2368,11 +2440,12 @@ export function createTools(): Record<string, Tool> {
     tw_add_task: def(
       "Create a planning task at docs/tasks/<effort>/tasks/<slug>/task.md: the named task creator, writing " +
         "through the frontmatter seam. Writes type: task with the given planning subtype (research, prototype, " +
-        "grilling, or manual), status: stable, workflow_state: ready, and an empty blocked_by (tasks are " +
-        "created before their edges are known; edges are wired when the blockers exist). An added task clears " +
-        "the map's ready flag, so a post-reconcile addition forces one more Wayfinder pass. Refuses an unsafe or " +
-        "duplicate slug (a slug that collides with any artifact of the effort, including tickets), a subtype " +
-        "outside the planning set, and an effort with no map.",
+        "grilling, or manual), status: stable, workflow_state: ready, and validates blocked_by at creation " +
+        "(kind-scoped: only existing planning tasks of the same effort; create in dependency order, no second " +
+        "wiring pass). An added task clears the map's ready flag, so a post-reconcile addition forces one more " +
+        "Wayfinder pass. Refuses an unsafe or duplicate slug (a slug that collides with any artifact of the " +
+        "effort, including tickets), a subtype outside the planning set, a blocked_by edge that dangles or " +
+        "crosses the kind, and an effort with no map.",
       {
         effort: Str("The effort slug the task lands in"),
         slug: Str("The task slug (lowercase letters, digits, hyphens)"),
@@ -2383,6 +2456,7 @@ export function createTools(): Record<string, Tool> {
         },
         title: Str("The task title"),
         mode: OptStr("'human' when the human must perform it; omit otherwise"),
+        blocked_by: { type: "array" as const, items: { type: "string" as const }, optional: true, description: "Planning task slugs in the same effort that must be done first" },
         content: OptStr("The task body (the decision to settle, the known choices, the recommended answer)"),
       },
       async (p, ctx) => {
@@ -2420,13 +2494,28 @@ export function createTools(): Record<string, Tool> {
         if (isDir(join(effortDir, "tasks", slug)) || isDir(join(effortDir, "tickets", slug))) {
           throw new Error(`'${slug}' already exists in '${p.effort}' (its directory is there)`);
         }
+        const blockedBy = Array.isArray(p.blocked_by) ? p.blocked_by.map(String) : [];
+        for (const target of blockedBy) {
+          if (target === slug) {
+            throw new Error(`task '${slug}' cannot block on itself`);
+          }
+          const known = index.hits.find(
+            (h) => h.art.type === "task" && h.art.slug === target && isInside(effortDir, h.path),
+          );
+          if (known === undefined) {
+            throw new Error(
+              `blocked_by target '${target}' is not an existing planning task in '${p.effort}': create the tasks ` +
+                `in dependency order (edges are kind-scoped: tasks block tasks)`,
+            );
+          }
+        }
         const data: FrontmatterData = {
           type: "task",
           subtype,
           title,
           status: "stable",
           workflow_state: "ready",
-          blocked_by: [],
+          blocked_by: blockedBy,
         };
         if (p.mode === "human") data.mode = "human";
         const taskDir = join(effortDir, "tasks", slug);
@@ -3206,6 +3295,125 @@ export function createTools(): Record<string, Tool> {
       { activeByDefault: true },
     ),
 
+    tw_request_tool: defStructured(
+      "Ask the operator for access to one workflow tool the open phase does not disclose. The request is " +
+        "put to the operator as an interactive confirmation naming the tool and your reason. Approval adds " +
+        "the tool to this session and it stays available until the next tw_close, which revokes it. Only this " +
+        "package's tw_* tools can be requested. Refused with the legal next call when no phase is open, when " +
+        "the tool is unknown or already active, when granting it would make another skill look open, and when " +
+        "the session has no interactive UI to ask. The outcome is recorded as workflow feedback.",
+      Type.Object({
+        tool: Type.String({ description: "The workflow tool to request, for example tw_add_ticket" }),
+        reason: Type.String({ description: "One sentence on why this phase needs it, shown to the operator" }),
+      }),
+      async (p, ctx) => {
+        const requested = typeof p.tool === "string" ? p.tool.trim() : "";
+        const reason = typeof p.reason === "string" ? p.reason.trim() : "";
+        const open = [...currentOpenSkills(ctx)].sort();
+        const named = requested === "" ? "a tool" : requested;
+
+        if (open.length === 0) {
+          return outcome(
+            `Refused: no workflow skill is open, so there is no phase to grant ${named} to. ` +
+              `Legal next: open a phase with tw_open.`,
+            { granted: false, reason: "no open skill", open: [], legal_next: ["tw_open"] },
+          );
+        }
+        if (!workflowToolNames().has(requested)) {
+          return outcome(
+            `Refused: '${requested}' is not a tool this package registers, so it cannot be granted here. ` +
+              `Request one of its tw_* tools instead.`,
+            { granted: false, reason: "unknown tool", open, legal_next: ["tw_next"] },
+          );
+        }
+        if ([...ALWAYS_DECLARED, CLOSER].includes(requested)) {
+          return outcome(
+            `Refused: ${requested} is declared in every state already, so it needs no grant.`,
+            { granted: false, reason: "already declared", open },
+          );
+        }
+        const activeSet = requireActiveSet(ctx);
+        const active = activeSet.get();
+        if (active.includes(requested)) {
+          return outcome(`Refused: ${requested} is already active. Legal next: use it.`, {
+            granted: false,
+            reason: "already active",
+            open,
+            active,
+          });
+        }
+
+        const phase = open.join(" and ");
+        const asked = reason === "" ? "No reason given." : reason;
+
+        // The open set is derived from whole toolsets, so a grant that completes
+        // another skill's toolset would make that skill look open without an
+        // opener. Refuse it and name the skill to open instead.
+        const wouldOpen = [...openSkillsIn([...active, requested])].filter((name) => !open.includes(name));
+        if (wouldOpen.length > 0) {
+          const note = await recordRequestFeedback(ctx, {
+            skill: open,
+            tool: requested,
+            decision: "blocked",
+            reason,
+            consequence: wouldOpen,
+          });
+          return outcome(
+            `Refused: granting ${requested} to ${phase} would also make ${wouldOpen.join(" and ")} look open, ` +
+              `because the opener derives the open set from whole toolsets. Legal next: open ${wouldOpen[0]} ` +
+              `when it is the phase you need, or ask for a different tool.${note}`,
+            { granted: false, reason: "would open another skill", open, consequence: wouldOpen },
+          );
+        }
+
+        if (ctx.hasUI !== true || !ctx.confirm) {
+          const note = await recordRequestFeedback(ctx, {
+            skill: open,
+            tool: requested,
+            decision: "unavailable",
+            reason,
+          });
+          return outcome(
+            `Refused: ${phase} asked for ${requested}, but this session has no interactive UI to approve it, ` +
+              `so the tool set is unchanged. Ask again from an interactive session.${note}`,
+            { granted: false, reason: "no interactive UI", open },
+          );
+        }
+
+        const approved = await ctx.confirm(
+          `Allow ${requested}?`,
+          `${phase} asked for ${requested}.\n\n${asked}\n\n` +
+            `Approving adds it to this session until the next tw_close. Denying leaves the tool set unchanged.`,
+        );
+        if (!approved) {
+          const note = await recordRequestFeedback(ctx, {
+            skill: open,
+            tool: requested,
+            decision: "denied",
+            reason,
+          });
+          return outcome(
+            `Refused: the operator denied ${requested} for ${phase}. The tool set is unchanged.${note}`,
+            { granted: false, reason: "operator denied", open },
+          );
+        }
+
+        const next = [...active, requested];
+        activeSet.set(next);
+        const note = await recordRequestFeedback(ctx, {
+          skill: open,
+          tool: requested,
+          decision: "granted",
+          reason,
+        });
+        return outcome(
+          `Granted ${requested} for ${phase}. It stays available until the next tw_close.${note}`,
+          { granted: true, tool: requested, open, active: next },
+        );
+      },
+      { activeByDefault: true },
+    ),
+
     // ── workflow feedback: the labelled route into the telemetry store ──
 
     tw_feedback: defStructured(
@@ -3218,36 +3426,7 @@ export function createTools(): Record<string, Tool> {
         data: Type.Union([Type.String(), Type.Record(Type.String(), Type.Unknown())]),
       }),
       async (p, ctx) => {
-        if (!ctx.executeTool) {
-          throw new Error(
-            "tw_feedback needs a session-bound tool executor; the pi-telemetry `submit_feedback` tool cannot be reached",
-          );
-        }
-        // The sibling tool is inspected, not assumed: the installed version may
-        // predate the `source` parameter, and the row has to be labelled
-        // correctly under either shape. `ctx.tools` can omit a callable tool
-        // (a session's custom tools are not in it), so an absent entry is not
-        // a rejection: it only means the shape cannot be read, and a failure
-        // from the call itself is where a missing store is diagnosed.
-        const target = ctx.tools?.find((tool) => tool.name === FEEDBACK_TOOL);
-        const call = feedbackCall(p.kind, p.data, target?.parameters);
-        const result = (await ctx.executeTool(FEEDBACK_TOOL, call.args)) as
-          | { isError?: boolean; content?: Array<{ text?: string }> }
-          | undefined;
-        if (result?.isError) {
-          const detail = (result.content ?? [])
-            .map((part) => part.text ?? "")
-            .filter((text) => text !== "")
-            .join(" ");
-          const unlisted = ctx.tools !== undefined && target === undefined;
-          throw new Error(
-            `the workflow feedback was not recorded: ${detail === "" ? "no reason given" : detail}` +
-              (unlisted
-                ? ". pi-telemetry is not installed, so nothing stores feedback; " +
-                  "install it with: pi install npm:@y4shin/pi-telemetry"
-                : ""),
-          );
-        }
+        const call = await sendWorkflowFeedback(ctx, p.kind, p.data);
         const label = call.namespaced
           ? `kind '${String(call.args.kind)}'`
           : `source '${WORKFLOW_SOURCE}' with kind '${p.kind}'`;
@@ -3417,6 +3596,10 @@ export default function (pi: ExtensionAPI) {
             setActiveTools: (toolNames: string[]) => pi.setActiveTools(toolNames),
             ...(ctx.executeTool ? { executeTool: (n: string, a: unknown) => ctx.executeTool(n, a) } : {}),
             ...(Array.isArray(ctx.tools) ? { tools: ctx.tools } : {}),
+            ...(typeof ctx.hasUI === "boolean" ? { hasUI: ctx.hasUI } : {}),
+            ...(ctx.ui?.confirm
+              ? { confirm: (title: string, message: string) => ctx.ui.confirm(title, message) }
+              : {}),
           });
           if (typeof result === "string") {
             return { content: [{ type: "text", text: result }], details: {} };

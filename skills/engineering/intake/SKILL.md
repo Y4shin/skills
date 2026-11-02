@@ -24,8 +24,10 @@ Every run starts by opening the skill: call `tw_open` with
 `{ skill: "intake", effort: "<effort-slug>" }` (the effort slug is the
 directory name the effort will get under `docs/tasks/`; it need not exist
 yet, because intake creates it). The opener activates the intake toolset,
-and work goes only through the tools it discloses. Close the phase with
-`tw_close intake` when the run releases.
+and work goes only through the tools it discloses. When a step genuinely needs
+a tool the phase does not disclose, call `tw_request_tool` and let the operator
+decide: never close the phase early to reopen another one for its tools. Close
+the phase with `tw_close intake` when the run releases.
 
 ## Intake's round is its own short round, not a grilling
 
@@ -85,7 +87,8 @@ Create the effort through the named tools, in this order:
 
 1. **`tw_create_effort`** with the effort slug and title: it writes the
    map at `docs/tasks/<effort>/map.md` and registers the effort in the
-   root index. The map carries `## Non-goals` and
+   root index at `docs/tasks/index.md` (its `## Live` list, kept sorted). The
+   map carries `## Non-goals` and
    `## Non-negotiable facts` seeded as **empty placeholders**, so a later
    gate refusal names missing content rather than a missing section.
 2. **`tw_add_task`** with subtype `grilling`: create **exactly one**
