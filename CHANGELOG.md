@@ -1,5 +1,111 @@
 # task-workflow
 
+## 5.2.0
+
+### Minor Changes
+
+- 0b13289: Add `operator-communication`, the rule set for every message an agent sends the operator.
+  
+  A run held the style guidance in its prompt and still ended with a summary
+  that only its own context could decode. The failure is not ignorance of the
+  rules. It is a skipped self-check at the moment of writing, most of all in
+  the closing report at the end of a long run, where the agent's context is
+  full of vocabulary the operator does not have.
+  
+  - `skills/productivity/operator-communication/SKILL.md` holds the rules: one
+    test (could a developer who saw none of the run follow this?), three checks
+    the agent runs on its own draft, a selection rule for what earns a place in
+    the message, a worked bad/good pair, and an explicit settlement of
+    "maximize useful information per word", which agents read as "use fewer
+    words". The selection rule asks whether a detail changes what the operator
+    can rely on or decide, so a snag closed in the next step goes and an
+    unconfirmed fix stays.
+  - Every other promoted skill names the skill near its top, so the dependency
+    travels with whatever skill is running.
+  - The five skills that end a run with a user-facing report
+    (`implement-ticket`, `finalize-effort`, `wayfinder`,
+    `task-workflow-overview`, `task-workflow-doctor`) also carry the three
+    checks inline at the report step. A pointer reached only at the end of a
+    long run is the pointer that gets skipped.
+  - `wait-what` becomes a repair command instead of a canned re-pitch. It loads
+    `operator-communication` and asks for the last answer to be rewritten under
+    it, keeping the detail the operator needs to judge the outcome, dropping the
+    detail that carries neither of the selection rule's two questions, adding
+    what is missing, applying any request appended to the command, and never
+    announcing the rewrite. This is the fallback for the answer the rules did
+    not prevent.
+  - `wait-what` also records each invocation through `submit_feedback` with the
+    fixed `kind: "wait-what"` and one sentence of `data`, so the rate at which
+    the operator had to intervene is countable in the feedback table. A
+    structural test pins the tool, the kind, and the literal-kind rule so the
+    series cannot break silently.
+  
+  `docs/migration-target.yaml`, `package.json`, both bucket indexes, the
+  top-level `README.md`, and the router now list the new skill. Its docs page is
+  `docs/productivity/operator-communication.md`.
+- 2c1765f: Let a phase ask the operator for a tool it does not disclose, and record the answer.
+  
+  A phase used to have one path to a tool its own toolset did not declare: close
+  the skill, open a different phase that declares it, and borrow it. That is what
+  a model does when it cannot find a sanctioned route, and it steps around the
+  gates the workflow exists to enforce. There is now a legal route, and it asks
+  the operator.
+  
+  - `tw_request_tool` is always declared, next to the opener pair, so asking never
+    depends on already holding the tool. It takes the tool name and one sentence
+    of reason, and it puts a confirmation to the operator through the session UI.
+  - Approval adds the tool to the session's active set. The grant ends at the next
+    `tw_close`: closing prunes every workflow tool that no remaining open skill
+    declares, which covers both the phase's own tools and anything it was granted.
+  - A denial leaves the tool set unchanged. A session with no interactive UI is
+    refused rather than treated as a denial, because nobody was asked.
+  - A grant that would complete another skill's toolset is refused too, naming
+    the skill to open instead. The open set is derived from whole toolsets, so
+    that grant would make a phase look open that nobody opened; the guard keeps
+    the derivation exact (granting `tw_context` while `wayfinder` is open would
+    otherwise look like `setup-workflow`).
+  - Every outcome (granted, denied, blocked, unavailable) is written to the
+    telemetry store through `submit_feedback`, labelled as workflow feedback with
+    kind `friction`. Feedback failure never undoes a grant; the result says it
+    was not recorded.
+  - Only this package's own `tw_*` tools are requestable. The always-declared pair
+    and the closer are refused as already available, and a built-in such as `bash`
+    or `write` is refused as outside the workflow surface.
+  - The six phase skills now name the sanctioned route at the point where they
+    state the rule, and say plainly not to close a phase early to reopen another
+    one for its tools. The README, the router skill, and its docs page describe it.
+  - `tw_feedback` and the requester share one feedback call path, so both address
+    the installed `submit_feedback` shape the same way.
+  
+  `npm test` and all three typechecks pass.
+
+### Patch Changes
+
+- 2c1765f: Give `wayfinder` its task-creation tool, and let two phases share a tool.
+  
+  The planning phase's Boundary names task creation, its reconcile promotes each
+  fog line into a planning task, and its escape hatch adds a new one when
+  implementation turns up uncertainty. None of that was possible: `tw_add_task`
+  was disclosed to `intake` alone, and the built-in write is refused under
+  `docs/tasks/`, so a planning pass that needed a new task had no legal path.
+  
+  - `wayfinder`'s toolset gains `tw_add_task`.
+  - `tw_add_task` gains an optional `blocked_by`, validated at creation the way
+    ticket creation validates it: kind-scoped to existing planning tasks of the
+    same effort, no self-edge, no dangling target. Edges are wired when the task
+    is created, so a planning graph never needs a second pass over frontmatter
+    that no tool can write.
+  - The open-set derivation no longer requires every skill to own a private
+    tool. A skill is open when its whole toolset is active, which is the literal
+    definition and makes a shared tool legal. `assertDerivableOpenSets` refuses a
+    registry where one toolset, or the union of two skills that can be open
+    together, covers another, because that would make a closed skill look open.
+  - The `wayfinder` charting steps no longer claim the phase creates the map or
+    registers the effort in the root index. `intake` does both, and the intake
+    skill now names `docs/tasks/index.md` and its sorted `## Live` list.
+  
+  `npm test` and all three typechecks pass.
+
 ## 5.1.0
 
 ### Minor Changes
