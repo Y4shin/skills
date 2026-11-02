@@ -8,6 +8,8 @@ description: Entry point. Ask which skill or flow fits your situation, or which 
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 **Fast track.** Ask `tw_next` for the live answer. Outside a workflow skill
 it names the next phase to open through `tw_open`; inside one it tells you to
 finish the current work first and ask again after `tw_close`. The live answer
@@ -34,6 +36,9 @@ and closes with `tw_close`; each phase's own `SKILL.md` carries the detail.
 When a step needs a tool the phase does not disclose, the phase asks for it
 with `tw_request_tool`, which puts the decision to the operator; approval
 lasts until the next `tw_close`, and the outcome is recorded as feedback.
+Read [WORKFLOW-INTERNALS.md](WORKFLOW-INTERNALS.md) for the mechanical
+detail behind this flow: the artifact tree and its types, the gates, the
+`tw_*` tools by phase, and the refusal shapes with their legal routes.
 
 1. **`/skill:intake`** is the front door. It records the request verbatim,
    classifies it (feature or bug), and creates the effort: a map with its
@@ -170,6 +175,7 @@ and the call.
 | Finalize / archive an effort | `/skill:finalize-effort` |
 | Initialize or migrate a repo | `/skill:setup-workflow` |
 | Diagnose a broken workflow | `/skill:task-workflow-doctor` |
+| Escalate a workflow snag (a refusal, a gate that will not open, a stuck run) | `/skill:workflow-failure` |
 | Diagnose a hard bug | `/skill:diagnosing-bugs` |
 | Review an eval suite or triage a failed run | `/skill:eval-review` |
 | Review an Agent Skill | `/skill:skill-review` |

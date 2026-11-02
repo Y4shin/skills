@@ -85,7 +85,6 @@ docs/tasks/
 |   |   `-- <slug>/ticket.md      type: ticket; an implementation ticket (feature, bug)
 |   |       `-- .work/            scratch beside a ticket (the uncertainty stop)
 |   |-- deviation-reports/        type: deviation report; the deviation report's home
-|   `-- slices/                   legacy container; read, never written
 `-- archive/
     `-- <effort>/                 an archived effort, moved as a unit; the record of what shipped
 ```
@@ -97,9 +96,10 @@ rules it follows, exactly:
   carries a non-empty OKF type (v4 `type:`, or v3 `kind:`). Anything else
   is skipped, never fatal. Dot-directories are not walked, so `.work/`
   scratch is invisible to the graph.
-- The container directories (`tasks/`, `tickets/`, `slices/`,
-  `deviation-reports/`, `archive/`, `maps/`) take the slug from the file
-  name; everywhere else the directory name is the slug.
+- The container directories take the slug from the file name; everywhere
+  else the directory name is the slug. The live containers are `tasks/`,
+  `tickets/`, `deviation-reports/`, and `archive/`; the oldest vintage adds
+  a `maps/` scope beside them, which the scanner reads with the same rule.
 - The type is implied by the file name for the leaf types (map.md,
   spec.md, architecture.md, review.md, arch-spec.md, ticket.md, and
   task.md under `tasks/`); a frontmatter type that disagrees with its
@@ -120,10 +120,11 @@ rules it follows, exactly:
   never as tool failures.
 
 The legacy shapes the reader keeps tolerating: a v3 flat task
-(`docs/tasks/<slug>/task.md`) is its own effort; the v3 maps subtree
-(`docs/tasks/maps/<map>/`) survives as a read-only scope; and `type: arch
-spec` in `arch-spec.md` is the legacy architecture shape, accepted until
-the migration renames it.
+(`docs/tasks/<slug>/task.md`) is its own effort; the `maps/` subtree of the
+oldest vintage survives as a read-only scope; and `type: arch spec` in
+`arch-spec.md` is the legacy architecture shape, accepted until the
+migration renames it. The migration reports a legacy container directory
+and leaves it in place; no v5 writer touches one.
 
 The artifact types: the effort-root types (map, spec, architecture,
 review), the work-item types (task with a planning subtype of research,
