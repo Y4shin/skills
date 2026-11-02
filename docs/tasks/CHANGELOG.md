@@ -70,6 +70,11 @@ title: Task Changelog
 
 
 
+
+## 2026-11-02, Remove the migration CLI from the package (remove-migration-cli)
+
+The package now ships exactly one migration executor, the disclosed `tw_migrate` tool. The three CLI files (the argv wrapper, the spawn shim, and its TypeScript resolve hook) are deleted, together with the four spawn-based shim tests whose coverage already lived in the tool tests; comment headers and the doctor skill's failure-cause wording were reworded so no living file names the removed CLI (dated changelog entries and archives keep their historical mentions, per the repo's exemption classes). Three permanent structure guards now pin the removal executably, following the repo's corpus-sweep prior art. Suite green: 22 files, 1299 tests.
+
 ## 2026-11-02, Reroute the migrate branch through the tool, with the branch choreography (reroute-migrate-branch)
 
 The migrate branch of `/skill:setup-workflow` now opens its phase and calls the disclosed `tw_migrate` tool, never a shell command, with the six-step branch choreography explicit: record the integration branch, create the migration branch from it, run the tool and the test suite and the commit there, fast-forward the integration branch (explicit user approval first outside `main`/`master`), delete the migration branch, and close the phase at the end. The dry-run prose became the tool parameter. The skill's docs page and both upgrade resources name the tool as the executor; the onboard and no-op branches are byte-identical (pinned by a green-on-arrival regression test). Structure tests were rewritten around the new executor while keeping the safety-theme pins. Suite green: 22 files, 1300 tests.

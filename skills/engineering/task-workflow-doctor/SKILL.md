@@ -56,8 +56,8 @@ never clobbers an existing file.
 
 ## Failed migration
 
-The migrate branch stopped partway: the migration CLI errored, the layout is
-half-applied, both the old and the new path exist for the same artifact, or
+The migrate branch stopped partway: the `tw_migrate` tool errored, the layout
+is half-applied, both the old and the new path exist for the same artifact, or
 the migration report lists failures. The tree is between schemas and no
 amount of re-diagnosing makes it readable.
 

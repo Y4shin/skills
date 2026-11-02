@@ -1,10 +1,9 @@
 /**
  * The migration report rendering.
  *
- * Moved verbatim from the argv wrapper (`src/migrate-cli.ts`): one rendering,
- * frozen at parity with the CLI's output. The `tw_migrate` tool in src/pi.ts
- * returns it; the wrapper renders through the same function, so the two
- * executors cannot drift while both exist.
+ * One rendering, frozen (the parity decision): the `tw_migrate` tool in
+ * src/pi.ts returns it, and its text is pinned so the report cannot drift
+ * from the shape the migration has always printed.
  */
 
 import type { MigrateReport } from "./core/migrate.js";
