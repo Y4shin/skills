@@ -143,12 +143,12 @@ the published spec into the architecture document and the ticket graph.
 flowchart TD
     idea["A request: idea, feature, or bug"] --> intake["intake, the front door: creates the effort, its map with Non-goals and Non-negotiable facts, and exactly one non-negotiables grilling task"]
     intake --> wayfinder["wayfinder: works the planning frontier, writes results back to the map, runs the reconcile"]
-    wayfinder -- "tw_finalize_map sets ready_for_spec: the planning graph hands off" --> tospec["to-spec: collapses the settled record into the specification"]
-    tospec -- "publish the spec, status stable" --> totickets["to-tickets: writes the architecture document and the ticket graph"]
-    totickets -- "tw_open implement-ticket with the effort and a ready target" --> impl["implement-ticket: per-ticket chain, red-green loop, verification, landing, close-out"]
-    impl -- "tw_frontier again for the next ready ticket" --> impl
-    impl -- "every ticket done" --> finalize["finalize-effort: holistic review, one disposition per finding"]
-    finalize -- "tw_archive_effort" --> archive["docs/tasks/archive/: the record of what shipped"]
+    wayfinder -->|"tw_finalize_map sets ready_for_spec: the planning graph hands off"| tospec["to-spec: collapses the settled record into the specification"]
+    tospec -->|"publish the spec, status stable"| totickets["to-tickets: writes the architecture document and the ticket graph"]
+    totickets -->|"tw_open implement-ticket with the effort and a ready target"| impl["implement-ticket: per-ticket chain, red-green loop, verification, landing, close-out"]
+    impl -->|"tw_frontier again for the next ready ticket"| impl
+    impl -->|"every ticket done"| finalize["finalize-effort: holistic review, one disposition per finding"]
+    finalize -->|"tw_archive_effort"| archive["docs/tasks/archive/: the record of what shipped"]
 ```
 
 ## The phase-gate state machine
