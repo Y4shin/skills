@@ -69,6 +69,11 @@ title: Task Changelog
 
 
 
+
+## 2026-11-02, Write the workflow internals reference (workflow-internals-reference)
+
+Shipped WORKFLOW-INTERNALS.md under task-workflow-overview: the agent-facing internals reference carrying the big picture, the ASCII artifact tree, mermaid flow charts for the main flow and the phase-gate state machine, the tw_* tools by disclosure scope, the refusal shapes and their legal routes, and the escalation ladder in brief. The overview SKILL.md now links the resource, carries the router row for /skill:workflow-failure, and holds the canonical reference sentence. The previously designed-red router test is green again; the full suite stands at 1304 passed, 0 failed.
+
 ## 2026-11-02, Create the workflow-failure skill (create-workflow-failure-skill)
 
 Created the promoted, model-invoked engineering skill `workflow-failure`, the single owner of the workflow escalation ladder: act on a refusal's own reason and legal_next, reorient from the internals reference or route to task-workflow-doctor, record the snag with tw_feedback, then stop and escalate with the five-part completion report that ends the run. Hand-editing the tree, skipping a gate, and invented workarounds are forbidden at every rung. Shipped with full convention sync (package skill list, READMEs, four-section docs page, CONTEXT.md glossary, migration target, changeset) and structural tests. The agent-facing fallback for stuck runs now exists; the escalation ladders it documents land in the remaining tickets of the effort.

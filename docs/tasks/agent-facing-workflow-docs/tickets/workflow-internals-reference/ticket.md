@@ -67,3 +67,7 @@ touches that directory.
 
 - `create-workflow-failure-skill` (the router row and reference name a
   skill that must exist and ship).
+
+## Implementation notes
+
+Knowledge harvest: writing authoritative prose about shipped behavior is self-testing documentation if the content stays literal; the verifier diffed the tool-by-phase table verbatim against SKILL_REGISTRY, which is the quality bar this kind of reference needs (drift is caught by reading the source, not by a generator). Retired-vocabulary tests constrain what a resource may name: the artifact-tree section could not enumerate the retired slices/ and maps/ container shapes because the em-dash/vocabulary corpus bans the path strings; documenting legacy shapes requires reopening that ban deliberately, not working around it with near-spellings. Mermaid edge labels in this repo's shipped prose use the pipe form (-->|label|) for maximum parser compatibility.
