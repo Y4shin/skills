@@ -1132,6 +1132,10 @@ describe("setup-workflow / migration skill references", () => {
 
 describe("setup-workflow v5", () => {
   const skill = readFile("skills/engineering/setup-workflow/SKILL.md");
+  // The migrate branch is the section between its heading and the upgrade
+  // resources list; the dry-run/idempotence/corruption subsections live in it.
+  const migrateBranch = (text: string): string =>
+    text.slice(text.indexOf("## Migrate (old repo)"), text.indexOf("## Available upgrade resources"));
 
   test("keys detection on schema_version 5 as current", () => {
     expect(skill).toMatch(/current schema version is \*\*5\*\*/);
@@ -1151,17 +1155,102 @@ describe("setup-workflow v5", () => {
     expect(skill).toMatch(/no-op|already on schema_version/i);
   });
 
-  test("the migrate branch invokes the CLI", () => {
-    expect(skill).toMatch(/scripts\/migrate\.mjs/);
+  test("the migrate branch opens the phase and calls the disclosed tool, never a shell command", () => {
+    // The executor step opens the phase (the opener discloses the tool) and
+    // calls the tool; the migration is never a shell command.
+    const migrate = migrateBranch(skill);
+    expect(migrate).toMatch(/tw_open/);
+    expect(migrate).toMatch(/tw_migrate/);
+    expect(skill).not.toMatch(/scripts\/migrate\.mjs/);
+    expect(skill).not.toMatch(/node skills\/engineering\/setup-workflow\/scripts/);
+  });
+
+  test("the migrate branch carries the six-step branch choreography", () => {
+    const migrate = migrateBranch(skill);
+    // 1. Record the integration branch: the branch the run was invoked on.
+    expect(migrate).toMatch(/record the integration branch/i);
+    // 2. Create the migration branch from it.
+    expect(migrate).toMatch(/migrate\/schema-\$\{from\}-to-5/);
+    // 3. The tool, the test suite, and the commit run on the migration branch.
+    expect(migrate).toMatch(/on the migration branch/i);
+    // 4. Fast-forward the integration branch to the branch tip, asking for
+    //    explicit user approval first when it is not main or master.
+    expect(migrate).toMatch(/fast-forward/i);
+    expect(migrate).toMatch(/approval/i);
+    expect(migrate).toMatch(/not `?main`? or `?master`?/);
+    // 5. Delete the migration branch after the fast-forward.
+    expect(migrate).toMatch(/delete the migration branch/i);
+    // 6. The run ends on the integration branch.
+    expect(migrate).toMatch(/end the run on the integration branch/i);
   });
 
   test("the migrate branch mentions the MigrateReport", () => {
     expect(skill).toMatch(/MigrateReport/);
   });
 
+  test("the dry-run section describes the tool parameter, not a CLI flag", () => {
+    const start = skill.indexOf("### Dry-run mode");
+    const end = skill.indexOf("###", start + 3);
+    const dryRun = skill.slice(start, end === -1 ? undefined : end);
+    expect(dryRun).toMatch(/tw_migrate/);
+    expect(dryRun).toMatch(/dryRun/);
+    expect(dryRun).not.toMatch(/--dry-run/);
+    // The flag is gone from the skill everywhere: the parameter replaced it.
+    expect(skill).not.toMatch(/--dry-run/);
+  });
+
   test("the onboard branch writes the v5 scaffold", () => {
     expect(skill).toMatch(/schema_version: 5/);
     expect(skill).toMatch(/okf_version/);
+  });
+
+  test("the docs page matches the rerouted migrate branch", () => {
+    const page = readFile("docs/engineering/setup-workflow.md");
+    // Executor: the disclosed tool, never the shell command.
+    expect(page).toMatch(/tw_migrate/);
+    expect(page).not.toMatch(/scripts\/migrate\.mjs/);
+    expect(page).not.toMatch(/migration CLI/);
+    // Choreography: the migration branch, the fast-forward with the
+    // approval gate, the deletion, and the run ends on the integration
+    // branch.
+    expect(page).toMatch(/migrate\/schema/);
+    expect(page).toMatch(/integration branch/i);
+    expect(page).toMatch(/fast-forward/i);
+    expect(page).toMatch(/approval/i);
+    expect(page).toMatch(/delet/i);
+    // The dry run is the tool parameter.
+    expect(page).toMatch(/dryRun/);
+    expect(page).not.toMatch(/--dry-run/);
+  });
+
+  test("the onboard and no-op branches are untouched by the reroute", () => {
+    // The reroute owns the migrate branch only. The onboard branch keeps its
+    // scaffold steps and its direct-write bootstrap (the tree is unstamped,
+    // so no named writer exists yet), and the no-op branch keeps its
+    // detection and message. Regression pins: green on arrival by design.
+    const onboard = skill.slice(
+      skill.indexOf("## Onboard (fresh repo)"),
+      skill.indexOf("## Migrate (old repo)"),
+    );
+    for (const marker of [
+      "mkdir -p docs/tasks/archive",
+      "schema_version: 5",
+      "docs/tasks/index.md",
+      "docs/testing.md",
+      "docs/dev-env.md",
+      "CONTEXT.md",
+      "AGENTS.md",
+      "docs/agents/README.md",
+      "out-of-scope/index.md",
+      "chore: initialize task-workflow (schema_version 5)",
+      "/skill:task-workflow-overview",
+    ]) {
+      expect(onboard, marker).toContain(marker);
+    }
+    expect(onboard).not.toMatch(/tw_migrate/);
+    const detection = skill.slice(0, skill.indexOf("## Onboard (fresh repo)"));
+    expect(detection).toMatch(/schema_version` is less than 5/);
+    expect(detection).toMatch(/schema_version` equals 5/);
   });
 
   test("references the upgrade-3-to-4 resource", () => {
@@ -1176,7 +1265,7 @@ describe("setup-workflow v5", () => {
   test("upgrade-3-to-4 resource exists with the ordered step list", () => {
     const content = readFile("skills/engineering/setup-workflow/resources/upgrade-3-to-4.md");
     expect(content).toMatch(/Migration/);
-    expect(content).toMatch(/scripts\/migrate\.mjs/);
+    expect(content).toMatch(/tw_migrate/);
     for (let i = 1; i <= 9; i++) {
       expect(content).toMatch(new RegExp(`## Step ${i}`));
     }
@@ -1184,7 +1273,7 @@ describe("setup-workflow v5", () => {
 
   test("upgrade-4-to-5 resource exists with the established shape", () => {
     const content = readFile("skills/engineering/setup-workflow/resources/upgrade-4-to-5.md");
-    expect(content).toMatch(/scripts\/migrate\.mjs/);
+    expect(content).toMatch(/tw_migrate/);
     expect(content).toMatch(/## Before you start/);
     expect(content).toMatch(/## After the run/);
     expect(content).toMatch(/## Step 1/);
@@ -1208,7 +1297,19 @@ describe("setup-workflow v5", () => {
     expect(content).toMatch(/docs\/bugs\//);
   });
 
-  test("upgrade-4-to-5's transcript matches what the CLI actually prints", () => {
+  test("the upgrade resources name the tool as the executor, not the CLI", () => {
+    // No living page instructs the shell command: the resources' executor
+    // wording follows the skill's reroute.
+    for (const name of ["upgrade-3-to-4.md", "upgrade-4-to-5.md"]) {
+      const content = readFile(`skills/engineering/setup-workflow/resources/${name}`);
+      expect(content, name).toMatch(/tw_migrate/);
+      expect(content, name).not.toMatch(/scripts\/migrate\.mjs/);
+      expect(content, name).not.toMatch(/node skills\/engineering\/setup-workflow\/scripts/);
+      expect(content, name).not.toMatch(/migration CLI/);
+    }
+  });
+
+  test("upgrade-4-to-5's transcript matches what the tool returns", () => {
     const content = readFile("skills/engineering/setup-workflow/resources/upgrade-4-to-5.md");
     expect(content).toMatch(/migrated from schema_version 4 to 5/);
     expect(content).toMatch(/already on schema_version 5, nothing to do\./);
@@ -1564,6 +1665,10 @@ const SURVIVING_TOOLS = new Set([
   // lifecycle-hardening: the planning task's record writer, the named
   // replacement for the shell append the grilling resource needed.
   "tw_write_task_note",
+  // migration-tool (tw-migrate-tool): the migration executor the
+  // setup-workflow phase discloses; the skill prose and its docs page name
+  // it from reroute-migrate-branch on.
+  "tw_migrate",
   // tw-feedback: the labelled route into the telemetry store, disclosed by
   // every phase, so the feedback prose names it rather than submit_feedback.
   "tw_feedback",
