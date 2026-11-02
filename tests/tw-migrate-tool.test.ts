@@ -111,6 +111,16 @@ function tracked(make: () => string): string {
 }
 
 describe("tw_migrate through the public tool factory", () => {
+  test("with the dry-run flag set, returns the plan and the tree stays byte-identical", async () => {
+    const dir = tracked(makeV3Tree);
+    const before = snapshot(dir);
+    const tools = createTools();
+    const result = (await tools.tw_migrate.execute({ dryRun: true }, { directory: dir })) as ToolResult;
+
+    expect(result.text).toBe(REPORT_DRY_RUN);
+    expect(snapshot(dir)).toEqual(before);
+  });
+
   test("migrates an old-vintage tree and returns the frozen report", async () => {
     const dir = tracked(makeV3Tree);
     const tools = createTools();

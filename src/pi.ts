@@ -3126,16 +3126,19 @@ export function createTools(): Record<string, Tool> {
         "schema versions, every change, every item needing human attention, or the already-current no-op " +
         "answer. Read and surface the report; every rewrite is verified, a failure leaves the tree " +
         "untouched, and a re-run is a no-op.",
-      Type.Object({}),
-      async (_p, ctx) => {
+      Type.Object({
+        dryRun: Type.Optional(Type.Boolean({ description: "Compute the report and write nothing" })),
+      }),
+      async (p, ctx) => {
         const root = findRoot(ctx.directory);
+        const dryRun = p.dryRun === true;
         try {
-          const report = migrate(new FsPort(root));
-          return outcome(renderMigrationReport(report, false), {
+          const report = migrate(new FsPort(root), { dryRun });
+          return outcome(renderMigrationReport(report, dryRun), {
             from: report.from,
             to: report.to,
             noop: report.noop,
-            dryRun: false,
+            dryRun,
             changes: report.changes.length,
             needsHuman: report.needsHuman.length,
           });
