@@ -48,3 +48,7 @@ restating the ladder, no reformatted prose.
 
 - `create-workflow-failure-skill` (the sentence names a skill that must
   exist and ship).
+
+## Implementation notes
+
+Knowledge harvest: 'top of the body' needs one interpretation for titled files without the standard preamble: the first prose paragraph after the H1, never above the document title (slot ruled in by the coherence criterion; the mechanical contract is unaffected because it asserts verbatim presence only). A seam collision between the TDD red-green discipline and 'tests/' ownership assigned to a later ticket resolves cleanly with an untracked ticket-local checker inside the ticket's .work/ directory: the loop gets its executable seam, the source tree keeps its ownership split untouched. When threading one canonical sentence across ~40 files, a single enumerated-touchpoint checker (derived from the promoted-set manifest) doubles as both the RED condition and the GREEN proof.
