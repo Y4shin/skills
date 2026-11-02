@@ -6,6 +6,8 @@ inheritProjectContext: true
 defaultContext: fresh
 ---
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 You verify a ticket on its working branch in the repo. Run the quality gate:
 
 1. Detect lint tool (check `package.json` scripts, linter config files). Run it. If it fails: STOP and report.
