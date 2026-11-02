@@ -1165,6 +1165,25 @@ describe("setup-workflow v5", () => {
     expect(skill).not.toMatch(/node skills\/engineering\/setup-workflow\/scripts/);
   });
 
+  test("the migrate branch carries the six-step branch choreography", () => {
+    const migrate = migrateBranch(skill);
+    // 1. Record the integration branch: the branch the run was invoked on.
+    expect(migrate).toMatch(/record the integration branch/i);
+    // 2. Create the migration branch from it.
+    expect(migrate).toMatch(/migrate\/schema-\$\{from\}-to-5/);
+    // 3. The tool, the test suite, and the commit run on the migration branch.
+    expect(migrate).toMatch(/on the migration branch/i);
+    // 4. Fast-forward the integration branch to the branch tip, asking for
+    //    explicit user approval first when it is not main or master.
+    expect(migrate).toMatch(/fast-forward/i);
+    expect(migrate).toMatch(/approval/i);
+    expect(migrate).toMatch(/not `?main`? or `?master`?/);
+    // 5. Delete the migration branch after the fast-forward.
+    expect(migrate).toMatch(/delete the migration branch/i);
+    // 6. The run ends on the integration branch.
+    expect(migrate).toMatch(/end the run on the integration branch/i);
+  });
+
   test("the migrate branch mentions the MigrateReport", () => {
     expect(skill).toMatch(/MigrateReport/);
   });
