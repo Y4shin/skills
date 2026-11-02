@@ -8,6 +8,8 @@ description: Test-driven development. Use when a slice is implemented test-first
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 TDD is the red → green loop. This skill is the reference that makes that loop
 produce tests worth keeping: what a good test is, where tests go, the
 anti-patterns, and the rules of the loop. Every section applies on every cycle:

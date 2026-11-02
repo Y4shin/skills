@@ -8,6 +8,8 @@ description: "The effort close: one holistic whole-effort review, a triage of ev
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 `finalize-effort` is the effort close. It runs one holistic review of the
 whole effort, triages every finding, and archives the effort once nothing is
 left to resolve. The review is read-only toward the code: this phase never

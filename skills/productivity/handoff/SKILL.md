@@ -11,6 +11,8 @@ metadata:
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 User-invoked. Reachable only when the human types `/skill:handoff`. The model
 will not auto-invoke it.
 

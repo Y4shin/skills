@@ -8,6 +8,8 @@ description: Build a throwaway prototype to answer a design question. Use when t
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 A prototype is **throwaway code that answers a question**. The question decides the shape.
 
 ## Pick a branch

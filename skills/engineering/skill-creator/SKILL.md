@@ -8,6 +8,8 @@ description: Create, make, build, or scaffold a new Agent Skill from a workflow,
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 Create, review, update, and improve other Agent Skills. Produces small,
 spec-conformant, well-triggered skills that load wherever the Agent Skills
 format is supported.
