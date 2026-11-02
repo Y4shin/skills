@@ -30,3 +30,9 @@ The executor-seam coverage carries over from the spawn-based shim tests (report 
 ## Blocked by
 
 None (can start immediately).
+
+## Implementation notes
+
+- Architecture lessons from the landing: the report rendering lives in the shared module `src/migrate-report.ts` (moved verbatim from the argv wrapper), imported by the tool and transitionally by the still-shipped wrapper, because the wrapper runs standalone under the resolve hook and cannot import the extension entry (its runtime import is a devDependency, unavailable to the spawned process in an installed package). `remove-migration-cli` deletes the transitional import and inherits the module as the tool's single renderer; its pure-deletion contract is unchanged.
+- Four foreign registered-surface test tables gained `tw_migrate` (`tests/plugin.test.ts` registered names, `tests/gate-factory.test.ts` `GATED_NAMES`, `tests/opener-gate.test.ts` phase-to-toolset table, `tests/integration/disclosure.test.ts` `GATED_WORKFLOW_TOOLS`), and the `tw_request_tool` refusal scenario in `tests/opener-gate.test.ts` was re-scenariod: with `tw_migrate` added, setup-workflow now declares two tools no other phase declares, so granting `tw_context` no longer completes its set; the refusal path now opens wayfinder plus the nested skill-creator, grants `tw_context` (allowed), then requests `tw_migrate` (refused, naming setup-workflow). The containment guard's semantics are unchanged.
+- The tool returns the conventional `outcome` details envelope (`from`, `to`, `noop`, `dryRun`, `changes`, `needsHuman` counts) around the frozen report text; failures throw `migration failed: <reason>`. That failure path is not pinned by a test in `tests/tw-migrate-tool.test.ts`: the spawn-based shim failure test covers it until `remove-migration-cli` deletes those tests, so that ticket should either add a one-test pin or accept the gap knowingly.
