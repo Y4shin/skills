@@ -12,10 +12,21 @@
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { createTools } from "../src/pi.js";
 import { ALWAYS_DECLARED, SKILL_REGISTRY } from "../src/disclosure.js";
+
+// The migration must run in the extension host's own process: any spawn of a
+// Node child fails loudly here instead of silently re-creating the CLI shim's
+// spawn path (whose module-loading restriction is what the tool exists to
+// avoid). Everything else from the module stays real.
+vi.mock("node:child_process", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  spawnSync: vi.fn(() => {
+    throw new Error("spawning a Node child is forbidden in this suite");
+  }),
+}));
 
 interface ToolResult {
   text: string;
@@ -110,6 +121,16 @@ function tracked(make: () => string): string {
   dirs.push(dir);
   return dir;
 }
+
+describe("tw_migrate in-process execution", () => {
+  test("the transformation runs without spawning a Node child", async () => {
+    const dir = tracked(makeV3Tree);
+    const tools = createTools();
+    const result = (await tools.tw_migrate.execute({}, { directory: dir })) as ToolResult;
+    expect(result.text).toBe(REPORT_MIGRATED);
+    expect(existsSync(join(dir, "docs/tasks/effort/tickets/effort-task/ticket.md"))).toBe(true);
+  });
+});
 
 describe("tw_migrate disclosure", () => {
   /** A tool context with an in-memory active set standing in for the session. */
