@@ -68,9 +68,6 @@ title: Task Changelog
   narrative' core principle. 28 promoted skills.
 
 
-
-
-
 ## 2026-11-02, Remove the migration CLI from the package (remove-migration-cli)
 
 The package now ships exactly one migration executor, the disclosed `tw_migrate` tool. The three CLI files (the argv wrapper, the spawn shim, and its TypeScript resolve hook) are deleted, together with the four spawn-based shim tests whose coverage already lived in the tool tests; comment headers and the doctor skill's failure-cause wording were reworded so no living file names the removed CLI (dated changelog entries and archives keep their historical mentions, per the repo's exemption classes). Three permanent structure guards now pin the removal executably, following the repo's corpus-sweep prior art. Suite green: 22 files, 1299 tests.

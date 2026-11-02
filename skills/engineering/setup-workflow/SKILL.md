@@ -164,6 +164,20 @@ branch is touched only at the end. The branch choreography is explicit:
    branch is not `main` or `master`, ask for explicit user approval before
    the fast-forward, and proceed only on a yes.
 
+   If `git merge --ff-only` refuses, the integration branch moved while the
+   migration ran (a commit landed on it mid-run). The refusal is the safety
+   working: nothing is merged, and both branches survive (the migration
+   branch holds the migrated tree, the integration branch the mid-run
+   work). Surface the refusal to the user, then recover by re-deriving the
+   migration on the moved tip: delete the superseded migration branch
+   (`git branch -D migrate/schema-${from}-to-5`, the one place `-D` is
+   correct, because the re-run re-derives its work), create a fresh
+   migration branch from the moved integration-branch tip, and repeat from
+   step 3 (the phase is already open; the migration is idempotent, so the
+   re-run migrates the moved tree and converges to the same end state),
+   then repeat this step's fast-forward. The merge is never forced and
+   never bridged with a merge commit.
+
 5. **Delete the migration branch**:
    `git branch -d migrate/schema-${from}-to-5`. After the fast-forward the
    branch is dangling, and no history is lost.

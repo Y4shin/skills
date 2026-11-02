@@ -99,6 +99,14 @@ function makeV3TreeWithSlices(): string {
   return dir;
 }
 
+/** A tree whose state.yaml is a YAML list, not a mapping: the migration refuses loudly. */
+function makeNonMappingStateTree(): string {
+  const dir = mkdtempSync(join(tmpdir(), "tw-migrate-tool-"));
+  mkdirSync(join(dir, "docs/tasks"), { recursive: true });
+  writeFileSync(join(dir, "docs/tasks/state.yaml"), "- just\n- a\n- list\n");
+  return dir;
+}
+
 /** Every file under `dir`, as sorted [repo-relative path, bytes] pairs. */
 function snapshot(dir: string): Array<[string, string]> {
   const out: Array<[string, string]> = [];
@@ -252,5 +260,19 @@ describe("tw_migrate through the public tool factory", () => {
     expect(existsSync(join(dir, "docs/tasks/effort/tickets/effort-task/ticket.md"))).toBe(true);
     expect(existsSync(join(dir, "docs/tasks/effort-task/task.md"))).toBe(false);
     expect(readFileSync(join(dir, "docs/tasks/state.yaml"), "utf-8")).toMatch(/^schema_version: 5/m);
+  });
+
+  test("a failure throws the wrapped reason and the tree stays untouched", async () => {
+    // The twin of the deleted spawn-based shim test ("a failure exits
+    // non-zero with the reason") at the tool seam: the CLI's non-zero exit
+    // is the tool's thrown wrapper line, the line the skill surfaces. The
+    // fixture is the shim test's: a state.yaml that is not a YAML mapping.
+    const dir = tracked(makeNonMappingStateTree);
+    const before = snapshot(dir);
+    const tools = createTools();
+    await expect(tools.tw_migrate.execute({}, { directory: dir })).rejects.toThrow(
+      /^migration failed: cannot read 'docs\/tasks\/state\.yaml': expected a YAML mapping, got a list$/,
+    );
+    expect(snapshot(dir)).toEqual(before);
   });
 });

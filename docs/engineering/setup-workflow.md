@@ -28,7 +28,10 @@ is **5**.
   branch tip, with explicit user approval asked for first when the
   integration branch is not `main` or `master`; the migration branch is
   deleted after the fast-forward (it is dangling, no history is lost), and
-  the run ends on the integration branch. A
+  the run ends on the integration branch. A refused fast-forward (the
+  integration branch moved mid-run) is safe: both branches survive, and the
+  recovery re-derives the migration from the moved tip, because the tool is
+  idempotent; the merge is never forced. A
   `docs/bugs/` archive is left exactly where it
   is: schema 5 makes it a static archive, never a substrate and never moved.
   Repos still on schema 2 follow
@@ -70,6 +73,13 @@ and every rewrite is verified before a byte lands. A mid-run failure leaves
 the tree untouched, and the integration branch was never touched: it
 fast-forwards to the branch tip only after the migration commit, with the
 user's approval when it is not `main` or `master`.
+
+**What if the integration branch moved while the migration ran?**
+The `--ff-only` fast-forward refuses loudly, and both branches survive: the
+migration branch keeps the migrated tree, the integration branch the mid-run
+work. The recovery deletes the superseded migration branch and re-derives the
+migration on a fresh branch from the moved tip (the tool is idempotent, so
+the re-run converges); the merge itself is never forced.
 
 **What is in the MigrateReport?**
 Every change the tool made and every item needing human eyes. It is the
