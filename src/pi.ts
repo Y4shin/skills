@@ -46,7 +46,9 @@ import {
   type ScanIndexLike,
 } from "./core/graph.js";
 import { toObject, fromObject, freshState, isPointerName, POINTER_NAMES, type WorkflowState } from "./core/state.js";
-import { OKF_VERSION } from "./core/migrate.js";
+import { OKF_VERSION, migrate } from "./core/migrate.js";
+import { FsPort } from "./core/fs-port.js";
+import { renderMigrationReport } from "./migrate-report.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { FEEDBACK_KINDS, WORKFLOW_SOURCE, feedbackCall } from "./core/feedback.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
@@ -3112,6 +3114,34 @@ export function createTools(): Record<string, Tool> {
         const profile = profileText(root);
         const schema = artifactSchemaRef();
         return profile ? `${schema}\n\n---\n\n## Project profile\n\n${profile}` : schema;
+      },
+    ),
+
+    tw_migrate: defStructured(
+      "Migrate this repo's task-workflow bundle to schema 5, in-process: the whole any-vintage-to-5 " +
+        "transformation (the effort-grouped layout reorganization, the frontmatter unification, the aux " +
+        "backfill, the archive reshape, the state rebuild, the legacy slice reporting, the vendored-tree " +
+        "relocation, the schema-5 renames, the map body reshape, and the root index write) over the target " +
+        "tree, with every rewrite verified before it lands. Returns the migration report: the from and to " +
+        "schema versions, every change, every item needing human attention, or the already-current no-op " +
+        "answer. Read and surface the report; every rewrite is verified, a failure leaves the tree " +
+        "untouched, and a re-run is a no-op.",
+      Type.Object({}),
+      async (_p, ctx) => {
+        const root = findRoot(ctx.directory);
+        try {
+          const report = migrate(new FsPort(root));
+          return outcome(renderMigrationReport(report, false), {
+            from: report.from,
+            to: report.to,
+            noop: report.noop,
+            dryRun: false,
+            changes: report.changes.length,
+            needsHuman: report.needsHuman.length,
+          });
+        } catch (e) {
+          throw new Error(`migration failed: ${(e as Error).message}`);
+        }
       },
     ),
 
