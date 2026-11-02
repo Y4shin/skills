@@ -9,6 +9,8 @@ disable-model-invocation: true
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 `to-spec` synthesizes the effort's specification from the settled record: the
 map and the planning tasks' recorded results. No phase-owned question round
 runs here, and nothing new is asked that planning already settled. The

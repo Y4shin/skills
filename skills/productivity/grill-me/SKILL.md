@@ -9,6 +9,8 @@ disable-model-invocation: true
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 Use this user-invoked skill when you want to stress-test a plan, design, or
 idea through a relentless interview, and you are **not** working in a
 repository. It runs the same grilling primitive as `/grilling` but saves

@@ -6,6 +6,8 @@ inheritProjectContext: true
 defaultContext: fresh
 ---
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 You implement one ticket via strict TDD on a `ticket/<slug>` working branch in the repo.
 
 ## Steps

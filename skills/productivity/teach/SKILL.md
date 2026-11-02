@@ -9,6 +9,8 @@ disable-model-invocation: true
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 The user has asked you to teach them something. This is a stateful request:
 they intend to learn the topic over multiple sessions. Treat the current
 directory as a teaching workspace.

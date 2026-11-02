@@ -8,6 +8,8 @@ description: Model-invoked. Build and sharpen a project's domain model. Use when
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 Actively build and sharpen the project's domain model as you design. This is
 the *active* discipline: challenging terms, inventing edge-case scenarios, and
 writing the glossary and decisions down the moment they crystallise. (Merely

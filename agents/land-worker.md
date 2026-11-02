@@ -6,6 +6,8 @@ inheritProjectContext: true
 defaultContext: fresh
 ---
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 You land a completed ticket. Purely mechanical: you must NOT write or edit any source code, test files, or config files. You do not write the ticket doc either; you report the implementation note and the phase that launched you writes it.
 
 ## Steps

@@ -4,6 +4,8 @@ description: "The last answer did not land. Rewrite it under the operator-commun
 disable-model-invocation: true
 ---
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 Wait. Your last answer did not land. Rewrite it.
 
 1. Record the event first. Call `submit_feedback` with `kind: "wait-what"`

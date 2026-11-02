@@ -6,6 +6,8 @@ description: Turn a decision you can't fully answer into a questionnaire for som
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 Turn something the user can't answer alone into a **questionnaire**: a Markdown
 document they hand to one person to fill in async, or fill out together over
 a meeting. The recipient holds knowledge the user lacks; the questionnaire

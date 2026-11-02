@@ -8,6 +8,8 @@ description: Model-invoked, Pi-native reference for relentlessly stress-testing 
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 Interview the user relentlessly until you reach a shared understanding. Map
 this as a **design tree**: every decision branches into the decisions that
 depend on it.

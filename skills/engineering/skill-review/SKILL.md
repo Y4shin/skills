@@ -8,6 +8,8 @@ description: Review an Agent Skill along independent criteria, audience fit / me
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 Review a skill (its `SKILL.md`, references, scripts, and frontmatter) along
 independent axes. A cheap **stage-0 triage** fixes the axis set up front -
 core axes always run, optional axes run only for skills that exercise them -

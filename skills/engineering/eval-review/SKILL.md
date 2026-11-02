@@ -8,6 +8,8 @@ description: "Review an Inspect-based eval suite for the pi harness along indepe
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 Review an eval suite (its task modules, scorers, fixtures, and runner
 setup) along independent axes, or triage a failed or flaky run. Two modes:
 

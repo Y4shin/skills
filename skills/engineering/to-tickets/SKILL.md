@@ -9,6 +9,8 @@ disable-model-invocation: true
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 `to-tickets` turns a settled specification into two artifacts: the **living
 architecture document** and the **ticket graph**. The architecture is
 produced from the spec, not invented fresh.

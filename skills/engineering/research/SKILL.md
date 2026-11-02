@@ -8,6 +8,8 @@ description: Investigate a question against high-trust primary sources and captu
 Every message to the operator follows the `operator-communication`
 skill: load it before your first message.
 
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 Spin up a **background subagent** to do the research, so you keep working
 while it reads.
 
