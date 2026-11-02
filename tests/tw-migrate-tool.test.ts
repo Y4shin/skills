@@ -185,6 +185,15 @@ describe("tw_migrate disclosure", () => {
     expect(entry).toMatch(/tw_migrate/);
     expect(entry).toMatch(/disclosed tool/);
   });
+
+  test("the glossary's Migration entry names tw_migrate as the disclosed executor", () => {
+    const glossary = readFileSync(join(PROJECT, "CONTEXT.md"), "utf-8");
+    const entry = glossary.slice(glossary.indexOf("**Migration**"), glossary.indexOf("**Invocation model**"));
+    expect(entry).toContain("tw_migrate");
+    expect(entry).not.toContain("not a tool in the registered surface");
+    // The executor is the one the setup-workflow phase discloses.
+    expect(entry).toMatch(/setup-workflow/);
+  });
 });
 
 describe("tw_migrate through the public tool factory", () => {
