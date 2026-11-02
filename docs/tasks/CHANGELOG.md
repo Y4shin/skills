@@ -68,6 +68,11 @@ title: Task Changelog
   narrative' core principle. 28 promoted skills.
 
 
+
+## 2026-11-02, Add tw_migrate to the registered surface (tw-migrate-tool)
+
+The migration executor moved into the registered tool surface: `tw_migrate` is disclosed by the `setup-workflow` phase opener (withdrawn on close, absent from the idle default set) and runs the untouched `migrate()` core in-process over the production filesystem port, never spawning a Node child, so the installed-copy type-stripping refusal cannot recur. The CLI's report rendering moved verbatim into a shared module the tool imports (the still-shipped wrapper imports it transitionally until `remove-migration-cli` deletes it). The glossary's Migration entry now names `tw_migrate` as the executor instead of saying "not a tool in the registered surface". Nine new tests pin disclosure and the executor seam through the public tool factory over fixture trees, with golden report literals captured from the CLI before the redirect plus a spawn guard; four registered-surface test tables and one `tw_request_tool` refusal scenario were re-scenariod for the larger toolset. Suite green: 22 files, 1295 tests.
+
 ## 2026-11-01, Validate advisory review disposition targets (advisory-disposition-target-check)
 
 `tw_write_review` now validates every disposition target in both review passes. The finalize pass already refused a `ticket` disposition naming no ticket in the effort and a `follow-up` naming no live effort stamped `origin_effort`; the advisory pass, where the finalize triage records its dispositions of the end-of-effort findings, did not. A typo'd or invented slug therefore recorded "ticketed to X" for a ticket that never existed, and because `tw_archive_effort` deliberately skips `pass: end-of-effort` artifacts, the effort still archived with a dangling pointer and the finding was silently stranded.
