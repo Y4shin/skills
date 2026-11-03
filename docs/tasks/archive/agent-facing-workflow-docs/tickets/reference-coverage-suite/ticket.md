@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Reference coverage tests
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - write-workflow-internals

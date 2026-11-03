@@ -1,7 +1,7 @@
 ---
 type: map
 title: Agent-facing workflow troubleshooting docs
-status: stable
+status: deprecated
 ready_for_spec: true
 ---
 # Agent-facing workflow troubleshooting docs

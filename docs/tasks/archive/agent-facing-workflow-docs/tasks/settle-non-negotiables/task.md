@@ -2,7 +2,7 @@
 type: task
 subtype: grilling
 title: Settle non-negotiables
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 ---

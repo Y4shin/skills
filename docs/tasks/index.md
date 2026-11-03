@@ -8,14 +8,15 @@ title: docs/tasks
 
 ## Live
 
-- agent-facing-workflow-docs
 - build-eval-creator-skill
+- conventions-and-writer-cleanups
 - eval-scorer-feedback
 - migration-surface-polish
 
 ## Archived
 
 - adopt-mp-skills-way
+- agent-facing-workflow-docs
 - backfill-skill-docs-pages
 - bug-workflow
 - build-code-review-skill

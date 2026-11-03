@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Write the workflow internals reference
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - create-workflow-failure-skill

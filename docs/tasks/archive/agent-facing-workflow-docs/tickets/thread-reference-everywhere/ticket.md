@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Thread the reference sentence through skills and agent profiles
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - create-workflow-failure-skill

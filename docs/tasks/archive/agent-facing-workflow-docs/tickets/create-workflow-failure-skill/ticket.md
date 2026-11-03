@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Create the workflow-failure skill
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 size: m
