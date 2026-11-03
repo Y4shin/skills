@@ -14,7 +14,7 @@ The same installed task-workflow package runs in two setups: the regular setup, 
 - One installed Pi package serves both setups; work repos receive the work's own changes but never workflow files.
 - Local state is single-machine and single-operator; nothing syncs or shares it.
 - Terminology: a regularly set-up repo carries the workflow's files inside the repo; a locally set-up repo keeps all workflow state outside the repo, on the local machine. The raw request's "non-set-up" framing is retracted, because a local setup is still a setup.
-- The implementation shape stays open for the spec: how the skills serve both setups (variants, resource files, or otherwise), where supporting material lives, and the exact local-state layout and naming. The raw request's two-variants-inside-each-skill sketch and its `~/.pi/task-workflow/external-state/` path are possibilities, not decisions.
+- How the skills serve both setups (variants, resource files, or otherwise) stays open for the spec. The local state root, its keying, its marker, and the hook declaration are settled in `## Decisions so far`; the raw request's two-variants-inside-each-skill sketch and its `~/.pi/task-workflow/external-state/` path were possibilities, and research replaced both.
 
 ## Non-goals
 
@@ -40,8 +40,17 @@ The same installed task-workflow package runs in two setups: the regular setup, 
 ## Decisions so far
 
 - `settle-non-negotiables`: the success test, non-negotiable facts, and non-goals are settled; the tracker bridge widened into a milestone hook system declared in the local state, and the both-setups state is refused rather than resolved by preference.
+- `survey-in-repo-assumptions`: one resolved workflow root (the repo's `docs/tasks` in a regular setup, the per-repo local directory in a local setup) replaces the hardcoded root at every site that resolves it, including the write lockdown, the setup stamp, and the path strings in tool descriptions. `setup-workflow`'s scaffold, the knowledge-artifact writes, and the `git add docs/tasks/` commits are skipped in local setups; the CI gate, the branch merge, and the push stay untouched because they are repository operations. `state.ts` and `frontmatter.ts` need no change; `migrate.ts` and `fs-port.ts` need an injected root.
+- `research-local-state-root`: local state lives at `<agent-dir>/task-workflow/local-state/repos/<slug>-<hash12>/`, with the agent dir resolved through `getAgentDir()` rather than a hardcoded `~/.pi/agent`. The per-repo key is the canonical (symlink-resolved) repo path, rendered as a readable slug truncated from the leaf side plus 12 hex characters of its SHA-256. This was chosen over pi's session-style encoding, which was verified to collide (`/x/a/b` and `/x/a-b`), to overflow the 255-byte name limit, to leave paths outside `$HOME` with `..` in the name, and to be lexical rather than canonical. The marker is `local-setup.yaml` in that directory, holding `schema_version`, `kind: local`, `repo` (the canonical path), and `created_at`; detection reads it with a plain existence check that never creates a directory, then verifies `repo` against the detected path.
+- `design-hook-mechanism`: hooks are declared in `hooks.yaml` beside the effort state file and recorded in a separate `hook-state.yaml`, keyed `<effort>/<milestone>/<hook-id>`. A hook names a milestone token, `when` (gate or notify), a scope (phase or milestone), a prose instruction, and `done_when: evidence`. Milestone tokens are the single-writer `tw_*` transitions plus the phase boundaries. A gate hook lets the milestone write land, then refuses the next transition in the established `Refused: ... Legal next: ...` shape until a new `tw_hook_done` records evidence; `tw_hook_skip` with a mandatory reason is the escape hatch for an external outage, and its use shows up in the run's degradation report. `hooks.yaml` and the recovery surfaces (`tw_open`, `before_agent_start`, `session_start`) are the delivery channel; the pi `tool_call` hook stays reserved for the write lockdown.
+
+Decisions taken here from the research, not tied to a single task:
+
+- Setup detection reads the local marker first (read-only), then today's `isDir(docs/tasks)` rule. A repo with neither refuses and names both initializations; a repo with both refuses until the local setup is removed. The regular path is unchanged for repos that already work.
+- The local initialization counterpart owns schema upgrades of the local state (the marker and the hook declaration versions), mirroring `setup-workflow`'s migration role.
+- Archiving a locally set-up effort is local only: the work repo keeps only the work's own commits, so "archived" means archived under the local state root.
+- The explicit-degradation notice covers the core arc. Non-arc skills (`code-review`, `domain-modeling`, `tdd`, `improve-codebase-architecture`) keep their current behaviour and are outside this effort.
+- Notify hooks are recorded like gate hooks, so the degradation report can name them. `done_when: evidence` requires a non-empty reference to the artifact that was created; typed per-hook checks are a later addition.
+- Milestones that no single writer terminates are taken from the phase boundaries (`tw_open`, `tw_close`), not from new writer tools.
 
 ## Fog
-
-- The shape of the collected documentation and of finalize's integration review, and whether that review is built in or an instance of the hook system.
-- Whether the local initialization counterpart owns schema upgrades of existing local state, mirroring setup-workflow's migration role.

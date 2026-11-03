@@ -3,7 +3,7 @@ type: task
 subtype: research
 title: Design the milestone hook mechanism
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 ---
 
@@ -31,3 +31,7 @@ Findings at `docs/tasks/local-state-efforts/tasks/design-hook-mechanism/findings
 # Likely dependent tasks
 
 The spec; consumes `research-local-state-root` context for where the declaration lives.
+
+## Notes
+
+Findings: see `findings.md` in this task directory. Recommendation: `hooks.yaml` declaration plus a separate `hook-state.yaml`, milestone tokens from the single-writer `tw_*` transitions plus phase boundaries, gating by refusal at the transition tools in the existing `Refused: ... Legal next: ...` shape, completion through a new `tw_hook_done`. Confidence medium-high; the residual uncertainty is the milestone token set and whether a non-empty evidence reference is a strong enough completion bar.

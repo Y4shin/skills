@@ -3,7 +3,7 @@ type: task
 subtype: research
 title: Research keying and layout for the local state root
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 ---
 
@@ -31,3 +31,7 @@ Findings at `docs/tasks/local-state-efforts/tasks/research-local-state-root/find
 # Likely dependent tasks
 
 The spec; `design-hook-mechanism` consumes this task's result, because the hook declaration lives inside the local state root.
+
+## Notes
+
+Findings: see `findings.md` in this task directory. Recommendation: `<agent-dir>/task-workflow/local-state/repos/<readable-slug>-<hash12>/`, keyed by the canonical repo path, with a `local-setup.yaml` marker read by existence check only. Confidence high: the failed properties of pi's session-style encoding (collisions, 255-byte limit, `..` outside `$HOME`, lexical symlink handling) were verified rather than assumed.

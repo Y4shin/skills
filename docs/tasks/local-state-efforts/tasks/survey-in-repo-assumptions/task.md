@@ -3,7 +3,7 @@ type: task
 subtype: research
 title: Survey the workflow's in-repo assumptions
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 ---
 
@@ -31,3 +31,7 @@ Findings at `docs/tasks/local-state-efforts/tasks/survey-in-repo-assumptions/fin
 # Likely dependent tasks
 
 The spec. `research-local-state-root` and `design-hook-mechanism` consume overlapping context (layout constraints, milestone points), but none of the three blocks the others.
+
+## Notes
+
+Findings: see `findings.md` in this task directory. Recommendation: re-anchor one seam (a resolved workflow root) rather than sixteen call sites; skip `setup-workflow`'s scaffold, the knowledge-artifact writes, and the tree commits; keep the CI gate, branch merge, and push. Confidence high on the facts, medium on the disposition of four rows (effort grouping, lockdown, in-repo detection settings, foreign `docs/tasks`).
