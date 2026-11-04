@@ -74,6 +74,52 @@ function dirSnapshot(root: string): string[] {
   return out;
 }
 
+/**
+ * Whether this host enforces POSIX directory permissions. Windows ignores the
+ * mode bits of a directory, so `chmod 0o500` does not stop a write there and the
+ * permission-failure reproduction cannot be built. Probing by doing it also
+ * covers a POSIX host running as root.
+ */
+function chmodCanLockDirectory(): boolean {
+  const root = mkTmp();
+  const locked = join(root, "locked");
+  try {
+    mkdirSync(locked, { recursive: true });
+    chmodSync(locked, 0o500);
+    try {
+      writeFileSync(join(locked, "probe.txt"), "probe");
+      return false;
+    } catch {
+      return true;
+    } finally {
+      chmodSync(locked, 0o700);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Whether this process may create a symlink. Windows allows it only under
+ * Developer Mode or an elevated shell, so the dangling-symlink reproduction is
+ * unavailable there. The restore guarantee itself is covered on every host by
+ * the injected-failure test, which needs no permissions.
+ */
+function canCreateSymlink(): boolean {
+  const root = mkTmp();
+  try {
+    symlinkSync(join(root, "missing-target"), join(root, "link"));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+const CHMOD_LOCKS = chmodCanLockDirectory();
+const SYMLINKS_AVAILABLE = canCreateSymlink();
+
 /** A v3 tree: a map under maps/, a flat task, and a v3 state file. */
 function seedV3(root: string): void {
   mkdirSync(join(root, "docs/tasks/maps/effort"), { recursive: true });
@@ -147,7 +193,9 @@ describe("FsPort: corruption safety on real disk", () => {
     }
   });
 
-  test("a real I/O failure mid-commit restores the tree byte-identically", () => {
+  // Skipped where directory modes are not enforced: Windows, and a POSIX host
+  // running as root. docs/testing.md lists both capability gates.
+  test.skipIf(!CHMOD_LOCKS)("a real I/O failure mid-commit restores the tree byte-identically", () => {
     // The reproduction from the deviation report: a rename fails with EACCES
     // because the destination directory is read-only. The first move has
     // already landed when the second fails, so without a journal the tree is
@@ -172,6 +220,30 @@ describe("FsPort: corruption safety on real disk", () => {
       expect(dirSnapshot(root)).toEqual(dirsWithDest);
       expect(dirsWithDest).toContain("docs/tasks/effort/tickets");
       expect(dirsBefore).not.toContain("docs/tasks/effort/tickets");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a blocked destination path mid-commit restores the tree byte-identically", () => {
+    // The same guarantee as the read-only-directory case, built from a
+    // construct every platform enforces: a regular file where the commit must
+    // create a directory. POSIX fails with ENOTDIR, Windows with ENOENT or
+    // EEXIST, and either way the failure lands after earlier changes have been
+    // applied, so the journal is exercised rather than bypassed. This keeps the
+    // atomicity proof running on hosts that do not enforce directory modes.
+    const root = mkTmp();
+    try {
+      seedV3(root);
+      mkdirSync(join(root, "docs/tasks/effort"), { recursive: true });
+      writeFileSync(join(root, "docs/tasks/effort/tickets"), "a file where a directory must go\n");
+      const before = snapshot(root);
+      const dirsBefore = dirSnapshot(root);
+
+      expect(() => migrate(new FsPort(root))).toThrow();
+
+      expect(snapshot(root)).toEqual(before);
+      expect(dirSnapshot(root)).toEqual(dirsBefore);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -209,7 +281,8 @@ describe("FsPort: corruption safety on real disk", () => {
 });
 
 describe("FsPort: the tree walk tolerates symlink hazards", () => {
-  test("a dangling symlink outside the bundle is skipped, not fatal", () => {
+  // Skipped where symlinks need privileges: Windows without Developer Mode.
+  test.skipIf(!SYMLINKS_AVAILABLE)("a dangling symlink outside the bundle is skipped, not fatal", () => {
     // The reproduction from the live 3-to-4 run: a gitignored experiment
     // tree carries .devenv pointers to ephemeral runtime dirs, and statSync
     // (which follows links) threw ENOENT, killing the whole migration

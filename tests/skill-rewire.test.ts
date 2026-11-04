@@ -17,6 +17,9 @@ import { describe, expect, test } from "vitest";
 
 const PROJECT = process.cwd();
 
+// Paths compared against POSIX literals must be POSIX on every host.
+import { repoRel } from "./lib/repo-paths.js";
+
 function readFile(relativePath: string): string {
   return readFileSync(join(PROJECT, relativePath), "utf-8");
 }
@@ -309,11 +312,12 @@ describe("seam 7 - skill-creator invokes its bundled scripts through the registe
 
 // All files under a directory, depth-first (a tiny local walker keeps this
 // seam independent of skills.test.ts's helpers).
+/** Every file under `dir`, as repo-relative POSIX paths the seams can match. */
 function filesUnder(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) filesUnder(path, out);
-    else if (entry.isFile()) out.push(path);
+    else if (entry.isFile()) out.push(repoRel(path));
   }
   return out;
 }

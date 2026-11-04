@@ -1,0 +1,71 @@
+name: CI
+
+# Every push to a branch and every pull request runs the suite on Linux and on
+# Windows.
+#
+# Windows is in the matrix because it is the host this package kept breaking on
+# in ways Linux could not see: a byte-order mark hid artifacts from the scan,
+# CRLF leaked into frontmatter values, tool output printed backslashes, and the
+# corpus sweeps silently stopped enforcing their guards. All four were found by
+# running the suite on a real Windows machine, so the machine is now part of the
+# gate.
+#
+# Cost: standard GitHub-hosted runners are free in public repositories, which is
+# what this repository is. Only larger runners and private repositories are
+# billed, and this workflow uses neither.
+#
+# Two reproductions skip themselves on Windows and report why: the
+# permission-failure restore (needs enforced directory modes) and the
+# dangling-symlink walk (needs symlink permission). The restore guarantee still
+# runs there through a file-where-a-directory-belongs failure, so the skip is a
+# hole in the reproduction, not in the behaviour.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+# Default deny: this workflow only reads the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing must not hide the other platform's result.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    permissions:
+      contents: read
+    steps:
+      # Pinned to the commit behind v4.4.0, the same pins release.yml uses: a
+      # moved tag cannot change what runs.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Typecheck tests
+        run: npm run typecheck:tests
+
+      - name: Test
+        run: npm test

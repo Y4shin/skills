@@ -13,7 +13,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join, posix, win32 } from "node:path";
+import { dirname, join, posix, win32 } from "node:path";
 import { randomBytes } from "node:crypto";
 import { afterEach, describe, expect, test } from "vitest";
 
@@ -22,6 +22,7 @@ import { decodeText, normalizeNewlines, stripBom } from "../src/core/encoding.js
 import { FsPort } from "../src/core/fs-port.js";
 import { migrate } from "../src/core/migrate.js";
 import { parse } from "../src/core/frontmatter.js";
+import { repoRel } from "./lib/repo-paths.js";
 import { MAX_SLUG_LENGTH, WINDOWS_RESERVED_SLUGS, slugRejection } from "../src/core/slug.js";
 
 const REPO_ROOT = process.cwd();
@@ -317,6 +318,18 @@ describe("slug rules are legal directory names on every desktop OS", () => {
     }
   });
 
+  test("the cap leaves room for the checkout root under the Windows path limit", () => {
+    // A deviation report repeats the ticket slug at depth, so this is the
+    // longest path the package generates on its own. 260 characters is the
+    // Windows MAX_PATH limit before long-path support is switched on; whatever
+    // this suffix costs is what is left for the checkout root.
+    const slug = "a".repeat(MAX_SLUG_LENGTH);
+    const deepest = join("docs", "tasks", slug, "tickets", slug, "deviation-reports", `${slug}.md`);
+    const suffix = segments(deepest).join("/").length;
+    expect(suffix).toBeLessThanOrEqual(234);
+    expect(260 - suffix).toBeGreaterThanOrEqual(26);
+  });
+
   for (const desktop of DESKTOPS) {
     test(`${desktop.name}: every accepted slug is exactly one directory name`, () => {
       const base = desktop.path.join("docs", "tasks");
@@ -364,6 +377,78 @@ describe("slug rules are legal directory names on every desktop OS", () => {
         ctx,
       ),
     ).resolves.toContain("created");
+  });
+});
+
+// ─── Tool results carry POSIX paths on every host ────────────────────────────
+
+const TOOLS: Record<string, { description: string; execute: Function }> = createTools();
+const ctxFor = (directory: string): any => ({ directory });
+
+/** Write a frontmattered artifact, creating its directory. */
+function seedArtifact(path: string, frontmatter: string, body = ""): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `---\n${frontmatter}---\n${body}`);
+}
+
+describe("tool results carry POSIX artifact paths on every host", () => {
+  test("the repo-relative helper returns POSIX form for a host-joined path", () => {
+    // Every corpus sweep compares against POSIX literals, so this is the
+    // invariant that keeps the guards enforcing on Windows.
+    expect(repoRel(join(REPO_ROOT, "docs", "tasks", "CHANGELOG.md"))).toBe("docs/tasks/CHANGELOG.md");
+    expect(repoRel(join(REPO_ROOT, "skills"))).toBe("skills");
+  });
+
+  test("creation results name docs/tasks/... with forward slashes", async () => {
+    const dir = mkTmp("posix-create");
+    const ctx = ctxFor(dir);
+
+    const effort = await TOOLS.tw_create_effort.execute({ effort: "posix", title: "Posix" }, ctx);
+    expect(effort).toContain("created docs/tasks/posix/map.md");
+    expect(effort).not.toContain("\\");
+
+    const ticket = await TOOLS.tw_add_ticket.execute(
+      { effort: "posix", slug: "posix-ticket", title: "T", subtype: "feature" },
+      ctx,
+    );
+    expect(ticket).toContain("created docs/tasks/posix/tickets/posix-ticket/ticket.md");
+    expect(ticket).not.toContain("\\");
+  });
+
+  test("tw_resolve_uncertainty returns a POSIX path", async () => {
+    const dir = mkTmp("posix-uncertainty");
+    seedArtifact(join(dir, "docs/tasks/posix/map.md"), "type: map\ntitle: Posix\nstatus: stable\n");
+    seedArtifact(
+      join(dir, "docs/tasks/posix/tickets/posix-ticket/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Posix ticket\nstatus: stable\nworkflow_state: ready\nblocked_by: []\n",
+    );
+    seedArtifact(join(dir, "docs/tasks/posix/tickets/posix-ticket/.work/uncertainty.md"), "", "Which font?\n");
+
+    const out = await TOOLS.tw_resolve_uncertainty.execute(
+      { selector: "posix-ticket", resolution: "The sans one." },
+      ctxFor(dir),
+    );
+    expect(out).toBe("docs/tasks/posix/tickets/posix-ticket/.work/resolution.md");
+  });
+
+  test("tw_archive_effort names the archive and the index in POSIX form", async () => {
+    const dir = mkTmp("posix-archive");
+    seedArtifact(join(dir, "docs/tasks/winding/map.md"), "type: map\ntitle: Winding\nstatus: stable\n");
+    seedArtifact(join(dir, "docs/tasks/winding/spec.md"), "type: spec\ntitle: Winding spec\nstatus: stable\n");
+    seedArtifact(
+      join(dir, "docs/tasks/winding/tickets/land/ticket.md"),
+      "type: ticket\nsubtype: feature\ntitle: Land\nstatus: stable\nworkflow_state: done\nblocked_by: []\n",
+    );
+    seedArtifact(
+      join(dir, "docs/tasks/index.md"),
+      'type: index\nokf_version: "0.2"\ntitle: docs/tasks\n',
+      "\n# docs/tasks\n\n## Live\n\n- winding\n\n## Archived\n",
+    );
+
+    const out = await TOOLS.tw_archive_effort.execute({ selector: "winding" }, ctxFor(dir));
+    expect(out).toContain("archived 'winding' to docs/tasks/archive/winding");
+    expect(out).toContain("docs/tasks/index.md");
+    expect(out).not.toContain("\\");
   });
 });
 

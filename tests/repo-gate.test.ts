@@ -17,7 +17,7 @@ import {
 } from "../src/core/repo-gate.js";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 describe("normalizeRemote", () => {
   test("normalizes SSH github URL", () => {
@@ -73,79 +73,80 @@ describe("normalizeRemote", () => {
   });
 });
 
+// A host-shaped absolute path: `walkToGitRoot` resolves its argument, so a fake
+// tree keyed on POSIX literals ("/repo/.git") only matches on POSIX hosts.
+// These fakes are keyed on the resolved path instead, which is what the walker
+// actually asks about on every platform.
+const FAKE_REPO = resolve(join("tests", "fixtures", "repo"));
+const FAKE_GIT = join(FAKE_REPO, ".git");
+const FAKE_CONFIG = join(FAKE_GIT, "config");
+
+/** Keyed exactly as the walker resolves and joins: host separators, host drive. */
+const onlyFakeGit = (p: string): boolean => p === FAKE_GIT;
+
 describe("walkToGitRoot", () => {
   test("returns null when no .git exists", () => {
     const existsSync = () => false;
-    expect(walkToGitRoot("/tmp/nowhere", { existsSync })).toBeNull();
+    expect(walkToGitRoot(join(FAKE_REPO, "nowhere"), { existsSync })).toBeNull();
   });
 
   test("finds .git in the starting directory", () => {
-    const existsSync = (p: string) => p === "/repo/.git";
-    expect(walkToGitRoot("/repo", { existsSync })).toBe("/repo");
+    expect(walkToGitRoot(FAKE_REPO, { existsSync: onlyFakeGit })).toBe(FAKE_REPO);
   });
 
   test("walks up to find .git in a parent directory", () => {
-    const existsSync = (p: string) => p === "/repo/.git";
-    expect(walkToGitRoot("/repo/src/core", { existsSync })).toBe("/repo");
+    expect(walkToGitRoot(join(FAKE_REPO, "src", "core"), { existsSync: onlyFakeGit })).toBe(FAKE_REPO);
   });
 });
 
 describe("readOriginRemote", () => {
   test("returns null when no .git directory exists", () => {
     const existsSync = () => false;
-    expect(readOriginRemote("/tmp/nowhere", { existsSync })).toBeNull();
+    expect(readOriginRemote(join(FAKE_REPO, "nowhere"), { existsSync })).toBeNull();
   });
 
   test("reads origin URL from synthetic .git/config", () => {
-    const existsSync = (p: string) => p === "/repo/.git";
-    const isDir = () => true;
     const readFileSync = (p: string, _encoding: "utf-8" = "utf-8"): string => {
-      if (p === "/repo/.git/config") {
+      if (p === FAKE_CONFIG) {
         return '[remote "origin"]\n\turl = git@github.com:QNCGmbH/openai.git\n';
       }
       throw new Error(`unexpected read: ${p}`);
     };
     expect(
-      readOriginRemote("/repo", { existsSync, isDir, readFileSync }),
+      readOriginRemote(FAKE_REPO, { existsSync: onlyFakeGit, isDir: () => true, readFileSync }),
     ).toBe("git@github.com:QNCGmbH/openai.git");
   });
 
   test("returns null when .git directory has no origin remote", () => {
-    const existsSync = (p: string) => p === "/repo/.git";
-    const isDir = () => true;
     const readFileSync = (p: string, _encoding: "utf-8" = "utf-8"): string => {
-      if (p === "/repo/.git/config") {
+      if (p === FAKE_CONFIG) {
         return '[remote "upstream"]\n\turl = git@github.com:QNCGmbH/openai.git\n';
       }
       throw new Error(`unexpected read: ${p}`);
     };
     expect(
-      readOriginRemote("/repo", { existsSync, isDir, readFileSync }),
+      readOriginRemote(FAKE_REPO, { existsSync: onlyFakeGit, isDir: () => true, readFileSync }),
     ).toBeNull();
   });
 
   test("falls back to git CLI for gitfile-style .git", () => {
-    const existsSync = (p: string) => p === "/repo/.git";
-    const isDir = () => false;
     const execSync = (cmd: string, opts?: { cwd?: string }) => {
-      if (cmd === "git remote get-url origin" && opts?.cwd === "/repo") {
+      if (cmd === "git remote get-url origin" && opts?.cwd === FAKE_REPO) {
         return "git@github.com:QNCGmbH/openai.git\n";
       }
       throw new Error(`unexpected exec: ${cmd}`);
     };
     expect(
-      readOriginRemote("/repo", { existsSync, isDir, execSync }),
+      readOriginRemote(FAKE_REPO, { existsSync: onlyFakeGit, isDir: () => false, execSync }),
     ).toBe("git@github.com:QNCGmbH/openai.git");
   });
 
   test("returns null when git CLI fallback fails", () => {
-    const existsSync = (p: string) => p === "/repo/.git";
-    const isDir = () => false;
     const execSync = () => {
       throw new Error("git not found");
     };
     expect(
-      readOriginRemote("/repo", { existsSync, isDir, execSync }),
+      readOriginRemote(FAKE_REPO, { existsSync: onlyFakeGit, isDir: () => false, execSync }),
     ).toBeNull();
   });
 });

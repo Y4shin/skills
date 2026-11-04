@@ -741,7 +741,7 @@ function markTicketDone(root: string, path: string, art: Artifact, doc: Document
   const changelogPath = join(taskRoot(root), "CHANGELOG.md");
   if (!isFile(changelogPath)) {
     throw new Error(
-      `'${art.slug}' cannot be marked done: the changelog (${relative(root, changelogPath)}) does not exist; ` +
+      `'${art.slug}' cannot be marked done: the changelog (${relPosix(root, changelogPath)}) does not exist; ` +
         `write the ticket's changelog entry with tw_write_changelog first`,
     );
   }
@@ -780,7 +780,7 @@ function liveEffortDir(root: string, selector: string): string | null {
     candidates.push(dirname(resolveArt(root, selector, "map").path));
   } catch { /* not a map selector */ }
   for (const candidate of candidates) {
-    const rel = relative(taskRoot(root), candidate);
+    const rel = relPosix(taskRoot(root), candidate);
     if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) continue;
     // An archived effort is not live: its directory sits under archive/.
     const first = rel.split(/[\\/]/)[0];
@@ -876,7 +876,7 @@ function writeEffortRootArtifact(o: EffortRootWriteOptions): string {
     if (publish) hit.doc.data.status = "stable";
     writeFileSync(hit.path, dump(hit.doc), "utf-8");
     const suffix = o.afterWrite ? o.afterWrite(hit.path, dirname(hit.path)) : "";
-    const where = o.section !== undefined ? `wrote '## ${o.section}' in ${relative(root, hit.path)}` : `wrote ${relative(root, hit.path)}`;
+    const where = o.section !== undefined ? `wrote '## ${o.section}' in ${relPosix(root, hit.path)}` : `wrote ${relPosix(root, hit.path)}`;
     return `${where}${publish ? " (status: stable)" : ""}${suffix}`;
   }
 
@@ -901,7 +901,7 @@ function writeEffortRootArtifact(o: EffortRootWriteOptions): string {
   const path = join(effortDir, TYPE_LEAF[kind]);
   writeFileSync(path, dump({ data: { type: kind, title, status: publish ? "stable" : "draft" }, body }), "utf-8");
   const suffix = o.afterWrite ? o.afterWrite(path, effortDir) : "";
-  return `wrote ${relative(root, path)} (created, status: ${publish ? "stable" : "draft"})${suffix}`;
+  return `wrote ${relPosix(root, path)} (created, status: ${publish ? "stable" : "draft"})${suffix}`;
 }
 
 /** The ticket-doc section the implementation-notes writer owns. */
@@ -1061,7 +1061,7 @@ function liveEffortDirOfArtifact(root: string, selector: string, want: string): 
     return null;
   }
   const candidate = dirname(hit.path);
-  const rel = relative(taskRoot(root), candidate);
+  const rel = relPosix(taskRoot(root), candidate);
   if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return null;
   if (rel.split(/[\\/]/)[0] === "archive") return null;
   return isDir(candidate) ? candidate : null;
@@ -1093,6 +1093,20 @@ function requireLinkedFollowUp(root: string, origin: string, target: string, sub
         `tw_create_effort and origin_effort '${origin}'`,
     );
   }
+}
+
+/**
+ * The POSIX form of `relative(from, to)`.
+ *
+ * Artifact paths are POSIX everywhere else in the package: frontmatter, the
+ * docs, the skills, and the tree model all write `docs/tasks/<effort>/...`.
+ * A Windows host would otherwise put `docs\tasks\...` into tool results and
+ * error messages, which the model then pastes into path arguments and compares
+ * against prose. The result is identical on every platform, so a message is
+ * never host-shaped.
+ */
+function relPosix(from: string, to: string): string {
+  return relative(from, to).split("\\").join("/");
 }
 
 const TICKET_SIZES = ["s", "m", "l", "xl"] as const;
@@ -1140,17 +1154,17 @@ function registerLiveEffort(root: string, effort: string): void {
  * opens for an archived effort, so no writer is reachable there anyway).
  */
 function refuseArchivedArtifact(root: string, path: string): void {
-  const rel = relative(taskRoot(root), path);
+  const rel = relPosix(taskRoot(root), path);
   const segments = rel.split(/[\\/]/).filter((s) => s !== "" && s !== ".");
   if (segments[0] !== "archive") return;
   throw new Error(
-    `'${relative(root, path)}' belongs to an archived effort: the archive is the record of what was ` +
+    `'${relPosix(root, path)}' belongs to an archived effort: the archive is the record of what was ` +
       `settled, not a document to amend. A correction to what was built belongs to a new effort`,
   );
 }
 
 function isInside(dir: string, path: string): boolean {
-  const rel = relative(dir, path);
+  const rel = relPosix(dir, path);
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
 
@@ -1400,13 +1414,13 @@ function phaseGate(
         const status = parseArtifactFile(specPath).art.status;
         if (status !== null && status !== "stable") {
           return {
-            reason: `'${relative(root, specPath)}' has status '${status}', not stable: to-tickets consumes the published spec`,
+            reason: `'${relPosix(root, specPath)}' has status '${status}', not stable: to-tickets consumes the published spec`,
             legalNext: ["publish the spec through to-spec"],
           };
         }
       } catch {
         return {
-          reason: `'${relative(root, specPath)}' is not a readable artifact: rewrite it through to-spec`,
+          reason: `'${relPosix(root, specPath)}' is not a readable artifact: rewrite it through to-spec`,
           legalNext: ["run to-spec"],
         };
       }
@@ -1457,7 +1471,7 @@ function phaseGate(
         if (arch.art.status !== null && arch.art.status !== "stable") {
           return {
             reason:
-              `'${relative(root, arch.path)}' has status '${arch.art.status}', not stable: ` +
+              `'${relPosix(root, arch.path)}' has status '${arch.art.status}', not stable: ` +
               `the architecture document is never drafted here`,
             legalNext: ["run to-tickets"],
           };
@@ -1916,7 +1930,7 @@ export function createTools(): Record<string, Tool> {
         doc.body = writeMapSection(doc.body, section, typeof p.content === "string" ? p.content : "");
         const cleared = clearReadyForSpec(doc);
         writeFileSync(path, dump(doc), "utf-8");
-        return `wrote '## ${section}' in ${relative(root, path)}${cleared ? "; ready_for_spec cleared" : ""}`;
+        return `wrote '## ${section}' in ${relPosix(root, path)}${cleared ? "; ready_for_spec cleared" : ""}`;
       },
     ),
 
@@ -1979,7 +1993,7 @@ export function createTools(): Record<string, Tool> {
         // Every check passed: the flag is set last, in the single write.
         doc.data.ready_for_spec = true;
         writeFileSync(path, dump(doc), "utf-8");
-        return `map finalized: ready_for_spec = true in ${relative(root, path)}`;
+        return `map finalized: ready_for_spec = true in ${relPosix(root, path)}`;
       },
     ),
 
@@ -2070,7 +2084,7 @@ export function createTools(): Record<string, Tool> {
             if (legacy.length > 0) {
               throw new Error(
                 `effort '${effortName}' still holds the legacy architecture shape ` +
-                  `(${legacy.map((h) => relative(root, h.path)).join(", ")}): run the schema-5 migration ` +
+                  `(${legacy.map((h) => relPosix(root, h.path)).join(", ")}): run the schema-5 migration ` +
                   `(it renames arch-spec.md to architecture.md) before using the v5 architecture writer`,
               );
             }
@@ -2087,7 +2101,7 @@ export function createTools(): Record<string, Tool> {
             if (duplicates.length > 0) {
               throw new Error(
                 `effort '${effortName}' already holds architecture document(s) elsewhere ` +
-                  `(${duplicates.map((h) => relative(root, h.path)).join(", ")}): resolve the duplication before creating another one`,
+                  `(${duplicates.map((h) => relPosix(root, h.path)).join(", ")}): resolve the duplication before creating another one`,
               );
             }
           },
@@ -2209,10 +2223,10 @@ export function createTools(): Record<string, Tool> {
           }
           writeFileSync(path, dump({ data, body }), "utf-8");
           return outcome(
-            `wrote ${relative(root, path)} (advisory end-of-effort pass${
+            `wrote ${relPosix(root, path)} (advisory end-of-effort pass${
               advisoryFindings === undefined ? "" : `, dispositioned: ${String(data.dispositioned)}`
             })`,
-            { path: relative(root, path), pass, dispositioned: data.dispositioned },
+            { path: relPosix(root, path), pass, dispositioned: data.dispositioned },
           );
         }
         {
@@ -2307,8 +2321,8 @@ export function createTools(): Record<string, Tool> {
         writeFileSync(reviewPath, dump(doc), "utf-8");
         const movedNote = followUp !== undefined ? `; findings moved to ${followUp}` : "";
         return outcome(
-          `wrote ${relative(root, reviewPath)} (dispositioned: ${dispositioned}${movedNote})`,
-          { path: relative(root, reviewPath), dispositioned, movedTo: followUp },
+          `wrote ${relPosix(root, reviewPath)} (dispositioned: ${dispositioned}${movedNote})`,
+          { path: relPosix(root, reviewPath), dispositioned, movedTo: followUp },
         );
         }
       },
@@ -2360,7 +2374,7 @@ export function createTools(): Record<string, Tool> {
         const inEffort = (path: string): boolean => isInside(effortDir, path);
         const clash = index.hits.find((h) => h.art.slug === seed.slug && inEffort(h.path));
         if (clash !== undefined) {
-          throw new Error(`'${seed.slug}' already exists in '${p.effort}' (${clash.art.type} at ${relative(root, clash.path)})`);
+          throw new Error(`'${seed.slug}' already exists in '${p.effort}' (${clash.art.type} at ${relPosix(root, clash.path)})`);
         }
         if (isDir(join(effortDir, "tickets", seed.slug))) {
           throw new Error(`'${seed.slug}' already exists in '${p.effort}' (its ticket directory is there)`);
@@ -2386,7 +2400,7 @@ export function createTools(): Record<string, Tool> {
         mkdirSync(ticketDir, { recursive: true });
         writeFileSync(ticketPath, dump(ticketDocument(seed)), "utf-8");
         const sizeNote = seed.size !== undefined ? `, size: ${seed.size}` : "";
-        return `created ${relative(root, ticketPath)} (${seed.subtype}${sizeNote})`;
+        return `created ${relPosix(root, ticketPath)} (${seed.subtype}${sizeNote})`;
       },
     ),
 
@@ -2444,7 +2458,7 @@ export function createTools(): Record<string, Tool> {
         writeFileSync(mapPath, dump(createEffortDocument(title, originEffort)), "utf-8");
         registerLiveEffort(root, effort);
         const linkNote = originEffort !== undefined ? `; linked to origin effort '${originEffort}'` : "";
-        return `created ${relative(root, mapPath)} (both canonical sections seeded empty); registered '${effort}' in the root index${linkNote}`;
+        return `created ${relPosix(root, mapPath)} (both canonical sections seeded empty); registered '${effort}' in the root index${linkNote}`;
       },
     ),
 
@@ -2498,7 +2512,7 @@ export function createTools(): Record<string, Tool> {
         const clash = index.hits.find((h) => h.art.slug === slug && isInside(effortDir, h.path));
         if (clash !== undefined) {
           throw new Error(
-            `'${slug}' already exists in '${p.effort}' (${clash.art.type} at ${relative(root, clash.path)})`,
+            `'${slug}' already exists in '${p.effort}' (${clash.art.type} at ${relPosix(root, clash.path)})`,
           );
         }
         if (isDir(join(effortDir, "tasks", slug)) || isDir(join(effortDir, "tickets", slug))) {
@@ -2544,7 +2558,7 @@ export function createTools(): Record<string, Tool> {
         // present `true` is rewritten (absent stays absent).
         const cleared = clearReadyForSpec(mapHit.doc);
         if (cleared) writeFileSync(join(effortDir, "map.md"), dump(mapHit.doc), "utf-8");
-        return `created ${relative(root, taskPath)} (${subtype})${cleared ? "; ready_for_spec cleared" : ""}`;
+        return `created ${relPosix(root, taskPath)} (${subtype})${cleared ? "; ready_for_spec cleared" : ""}`;
       },
     ),
 
@@ -2619,7 +2633,7 @@ export function createTools(): Record<string, Tool> {
           }
           const clash = index.hits.find((h) => h.art.slug === sub.slug && inEffort(h.path));
           if (clash !== undefined) {
-            throw new Error(`'${sub.slug}' already exists in the effort (${clash.art.type} at ${relative(root, clash.path)})`);
+            throw new Error(`'${sub.slug}' already exists in the effort (${clash.art.type} at ${relPosix(root, clash.path)})`);
           }
         }
         for (const sub of subs) {
@@ -2654,7 +2668,7 @@ export function createTools(): Record<string, Tool> {
           const ticketPath = join(ticketDir, "ticket.md");
           mkdirSync(ticketDir, { recursive: true });
           writeFileSync(ticketPath, dump(ticketDocument(seed)), "utf-8");
-          created.push(relative(root, ticketPath));
+          created.push(relPosix(root, ticketPath));
         }
 
         original.doc.data.status = "deprecated";
@@ -2809,7 +2823,7 @@ export function createTools(): Record<string, Tool> {
         );
         if (unDispositioned.length > 0) {
           throw new Error(
-            `cannot archive '${effortKey}': ${unDispositioned.map((h) => relative(root, h.path)).join(", ")} ` +
+            `cannot archive '${effortKey}': ${unDispositioned.map((h) => relPosix(root, h.path)).join(", ")} ` +
               `carry undispositioned findings; disposition every finding (in-scope: an implementation ticket, ` +
               `out-of-scope: a follow-up effort after a human yes, informational: accepted) before archiving`,
           );
@@ -2827,7 +2841,7 @@ export function createTools(): Record<string, Tool> {
         );
         if (unreconciled.length > 0) {
           throw new Error(
-            `cannot archive '${effortKey}': ${unreconciled.map((h) => relative(root, h.path)).join(", ")} ` +
+            `cannot archive '${effortKey}': ${unreconciled.map((h) => relPosix(root, h.path)).join(", ")} ` +
               `carries no reconcile record; reconcile the living architecture against what landed, then record ` +
               `the outcome through tw_write_review with reconcile: 'done: <what changed>', 'none: <why>' or ` +
               `'unavailable: <reason>'`,
@@ -2836,7 +2850,7 @@ export function createTools(): Record<string, Tool> {
         const destDir = join(taskRoot(root), "archive", effortKey);
         if (existsSync(destDir)) {
           throw new Error(
-            `archive destination '${relative(root, destDir)}' already exists: a collision is refused, never overwritten`,
+            `archive destination '${relPosix(root, destDir)}' already exists: a collision is refused, never overwritten`,
           );
         }
 
@@ -2877,7 +2891,7 @@ export function createTools(): Record<string, Tool> {
               })()
             : "";
 
-        return `archived '${effortKey}' to ${relative(root, destDir)}; index updated (${relative(root, indexPath)})${pointerNote}`;
+        return `archived '${effortKey}' to ${relPosix(root, destDir)}; index updated (${relPosix(root, indexPath)})${pointerNote}`;
       },
     ),
 
@@ -2891,12 +2905,12 @@ export function createTools(): Record<string, Tool> {
         const workDir = join(dirname(path), ".work");
         const uncertaintyPath = join(workDir, "uncertainty.md");
         if (!isFile(uncertaintyPath)) {
-          throw new Error(`no uncertainty to resolve for ticket '${art.slug}': ${relative(root, uncertaintyPath)} does not exist`);
+          throw new Error(`no uncertainty to resolve for ticket '${art.slug}': ${relPosix(root, uncertaintyPath)} does not exist`);
         }
         const resolutionPath = join(workDir, "resolution.md");
         writeFileSync(resolutionPath, `${p.resolution.trim()}\n`, "utf-8");
         rmSync(uncertaintyPath);
-        return relative(root, resolutionPath);
+        return relPosix(root, resolutionPath);
       },
     ),
 
@@ -2952,7 +2966,7 @@ export function createTools(): Record<string, Tool> {
           doc.body = lines.join("\n");
         }
         writeFileSync(changelogPath, dump(doc), "utf-8");
-        return `wrote ${relative(root, changelogPath)}: ${heading}`;
+        return `wrote ${relPosix(root, changelogPath)}: ${heading}`;
       },
     ),
 
@@ -2978,7 +2992,7 @@ export function createTools(): Record<string, Tool> {
               `tw_write_ticket_note, a map section through tw_write_section`,
           );
         }
-        const treeRel = relative(taskRoot(root), path);
+        const treeRel = relPosix(taskRoot(root), path);
         if (treeRel.split(/[\\/]/)[0] === "archive") {
           throw new Error(
             `'${p.selector}' is an archived task: a planning record belongs to a live effort`,
@@ -2988,7 +3002,7 @@ export function createTools(): Record<string, Tool> {
         const content = existing.length > 0 ? [...existing, "", ...note.split("\n")].join("\n") : note;
         doc.body = writeMapSection(doc.body, PLANNING_NOTES_SECTION, content);
         writeFileSync(path, dump(doc), "utf-8");
-        return `wrote '## ${PLANNING_NOTES_SECTION}' in ${relative(root, path)}`;
+        return `wrote '## ${PLANNING_NOTES_SECTION}' in ${relPosix(root, path)}`;
       },
     ),
 
@@ -3014,7 +3028,7 @@ export function createTools(): Record<string, Tool> {
               `writes ticket docs only`,
           );
         }
-        const treeRel = relative(taskRoot(root), path);
+        const treeRel = relPosix(taskRoot(root), path);
         if (treeRel.split(/[\\/]/)[0] === "archive") {
           throw new Error(
             `'${p.selector}' is an archived ticket: implementation notes belong to a live effort's record`,
@@ -3024,7 +3038,7 @@ export function createTools(): Record<string, Tool> {
         const content = existing.length > 0 ? [...existing, "", ...note.split("\n")].join("\n") : note;
         doc.body = writeMapSection(doc.body, IMPLEMENTATION_NOTES_SECTION, content);
         writeFileSync(path, dump(doc), "utf-8");
-        return `wrote '## ${IMPLEMENTATION_NOTES_SECTION}' in ${relative(root, path)}`;
+        return `wrote '## ${IMPLEMENTATION_NOTES_SECTION}' in ${relPosix(root, path)}`;
       },
     ),
 
@@ -3077,7 +3091,7 @@ export function createTools(): Record<string, Tool> {
         bullets.sort((a, b) => slugOf(a).localeCompare(slugOf(b)));
         indexDoc.body = writeMapSection(indexDoc.body, "Notes", bullets.join("\n"));
         writeFileSync(indexPath, dump(indexDoc), "utf-8");
-        return `recorded ${relative(root, notePath)} and updated ${relative(root, indexPath)}`;
+        return `recorded ${relPosix(root, notePath)} and updated ${relPosix(root, indexPath)}`;
       },
     ),
 
@@ -3540,7 +3554,7 @@ function isTaskTreePath(path: string, cwd: string): boolean {
   const resolved = resolvePath(cwd, path);
   const root = findRoot(cwd);
   const tree = taskRoot(root);
-  const rel = relative(tree, resolved);
+  const rel = relPosix(tree, resolved);
   if (rel !== "" && (rel.startsWith("..") || isAbsolute(rel))) return false;
   const segments = rel.split(/[\\/]/).filter((s) => s !== "" && s !== ".");
   if (segments.some((segment) => LOCKDOWN_EXEMPT_SEGMENTS.has(segment))) return false;

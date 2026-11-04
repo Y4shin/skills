@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, test } from "vitest";
 import { parse as parseYaml } from "yaml";
+import { repoRel } from "./lib/repo-paths.js";
 import { parse } from "../src/core/frontmatter.js";
 import { findAnomalies, fromFrontmatter, validateArtifact, type Artifact } from "../src/core/art.js";
 import { createTools } from "../src/pi.js";
@@ -1344,7 +1345,7 @@ describe("migration CLI removal (remove-migration-cli)", () => {
     const self = "tests/skills.test.ts";
     const offenders: string[] = [];
     for (const file of corpusFiles(PROJECT)) {
-      const rel = file.slice(PROJECT.length + 1);
+      const rel = repoRel(file);
       if (rel === self) continue;
       if (rel.startsWith("docs/tasks/migration-tool/")) continue;
       if (removed.test(readFileSync(file, "utf-8"))) {
@@ -1364,7 +1365,7 @@ describe("migration CLI removal (remove-migration-cli)", () => {
     for (const dir of ["skills", "docs/engineering", "docs/productivity"]) {
       for (const file of corpusFiles(join(PROJECT, dir))) {
         if (/migration CLI/i.test(readFileSync(file, "utf-8"))) {
-          proseOffenders.push(file.slice(PROJECT.length + 1));
+          proseOffenders.push(repoRel(file));
         }
       }
     }
@@ -1527,7 +1528,7 @@ describe("tool prefix rename", () => {
   test("no old-prefix tool reference remains outside archive", () => {
     const offenders: string[] = [];
     for (const file of corpusFiles(PROJECT)) {
-      const rel = file.slice(PROJECT.length + 1);
+      const rel = repoRel(file);
       if (CORPUS_EXEMPTIONS.has(rel)) continue;
       const content = readFileSync(file, "utf-8");
       if (OLD_TOOL_PATTERN.test(content)) {
@@ -1540,7 +1541,7 @@ describe("tool prefix rename", () => {
   test("no old-prefix wildcard reference remains in living docs", () => {
     const offenders: string[] = [];
     for (const file of corpusFiles(PROJECT)) {
-      const rel = file.slice(PROJECT.length + 1);
+      const rel = repoRel(file);
       if (WILDCARD_EXEMPTIONS.has(rel)) continue;
       const content = readFileSync(file, "utf-8");
       if (OLD_WILDCARD_PATTERN.test(content)) {
@@ -1617,7 +1618,7 @@ describe("workflow feedback routes through tw_feedback", () => {
 
   const corpus = (): { rel: string; text: string }[] =>
     corpusFiles(PROJECT)
-      .map((file) => file.slice(PROJECT.length + 1))
+      .map((file) => repoRel(file))
       .filter((rel) => !ROUTING_EXEMPT.has(rel))
       .filter((rel) => !ROUTING_EXEMPT_PREFIXES.some((p) => rel.startsWith(p)))
       .map((rel) => {
@@ -1647,7 +1648,7 @@ describe("dead surface deletion (corpus check)", () => {
   test("no deleted tool or guidelines machinery identifier remains outside the historical exemptions", () => {
     const offenders: string[] = [];
     for (const file of corpusFiles(PROJECT)) {
-      const rel = file.slice(PROJECT.length + 1);
+      const rel = repoRel(file);
       if (DEAD_SURFACE_EXEMPT_FILES.has(rel)) continue;
       if (DEAD_SURFACE_EXEMPT_PREFIXES.some((p) => rel.startsWith(p))) continue;
       if (DELETED_SURFACE_PATTERN.test(readFileSync(file, "utf-8"))) {
@@ -1664,7 +1665,7 @@ describe("dead surface deletion (corpus check)", () => {
     const offenders: string[] = [];
     for (const file of corpusFiles(join(PROJECT, "src"))) {
       if (/\bSKIP_DIRS\b/.test(readFileSync(file, "utf-8"))) {
-        offenders.push(file.slice(PROJECT.length + 1));
+        offenders.push(repoRel(file));
       }
     }
     expect(offenders).toEqual([]);
@@ -3854,7 +3855,7 @@ describe("documentation re-sync (docs-resync)", () => {
     // record is skipped rather than repunctuated.
     const offenders: string[] = [];
     for (const file of corpusFiles(PROJECT)) {
-      const rel = file.slice(PROJECT.length + 1);
+      const rel = repoRel(file);
       if (CORPUS_EXEMPTIONS.has(rel) || DEAD_SURFACE_EXEMPT_FILES.has(rel)) continue;
       let text = "";
       try {
@@ -4065,7 +4066,7 @@ describe("the retired bug substrate (end-of-effort-reconciliation)", () => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const path = join(dir, entry.name);
         if (entry.isDirectory()) walk(path);
-        else if (entry.isFile() && entry.name.endsWith(".md")) out.push(path.slice(PROJECT.length + 1));
+        else if (entry.isFile() && entry.name.endsWith(".md")) out.push(repoRel(path));
       }
     };
     walk(join(PROJECT, "skills", "engineering"));
@@ -4186,7 +4187,7 @@ describe("retired vocabulary across the live language (end-of-effort-reconciliat
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const path = join(dir, entry.name);
         if (entry.isDirectory()) walk(path);
-        else if (entry.isFile() && entry.name.endsWith(".md")) out.push(path.slice(PROJECT.length + 1));
+        else if (entry.isFile() && entry.name.endsWith(".md")) out.push(repoRel(path));
       }
     };
     walk(join(PROJECT, "skills", "engineering"));
@@ -4272,7 +4273,7 @@ describe("the gates and hygiene (end-of-effort-reconciliation)", () => {
     // No live prose links either one; the historical records under docs/tasks/
     // may still name them.
     const offenders = corpusFiles(PROJECT)
-      .map((file) => file.slice(PROJECT.length + 1))
+      .map((file) => repoRel(file))
       .filter(
         (rel) =>
           !rel.startsWith("docs/tasks/") &&

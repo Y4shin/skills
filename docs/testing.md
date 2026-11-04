@@ -54,6 +54,46 @@ Run if asked (by number):
 
 A single test file, for manual use only (not part of the gated protocol):
 `npx vitest run <file>`.
+## Running on Windows
+
+The suite runs natively on Windows against a real clone; it is not Linux-only.
+Three things make that work, and each has a test rather than a convention:
+
+- `tests/lib/repo-paths.ts` derives repo-relative paths in POSIX form. Every
+  corpus sweep (retired vocabulary, old tool prefixes, dead surface, em dashes)
+  compares against POSIX literals, so a Windows checkout that skipped this would
+  report false positives on its own exemption files and enforce nothing.
+- `src/core/encoding.ts` decodes UTF-8 with a byte-order mark, UTF-16LE, and
+  UTF-16BE, and normalises CRLF at the frontmatter seam. Notepad and Windows
+  PowerShell 5.1 write those forms; `tests/platform-compat.test.ts` builds the
+  bytes explicitly, so the Windows cases run on a Linux runner too.
+- `.gitattributes` pins `eol=lf`, and a test asserts that every tracked file in
+  the working tree is LF.
+
+Two reproductions are capability-gated rather than platform-gated, and report
+the reason when they skip: the permission-failure restore (needs enforced
+directory modes) and the dangling-symlink walk (needs symlink permission). The
+restore guarantee itself still runs on Windows, through a file-where-a-directory
+belongs failure and through the injected-failure test.
+
+`.github/workflows/ci.yml` runs the protocol above on `ubuntu-latest` and
+`windows-latest` for every branch push and pull request. Standard GitHub-hosted
+runners are free in public repositories, so the Windows job costs nothing; only
+larger runners and private repositories are billed. The two capability-gated
+tests skip on Windows, which is why the restore guarantee also has a
+reproduction that needs no permissions.
+
+To read files written by the real Windows writers, write them with PowerShell
+and pass them to `decodeText`:
+
+```powershell
+$text = "---`ntype: map`ntitle: Entwurf`n---`n"
+$text | Out-File -Encoding Unicode -FilePath "$env:TEMP\utf16.md"
+$text | Set-Content -Encoding UTF8 -Path "$env:TEMP\bom.md"
+```
+
+Both decode to the authored text, with no replacement characters and no leading
+byte-order mark.
 
 ## Mock conventions
 
