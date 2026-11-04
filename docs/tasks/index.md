@@ -8,7 +8,9 @@ title: docs/tasks
 
 ## Live
 
+- architecture-tracking
 - build-eval-creator-skill
+- coding-taste
 - conventions-and-writer-cleanups
 - eval-scorer-feedback
 - migration-surface-polish
