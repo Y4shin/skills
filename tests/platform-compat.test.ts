@@ -59,6 +59,9 @@ const DESKTOPS: Desktop[] = [
 
 const CONFIG_TAIL = [".unipi", "config", "notify", "config.json"];
 
+/** The path module of the host running the suite. */
+const HOST_PATH = process.platform === "win32" ? win32 : posix;
+
 // ─── Notify config path ───────────────────────────────────────────────────────
 
 describe("notify config path", () => {
@@ -78,13 +81,19 @@ describe("notify config path", () => {
   });
 
   for (const desktop of DESKTOPS) {
-    test(`${desktop.name}: resolves under the home directory as an absolute path`, () => {
+    test(`${desktop.name}: joins the home directory and the fixed tail`, () => {
       const resolved = notifyConfigPath(desktop.home);
-      expect(resolved.startsWith(desktop.home)).toBe(true);
-      expect(desktop.path.isAbsolute(resolved)).toBe(true);
-      expect(desktop.path.basename(resolved)).toBe("config.json");
+      // notifyConfigPath joins with the host's path module, so the expected
+      // string is the host's join of a home shaped like the desktop's. The
+      // absolute-path and basename assertions only mean something for the
+      // flavour that matches the running host.
+      expect(resolved).toBe(join(desktop.home, ...CONFIG_TAIL));
       expect(segments(resolved).slice(-CONFIG_TAIL.length)).toEqual(CONFIG_TAIL);
       expect(segments(resolved)).not.toContain("~");
+      if (HOST_PATH === desktop.path) {
+        expect(desktop.path.isAbsolute(resolved)).toBe(true);
+        expect(desktop.path.basename(resolved)).toBe("config.json");
+      }
     });
   }
 });
