@@ -5,6 +5,7 @@
  */
 
 import YAML from "yaml";
+import { normalizeNewlines, stripBom } from "./encoding.js";
 import { FrontmatterError } from "./err.js";
 
 const FENCE = "---";
@@ -18,7 +19,7 @@ export interface Document {
 
 /** Parse a markdown string with YAML frontmatter. */
 export function parse(text: string): Document {
-  const lines = text.split("\n");
+  const lines = normalizeNewlines(stripBom(text)).split("\n");
   if (lines.length === 0 || lines[0].trim() !== FENCE) {
     throw new FrontmatterError("no opening '---' frontmatter fence");
   }

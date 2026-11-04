@@ -1,0 +1,30 @@
+# Line endings are LF on every platform, in the repository and in the working
+# tree.
+#
+# The workflow writes artifacts with LF and compares them byte for byte, so a
+# Windows checkout must not convert them. `text=auto eol=lf` keeps the working
+# tree identical to what the tooling wrote, and stops `core.autocrlf` from
+# turning every artifact the extension touches into a CRLF diff.
+* text=auto eol=lf
+
+# Files an agent reads verbatim: shipped skills, agents, docs, and source.
+*.md text eol=lf
+*.sh text eol=lf
+*.ts text eol=lf
+*.mjs text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Vendored minified bundles are not hand-authored text; leave them untouched.
+*.min.js -text
+
+# Binary assets.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

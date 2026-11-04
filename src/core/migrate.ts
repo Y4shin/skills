@@ -20,6 +20,7 @@
  */
 
 import YAML from "yaml";
+import { normalizeNewlines, stripBom } from "./encoding.js";
 import { parse, dump, type FrontmatterData } from "./frontmatter.js";
 import {
   fromFrontmatter,
@@ -457,7 +458,7 @@ function readDoc(
 ): { data: FrontmatterData; body: string } | { broken: true } | null {
   let text: string;
   try {
-    text = tree.read(path);
+    text = normalizeNewlines(stripBom(tree.read(path)));
   } catch {
     return null;
   }
@@ -974,7 +975,12 @@ function doc0(tree: TreePort, path: string): { data: FrontmatterData; body: stri
 
 function safeRead(tree: TreePort, path: string): string | null {
   try {
-    return tree.read(path);
+    // A byte-order mark the port did not decode away (a string port in a test,
+    // or a writer that emitted one after the decode) would otherwise make the
+    // first line unreadable as a fence. CRLF is normalised for the same
+    // reason: Windows writes it, and a trailing carriage return would leak
+    // into the last parsed value and into body compares.
+    return normalizeNewlines(stripBom(tree.read(path)));
   } catch {
     return null;
   }

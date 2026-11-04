@@ -13,6 +13,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext, InputEvent, InputEventResult, ToolCallEvent, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
@@ -21,6 +22,8 @@ import { Type, type TSchema } from "typebox";
 import YAML from "yaml";
 
 import { parse, dump, type Document, type FrontmatterData } from "./core/frontmatter.js";
+import { decodeText } from "./core/encoding.js";
+import { slugRejection } from "./core/slug.js";
 import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVES, readMapSection, writeMapSection, effortDirOf, MAP_SECTION_NON_GOALS, MAP_SECTION_NON_NEGOTIABLE_FACTS, TICKET_SUBTYPES, TASK_SUBTYPES, type Artifact, type WorkItemInfo, type Anomaly } from "./core/art.js";
 import {
   ALWAYS_DECLARED,
@@ -74,7 +77,7 @@ function loadGatedSkillNames(): { names: string[]; diagnostics: string[] } {
       "..",
       "package.json",
     );
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as Record<string, unknown>;
+    const pkg = JSON.parse(readText(pkgPath)) as Record<string, unknown>;
     const piSection = pkg.pi as Record<string, unknown> | undefined;
     const skills = piSection?.skills;
     if (Array.isArray(skills) && skills.every((s) => typeof s === "string")) {
@@ -223,15 +226,27 @@ function isFile(p: string): boolean {
   try { return statSync(p).isFile(); } catch { return false; }
 }
 
+/**
+ * Read a text file through the encoding seam.
+ *
+ * Every file this extension reads can have been written by a human, and on
+ * Windows that often means a UTF-8 byte-order mark or UTF-16LE from
+ * PowerShell. Decoding the bytes rather than assuming UTF-8 keeps those files
+ * readable instead of turning them into replacement characters.
+ */
+function readText(p: string): string {
+  return decodeText(readFileSync(p));
+}
+
 function readYaml(p: string): unknown {
-  return YAML.parse(readFileSync(p, "utf-8"));
+  return YAML.parse(readText(p));
 }
 
 /** The frontmatter title of an artifact file, or null when it has none. */
 function readArtifactTitle(path: string): string | null {
   if (!isFile(path)) return null;
   try {
-    const title = parse(readFileSync(path, "utf-8")).data.title;
+    const title = parse(readText(path)).data.title;
     return typeof title === "string" && title.trim() !== "" ? title : null;
   } catch {
     return null;
@@ -255,7 +270,7 @@ function listSubdirs(base: string, skip: Set<string> = new Set()): string[] {
 }
 
 function parseArtifactFile(path: string): { art: Artifact; doc: Document } {
-  const text = readFileSync(path, "utf-8");
+  const text = readText(path);
   const doc = parse(text);
   const art = fromFrontmatter(doc.data, slugDirFor(path));
   art.path = path;
@@ -526,7 +541,7 @@ function saveState(root: string, state: WorkflowState): void {
 
 function profileText(root: string): string {
   const p = join(root, "docs", "tasks", "profile.md");
-  if (existsSync(p) && statSync(p).isFile()) return readFileSync(p, "utf-8");
+  if (existsSync(p) && statSync(p).isFile()) return readText(p);
   return "";
 }
 
@@ -730,7 +745,7 @@ function markTicketDone(root: string, path: string, art: Artifact, doc: Document
         `write the ticket's changelog entry with tw_write_changelog first`,
     );
   }
-  const changelogDoc = parse(readFileSync(changelogPath, "utf-8"));
+  const changelogDoc = parse(readText(changelogPath));
   if (!referencesSlug(changelogDoc.body, art.slug)) {
     throw new Error(
       `'${art.slug}' cannot be marked done: the changelog has no entry for it yet; the changelog entry lands ` +
@@ -1080,13 +1095,6 @@ function requireLinkedFollowUp(root: string, origin: string, target: string, sub
   }
 }
 
-/**
- * The slug shape every created artifact must carry: it becomes a directory
- * name under docs/tasks/, so anything else (spaces, slashes, traversal,
- * leading hyphen) is refused before it can escape the tree.
- */
-const SAFE_SLUG = /^[a-z0-9][a-z0-9-]*$/;
-
 const TICKET_SIZES = ["s", "m", "l", "xl"] as const;
 
 /**
@@ -1117,7 +1125,7 @@ function createEffortDocument(title: string, originEffort?: string): Document {
  */
 function registerLiveEffort(root: string, effort: string): void {
   const indexPath = join(taskRoot(root), "index.md");
-  const body = isFile(indexPath) ? parse(readFileSync(indexPath, "utf-8")).body : "";
+  const body = isFile(indexPath) ? parse(readText(indexPath)).body : "";
   writeTasksIndex(root, {
     live: [...indexNames(body, "Live"), effort],
     archived: indexNames(body, "Archived"),
@@ -1182,8 +1190,9 @@ function ticketDocument(seed: TicketSeed): Document {
  * effort's scanned tickets by the caller (it needs the scan).
  */
 function validateTicketSeed(seed: TicketSeed): void {
-  if (!SAFE_SLUG.test(seed.slug)) {
-    throw new Error(`invalid slug '${seed.slug}': use lowercase letters, digits, and hyphens (a slug becomes a directory name)`);
+  const rejection = slugRejection(seed.slug);
+  if (rejection !== null) {
+    throw new Error(`invalid slug '${seed.slug}': ${rejection}`);
   }
   if (typeof seed.title !== "string" || seed.title.trim() === "") {
     throw new Error(`ticket '${seed.slug}' has no title`);
@@ -1289,7 +1298,7 @@ function indexNames(body: string, section: string): string[] {
 function writeTasksIndex(root: string, lists: { live: string[]; archived: string[] }): string {
   const indexPath = join(taskRoot(root), "index.md");
   const doc: Document = isFile(indexPath)
-    ? parse(readFileSync(indexPath, "utf-8"))
+    ? parse(readText(indexPath))
     : { data: { type: "index", okf_version: OKF_VERSION, title: "docs/tasks" }, body: "\n# docs/tasks\n" };
   const sorted = (names: string[]): string[] => [...new Set(names)].sort((a, b) => a.localeCompare(b));
   let body = writeMapSection(doc.body, "Live", indexSection(sorted(lists.live)));
@@ -2401,17 +2410,17 @@ export function createTools(): Record<string, Tool> {
         const root = findRoot(ctx.directory);
         const effort = String(p.effort ?? "");
         const title = typeof p.title === "string" ? p.title.trim() : "";
-        if (!SAFE_SLUG.test(effort)) {
-          throw new Error(
-            `invalid effort slug '${effort}': use lowercase letters, digits, and hyphens (a slug becomes a directory name)`,
-          );
+        const effortRejection = slugRejection(effort);
+        if (effortRejection !== null) {
+          throw new Error(`invalid effort slug '${effort}': ${effortRejection}`);
         }
         if (title === "") throw new Error("title is empty: an effort needs a title");
         const originEffort =
           typeof p.origin_effort === "string" && p.origin_effort.trim() !== "" ? p.origin_effort.trim() : undefined;
         if (originEffort !== undefined) {
-          if (!SAFE_SLUG.test(originEffort)) {
-            throw new Error(`invalid origin effort slug '${originEffort}': use lowercase letters, digits, and hyphens`);
+          const originRejection = slugRejection(originEffort);
+          if (originRejection !== null) {
+            throw new Error(`invalid origin effort slug '${originEffort}': ${originRejection}`);
           }
           if (liveEffortDir(root, originEffort) === null) {
             throw new Error(
@@ -2465,10 +2474,9 @@ export function createTools(): Record<string, Tool> {
         const root = findRoot(ctx.directory);
         const slug = String(p.slug ?? "");
         const title = typeof p.title === "string" ? p.title.trim() : "";
-        if (!SAFE_SLUG.test(slug)) {
-          throw new Error(
-            `invalid slug '${slug}': use lowercase letters, digits, and hyphens (a slug becomes a directory name)`,
-          );
+        const rejection = slugRejection(slug);
+        if (rejection !== null) {
+          throw new Error(`invalid slug '${slug}': ${rejection}`);
         }
         if (title === "") throw new Error(`task '${slug}' has no title`);
         const subtype = String(p.subtype ?? "");
@@ -2851,7 +2859,7 @@ export function createTools(): Record<string, Tool> {
 
         // 3. The root index: the effort leaves Live and joins Archived.
         const existingIndexPath = join(taskRoot(root), "index.md");
-        const existing = isFile(existingIndexPath) ? parse(readFileSync(existingIndexPath, "utf-8")).body : "";
+        const existing = isFile(existingIndexPath) ? parse(readText(existingIndexPath)).body : "";
         const indexPath = writeTasksIndex(root, {
           live: indexNames(existing, "Live").filter((n) => n !== effortKey),
           archived: [...indexNames(existing, "Archived"), effortKey],
@@ -2908,8 +2916,9 @@ export function createTools(): Record<string, Tool> {
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         const slug = String(p.slug ?? "").trim();
-        if (!SAFE_SLUG.test(slug)) {
-          throw new Error(`invalid slug '${slug}': use lowercase letters, digits, and hyphens`);
+        const rejection = slugRejection(slug);
+        if (rejection !== null) {
+          throw new Error(`invalid slug '${slug}': ${rejection}`);
         }
         const title = typeof p.title === "string" ? p.title.trim() : "";
         if (title === "") throw new Error("title is empty: an entry names what landed");
@@ -2925,7 +2934,7 @@ export function createTools(): Record<string, Tool> {
 
         const changelogPath = join(taskRoot(root), "CHANGELOG.md");
         const doc: Document = isFile(changelogPath)
-          ? parse(readFileSync(changelogPath, "utf-8"))
+          ? parse(readText(changelogPath))
           : { data: { type: "changelog", title: "Task Changelog" }, body: "\n# Task Changelog\n" };
 
         const escaped = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -3035,8 +3044,9 @@ export function createTools(): Record<string, Tool> {
       async (p, ctx) => {
         const root = findRoot(ctx.directory);
         const slug = String(p.slug ?? "").trim();
-        if (!SAFE_SLUG.test(slug)) {
-          throw new Error(`invalid slug '${slug}': use lowercase letters, digits, and hyphens`);
+        const rejection = slugRejection(slug);
+        if (rejection !== null) {
+          throw new Error(`invalid slug '${slug}': ${rejection}`);
         }
         const title = typeof p.title === "string" ? p.title.trim() : "";
         if (title === "") throw new Error("title is empty: a note names the request");
@@ -3059,7 +3069,7 @@ export function createTools(): Record<string, Tool> {
 
         const indexPath = join(kbDir, "index.md");
         const indexDoc: Document = isFile(indexPath)
-          ? parse(readFileSync(indexPath, "utf-8"))
+          ? parse(readText(indexPath))
           : { data: { type: "out-of-scope note", title: "out-of-scope", status: "stable" }, body: "\n# out-of-scope\n" };
         const existing = (readMapSection(indexDoc.body, "Notes") ?? []).filter((l) => l.trim() !== "");
         const bullets = [...existing, `- [${title}](${slug}.md)`];
@@ -3579,6 +3589,18 @@ async function restoreDeclaredSetFromTranscript(
   pi.setActiveTools(names);
 }
 
+/**
+ * The notify config path.
+ *
+ * Resolved from the OS home directory, never `process.env.HOME`: native
+ * Windows sets `USERPROFILE` and leaves `HOME` unset, so an env lookup
+ * silently resolves to the literal string `~` and the config is never found.
+ * `home` is a parameter so the cross-platform shape is testable.
+ */
+export function notifyConfigPath(home: string = homedir()): string {
+  return join(home, ".unipi", "config", "notify", "config.json");
+}
+
 // ─── Pi extension entry point ──────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
@@ -3661,12 +3683,12 @@ export default function (pi: ExtensionAPI) {
         priority: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("normal"), Type.Literal("high")])),
       }),
       async execute(_id: string, params: any) {
-        const cfgPath = join(process.env.HOME || "~", ".unipi", "config", "notify", "config.json");
+        const cfgPath = notifyConfigPath();
         if (!existsSync(cfgPath)) {
           return { content: [{ type: "text", text: "No ntfy config found." }], details: { sent: false } };
         }
         try {
-          const cfg = JSON.parse(readFileSync(cfgPath, "utf-8"));
+          const cfg = JSON.parse(readText(cfgPath));
           const ntfy = cfg.ntfy;
           if (!ntfy?.enabled || !ntfy?.topic) {
             return { content: [{ type: "text", text: "ntfy not enabled or no topic configured." }], details: { sent: false } };

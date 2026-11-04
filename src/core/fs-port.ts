@@ -30,6 +30,7 @@ import {
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
+import { decodeText } from "./encoding.js";
 import { verifyStagedWrite, type TreePort } from "./migrate.js";
 
 /** A TreePort over a real directory, with staged changes and an atomic commit. */
@@ -69,7 +70,7 @@ export class FsPort implements TreePort {
   }
 
   read(path: string): string {
-    return readFileSync(join(this.root, path), "utf-8");
+    return decodeText(readFileSync(join(this.root, path)));
   }
 
   stageWrite(path: string, content: string): void {
@@ -96,8 +97,11 @@ export class FsPort implements TreePort {
     // begin to land.
     for (const [path, content] of this.writes) verifyStagedWrite(path, content);
 
-    // (2) Snapshot every path this commit may touch. `null` means "did not
-    // exist", which is what restore writes back (a removal).
+    // (2) Snapshot every path this commit may touch, as bytes: a UTF-16
+    // document restored from a decoded string would come back with replacement
+    // characters, which breaks the byte-identical guarantee this journal
+    // exists to provide. `null` means "did not exist", which is what restore
+    // writes back (a removal).
     const touched = new Set<string>();
     for (const [from, to] of this.moves) {
       touched.add(from);
@@ -106,10 +110,10 @@ export class FsPort implements TreePort {
     for (const path of this.writes.keys()) touched.add(path);
     for (const path of this.deletes) touched.add(path);
 
-    const journal = new Map<string, string | null>();
+    const journal = new Map<string, Buffer | null>();
     for (const p of touched) {
       const abs = join(this.root, p);
-      journal.set(p, existsSync(abs) ? readFileSync(abs, "utf-8") : null);
+      journal.set(p, existsSync(abs) ? readFileSync(abs) : null);
     }
 
     // Directories this commit may create. A failure must remove the ones that
@@ -163,7 +167,7 @@ export class FsPort implements TreePort {
           if (original === null) {
             if (existsSync(abs)) rmSync(abs, { force: true });
           } else {
-            writeFileSync(abs, original, "utf-8");
+            writeFileSync(abs, original);
           }
         } catch {
           // Best effort: keep restoring the remaining paths so one stubborn
