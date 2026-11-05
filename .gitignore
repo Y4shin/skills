@@ -18,3 +18,6 @@ prototype-bundle/
 
 # Eval harness outputs and spend ledger.
 evals/out/
+
+# Codegraph artifacts should be regenerated locally
+.codegraph
