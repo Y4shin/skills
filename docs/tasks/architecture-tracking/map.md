@@ -106,9 +106,13 @@ recomputable from `state.yaml` and the archived reviews alone.
   the unit file links to that check. Automatic generation of checks from the
   model is neither promised nor ruled out by this map; `check-enforcement`
   decides.
-- Facts come from CodeGraph only, behind one documented interface. The provider
-  supplies an inventory, declarations with language visibility where available,
-  and resolved references, each with locations.
+- Facts come through one documented provider interface. Which tool implements it
+  is open and belongs to `tree-sitter-provider`; the candidate is an owned
+  tree-sitter layer, because a separately installed tool whose Go graph is wrong
+  does not earn its install. Whichever provider wins supplies an inventory, unit
+  membership, declarations with visibility where the language's own metadata has
+  it, unit edges, and resolved references with locations, and it reports what it
+  could not resolve rather than guessing.
 - Refactoring pressure: an integer 1 to 3, no zero, a prose guide for choosing
   the level, a default threshold of 9, the value in the review front matter with
   its evidence section, the contributing archived efforts listed in
@@ -124,16 +128,24 @@ recomputable from `state.yaml` and the archived reviews alone.
 ## Decisions so far
 
 - `non-negotiables` settled the effort's shape on 2026-11-05: the whole proposal
-  lands except the recorded non-goals; the pressure ledger is v1; CodeGraph is
-  the only provider; both architecture skills are retired here; the model gets
-  phase-disclosed `tw_*` tools with a dedicated target for the refactor-effort
-  copy, and `write`/`edit` blocked on `docs/architecture/`; all three sync
-  guarantees are mechanical; one source root with exclude globs, and multi-root
-  only if the prototype allows; pressure is an integer 1 to 3 with no zero and a
-  default threshold of 9, held in the review front matter and rolled up from
-  `state.yaml`.
+  lands except the recorded non-goals; the pressure ledger is v1; both
+  architecture skills are retired here; the model gets phase-disclosed `tw_*`
+  tools with a dedicated target for the refactor-effort copy, and `write`/`edit`
+  blocked on `docs/architecture/`; all three sync guarantees are mechanical; one
+  source root with exclude globs, and multi-root only if the prototype allows;
+  pressure is an integer 1 to 3 with no zero and a default threshold of 9, held
+  in the review front matter and rolled up from `state.yaml`.
 - Automatic check generation stays undecided, so it is recorded as
   `check-enforcement` rather than as a non-goal.
+- The provider choice from `non-negotiables` is open again as of 2026-11-05. It
+  named CodeGraph as the only provider; measurement on the Go repository then
+  found 160 false cross-package edges, no package nodes, unresolved import paths
+  and no Go visibility, and the operator decided that a separately installed tool
+  that is wrong does not earn its install. `tree-sitter-provider` decides the
+  replacement, and the same measurement supports the direction: unit ownership
+  and unit-to-unit edges are syntactic in every target language, so an owned
+  tree-sitter layer can produce the model's primary product exactly and report
+  the residue it cannot prove.
 
 ## Fog
 

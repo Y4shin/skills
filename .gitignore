@@ -21,3 +21,6 @@ evals/out/
 
 # Codegraph artifacts should be regenerated locally
 .codegraph
+
+# Throwaway tree-sitter provider prototype (code lives on prototype/tree-sitter-provider).
+prototype-tree-sitter/
