@@ -9,6 +9,7 @@ title: docs/tasks
 ## Live
 
 - architecture-tracking
+- bash-tail-preview-fix
 - build-eval-creator-skill
 - coding-taste
 - conventions-and-writer-cleanups
