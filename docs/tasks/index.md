@@ -15,6 +15,7 @@ title: docs/tasks
 - conventions-and-writer-cleanups
 - eval-scorer-feedback
 - migration-surface-polish
+- selective-repo-disable
 
 ## Archived
 

@@ -1,3 +1,3 @@
 schema_version: 5
-map: bash-tail-preview-fix
-task: null
+map: selective-repo-disable
+task: tool-use-inventory
