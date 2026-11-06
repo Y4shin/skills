@@ -258,7 +258,7 @@ describe("gated skill manifest", () => {
   });
 
   test("every workflow registry skill is gated; skill-creator is the only ungated registry entry", () => {
-    // skill-creator is the nested authoring discipline and stays openable in
+    // skill-creator is the authoring discipline and stays openable in
     // a gated repo; every other registry entry is a workflow phase the gate
     // must disable.
     const ungatedRegistryEntries = SKILL_REGISTRY.filter(

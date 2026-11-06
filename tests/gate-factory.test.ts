@@ -11,7 +11,7 @@
  * repos only.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -96,14 +96,16 @@ const FULL_TOOL_SURFACE = [
 ];
 
 /**
- * The registered tool set a gated (work) repo contributes, exactly: the
- * passive set (tw_open, tw_close, tw_feedback), skill-creator's three bundled
- * tools (inactive; the restricted tw_open discloses them there), and
- * notify_user (generic; it reads only the user's ntfy config). Every other
- * tw_* tool, including all writers and the dispatcher companions, stays
- * unregistered in a gated repo.
+ * The registered tool surface a gated (work) repo contributes, exactly:
+ * the passive set (tw_open, tw_close, tw_feedback), skill-creator's three
+ * bundled tools (inactive; the restricted tw_open discloses them there),
+ * and notify_user (generic; it reads only the user's ntfy config). Every
+ * other tw_* tool, including all writers and the dispatcher companions,
+ * stays unregistered in a gated repo. Deliberately not named
+ * GATED_REGISTERED_TOOLS: that constant in src/pi.ts is the tw_* passive
+ * set alone, and this surface adds the skill-creator tools and notify_user.
  */
-const GATED_REGISTERED_TOOLS = [
+const GATED_TOOL_SURFACE = [
   "tw_open",
   "tw_close",
   "tw_feedback",
@@ -160,17 +162,30 @@ function buildSkillsXml(skillNames: string[]): string {
   ].join("\n");
 }
 
-function setupWorkRepo(): string {
-  globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
+/**
+ * The shared disableOnRepo pattern: a QNCGmbH work remote matches it, the
+ * personal Y4shin/skills remote does not.
+ */
+const WORK_REPO_PATTERN = ["^github\\.com[:/]QNCGmbH/.*$"];
+
+/**
+ * Create the global settings the gate reads and point the agent dir at
+ * them: the shared classification seam, so a test body only picks a repo.
+ */
+function useGlobalSettings(disableOnRepo: string[] = WORK_REPO_PATTERN): void {
+  globalSettings = makeGlobalSettings(disableOnRepo);
   process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
+}
+
+function setupWorkRepo(): string {
+  useGlobalSettings();
   const repo = makeRepo("git@github.com:QNCGmbH/openai.git");
   process.chdir(repo);
   return repo;
 }
 
 function setupPersonalRepo(): string {
-  globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
-  process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
+  useGlobalSettings();
   const repo = makeRepo("https://github.com/Y4shin/skills.git");
   // An initialized tree: the lockdown protects it. The bootstrap exemption
   // (an unstamped tree) has its own test.
@@ -178,6 +193,14 @@ function setupPersonalRepo(): string {
   writeFileSync(join(repo, "docs", "tasks", "state.yaml"), "schema_version: 5\nmap: null\ntask: null\n");
   process.chdir(repo);
   return repo;
+}
+
+/**
+ * The narrative contract the doc tests pin: docs/repo-gating.md, read
+ * from the working tree the factory tests run in.
+ */
+function readRepoGatingDoc(): string {
+  return readFileSync(join(process.cwd(), "docs", "repo-gating.md"), "utf-8");
 }
 
 function createStub(): StubExtensionAPI {
@@ -278,7 +301,7 @@ describe("factory gate", () => {
     const names = stub.tools.map((t) => t.name);
     // The registered surface in a gated repo, exactly: a missing, extra, or
     // stale tool (a writer, a dispatcher companion) fails here.
-    expect([...names].sort()).toEqual([...GATED_REGISTERED_TOOLS].sort());
+    expect([...names].sort()).toEqual([...GATED_TOOL_SURFACE].sort());
   });
 
   test("gated registration keeps the opener and closer always-declared and the rest inactive", () => {
@@ -298,16 +321,13 @@ describe("factory gate", () => {
     for (const name of ["tw_feedback", "skill_validate", "skill_scaffold", "skill_discover"]) {
       expect(byName.get(name)?.defaultActive, `${name} is off until an opener activates it`).toBe(false);
     }
-    for (const name of GATED_REGISTERED_TOOLS.filter((n) => n !== "notify_user")) {
+    for (const name of GATED_TOOL_SURFACE.filter((n) => n !== "notify_user")) {
       expect(byName.get(name)?.exposure, `${name} is direct, never deferred`).toBe("direct");
     }
   });
 
   test("personal repo registers the full tool surface", () => {
-    globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
-    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
-    const repo = makeRepo("https://github.com/Y4shin/skills.git");
-    process.chdir(repo);
+    setupPersonalRepo();
 
     const stub = createStub();
     factory(stub);
@@ -368,10 +388,7 @@ describe("factory gate", () => {
   });
 
   test("personal repo emits session_start peer warnings", async () => {
-    globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
-    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
-    const repo = makeRepo("https://github.com/Y4shin/skills.git");
-    process.chdir(repo);
+    const repo = setupPersonalRepo();
 
     const stub = createStub();
     factory(stub);
@@ -411,15 +428,14 @@ describe("factory gate", () => {
   });
 
   test("factory re-detects gate when cwd changes between invocations", () => {
-    globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
-    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
+    useGlobalSettings();
     const workRepo = makeRepo("git@github.com:QNCGmbH/openai.git");
     const personalRepo = makeRepo("https://github.com/Y4shin/skills.git");
 
     const workStub = createStub();
     process.chdir(workRepo);
     factory(workStub);
-    expect([...workStub.tools.map((t) => t.name)].sort()).toEqual([...GATED_REGISTERED_TOOLS].sort());
+    expect([...workStub.tools.map((t) => t.name)].sort()).toEqual([...GATED_TOOL_SURFACE].sort());
 
     const personalStub = createStub();
     process.chdir(personalRepo);
@@ -443,30 +459,14 @@ describe("factory gate", () => {
     });
   });
 
-  describe("help and skill-list limitation", () => {
-    test("docs/repo-gating.md documents the /help and skill-list gap", () => {
-      // The /help limitation was originally written to the (now-archived)
-      // task doc; it is durably documented in docs/repo-gating.md, which
-      // lives outside the per-task tree and is the stable reference.
-      const limitationsPath = join(process.cwd(), "docs/repo-gating.md");
-
-      expect(existsSync(limitationsPath)).toBe(true);
-
-      const content = readFileSync(limitationsPath, "utf-8");
-      expect(content).toContain("/help");
-      expect(content).toContain("skill-list");
-    });
-  });
-
   describe("repo-gating doc resync (the narrowed gate)", () => {
     // The narrative contract (the docs seam): docs/repo-gating.md must
     // describe the registered surface the implementation tickets pinned,
     // not the pre-narrowing behavior. These assertions pin the resynced
     // description; a regression to "no tools register" phrasing fails here.
-    const readDoc = () => readFileSync(join(process.cwd(), "docs", "repo-gating.md"), "utf-8");
 
     test("documents the registered passive surface by name", () => {
-      const content = readDoc();
+      const content = readRepoGatingDoc();
       for (const name of [
         "tw_open",
         "tw_close",
@@ -481,7 +481,7 @@ describe("factory gate", () => {
     });
 
     test("names the gated skill set and the one kept registry entry", () => {
-      const content = readDoc();
+      const content = readRepoGatingDoc();
       for (const name of [
         "task-workflow-overview",
         "setup-workflow",
@@ -500,13 +500,16 @@ describe("factory gate", () => {
     });
 
     test("states the tw_open restriction and that the refusal covers the whole manifest", () => {
-      const content = readDoc();
+      const content = readRepoGatingDoc();
       expect(content).toMatch(/restrict/i);
       expect(content).toMatch(/whole manifest|entire manifest|all ten/i);
     });
 
     test("scopes the /help and skill-list limitation to the gated workflow skills", () => {
-      const content = readDoc();
+      const content = readRepoGatingDoc();
+      // Durably documented here: the limitation originally lived in a
+      // (now-archived) task doc; this doc sits outside any per-task tree
+      // and is the stable reference.
       expect(content).toContain("/help");
       expect(content).toContain("skill-list");
       // Re-scoped: the gap now covers the ten gated skills, not every skill
@@ -515,12 +518,12 @@ describe("factory gate", () => {
     });
 
     test("states the write lockdown keys on the workflow being enabled", () => {
-      const content = readDoc();
+      const content = readRepoGatingDoc();
       expect(content).toMatch(/workflow (is|being) enabled/i);
     });
 
     test("re-states the classification contract as unchanged", () => {
-      const content = readDoc();
+      const content = readRepoGatingDoc();
       expect(content).toContain("disableOnRepo");
       expect(content).toContain("Truth table");
       expect(content).toMatch(/unchanged/i);
@@ -530,7 +533,7 @@ describe("factory gate", () => {
       // Verified against pi-subagents 0.34.0 and pi's --tools handling: no
       // launch-time check, silently ignored names. The doc describes that
       // shape, not a failed launch.
-      const content = readDoc();
+      const content = readRepoGatingDoc();
       expect(content).toMatch(/still launches/i);
       expect(content).toMatch(/ignores allowlisted names|silently ignores/i);
       expect(content).not.toMatch(/will not launch|fails a child/i);
@@ -1069,7 +1072,7 @@ describe("factory gate", () => {
     });
 
     test("the boundary documentation records the accepted bash residual risk", () => {
-      const doc = readFileSync(join(process.cwd(), "docs", "repo-gating.md"), "utf-8");
+      const doc = readRepoGatingDoc();
       expect(doc).toContain("Residual risk");
       expect(doc).toContain("cannot be gated soundly");
       expect(doc).toContain("bash");
@@ -1155,8 +1158,7 @@ describe("factory gate", () => {
 
 describe("write lockdown bootstrap exemption", () => {
   test("an unstamped tree is not locked, so onboarding can create it", async () => {
-    globalSettings = makeGlobalSettings([]);
-    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
+    useGlobalSettings([]);
     const repo = makeRepo("https://github.com/Y4shin/skills.git");
     // No docs/tasks/state.yaml yet: there is no schema to protect.
     mkdirSync(join(repo, "docs", "tasks"), { recursive: true });

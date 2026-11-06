@@ -83,11 +83,11 @@ function loadSkillNameDiagnostics(): string[] {
       return [];
     }
     return [
-      "gated-skill manifest: package.json pi.skills is missing or not an array of strings; the static manifest is in effect",
+      "package.json pi.skills is missing or not an array of strings; the static manifest is in effect",
     ];
   } catch (e) {
     return [
-      `gated-skill manifest: failed to read package.json pi.skills: ${(e as Error).message}; the static manifest is in effect`,
+      `failed to read package.json pi.skills: ${(e as Error).message}; the static manifest is in effect`,
     ];
   }
 }
@@ -1227,7 +1227,11 @@ interface Tool {
   args: Record<string, unknown>;
   /** Explicit TypeBox parameter schema; replaces the args-record conversion when present. */
   parameters?: TSchema;
-  /** Whether registration activates the tool. Only the dispatcher pair is always declared. */
+  /**
+   * Whether registration activates the tool. The dispatcher quartet
+   * (tw_open, tw_next, tw_request_tool, tw_close) is always declared; a
+   * gated repo registers only the opener and the closer.
+   */
   activeByDefault?: boolean;
   execute(args: Record<string, any>, ctx: ToolContext): Promise<string> | Promise<ToolOutcome>;
 }
@@ -1656,7 +1660,12 @@ function refusedOuttext(reason: string, legalNext: string[]): string {
  */
 const FEEDBACK_TOOL = "submit_feedback";
 
-/** Every tool this package registers, by name: the requestable surface. */
+/**
+ * Every tool definition the factory owns, by name: the requestable surface,
+ * built from the ungated full set. The only consumer is tw_request_tool's
+ * unknown-tool refusal, and that tool registers only where the workflow
+ * runs, so the ungated basis is exact wherever the cache is read.
+ */
 let workflowToolNamesCache: Set<string> | undefined;
 function workflowToolNames(): Set<string> {
   workflowToolNamesCache ??= new Set(Object.keys(createTools()));
@@ -3717,7 +3726,9 @@ export default function (pi: ExtensionAPI) {
       parameters: def.parameters ?? Type.Object(params),
       // The bypass-free gate: every workflow tool is direct and inactive
       // by default, activated only by the opener, except the dispatcher
-      // pair (tw_open, tw_next), which is declared in every state.
+      // quartet (tw_open, tw_next, tw_request_tool, tw_close), which is
+      // always declared; a gated repo registers only the opener and the
+      // closer of the quartet.
       exposure: "direct",
       defaultActive: def.activeByDefault ?? false,
       async execute(_id: string, args: any, _sig: any, _upd: any, ctx: any) {
@@ -3796,7 +3807,7 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.notify(`task-workflow gate: ${diagnostic}`, "info");
     }
     for (const diagnostic of SKILL_NAME_DIAGNOSTICS) {
-      ctx.ui.notify(`task-workflow: ${diagnostic}`, "warning");
+      ctx.ui.notify(`task-workflow manifest: ${diagnostic}`, "warning");
     }
     if (gate.active) {
       ctx.ui.notify(`task-workflow gate active: ${gate.reason}`, "info");

@@ -58,7 +58,7 @@ export interface SkillEntry {
  * all read this one list; there is no runtime derivation and no fallback.
  *
  * It mirrors the registry's workflow entries (every registry skill except
- * skill-creator, the nested authoring discipline that stays openable in gated
+ * skill-creator, the authoring discipline that stays openable in gated
  * repos) plus the three workflow skills that have no registry entry because
  * they own no toolset: task-workflow-overview, task-workflow-doctor, and
  * workflow-failure. The consistency tests in tests/skills.test.ts pin the
@@ -390,12 +390,12 @@ export function conflictReason(skill: string, openSkill: string): string {
 
 /**
  * The registry entries a gated (work) repo keeps openable: those whose names
- * are not in the gated manifest. Today exactly skill-creator, the nested
- * authoring discipline. The opener's schema and its gated refusal both read
- * this, so the offered surface and the enforced surface cannot drift.
+ * are not in the gated manifest. Today exactly skill-creator, the authoring
+ * discipline. The opener's schema and its gated refusal both read this, so
+ * the offered surface and the enforced surface cannot drift.
  */
-export function openableWhenGated(tables: readonly SkillEntry[] = SKILL_REGISTRY): SkillEntry[] {
-  return tables.filter((s) => !GATED_SKILL_NAMES.includes(s.name));
+export function openableWhenGated(): SkillEntry[] {
+  return SKILL_REGISTRY.filter((s) => !GATED_SKILL_NAMES.includes(s.name));
 }
 
 /**
