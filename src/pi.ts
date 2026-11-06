@@ -3650,11 +3650,13 @@ export function notifyConfigPath(home: string = homedir()): string {
  * opener, the closer, and the feedback wrapper stay declared: tw_open is the
  * activation path for the one kept discipline (skill-creator, through the
  * gated restriction), tw_close releases it, and tw_feedback is claimed by the
- * shipped subagent allowlists (verified against pi-subagents 0.34.0: a child
- * still launches when a listed tool never registers, so a missing peer costs
- * the feedback row, not the launch). The dispatcher companions tw_next and
- * tw_request_tool and every other tw_* tool stay unregistered in a gated
- * repo.
+ * shipped subagent allowlists (verified against pi-subagents 0.84.0: every
+ * plain name in an agent's tools allowlist becomes a required child tool, and
+ * a child whose allowlisted tool never registers fails its run at agent start
+ * with "requested unavailable child tools", so a missing peer costs the
+ * chain's runs, not just the feedback rows). The dispatcher companions
+ * tw_next and tw_request_tool and every other tw_* tool stay unregistered in
+ * a gated repo.
  */
 const GATED_REGISTERED_TOOLS = ["tw_open", "tw_close", "tw_feedback"] as const;
 
@@ -3829,9 +3831,10 @@ export default function (pi: ExtensionAPI) {
     if (!allTools.some((t) => t.name === "submit_feedback")) {
       ctx.ui.notify(
         "pi-telemetry is not installed. The shipped subagents list submit_feedback in their tools allowlist, and " +
-          "a child still launches when a listed tool is missing: pi-subagents does not check the allowlist at launch, " +
-          "and pi silently ignores allowlisted names that never register. The chain runs, but each child's " +
-          "tw_feedback call fails, so workflow feedback from children is not recorded. " +
+          "on pi-subagents 0.84.0 every plain name in that allowlist is a required child tool: a child whose " +
+          'allowlisted tool never registers fails its run at agent start with the error "requested unavailable ' +
+          'child tools". With pi-telemetry absent, the shipped chains do not run: every chain child fails at ' +
+          "agent start instead of recording workflow feedback. " +
           "Install it with: pi install npm:@y4shin/pi-telemetry",
         "warning",
       );

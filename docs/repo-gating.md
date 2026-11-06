@@ -72,25 +72,31 @@ surface works exactly as today.
 The shipped subagents list `tw_feedback` (and `submit_feedback`) in their
 `tools` allowlist, and `tw_feedback` registers in gated repos exactly for that
 reason. What happens when a listed tool is unavailable is stated from
-pi-subagents 0.34.0's own source, and confirmed against pi's `--tools`
-handling:
+pi-subagents 0.84.0's own source (`child-tool-plan.js`,
+`subagent-prompt-runtime.js`, `tool-availability.js`). The statement is
+version-pinned because the upstream shape changed between the previously
+verified 0.34.0 and 0.84.0; re-verify it against the source on any upgrade.
 
-- **pi-subagents performs no launch-time check of the allowlist.** The
-  extension passes the agent's `tools` list to the child as pi's `--tools`
-  argument and spawns; nothing in the launch path (foreground or background
-  runner) refuses a child whose listed tool never registers.
-- **A child still launches when a listed tool is missing.** pi silently
-  ignores allowlisted names that never register: only registered tools enter
-  the child's registry, and unknown names in `--tools` produce no error and
-  no warning.
-- **The cost is the feedback row, not the launch.** Without pi-telemetry a
-  child's `tw_feedback` call fails at call time ("the workflow feedback was
-  not recorded ... pi-telemetry is not installed"), so workflow feedback from
-  children is lost; the chain itself still runs.
+- **Every plain name in an agent's `tools` allowlist becomes a required child
+  tool.** The launch plan derives `requiredChildTools` from the requested
+  built-in tools and passes them into the child session. Path-like entries
+  (containing `/` or ending `.ts`/`.js`) load extensions instead of naming
+  tools, so they are not requirements.
+- **A required tool that never registers fails the child's run at agent
+  start.** The child's `agent_start` hook compares the required tools against
+  the child registry and throws "Agent '<name>' requested unavailable child
+  tools: <tool>." (a foreground child phrases the same failure as "these
+  child tools were unavailable"). The child process starts, but its run is
+  marked failed: a never-registering allowlisted tool does not pass silently.
+- **The cost of a missing peer is the chain's runs, not just the feedback
+  rows.** 10 of the 11 shipped agent allowlists name `submit_feedback`, a
+  pi-telemetry tool: with pi-telemetry absent, every shipped chain's children
+  fail at agent start. Install pi-telemetry before dispatching them
+  (`pi install npm:@y4shin/pi-telemetry`).
 
 The session-start warning when pi-telemetry is missing states exactly this
-shape: the child still launches, the allowlist is not checked at launch, and
-each child's feedback call fails.
+shape: the allowlisted name is a required child tool, and the child's run
+fails at agent start with "requested unavailable child tools".
 
 ## Write lockdown on docs/tasks (wherever the workflow is enabled)
 
