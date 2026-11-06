@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Vendor the pr skill into the promoted set
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: s
 ---
@@ -36,3 +36,5 @@ None (can start immediately).
 ## Implementation notes
 
 House seam discovered during implementation: the `reference-coverage-suite` in the structure tests is a manifest-driven loop that verbatim-forces the canonical `workflow-failure` reference sentence onto every promoted SKILL.md except `workflow-failure` itself; the ticket's "none expected" remark about mechanical adjustments was wrong, and any future vendoring effort must budget for this seam (the operator-communication preamble line beside it follows house convention but is pinned by no test). Upstream revision vendored: mattpocock/skills `main` at commit `4ae2317ddb22b046e26455e4f9c9b3aaaf62212d`, fetched live and not pinned anywhere in the repo; a future re-sync has no recorded revision to diff against, so it should pin one. Upstream's `agents/openai.yaml` and `CREDITS.md` were deliberately not vendored: the house is Pi-native (frontmatter only) and attribution lives in the `metadata.credits` block plus the docs page's provenance chain.
+
+Landed from the working branch `ticket/vendor-pr-skill` (checkpoints `1e81b4f`, `b8fc488`, `88a2357`) with `--no-ff` onto the landing branch `task/vendor-pr-skill` (merge commit `8ca7c0e`); the working branch was deleted afterwards. The landing branch did not exist at land time (the phase never created it before dispatch, and the tdd-worker had forked from `feature/pr-skills`), so it was created at the merge base `8136f4e`, the effort's starting branch tip, the same recreation the `write-lockdown-guard` landing needed. The vendored body carries the house preamble (the operator-communication line plus the canonical `workflow-failure` reference sentence) between the frontmatter and the upstream body: the one mechanical adjustment, forced by the `reference-coverage-suite` in the structure tests; frontmatter and everything outside the preamble are byte-identical to upstream. Verification on the landing branch: full suite 23 files / 1362 tests green, both typechecks clean. Residual, pre-existing and out of ticket scope: the overview docs page has no Actions-table mirror, so the new "Write a PR body" row exists only in the router SKILL.md; a later effort mirroring that table must add the row.
