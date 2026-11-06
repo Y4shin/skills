@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { GATED_SKILL_NAMES, SKILL_REGISTRY } from "../src/disclosure.js";
+import { GATED_SKILL_NAMES, SKILL_REGISTRY, openSkillsIn } from "../src/disclosure.js";
 import factory from "../src/pi.js";
 
 // ─── Mock control for fail-open throw scenario ───────────────────────────────
@@ -800,6 +800,40 @@ describe("factory gate", () => {
       expect(result.details.opened).toBe(false);
       expect(result.details.reason).toContain("no live effort");
       expect(stub.notifications.some((n) => n.message.includes("not opening"))).toBe(false);
+    });
+  });
+
+  // ── Disclosure soundness in a gated repo (tw-open-gated-restriction) ──────
+
+  describe("the open-set derivation in a gated repo", () => {
+    test("cannot derive a workflow phase as open from the passive active set", () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      // The passive active set: everything a gated repo can ever have active.
+      // The declared set is what registration marks defaultActive (the opener
+      // and the closer); the only toolset an open there can activate is the
+      // non-gated registry entries' (today skill-creator's), since a workflow
+      // phase never opens and tw_request_tool never registers to grant more.
+      const declared = stub.tools.filter((t: any) => t.defaultActive).map((t: any) => t.name);
+      const activatable = SKILL_REGISTRY.filter((e) => !GATED_SKILL_NAMES.includes(e.name)).flatMap(
+        (e) => e.toolset,
+      );
+      const passive = [...new Set([...declared, ...activatable])];
+
+      // The idle declared set derives nothing.
+      expect(openSkillsIn(declared).size, "the idle declared set opens nothing").toBe(0);
+
+      // The maximal passive set derives exactly the skill that genuinely
+      // opened, and never a workflow phase: a transcript replay that restored
+      // the whole passive set would still not manufacture an open phase.
+      const open = openSkillsIn(passive);
+      for (const name of GATED_SKILL_NAMES) {
+        expect(open.has(name), `${name} must not derive as open in a gated repo`).toBe(false);
+      }
+      expect([...open].sort()).toEqual(["skill-creator"]);
     });
   });
 
