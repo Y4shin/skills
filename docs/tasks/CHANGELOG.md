@@ -71,6 +71,11 @@ title: Task Changelog
 
 
 
+
+## 2026-11-06, Re-sync docs/repo-gating.md to the narrowed gate (repo-gating-docs-resync)
+
+docs/repo-gating.md now describes the narrowed gate as the implementation tickets pinned it: the 10-name gated skill manifest, the passive tools (tw_open, tw_close, tw_feedback) with tw_open restricted to non-gated skills, the skill-creator tools staying registered through the disclosure, notify_user in both states, the write lockdown keyed on its own workflow-enabled condition, and the /help limitation re-scoped to the ten; the disableOnRepo / per-repo-enable classification contract is unchanged. The pi-subagents launch-failure claim was verified against that package's source and corrected: a child whose allowlisted tool is unavailable still launches (no launch-time allowlist check exists), the missing tool is simply absent, and the real cost is the child's failed tw_feedback call; the session-start warning, README, and the skill-creator reference now state this verified shape, and seven doc-content tests pin the resynced narrative.
+
 ## 2026-11-06, Restrict tw_open to non-gated skills in gated repos (tw-open-gated-restriction)
 
 In a gated work repo, tw_open now offers only the non-gated registry entries (today exactly skill-creator) in its parameter description and refuses any of the 10 workflow-skill names at runtime with the opener's refused-outcome shape (reason plus legal next, plus a best-effort notify), so a gated repo treats the whole manifest consistently and skill-creator opens with its full toolset exactly as in an ungated repo. The refusal deliberately lands in the execute handler rather than argument validation, because validation throws and cannot carry the refused-outcome shape; the narrowing deliberately edits the description's enumerated list rather than the parameter type, because a provider-validated union short-circuits shaped refusals (the DeepSeek breakage class this repo documents). A derivation-soundness test proves the passive gated active set can never open a workflow phase. The ungated shape is unchanged; the suite is green relative to the proven main baseline.
