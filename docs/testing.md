@@ -48,6 +48,15 @@ Run these always:
 - `npm run typecheck:tests` -- type-check `tests/**` through
   `tsconfig.test.json` (the base config includes `src/**` only)
 
+When the installed `node_modules` desyncs from `package.json` (npm marks the
+packages `invalid`), these commands fail with a fixed, pre-existing set:
+version-skew crashes in the integration harness, version smoke tests against
+the installed package, and corpus scans polluted by a local virtualenv. The
+gate is then relative: diff the failure list, and the `tsc` errors with
+positions stripped, against a clean worktree of `main`. Identical sets are
+green; any new line is the change's regression. Resync `node_modules` to
+the declared versions to clear the baseline.
+
 Run if asked (by number):
 
 1. `devenv shell -- npm test` -- the full suite in the reproducible devenv shell
@@ -272,6 +281,14 @@ suite normally; do not exclude this file.
   applies per-upgrade resources (`resources/upgrade-<from>-to-<to>.md`) in
   sequence. Structure assertions verify the skill references `upgrade-2-to-3`,
   `migration-target.yaml`, and the dry-run/backup/idempotent safety guarantees.
+- **Static keep-lists get bidirectional consistency tests.** When a behaviour
+  (prompt strip, invocation block) consumes a static list instead of deriving
+  it at runtime, pin the list against its sources in both directions: the list
+  equals the settled literal (count pinned), every entry is a `package.json`
+  `pi.skills` basename, and the registry entries outside the list are exactly
+  the expected complement. A renamed or added skill then fails the test
+  instead of silently changing the strip. See the `gated skill manifest` block
+  in `tests/skills.test.ts`.
 - **Skill helper-script testing (CLI seam):** when a skill ships executable
   helper scripts (e.g. `skills/engineering/skill-creator/scripts/*.mjs`), test them via
   `spawnSync` on the script CLI (stdout + exit code) from a dedicated vitest
