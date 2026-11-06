@@ -69,6 +69,11 @@ title: Task Changelog
 
 
 
+
+## 2026-11-06, Split tool registration by gate state and re-key the write lockdown (gated-tool-registration)
+
+Tool registration is now a pure function of the gate state: a gated work repo registers exactly tw_open, tw_close, tw_feedback, the three skill-creator tools (inactive, as today) and notify_user, while an ungated repo keeps the full surface unchanged. The docs/tasks write lockdown and the transcript declared-set replay moved behind a new explicit workflowEnabled(gate) predicate instead of the raw gate boolean; refusal wording and the two exempt segments are untouched. The stale "gated five" factory fixture was replaced by dual gate-state exact-set tests bound to the landed skill manifest. Deliberate reading recorded: the session-start peer-extension warnings (pi-subagents, pi-telemetry) now fire in gated repos too, inverting one previously pinned test; the revert is one handler plus one test if that reading is ever judged wrong. The suite is green relative to the proven main baseline (identical failure and typecheck error sets).
+
 ## 2026-11-06, Static manifest of the 10 gated workflow skills (gated-skill-manifest)
 
 The 10 gated workflow-skill names now live in one exported manifest (`GATED_SKILL_NAMES` in `src/disclosure.ts`, directly above `SKILL_REGISTRY`); the prompt-strip and `/skill:` invocation-block handlers read it, and the runtime derivation plus its stale 8-name fallback are gone. A three-part consistency test pins the manifest against `package.json` `pi.skills` basenames and the registry complement (exactly `skill-creator`), so a renamed or added skill fails the test instead of silently changing the strip. In gated repos the strip and invocation block now cover only the 10 workflow skills, so generic skills stay in the prompt and invocable in work repos; ungated repos behave exactly as before. The suite is green relative to the proven `main` baseline: failure and typecheck error sets are identical, with six new passing tests.
