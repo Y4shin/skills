@@ -1511,8 +1511,10 @@ const OLD_WILDCARD_PATTERN = new RegExp(`${OLD_PREFIX}\\*`);
 // character and any retired identifier without anything of ours being wrong.
 // `.agents` (a vendored skills checkout) and `dist` (build output) are the
 // same class as prototype-bundle: local, gitignored, never shipped (the
-// package `files` set ships neither).
-const CORPUS_SKIP_DIRS = new Set(["node_modules", ".git", "archive", "prototype-bundle", ".pi-subagents", ".work", ".agents", "dist"]);
+// package `files` set ships neither). `.venv` (a checkout-local Python
+// virtualenv) is the same class: its site-packages carry em-dashes and
+// retired tool prefixes that are not ours.
+const CORPUS_SKIP_DIRS = new Set(["node_modules", ".git", "archive", "prototype-bundle", ".pi-subagents", ".work", ".agents", ".venv", "dist"]);
 function corpusFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
