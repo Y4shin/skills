@@ -458,6 +458,85 @@ describe("factory gate", () => {
     });
   });
 
+  describe("repo-gating doc resync (the narrowed gate)", () => {
+    // The narrative contract (the docs seam): docs/repo-gating.md must
+    // describe the registered surface the implementation tickets pinned,
+    // not the pre-narrowing behavior. These assertions pin the resynced
+    // description; a regression to "no tools register" phrasing fails here.
+    const readDoc = () => readFileSync(join(process.cwd(), "docs", "repo-gating.md"), "utf-8");
+
+    test("documents the registered passive surface by name", () => {
+      const content = readDoc();
+      for (const name of [
+        "tw_open",
+        "tw_close",
+        "tw_feedback",
+        "notify_user",
+        "skill_validate",
+        "skill_scaffold",
+        "skill_discover",
+      ]) {
+        expect(content, `the doc must name ${name}`).toContain(name);
+      }
+    });
+
+    test("names the gated skill set and the one kept registry entry", () => {
+      const content = readDoc();
+      for (const name of [
+        "task-workflow-overview",
+        "setup-workflow",
+        "intake",
+        "wayfinder",
+        "to-spec",
+        "to-tickets",
+        "implement-ticket",
+        "finalize-effort",
+        "task-workflow-doctor",
+        "workflow-failure",
+        "skill-creator",
+      ]) {
+        expect(content, `the doc must name ${name}`).toContain(name);
+      }
+    });
+
+    test("states the tw_open restriction and that the refusal covers the whole manifest", () => {
+      const content = readDoc();
+      expect(content).toMatch(/restrict/i);
+      expect(content).toMatch(/whole manifest|entire manifest|all ten/i);
+    });
+
+    test("scopes the /help and skill-list limitation to the gated workflow skills", () => {
+      const content = readDoc();
+      expect(content).toContain("/help");
+      expect(content).toContain("skill-list");
+      // Re-scoped: the gap now covers the ten gated skills, not every skill
+      // the package ships (skill-creator is not stripped).
+      expect(content).toMatch(/\bten\b|\b10\b/);
+    });
+
+    test("states the write lockdown keys on the workflow being enabled", () => {
+      const content = readDoc();
+      expect(content).toMatch(/workflow (is|being) enabled/i);
+    });
+
+    test("re-states the classification contract as unchanged", () => {
+      const content = readDoc();
+      expect(content).toContain("disableOnRepo");
+      expect(content).toContain("Truth table");
+      expect(content).toMatch(/unchanged/i);
+    });
+
+    test("states the verified pi-subagents launch behavior", () => {
+      // Verified against pi-subagents 0.34.0 and pi's --tools handling: no
+      // launch-time check, silently ignored names. The doc describes that
+      // shape, not a failed launch.
+      const content = readDoc();
+      expect(content).toMatch(/still launches/i);
+      expect(content).toMatch(/ignores allowlisted names|silently ignores/i);
+      expect(content).not.toMatch(/will not launch|fails a child/i);
+    });
+  });
+
   describe("input skill invocation gate", () => {
     test("work repo blocks /skill:<gated-name> and notifies", async () => {
       setupWorkRepo();
