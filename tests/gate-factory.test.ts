@@ -196,11 +196,20 @@ function setupPersonalRepo(): string {
 }
 
 /**
+ * A prose file the doc-content tests pin, read from the working tree the
+ * factory tests run in: the one read seam behind readRepoGatingDoc and the
+ * README / skill-creator-reference doc-content test.
+ */
+function readRepoDoc(...segments: string[]): string {
+  return readFileSync(join(process.cwd(), ...segments), "utf-8");
+}
+
+/**
  * The narrative contract the doc tests pin: docs/repo-gating.md, read
  * from the working tree the factory tests run in.
  */
 function readRepoGatingDoc(): string {
-  return readFileSync(join(process.cwd(), "docs", "repo-gating.md"), "utf-8");
+  return readRepoDoc("docs", "repo-gating.md");
 }
 
 function createStub(): StubExtensionAPI {
@@ -549,10 +558,13 @@ describe("factory gate", () => {
       // The same correction propagated beyond docs/repo-gating.md: the
       // README's install paragraph and skill-creator's target-pi reference
       // must state the 0.84.0 shape, not the superseded 0.34.0 record.
-      const readme = readFileSync(join(process.cwd(), "README.md"), "utf-8");
-      const targetPi = readFileSync(
-        join(process.cwd(), "skills", "engineering", "skill-creator", "references", "target-pi.md"),
-        "utf-8",
+      const readme = readRepoDoc("README.md");
+      const targetPi = readRepoDoc(
+        "skills",
+        "engineering",
+        "skill-creator",
+        "references",
+        "target-pi.md",
       );
       for (const content of [readme, targetPi]) {
         expect(content).toMatch(/0\.84\.0/);
