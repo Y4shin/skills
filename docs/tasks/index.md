@@ -12,6 +12,7 @@ title: docs/tasks
 - bash-tail-preview-fix
 - build-eval-creator-skill
 - coding-taste
+- configurable-git-workflow
 - conventions-and-writer-cleanups
 - eval-scorer-feedback
 - migration-surface-polish
