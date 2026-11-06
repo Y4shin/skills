@@ -70,6 +70,11 @@ title: Task Changelog
 
 
 
+
+## 2026-11-06, Restrict tw_open to non-gated skills in gated repos (tw-open-gated-restriction)
+
+In a gated work repo, tw_open now offers only the non-gated registry entries (today exactly skill-creator) in its parameter description and refuses any of the 10 workflow-skill names at runtime with the opener's refused-outcome shape (reason plus legal next, plus a best-effort notify), so a gated repo treats the whole manifest consistently and skill-creator opens with its full toolset exactly as in an ungated repo. The refusal deliberately lands in the execute handler rather than argument validation, because validation throws and cannot carry the refused-outcome shape; the narrowing deliberately edits the description's enumerated list rather than the parameter type, because a provider-validated union short-circuits shaped refusals (the DeepSeek breakage class this repo documents). A derivation-soundness test proves the passive gated active set can never open a workflow phase. The ungated shape is unchanged; the suite is green relative to the proven main baseline.
+
 ## 2026-11-06, Split tool registration by gate state and re-key the write lockdown (gated-tool-registration)
 
 Tool registration is now a pure function of the gate state: a gated work repo registers exactly tw_open, tw_close, tw_feedback, the three skill-creator tools (inactive, as today) and notify_user, while an ungated repo keeps the full surface unchanged. The docs/tasks write lockdown and the transcript declared-set replay moved behind a new explicit workflowEnabled(gate) predicate instead of the raw gate boolean; refusal wording and the two exempt segments are untouched. The stale "gated five" factory fixture was replaced by dual gate-state exact-set tests bound to the landed skill manifest. Deliberate reading recorded: the session-start peer-extension warnings (pi-subagents, pi-telemetry) now fire in gated repos too, inverting one previously pinned test; the revert is one handler plus one test if that reading is ever judged wrong. The suite is green relative to the proven main baseline (identical failure and typecheck error sets).
