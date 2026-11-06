@@ -67,6 +67,14 @@ positions stripped, against a clean worktree of `main`. Identical sets are
 green; any new line is the change's regression. Resync `node_modules` to
 the declared versions to clear the baseline.
 
+A ticket that verifies another package's behaviour states the version in
+its record and verifies against the lockfile-declared version, not the
+installed copy: a desynced `node_modules` can make the record false the
+moment the dependencies are resynced, and the record must then be
+corrected with the same source-backed method (`subagent-availability-resync`
+re-verified the pi-subagents child-tool availability shape for exactly
+this reason).
+
 Run if asked (by number):
 
 1. `devenv shell -- npm test` -- the full suite in the reproducible devenv shell
