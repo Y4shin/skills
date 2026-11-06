@@ -8,6 +8,7 @@ title: docs/tasks
 
 ## Live
 
+- add-pr-skill
 - architecture-tracking
 - bash-tail-preview-fix
 - build-eval-creator-skill
