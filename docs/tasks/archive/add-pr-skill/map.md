@@ -1,7 +1,7 @@
 ---
 type: map
 title: Integrate the pr skill into the package
-status: stable
+status: deprecated
 ready_for_spec: true
 ---
 # Integrate the pr skill into the package

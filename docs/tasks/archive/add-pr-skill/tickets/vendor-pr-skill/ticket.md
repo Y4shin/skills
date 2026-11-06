@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Vendor the pr skill into the promoted set
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 size: s

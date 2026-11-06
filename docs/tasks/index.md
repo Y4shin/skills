@@ -8,7 +8,6 @@ title: docs/tasks
 
 ## Live
 
-- add-pr-skill
 - architecture-tracking
 - bash-tail-preview-fix
 - build-eval-creator-skill
@@ -19,6 +18,7 @@ title: docs/tasks
 
 ## Archived
 
+- add-pr-skill
 - adopt-mp-skills-way
 - agent-facing-workflow-docs
 - backfill-skill-docs-pages

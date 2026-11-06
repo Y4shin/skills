@@ -2,7 +2,7 @@
 type: task
 subtype: grilling
 title: Settle the non-negotiables for the pr skill integration
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 ---
