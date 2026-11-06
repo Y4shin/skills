@@ -68,6 +68,11 @@ title: Task Changelog
   narrative' core principle. 28 promoted skills.
 
 
+
+## 2026-11-06, Static manifest of the 10 gated workflow skills (gated-skill-manifest)
+
+The 10 gated workflow-skill names now live in one exported manifest (`GATED_SKILL_NAMES` in `src/disclosure.ts`, directly above `SKILL_REGISTRY`); the prompt-strip and `/skill:` invocation-block handlers read it, and the runtime derivation plus its stale 8-name fallback are gone. A three-part consistency test pins the manifest against `package.json` `pi.skills` basenames and the registry complement (exactly `skill-creator`), so a renamed or added skill fails the test instead of silently changing the strip. In gated repos the strip and invocation block now cover only the 10 workflow skills, so generic skills stay in the prompt and invocable in work repos; ungated repos behave exactly as before. The suite is green relative to the proven `main` baseline: failure and typecheck error sets are identical, with six new passing tests.
+
 ## 2026-11-02, Remove the migration CLI from the package (remove-migration-cli)
 
 The package now ships exactly one migration executor, the disclosed `tw_migrate` tool. The three CLI files (the argv wrapper, the spawn shim, and its TypeScript resolve hook) are deleted, together with the four spawn-based shim tests whose coverage already lived in the tool tests; comment headers and the doctor skill's failure-cause wording were reworded so no living file names the removed CLI (dated changelog entries and archives keep their historical mentions, per the repo's exemption classes). Three permanent structure guards now pin the removal executably, following the repo's corpus-sweep prior art. Suite green: 22 files, 1299 tests.
