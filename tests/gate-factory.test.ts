@@ -459,6 +459,43 @@ describe("factory gate", () => {
       expect(stub.notifications).toHaveLength(0);
     });
 
+    test("work repo passes through /skill:<non-manifest package skill>", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      // tdd ships in pi.skills but is not a workflow skill: the invocation
+      // block reads the static manifest, not the package's whole skill list.
+      const inputHandlers = stub.handlers["input"];
+      const result = await inputHandlers[0](
+        { type: "input", text: "/skill:tdd", source: "interactive" },
+        { ui: stub.ui },
+      );
+
+      expect(result).toEqual({ action: "continue" });
+      expect(stub.notifications).toHaveLength(0);
+    });
+
+    test("work repo blocks /skill:task-workflow-doctor, a manifest name with no registry entry", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const inputHandlers = stub.handlers["input"];
+      const result = await inputHandlers[0](
+        { type: "input", text: "/skill:task-workflow-doctor", source: "interactive" },
+        { ui: stub.ui },
+      );
+
+      expect(result).toEqual({ action: "handled" });
+      expect(stub.notifications).toContainEqual({
+        message: "task-workflow is gated in this work repo; not loading task-workflow-doctor",
+        level: "warning",
+      });
+    });
+
     test("work repo passes through non-/skill: input", async () => {
       setupWorkRepo();
 
@@ -506,6 +543,26 @@ describe("factory gate", () => {
       expect(result.systemPrompt).toContain("<available_skills>");
       expect(result.systemPrompt).toContain("PREFIX LINE 1");
       expect(result.systemPrompt).toContain("SUFFIX LINE 2");
+    });
+
+    test("work repo leaves a non-manifest package skill in the prompt", async () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      // tdd and research ship in pi.skills but are not workflow skills: the
+      // static manifest gates exactly the 10, so the strip leaves them alone
+      // while a manifest name goes.
+      const fixture = buildSkillsXml(["tdd", "research", "wayfinder"]);
+      const result = await stub.handlers["before_agent_start"][0](
+        { systemPrompt: fixture },
+        { ui: stub.ui },
+      );
+
+      expect(result.systemPrompt).toContain("<name>tdd</name>");
+      expect(result.systemPrompt).toContain("<name>research</name>");
+      expect(result.systemPrompt).not.toContain("<name>wayfinder</name>");
     });
 
     test("work repo removes the whole skills block when only the five are present", async () => {

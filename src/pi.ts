@@ -28,6 +28,7 @@ import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVE
 import {
   ALWAYS_DECLARED,
   CLOSER,
+  GATED_SKILL_NAMES,
   SKILL_REGISTRY,
   buildOpenParameters,
   conflictReason,
@@ -56,21 +57,17 @@ import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { FEEDBACK_KINDS, WORKFLOW_SOURCE, feedbackCall } from "./core/feedback.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 
-// ─── Gated skill names (shared by strip + invocation gate) ─────────────────────
+// ─── Gated skill manifest sanity (session-start diagnostics) ──────────────────
 
-const FALLBACK_GATED_SKILL_NAMES = [
-  "task-workflow-overview",
-  "setup-workflow",
-  "intake",
-  "wayfinder",
-  "to-spec",
-  "to-tickets",
-  "implement-ticket",
-  "finalize-effort",
-];
-
-function loadGatedSkillNames(): { names: string[]; diagnostics: string[] } {
-  const diagnostics: string[] = [];
+/**
+ * The gated names are the static manifest exported from src/disclosure.ts;
+ * nothing is derived here. The one runtime read left is a sanity check: a
+ * broken install (package.json unreadable, pi.skills missing or not an array
+ * of strings) is worth one warning at session start. The strip and the
+ * invocation block run on the manifest regardless; the manifest-to-package
+ * consistency itself is pinned by the tests, not by this check.
+ */
+function loadSkillNameDiagnostics(): string[] {
   try {
     const pkgPath = resolvePath(
       dirname(fileURLToPath(import.meta.url)),
@@ -81,20 +78,19 @@ function loadGatedSkillNames(): { names: string[]; diagnostics: string[] } {
     const piSection = pkg.pi as Record<string, unknown> | undefined;
     const skills = piSection?.skills;
     if (Array.isArray(skills) && skills.every((s) => typeof s === "string")) {
-      return { names: (skills as string[]).map((s) => basename(s)), diagnostics };
+      return [];
     }
-    diagnostics.push(
-      "skill-strip: package.json pi.skills is missing or not an array of strings; using fallback list",
-    );
+    return [
+      "gated-skill manifest: package.json pi.skills is missing or not an array of strings; the static manifest is in effect",
+    ];
   } catch (e) {
-    diagnostics.push(
-      `skill-strip: failed to read package.json pi.skills: ${(e as Error).message}; using fallback list`,
-    );
+    return [
+      `gated-skill manifest: failed to read package.json pi.skills: ${(e as Error).message}; the static manifest is in effect`,
+    ];
   }
-  return { names: FALLBACK_GATED_SKILL_NAMES, diagnostics };
 }
 
-const { names: GATED_SKILL_NAMES, diagnostics: SKILL_NAME_DIAGNOSTICS } = loadGatedSkillNames();
+const SKILL_NAME_DIAGNOSTICS = loadSkillNameDiagnostics();
 
 /**
  * Block explicit `/skill:<gated-name>` invocations in a work repo. The input
