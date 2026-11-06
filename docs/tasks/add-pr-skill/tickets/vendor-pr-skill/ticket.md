@@ -32,3 +32,7 @@ The exact surface map, the existing test abstractions to reuse, and the do-not-r
 ## Blocked by
 
 None (can start immediately).
+
+## Implementation notes
+
+House seam discovered during implementation: the `reference-coverage-suite` in the structure tests is a manifest-driven loop that verbatim-forces the canonical `workflow-failure` reference sentence onto every promoted SKILL.md except `workflow-failure` itself; the ticket's "none expected" remark about mechanical adjustments was wrong, and any future vendoring effort must budget for this seam (the operator-communication preamble line beside it follows house convention but is pinned by no test). Upstream revision vendored: mattpocock/skills `main` at commit `4ae2317ddb22b046e26455e4f9c9b3aaaf62212d`, fetched live and not pinned anywhere in the repo; a future re-sync has no recorded revision to diff against, so it should pin one. Upstream's `agents/openai.yaml` and `CREDITS.md` were deliberately not vendored: the house is Pi-native (frontmatter only) and attribution lives in the `metadata.credits` block plus the docs page's provenance chain.
