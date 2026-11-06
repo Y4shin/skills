@@ -389,6 +389,25 @@ export function conflictReason(skill: string, openSkill: string): string {
 }
 
 /**
+ * The registry entries a gated (work) repo keeps openable: those whose names
+ * are not in the gated manifest. Today exactly skill-creator, the nested
+ * authoring discipline. The opener's schema and its gated refusal both read
+ * this, so the offered surface and the enforced surface cannot drift.
+ */
+export function openableWhenGated(tables: readonly SkillEntry[] = SKILL_REGISTRY): SkillEntry[] {
+  return tables.filter((s) => !GATED_SKILL_NAMES.includes(s.name));
+}
+
+/**
+ * The gated-name refusal's reason, in the opener's own refusal language: a
+ * workflow skill does not open in a work repo, whatever its phase gate would
+ * say about the tree.
+ */
+export function gatedReason(skill: string): string {
+  return `task-workflow is gated in this work repo: '${skill}' is a workflow skill and does not open here`;
+}
+
+/**
  * The opener's parameter contract: a plain object with the skill, the effort,
  * and an optional target. It is deliberately NOT a discriminated union on
  * `skill`: a provider validates the union before the handler runs, so a
@@ -396,9 +415,15 @@ export function conflictReason(skill: string, openSkill: string): string {
  * instead of the opener's own refusal naming the legal next call. The handler
  * validates the shape at runtime (validateOpenArgs) and the phase gate decides
  * whether a target is required, so every refusal reads.
+ *
+ * `gated` narrows the offered skill names to the non-gated registry entries
+ * (a work repo keeps only skill-creator openable), so the model never sees a
+ * hopeless value in the schema; the runtime refusal of a gated name stays the
+ * belt next to these suspenders.
  */
-export function buildOpenParameters(): TSchema {
-  const openable = SKILL_REGISTRY.map((s) => s.name).join(", ");
+export function buildOpenParameters(gated: boolean = false): TSchema {
+  const entries = gated ? openableWhenGated() : SKILL_REGISTRY;
+  const openable = entries.map((s) => s.name).join(", ");
   return Type.Object({
     skill: Type.String({ description: `The workflow skill to open: one of ${openable}` }),
     effort: Type.String({ description: "The effort the skill works in" }),
