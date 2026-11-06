@@ -63,21 +63,27 @@ test("has skills list", () => {
 
 ## The repo gate
 
-`task-workflow` (this package) has a **repo gate**: it auto-disables in
-work repositories. The gate reads `settings.json` for
+`task-workflow` (this package) has a **repo gate**: it disables the workflow
+in work repositories. The gate reads `settings.json` for
 `taskWorkflow.disableOnRepo` patterns and matches them against the git
-remote origin. When the gate is active, the package's skills are stripped
-from the system prompt and explicit `/skill:<name>` invocations are
-blocked.
+remote origin. When the gate is active, the ten workflow skills are stripped
+from the system prompt, the `tw_*` writers never register, explicit
+`/skill:<workflow-skill>` invocations are blocked, and `tw_open` refuses
+workflow skill names.
 
-Because `skill-creator` ships inside `task-workflow`, it inherits this
-gating. A skill you **produce** for this package also inherits the gate:
-it will not load in work repos. State this so the author isn't surprised:
-the skill works in personal repos and anywhere `task-workflow` is
-installed and not gated, but it is invisible in work repos.
+`skill-creator` is deliberately outside the gate: it is not in the gated
+skill manifest, its bundled script tools register in gated repos too, and
+`tw_open skill-creator` opens it there exactly as in a personal repo. State
+this so the author isn't surprised in the other direction: a skill you
+**produce** for this package is NOT auto-gated either. The gate's strip list
+is a static manifest of ten workflow skill names, so a new skill loads
+everywhere the package is installed, work repos included. If a produced
+skill must not load in work repos, that is a change to the manifest, which is
+a settled, reviewed change pinned by tests, not a local edit.
 
-This is a feature, not a bug, the gate keeps workflow skills out of
-unrelated work contexts.
+This is a feature, not a bug: the gate keeps the workflow skills out of
+unrelated work contexts while the authoring discipline and the skills it
+produces stay usable everywhere.
 
 ## Companion reference files
 
