@@ -360,13 +360,14 @@ describe("factory gate", () => {
     expect(telemetry).toBeDefined();
     expect(telemetry).toContain("pi install npm:@y4shin/pi-telemetry");
     expect(telemetry).toMatch(/allowlist/);
-    // Verified against pi-subagents 0.34.0 and pi's --tools handling: the
-    // extension performs no launch-time check of the allowlist, and a child
-    // pi silently ignores allowlisted names that never register, so the child
-    // still launches and only the feedback call fails at call time. The
-    // warning states that shape, not a failed launch.
-    expect(telemetry).toMatch(/still launches/);
-    expect(telemetry).not.toMatch(/will not launch|fails a child/);
+    // Verified against the installed pi-subagents 0.84.0 source: every plain
+    // name in an agent's tools allowlist becomes a required child tool, and
+    // the child's agent_start hook fails the run when a required tool never
+    // registers ("requested unavailable child tools"). The warning states
+    // that consequence, not the 0.34.0-era "the chain still launches".
+    expect(telemetry).toMatch(/0\.84\.0/);
+    expect(telemetry).toMatch(/requested unavailable child tools/);
+    expect(telemetry).not.toMatch(/still launches/);
   });
 
   test("work repo (gate active) skips the transcript declared-set replay on resume", async () => {
@@ -398,16 +399,18 @@ describe("factory gate", () => {
 
     const messages = stub.notifications.map((n) => n.message);
     expect(messages).toContain("pi-subagents is not installed. Install it with: pi install npm:pi-subagents");
-    // The warning names why the chain cannot record workflow feedback without
-    // it: the shipped agents list tw_feedback, and a child still launches when
-    // a listed tool is missing (verified against pi-subagents 0.34.0), so the
-    // row is lost at the child's feedback call, not at launch.
+    // The warning names why the shipped chains cannot run without it: the
+    // shipped agents list submit_feedback (a pi-telemetry tool) in their
+    // tools allowlist, and on pi-subagents 0.84.0 an allowlisted tool that
+    // never registers fails the child's run at agent start, so without
+    // pi-telemetry every chain child fails instead of recording feedback.
     const telemetry = messages.find((m) => m.startsWith("pi-telemetry is not installed."));
     expect(telemetry).toBeDefined();
     expect(telemetry).toContain("pi install npm:@y4shin/pi-telemetry");
     expect(telemetry).toMatch(/allowlist/);
-    expect(telemetry).toMatch(/still launches/);
-    expect(telemetry).not.toMatch(/will not launch|fails a child/);
+    expect(telemetry).toMatch(/0\.84\.0/);
+    expect(telemetry).toMatch(/requested unavailable child tools/);
+    expect(telemetry).not.toMatch(/still launches/);
   });
 
   test("detection throw falls open and registers all tools", async () => {
@@ -530,13 +533,32 @@ describe("factory gate", () => {
     });
 
     test("states the verified pi-subagents launch behavior", () => {
-      // Verified against pi-subagents 0.34.0 and pi's --tools handling: no
-      // launch-time check, silently ignored names. The doc describes that
-      // shape, not a failed launch.
+      // Verified against the installed pi-subagents 0.84.0 source: every
+      // plain name in an agent's tools allowlist becomes a required child
+      // tool, and the child's agent_start hook fails the run when a required
+      // tool never registers. The doc states that shape version-pinned, not
+      // the 0.34.0-era no-launch-check record.
       const content = readRepoGatingDoc();
-      expect(content).toMatch(/still launches/i);
-      expect(content).toMatch(/ignores allowlisted names|silently ignores/i);
-      expect(content).not.toMatch(/will not launch|fails a child/i);
+      expect(content).toMatch(/0\.84\.0/);
+      expect(content).toMatch(/requested\s+unavailable\s+child\s+tools/);
+      expect(content).toMatch(/agent start/i);
+      expect(content).not.toMatch(/still launches|silently ignores|does not check the allowlist/i);
+    });
+
+    test("carries the version-pinned launch shape in the README and the skill-creator reference", () => {
+      // The same correction propagated beyond docs/repo-gating.md: the
+      // README's install paragraph and skill-creator's target-pi reference
+      // must state the 0.84.0 shape, not the superseded 0.34.0 record.
+      const readme = readFileSync(join(process.cwd(), "README.md"), "utf-8");
+      const targetPi = readFileSync(
+        join(process.cwd(), "skills", "engineering", "skill-creator", "references", "target-pi.md"),
+        "utf-8",
+      );
+      for (const content of [readme, targetPi]) {
+        expect(content).toMatch(/0\.84\.0/);
+        expect(content).toMatch(/requested\s+unavailable\s+child\s+tools/);
+        expect(content).not.toMatch(/still launches|silently ignores|does not check the allowlist/i);
+      }
     });
   });
 
