@@ -1,9 +1,14 @@
 /**
  * Factory-level gate tests for task-workflow.
  *
- * Drives the real extension factory with a stub ExtensionAPI to verify that
- * tw_* tools, utility tools, and session_start peer warnings are skipped
- * when the repo gate is active (work repo) and present when inactive (personal).
+ * Drives the real extension factory with a stub ExtensionAPI to verify the
+ * registration split by gate state: an ungated repo (personal) registers the
+ * full tool surface, a gated one (work repo) registers exactly the passive
+ * set, the skill-creator tools, and notify_user. Also pins the session-start
+ * behavior of each state: the gate diagnostics and the peer-extension checks
+ * fire in both, the transcript declared-set replay stays workflow-bound
+ * (ungated only), and the strip plus invocation block hooks fire in gated
+ * repos only.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
@@ -12,6 +17,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
+import { GATED_SKILL_NAMES } from "../src/disclosure.js";
 import factory from "../src/pi.js";
 
 // ─── Mock control for fail-open throw scenario ───────────────────────────────
@@ -37,13 +43,19 @@ vi.mock("../src/core/repo-gate.js", async (importOriginal) => {
   };
 });
 
-// ─── Test helpers ────────────────────────────────────────────────────────────
+// ─── Test helpers ────────────────────────────────────────────────────────────────────
 
 const trackedRepos: string[] = [];
 
 let globalSettings: { dir: string; cleanup: () => void } | undefined;
 
-const GATED_NAMES = [
+/**
+ * The full tool surface an ungated (personal) repo registers, exactly: every
+ * tw_* tool from the factory, skill-creator's bundled script tools, and
+ * notify_user. The registered surface in an ungated repo is unchanged by the
+ * gate-state split, so a deleted or added tool fails here.
+ */
+const FULL_TOOL_SURFACE = [
   "skill_discover",
   "skill_scaffold",
   "skill_validate",
@@ -83,6 +95,24 @@ const GATED_NAMES = [
   "notify_user",
 ];
 
+/**
+ * The registered tool set a gated (work) repo contributes, exactly: the
+ * passive set (tw_open, tw_close, tw_feedback), skill-creator's three bundled
+ * tools (inactive; the restricted tw_open discloses them there), and
+ * notify_user (generic; it reads only the user's ntfy config). Every other
+ * tw_* tool, including all writers and the dispatcher companions, stays
+ * unregistered in a gated repo.
+ */
+const GATED_REGISTERED_TOOLS = [
+  "tw_open",
+  "tw_close",
+  "tw_feedback",
+  "skill_validate",
+  "skill_scaffold",
+  "skill_discover",
+  "notify_user",
+];
+
 interface StubExtensionAPI extends ExtensionAPI {
   tools: Array<{ name: string }>;
   handlers: Record<string, Array<(...args: any[]) => any>>;
@@ -94,16 +124,9 @@ interface StubExtensionAPI extends ExtensionAPI {
   ui: { notify(message: string, level: string): void };
 }
 
-// The gated names the package currently ships: the runtime derives the list
-// from package.json pi.skills, so the fixture matches the shipped surface.
-// finalize-effort joined when finalize-effort-skill landed (ticket 18).
-const GATED_SKILL_NAMES = [
-  "task-workflow-overview",
-  "setup-workflow",
-  "wayfinder",
-  "implement-ticket",
-  "finalize-effort",
-];
+// The stale gated-five strip fixture is gone: the strip reads the static
+// manifest exported from src/disclosure.ts, imported above as
+// GATED_SKILL_NAMES, so a manifest change updates these tests with it.
 
 function buildSkillsXml(skillNames: string[]): string {
   const preamble = [
@@ -246,37 +269,41 @@ describe("factory gate", () => {
     mockControl.mode = "passthrough";
   });
 
-  test("work repo (gate active) does not register tw_* tools", () => {
-    globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
-    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
-    const repo = makeRepo("git@github.com:QNCGmbH/openai.git");
-    process.chdir(repo);
+  test("work repo (gate active) registers exactly the passive set, the skill-creator tools, and notify_user", () => {
+    setupWorkRepo();
 
     const stub = createStub();
     factory(stub);
 
     const names = stub.tools.map((t) => t.name);
-    const gatedToolNames = GATED_NAMES.filter((n) => n.startsWith("tw_"));
-    expect(gatedToolNames.length).toBeGreaterThan(0);
-    for (const name of gatedToolNames) {
-      expect(names).not.toContain(name);
+    // The registered surface in a gated repo, exactly: a missing, extra, or
+    // stale tool (a writer, a dispatcher companion) fails here.
+    expect([...names].sort()).toEqual([...GATED_REGISTERED_TOOLS].sort());
+  });
+
+  test("gated registration keeps the opener and closer always-declared and the rest inactive", () => {
+    setupWorkRepo();
+
+    const stub = createStub();
+    factory(stub);
+
+    const byName = new Map(stub.tools.map((t: any) => [t.name, t]));
+    // The opener is the activation path in a gated repo too (for the one kept
+    // discipline, skill-creator), and the closer is declared in every state,
+    // so both ride the same always-declared shape as in an ungated repo. The
+    // feedback wrapper and the skill-creator tools register inactive, exactly
+    // as in an ungated repo: a phase's disclosure activates them.
+    expect(byName.get("tw_open")?.defaultActive, "tw_open is declared in every state").toBe(true);
+    expect(byName.get("tw_close")?.defaultActive, "tw_close is declared in every state").toBe(true);
+    for (const name of ["tw_feedback", "skill_validate", "skill_scaffold", "skill_discover"]) {
+      expect(byName.get(name)?.defaultActive, `${name} is off until an opener activates it`).toBe(false);
+    }
+    for (const name of GATED_REGISTERED_TOOLS.filter((n) => n !== "notify_user")) {
+      expect(byName.get(name)?.exposure, `${name} is direct, never deferred`).toBe("direct");
     }
   });
 
-  test("work repo (gate active) does not register utility tools", () => {
-    globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
-    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
-    const repo = makeRepo("git@github.com:QNCGmbH/openai.git");
-    process.chdir(repo);
-
-    const stub = createStub();
-    factory(stub);
-
-    const names = stub.tools.map((t) => t.name);
-    expect(names).not.toContain("notify_user");
-  });
-
-  test("personal repo registers all gated tools", () => {
+  test("personal repo registers the full tool surface", () => {
     globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
     process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
     const repo = makeRepo("https://github.com/Y4shin/skills.git");
@@ -288,14 +315,11 @@ describe("factory gate", () => {
     const names = stub.tools.map((t) => t.name);
     // The shrunken registered surface, exactly: a deleted tool still
     // registered fails here.
-    expect([...names].sort()).toEqual([...GATED_NAMES].sort());
+    expect([...names].sort()).toEqual([...FULL_TOOL_SURFACE].sort());
   });
 
-  test("work repo (gate active) skips session_start peer warnings", async () => {
-    globalSettings = makeGlobalSettings(["^github\\.com[:/]QNCGmbH/.*$"]);
-    process.env.PI_CODING_AGENT_DIR = globalSettings.dir;
-    const repo = makeRepo("git@github.com:QNCGmbH/openai.git");
-    process.chdir(repo);
+  test("work repo (gate active) still emits the peer-extension warnings", async () => {
+    const repo = setupWorkRepo();
 
     const stub = createStub();
     factory(stub);
@@ -308,8 +332,32 @@ describe("factory gate", () => {
 
     const messages = stub.notifications.map((n) => n.message);
     expect(messages).toContain("task-workflow gate active: work repo matched disableOnRepo pattern");
-    expect(messages).not.toContain("pi-subagents is not installed. Install it with: pi install npm:pi-subagents");
-    expect(messages).not.toContain("pi-telemetry is not installed. Install it with: pi install npm:@y4shin/pi-telemetry");
+    // The peer checks fire in a gated repo too: tw_feedback registers there
+    // (claimed by the shipped subagent allowlists) and the subagents launch
+    // there, so a missing peer is as diagnosable as in a personal repo.
+    expect(messages).toContain("pi-subagents is not installed. Install it with: pi install npm:pi-subagents");
+    const telemetry = messages.find((m) => m.startsWith("pi-telemetry is not installed."));
+    expect(telemetry).toBeDefined();
+    expect(telemetry).toContain("pi install npm:@y4shin/pi-telemetry");
+    expect(telemetry).toMatch(/allowlist/);
+  });
+
+  test("work repo (gate active) skips the transcript declared-set replay on resume", async () => {
+    const repo = setupWorkRepo();
+
+    const stub = createStub();
+    factory(stub);
+
+    // The declared set is the open/close engine's state, which only exists
+    // where the workflow runs: a gated repo never replays it, whatever the
+    // session-start reason. A regression here would also throw, since the
+    // replay reads the session transcript through the pi-ai helper.
+    const setActiveTools = vi.spyOn(stub, "setActiveTools");
+    await stub.handlers["session_start"][0](
+      { type: "session_start", reason: "resume" },
+      { cwd: repo, ui: stub.ui, sessionManager: { buildSessionProjection: () => ({ messages: [] }) } },
+    );
+    expect(setActiveTools).not.toHaveBeenCalled();
   });
 
   test("personal repo emits session_start peer warnings", async () => {
@@ -343,7 +391,7 @@ describe("factory gate", () => {
     factory(stub);
 
     const names = stub.tools.map((t) => t.name);
-    for (const name of GATED_NAMES) {
+    for (const name of FULL_TOOL_SURFACE) {
       expect(names).toContain(name);
     }
 
@@ -362,14 +410,14 @@ describe("factory gate", () => {
     const workStub = createStub();
     process.chdir(workRepo);
     factory(workStub);
-    expect(workStub.tools.map((t) => t.name)).toHaveLength(0);
+    expect([...workStub.tools.map((t) => t.name)].sort()).toEqual([...GATED_REGISTERED_TOOLS].sort());
 
     const personalStub = createStub();
     process.chdir(personalRepo);
     factory(personalStub);
     const names = personalStub.tools.map((t) => t.name);
-    expect(names).toHaveLength(GATED_NAMES.length);
-    for (const name of GATED_NAMES) {
+    expect(names).toHaveLength(FULL_TOOL_SURFACE.length);
+    for (const name of FULL_TOOL_SURFACE) {
       expect(names).toContain(name);
     }
   });
@@ -523,13 +571,15 @@ describe("factory gate", () => {
   });
 
   describe("before_agent_start skill strip", () => {
-    test("work repo strips only the gated five and leaves non-gated skills intact", async () => {
+    test("work repo strips exactly the manifest skills and leaves the rest intact", async () => {
       setupWorkRepo();
 
       const stub = createStub();
       factory(stub);
 
-      const fixture = buildSkillsXml([...GATED_SKILL_NAMES, "oracle"]);
+      // The manifest's 10 workflow skills go; a non-manifest package skill
+      // (tdd) and a foreign skill (oracle) stay.
+      const fixture = buildSkillsXml([...GATED_SKILL_NAMES, "oracle", "tdd"]);
       const result = await stub.handlers["before_agent_start"][0](
         { systemPrompt: fixture },
         { ui: stub.ui },
@@ -540,6 +590,7 @@ describe("factory gate", () => {
         expect(result.systemPrompt).not.toContain(`<name>${name}</name>`);
       }
       expect(result.systemPrompt).toContain("<name>oracle</name>");
+      expect(result.systemPrompt).toContain("<name>tdd</name>");
       expect(result.systemPrompt).toContain("<available_skills>");
       expect(result.systemPrompt).toContain("PREFIX LINE 1");
       expect(result.systemPrompt).toContain("SUFFIX LINE 2");
@@ -565,7 +616,7 @@ describe("factory gate", () => {
       expect(result.systemPrompt).not.toContain("<name>wayfinder</name>");
     });
 
-    test("work repo removes the whole skills block when only the five are present", async () => {
+    test("work repo removes the whole skills block when only manifest skills are present", async () => {
       setupWorkRepo();
 
       const stub = createStub();
@@ -640,7 +691,7 @@ describe("factory gate", () => {
     factory(stub);
 
     const labels = new Map(stub.tools.map((t: any) => [t.name, t.label]));
-    for (const name of GATED_NAMES) {
+    for (const name of FULL_TOOL_SURFACE) {
       const suffix = name.replace(/^tw_/, "");
       const expected = suffix.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       expect(labels.get(name)).toBe(expected);
@@ -660,7 +711,7 @@ describe("factory gate", () => {
       }
       // The bypass-free combination the prototype proved: direct (never
       // reachable through tool_search) and off until the opener activates it.
-      for (const name of GATED_NAMES.filter(
+      for (const name of FULL_TOOL_SURFACE.filter(
         (n) => n.startsWith("tw_") && !["tw_open", "tw_next", "tw_request_tool", "tw_close"].includes(n),
       )) {
         expect(byName.get(name)?.defaultActive, `${name} is off until an opener activates it`).toBe(false);
@@ -719,7 +770,11 @@ describe("factory gate", () => {
       }
     });
 
-    test("registers exactly one tool_call handler in a personal repo and none in a work repo", () => {
+    test("the lockdown registers when the workflow is enabled: one handler in a personal repo, none in a gated repo", () => {
+      // The guard keys on the workflow-enabled condition, not on the raw gate
+      // boolean: wherever the workflow runs, the named tw_* writers are the
+      // only writers of the tree. Today the two coincide, so the handler
+      // registers exactly in the ungated shape.
       setupPersonalRepo();
       const personalStub = createStub();
       factory(personalStub);
