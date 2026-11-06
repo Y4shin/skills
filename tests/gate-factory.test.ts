@@ -340,6 +340,13 @@ describe("factory gate", () => {
     expect(telemetry).toBeDefined();
     expect(telemetry).toContain("pi install npm:@y4shin/pi-telemetry");
     expect(telemetry).toMatch(/allowlist/);
+    // Verified against pi-subagents 0.34.0 and pi's --tools handling: the
+    // extension performs no launch-time check of the allowlist, and a child
+    // pi silently ignores allowlisted names that never register, so the child
+    // still launches and only the feedback call fails at call time. The
+    // warning states that shape, not a failed launch.
+    expect(telemetry).toMatch(/still launches/);
+    expect(telemetry).not.toMatch(/will not launch|fails a child/);
   });
 
   test("work repo (gate active) skips the transcript declared-set replay on resume", async () => {
@@ -374,14 +381,16 @@ describe("factory gate", () => {
 
     const messages = stub.notifications.map((n) => n.message);
     expect(messages).toContain("pi-subagents is not installed. Install it with: pi install npm:pi-subagents");
-    // The warning names why the chain cannot run without it: the shipped
-    // agents list
-    // tw_feedback, and an allowlisted-but-unavailable tool fails the child at
-    // launch.
+    // The warning names why the chain cannot record workflow feedback without
+    // it: the shipped agents list tw_feedback, and a child still launches when
+    // a listed tool is missing (verified against pi-subagents 0.34.0), so the
+    // row is lost at the child's feedback call, not at launch.
     const telemetry = messages.find((m) => m.startsWith("pi-telemetry is not installed."));
     expect(telemetry).toBeDefined();
     expect(telemetry).toContain("pi install npm:@y4shin/pi-telemetry");
     expect(telemetry).toMatch(/allowlist/);
+    expect(telemetry).toMatch(/still launches/);
+    expect(telemetry).not.toMatch(/will not launch|fails a child/);
   });
 
   test("detection throw falls open and registers all tools", async () => {
