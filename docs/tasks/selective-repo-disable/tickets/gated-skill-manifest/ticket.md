@@ -22,3 +22,7 @@ One exported, reviewable list of the 10 gated workflow-skill names living beside
 ## Blocked by
 
 None (can start immediately).
+
+## Implementation notes
+
+Architecture lessons from the knowledge harvest: the per-ticket contract line "manifest names are exactly the registry workflow skills" was not literally implementable, because three of the settled 10 names (task-workflow-overview, task-workflow-doctor, workflow-failure) own no toolset and therefore have no SKILL_REGISTRY entry. The implementable rule pins the registry's complement to exactly ["skill-creator"] plus the exact 10-name literal, which covers all three failure modes the acceptance criteria name. The consistency tests live in tests/skills.test.ts rather than tests/disclosure.test.ts because that file already reads package.json and imports SKILL_REGISTRY; disclosure.test.ts holds tool-behavior tests for tw_open, tw_close and tw_next.
