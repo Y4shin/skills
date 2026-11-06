@@ -71,5 +71,7 @@ Model- or user-reachable.
   file.
 - **[resolving-merge-conflicts](./resolving-merge-conflicts/SKILL.md)**:
   Resolve an in-progress merge or rebase conflict hunk by hunk, by intent.
+- **[pr](./pr/SKILL.md)**: Write a PR body from a summary visual, before
+  and after evidence, and a merge-danger assessment.
 - **[wizard](./wizard/SKILL.md)**: Generate an interactive bash wizard for
   steps only a human can perform.

@@ -190,7 +190,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(31);
+    expect(pkg.pi.skills.length).toBe(32);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
@@ -572,7 +572,7 @@ describe("triage is retired (intake-skill)", () => {
     const pkg = JSON.parse(readFile("package.json"));
     expect(pkg.pi.skills).toContain("./skills/engineering/intake");
     expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
-    expect(pkg.pi.skills.length).toBe(31);
+    expect(pkg.pi.skills.length).toBe(32);
     expect(pkg.pi.skills.filter((s: string) => s.includes("intake") || s.includes("triage"))).toEqual([
       "./skills/engineering/intake",
     ]);

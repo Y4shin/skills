@@ -140,6 +140,7 @@ decision, or when you type it.
 - [finalize-effort](./skills/engineering/finalize-effort/SKILL.md)
 - [grilling](./skills/engineering/grilling/SKILL.md)
 - [implement-ticket](./skills/engineering/implement-ticket/SKILL.md)
+- [pr](./skills/engineering/pr/SKILL.md)
 - [prototype](./skills/engineering/prototype/SKILL.md)
 - [research](./skills/engineering/research/SKILL.md)
 - [resolving-merge-conflicts](./skills/engineering/resolving-merge-conflicts/SKILL.md)

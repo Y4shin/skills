@@ -74,6 +74,7 @@ promoted_skills:
     - prototype
     - research
     - resolving-merge-conflicts
+    - pr                       # vendored from mattpocock/skills; writes a PR body
     - wizard
   productivity:
     - wait-what

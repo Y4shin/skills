@@ -9,6 +9,11 @@ metadata:
     url: "https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md"
 ---
 
+Every message to the operator follows the `operator-communication`
+skill: load it before your first message.
+
+If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
+
 Use this template for writing the PR body:
 
 ```markdown
