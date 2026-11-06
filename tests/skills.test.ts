@@ -142,6 +142,7 @@ const SKILL_FILES = [
   "skills/engineering/to-tickets/SKILL.md",
   "skills/engineering/skill-review/SKILL.md",
   "skills/engineering/eval-review/SKILL.md",
+  "skills/engineering/pr/SKILL.md",
 ];
 
 describe("skill files", () => {
