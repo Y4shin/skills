@@ -52,6 +52,34 @@ export interface SkillEntry {
 }
 
 /**
+ * The gated skill manifest: the workflow skills a work repo (gate active)
+ * disables, exactly as settled in the selective-repo-disable effort. The
+ * prompt strip, the /skill: invocation block, and tw_open's gated restriction
+ * all read this one list; there is no runtime derivation and no fallback.
+ *
+ * It mirrors the registry's workflow entries (every registry skill except
+ * skill-creator, the nested authoring discipline that stays openable in gated
+ * repos) plus the three workflow skills that have no registry entry because
+ * they own no toolset: task-workflow-overview, task-workflow-doctor, and
+ * workflow-failure. The consistency tests in tests/skills.test.ts pin the
+ * manifest against package.json's pi.skills basenames and the registry, so a
+ * renamed or added skill fails the suite instead of silently changing the
+ * strip.
+ */
+export const GATED_SKILL_NAMES: readonly string[] = [
+  "task-workflow-overview",
+  "setup-workflow",
+  "intake",
+  "wayfinder",
+  "to-spec",
+  "to-tickets",
+  "implement-ticket",
+  "finalize-effort",
+  "task-workflow-doctor",
+  "workflow-failure",
+];
+
+/**
  * The skill registry: one table, skill to toolset plus skill to gate. It is
  * the single source of the phase toolsets and of the opener's preconditions
  * (which gate applies); the gate evaluation itself reads the artifact tree in
