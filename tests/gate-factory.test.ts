@@ -711,6 +711,38 @@ describe("factory gate", () => {
       expect(skill.description).toContain("skill-creator");
     });
 
+    test("work repo: opening skill-creator discloses its toolset exactly as in an ungated repo", async () => {
+      const repo = setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+      stub.setActiveTools(["tw_open", "tw_close"]);
+
+      const twOpen = registeredTwOpen(stub);
+      const result = await twOpen.execute(
+        "t2",
+        { skill: "skill-creator", effort: "ready-effort" },
+        undefined,
+        undefined,
+        { cwd: repo, ui: stub.ui },
+      );
+
+      // The one kept discipline opens in a gated repo too: its bundled tools
+      // plus the shared reads activate, matching the ungated experience.
+      expect(result.details.opened).toBe(true);
+      expect(stub.getActiveTools()).toEqual(
+        expect.arrayContaining([
+          "tw_open",
+          "tw_close",
+          "tw_show",
+          "skill_validate",
+          "skill_scaffold",
+          "skill_discover",
+          "tw_feedback",
+        ]),
+      );
+    });
+
     test("work repo: tw_open refuses a workflow skill with the refused-outcome shape and notifies", async () => {
       const repo = setupWorkRepo();
 
@@ -742,6 +774,32 @@ describe("factory gate", () => {
         message: "task-workflow is gated in this work repo; not opening wayfinder",
         level: "warning",
       });
+    });
+
+    test("personal repo: tw_open is unchanged", async () => {
+      const repo = setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const twOpen = registeredTwOpen(stub);
+      // The ungated schema still offers every registry entry.
+      const skill = (twOpen.parameters as any)?.properties?.skill;
+      for (const entry of SKILL_REGISTRY) {
+        expect(skill.description, `the ungated schema must still offer '${entry.name}'`).toContain(entry.name);
+      }
+      // The ungated opener runs the phase gates, not the gated refusal: the
+      // refusal here is the phase gate's, and no gated notify fires.
+      const result = await twOpen.execute(
+        "t3",
+        { skill: "wayfinder", effort: "ready-effort" },
+        undefined,
+        undefined,
+        { cwd: repo, ui: stub.ui },
+      );
+      expect(result.details.opened).toBe(false);
+      expect(result.details.reason).toContain("no live effort");
+      expect(stub.notifications.some((n) => n.message.includes("not opening"))).toBe(false);
     });
   });
 
