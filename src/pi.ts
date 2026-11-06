@@ -1717,7 +1717,7 @@ async function recordRequestFeedback(ctx: ToolContext, data: Record<string, unkn
   }
 }
 
-export function createTools(): Record<string, Tool> {
+export function createTools(gated: boolean = false): Record<string, Tool> {
   return {
     tw_show: def(
       "Show artifact frontmatter (map, planning task, or ticket).",
@@ -3234,7 +3234,7 @@ export function createTools(): Record<string, Tool> {
         "toolset (plus tw_close) only when they pass; a refused open discloses nothing. " +
         "A wayfinder open carries only the effort; a ticket open carries the effort and the target. " +
         "Also refuses a skill that is already open or conflicts with an open skill.",
-      buildOpenParameters(),
+      buildOpenParameters(gated),
       async (p, ctx) => {
         validateOpenArgs(p);
         const entry = skillEntry(p.skill as string)!;
@@ -3659,7 +3659,7 @@ export default function (pi: ExtensionAPI) {
       diagnostics: [message],
     };
   }
-  const tools = createTools();
+  const tools = createTools(gate.active);
 
   // ── Tool registration, split by gate state ─────────────────────────
   // The set of names each state contributes is a pure function of the gate

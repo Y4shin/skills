@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { GATED_SKILL_NAMES } from "../src/disclosure.js";
+import { GATED_SKILL_NAMES, SKILL_REGISTRY } from "../src/disclosure.js";
 import factory from "../src/pi.js";
 
 // ─── Mock control for fail-open throw scenario ───────────────────────────────
@@ -682,6 +682,33 @@ describe("factory gate", () => {
       // The guidelines injection hook is gone: a personal repo registers no
       // before_agent_start handler at all, strip included.
       expect(stub.handlers["before_agent_start"]).toBeUndefined();
+    });
+  });
+
+  // ── The gated tw_open restriction (tw-open-gated-restriction) ──────────────
+
+  describe("the gated tw_open restriction", () => {
+    /** The registered tw_open tool definition, or undefined. */
+    function registeredTwOpen(stub: StubExtensionAPI): any {
+      return stub.tools.find((t: any) => t.name === "tw_open");
+    }
+
+    test("work repo: tw_open's parameter schema offers only the non-gated registry entries", () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const twOpen = registeredTwOpen(stub);
+      expect(twOpen).toBeDefined();
+      const skill = (twOpen.parameters as any)?.properties?.skill;
+      expect(skill, "tw_open's schema carries the skill parameter").toBeDefined();
+      // Enumerated narrowing: a gated name never appears in the offered
+      // surface, so the model cannot even see a hopeless value.
+      for (const name of GATED_SKILL_NAMES) {
+        expect(skill.description, `the gated schema must not offer '${name}'`).not.toContain(name);
+      }
+      expect(skill.description).toContain("skill-creator");
     });
   });
 

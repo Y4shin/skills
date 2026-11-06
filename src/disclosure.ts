@@ -396,9 +396,15 @@ export function conflictReason(skill: string, openSkill: string): string {
  * instead of the opener's own refusal naming the legal next call. The handler
  * validates the shape at runtime (validateOpenArgs) and the phase gate decides
  * whether a target is required, so every refusal reads.
+ *
+ * `gated` narrows the offered skill names to the non-gated registry entries
+ * (a work repo keeps only skill-creator openable), so the model never sees a
+ * hopeless value in the schema; the runtime refusal of a gated name stays the
+ * belt next to these suspenders.
  */
-export function buildOpenParameters(): TSchema {
-  const openable = SKILL_REGISTRY.map((s) => s.name).join(", ");
+export function buildOpenParameters(gated: boolean = false): TSchema {
+  const entries = gated ? SKILL_REGISTRY.filter((s) => !GATED_SKILL_NAMES.includes(s.name)) : SKILL_REGISTRY;
+  const openable = entries.map((s) => s.name).join(", ");
   return Type.Object({
     skill: Type.String({ description: `The workflow skill to open: one of ${openable}` }),
     effort: Type.String({ description: "The effort the skill works in" }),
