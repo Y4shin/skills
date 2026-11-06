@@ -24,11 +24,13 @@ For a local checkout, use `pi install /path/to/this/repo`.
 Both packages are necessary. The ticket chains use pi-subagents. Each shipped
 subagent lists `tw_feedback` and `submit_feedback` in its tool allowlist: the
 wrapper labels the row and then calls the store, and a nested call reaches only
-a tool the child has active. A child still launches when a listed tool is
-missing (pi-subagents does not check the allowlist at launch, and pi silently
-ignores allowlisted names that never register), so without pi-telemetry the
-chain runs but every child's workflow feedback call fails and the row is lost.
-The session start shows a warning when a package is missing.
+a tool the child has active. On pi-subagents 0.84.0 every plain name in that
+allowlist is a required child tool, and a child whose allowlisted tool never
+registers fails its run at agent start with "requested unavailable child
+tools": without pi-telemetry the shipped chains do not run, because every
+chain child fails at agent start instead of recording workflow feedback.
+Install pi-telemetry before dispatching the shipped chains. The session start
+shows a warning when a package is missing.
 
 Run this command one time in each repo:
 

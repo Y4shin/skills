@@ -85,6 +85,20 @@ This is a feature, not a bug: the gate keeps the workflow skills out of
 unrelated work contexts while the authoring discipline and the skills it
 produces stay usable everywhere.
 
+## The peer packages and the subagent allowlists
+
+The ticket chains dispatch through `pi-subagents`, and the shipped subagents
+list `tw_feedback` and `submit_feedback` in their `tools` allowlists:
+`tw_feedback` is this package's feedback wrapper, and `submit_feedback` is a
+pi-telemetry tool. On pi-subagents 0.84.0 every plain name in an agent's
+`tools` allowlist is a required child tool, and a child whose allowlisted tool
+never registers fails its run at agent start with "requested unavailable child
+tools". Without pi-telemetry the shipped chains do not run, because every
+chain child fails at agent start; install it
+(`pi install npm:@y4shin/pi-telemetry`) before dispatching them. This shape is
+version-pinned to pi-subagents 0.84.0 and was verified against that version's
+source; re-verify it on an upgrade.
+
 ## Companion reference files
 
 Companion reference files alongside `SKILL.md` are an established
