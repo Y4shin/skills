@@ -35,6 +35,14 @@ Run the probe from a throwaway repo holding the fixture tree the tool needs, and
 put the agent under test in `/tmp/probe/agent/agents/`. Drop this package from
 the list to reproduce a failure that only appears when it is missing.
 
+A consequence for offered-surface narrowing: narrow a parameter **description's
+enumerated list** and enforce at runtime, not through a provider-validated
+enum. A validated enum rejects a value before the tool runs, so a handler that
+must answer with a shaped refusal (`Refused: <reason>. Legal next: <call>.`)
+never gets to answer at all. The description keeps the model from seeing a
+hopeless value; the runtime refusal keeps the guaranteed response shape
+(`tw-open-gated-restriction`).
+
 ## Test protocol
 
 The task-workflow `test-runner` agent reads this section. "Run these always"
