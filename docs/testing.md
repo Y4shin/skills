@@ -51,7 +51,9 @@ Run these always:
 When the installed `node_modules` desyncs from `package.json` (npm marks the
 packages `invalid`), these commands fail with a fixed, pre-existing set:
 version-skew crashes in the integration harness, version smoke tests against
-the installed package, and corpus scans polluted by a local virtualenv. The
+the installed package, and corpus scans polluted by a checkout-local `.venv`
+(the corpus walker's skip set does not skip `.venv`, so it appears in this
+checkout but not in a fresh worktree). The
 gate is then relative: diff the failure list, and the `tsc` errors with
 positions stripped, against a clean worktree of `main`. Identical sets are
 green; any new line is the change's regression. Resync `node_modules` to
@@ -114,7 +116,10 @@ byte-order mark.
   isolating than the integration harness and works when the harness is
   broken. See `tests/gate-factory.test.ts` (the repo-gate factory tests) for
   the pattern, it asserts which tool names register and which `on(event)`
-  handlers fire under different gate decisions._
+  handlers fire under different gate decisions._ When the registered surface
+  splits by gate state, pin both states as exact sets (no more, no fewer),
+  including registration shape (`defaultActive`, `exposure`), so a stray
+  registration fails loudly (gated-tool-registration).
 - **Iteration-loop seams (function-as-dependency):** when a loop shells out
   to an external process and parses its output, inject the step as a
   `() => Promise<Result>` function so the loop logic (convergence, caps,

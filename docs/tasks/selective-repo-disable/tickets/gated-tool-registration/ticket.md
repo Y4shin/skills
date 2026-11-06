@@ -24,3 +24,7 @@ In a gated (work) repo, the extension registers the passive tool set `tw_open`, 
 ## Blocked by
 
 - `gated-skill-manifest` (the manifest is consumed by the strip and invocation handlers whose behaviour these tests pin).
+
+## Implementation notes
+
+Architecture lessons from the knowledge harvest: the architecture's sentence "the peer-extension checks (pi-subagents, pi-telemetry) stay" was ambiguous about where they fire; the implementer read it as "keep firing in gated repos", inverting the previously pinned test "work repo skips session_start peer warnings", and the orchestrator accepts that reading (the sentence's justification clause, tw_feedback and the subagents in gated repos, only makes sense that way). If the reading is ever judged wrong, the revert is confined to the session_start handler and that one test. The architecture's "export to the next ticket" phrase turned out to be a handed-forward guarantee, not a code export: tw-open-gated-restriction consumes the registered tw_open through the normal registerTool surface, and the new names GATED_REGISTERED_TOOLS, SKILL_CREATOR_TOOL_NAMES and workflowEnabled are module-private with no new exports.
