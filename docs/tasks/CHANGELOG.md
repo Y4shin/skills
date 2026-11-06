@@ -69,9 +69,9 @@ title: Task Changelog
 
 
 
+## 2026-11-06, Vendor the pr skill into the promoted set (vendor-pr-skill)
 
-
-
+Vendors the upstream `pr` skill (mattpocock/skills, itself credited to Dex Horthy's show-me at Humanlayer) into the promoted engineering bucket, byte-close: frontmatter intact (verbatim trigger description, credits block), body unchanged except the house preamble that the reference-coverage-suite test seam forces onto every promoted skill. Wires all nine promoted-set surfaces in one change: the manifest at 32 with both count pins, the migration target, both READMEs' Model-invoked groups, the four-section docs page carrying the full provenance chain, the router's Standalone bullet and Actions row, the structure-test file-list entry, and a minor changeset. Suite green (23 files, 1362 tests; both typechecks clean). A fresh install now auto-invokes `pr` when its agent writes a PR body.
 
 ## 2026-11-06, State the pi-subagents 0.84.0 child-tool availability shape in the warning and docs (subagent-availability-resync)
 
