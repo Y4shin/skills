@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { GATED_SKILL_NAMES } from "../src/disclosure.js";
+import { GATED_SKILL_NAMES, SKILL_REGISTRY, openSkillsIn } from "../src/disclosure.js";
 import factory from "../src/pi.js";
 
 // ─── Mock control for fail-open throw scenario ───────────────────────────────
@@ -682,6 +682,158 @@ describe("factory gate", () => {
       // The guidelines injection hook is gone: a personal repo registers no
       // before_agent_start handler at all, strip included.
       expect(stub.handlers["before_agent_start"]).toBeUndefined();
+    });
+  });
+
+  // ── The gated tw_open restriction (tw-open-gated-restriction) ──────────────
+
+  describe("the gated tw_open restriction", () => {
+    /** The registered tw_open tool definition, or undefined. */
+    function registeredTwOpen(stub: StubExtensionAPI): any {
+      return stub.tools.find((t: any) => t.name === "tw_open");
+    }
+
+    test("work repo: tw_open's parameter schema offers only the non-gated registry entries", () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const twOpen = registeredTwOpen(stub);
+      expect(twOpen).toBeDefined();
+      const skill = (twOpen.parameters as any)?.properties?.skill;
+      expect(skill, "tw_open's schema carries the skill parameter").toBeDefined();
+      // Enumerated narrowing: a gated name never appears in the offered
+      // surface, so the model cannot even see a hopeless value.
+      for (const name of GATED_SKILL_NAMES) {
+        expect(skill.description, `the gated schema must not offer '${name}'`).not.toContain(name);
+      }
+      expect(skill.description).toContain("skill-creator");
+    });
+
+    test("work repo: opening skill-creator discloses its toolset exactly as in an ungated repo", async () => {
+      const repo = setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+      stub.setActiveTools(["tw_open", "tw_close"]);
+
+      const twOpen = registeredTwOpen(stub);
+      const result = await twOpen.execute(
+        "t2",
+        { skill: "skill-creator", effort: "ready-effort" },
+        undefined,
+        undefined,
+        { cwd: repo, ui: stub.ui },
+      );
+
+      // The one kept discipline opens in a gated repo too: its bundled tools
+      // plus the shared reads activate, matching the ungated experience.
+      expect(result.details.opened).toBe(true);
+      expect(stub.getActiveTools()).toEqual(
+        expect.arrayContaining([
+          "tw_open",
+          "tw_close",
+          "tw_show",
+          "skill_validate",
+          "skill_scaffold",
+          "skill_discover",
+          "tw_feedback",
+        ]),
+      );
+    });
+
+    test("work repo: tw_open refuses a workflow skill with the refused-outcome shape and notifies", async () => {
+      const repo = setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+      // The declared state in a gated repo: the opener and the closer.
+      stub.setActiveTools(["tw_open", "tw_close"]);
+
+      const twOpen = registeredTwOpen(stub);
+      const result = await twOpen.execute(
+        "t1",
+        { skill: "wayfinder", effort: "ready-effort" },
+        undefined,
+        undefined,
+        { cwd: repo, ui: stub.ui },
+      );
+
+      const text = result.content[0].text as string;
+      expect(text).toMatch(/^Refused:/);
+      expect(text).toContain("gated");
+      expect(result.details.opened).toBe(false);
+      expect(result.details.reason).toContain("gated");
+      expect(result.details.legal_next).toEqual(["tw_open skill-creator"]);
+      // A refused open activates nothing.
+      expect(stub.getActiveTools()).toEqual(["tw_open", "tw_close"]);
+      // A notify in the spirit of the skill-invocation gate: same sentence
+      // family, warning level.
+      expect(stub.notifications).toContainEqual({
+        message: "task-workflow is gated in this work repo; not opening wayfinder",
+        level: "warning",
+      });
+    });
+
+    test("personal repo: tw_open is unchanged", async () => {
+      const repo = setupPersonalRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      const twOpen = registeredTwOpen(stub);
+      // The ungated schema still offers every registry entry.
+      const skill = (twOpen.parameters as any)?.properties?.skill;
+      for (const entry of SKILL_REGISTRY) {
+        expect(skill.description, `the ungated schema must still offer '${entry.name}'`).toContain(entry.name);
+      }
+      // The ungated opener runs the phase gates, not the gated refusal: the
+      // refusal here is the phase gate's, and no gated notify fires.
+      const result = await twOpen.execute(
+        "t3",
+        { skill: "wayfinder", effort: "ready-effort" },
+        undefined,
+        undefined,
+        { cwd: repo, ui: stub.ui },
+      );
+      expect(result.details.opened).toBe(false);
+      expect(result.details.reason).toContain("no live effort");
+      expect(stub.notifications.some((n) => n.message.includes("not opening"))).toBe(false);
+    });
+  });
+
+  // ── Disclosure soundness in a gated repo (tw-open-gated-restriction) ──────
+
+  describe("the open-set derivation in a gated repo", () => {
+    test("cannot derive a workflow phase as open from the passive active set", () => {
+      setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+
+      // The passive active set: everything a gated repo can ever have active.
+      // The declared set is what registration marks defaultActive (the opener
+      // and the closer); the only toolset an open there can activate is the
+      // non-gated registry entries' (today skill-creator's), since a workflow
+      // phase never opens and tw_request_tool never registers to grant more.
+      const declared = stub.tools.filter((t: any) => t.defaultActive).map((t: any) => t.name);
+      const activatable = SKILL_REGISTRY.filter((e) => !GATED_SKILL_NAMES.includes(e.name)).flatMap(
+        (e) => e.toolset,
+      );
+      const passive = [...new Set([...declared, ...activatable])];
+
+      // The idle declared set derives nothing.
+      expect(openSkillsIn(declared).size, "the idle declared set opens nothing").toBe(0);
+
+      // The maximal passive set derives exactly the skill that genuinely
+      // opened, and never a workflow phase: a transcript replay that restored
+      // the whole passive set would still not manufacture an open phase.
+      const open = openSkillsIn(passive);
+      for (const name of GATED_SKILL_NAMES) {
+        expect(open.has(name), `${name} must not derive as open in a gated repo`).toBe(false);
+      }
+      expect([...open].sort()).toEqual(["skill-creator"]);
     });
   });
 
