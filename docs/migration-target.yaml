@@ -15,7 +15,7 @@
 # original adoption grilling and are retained as provenance.
 
 schema_version: 5
-package_version: "5.3.1"
+package_version: "5.4.0"
 title: "Enforced workflow v5"
 
 # ── Skill buckets ──────────────────────────────────────────────────────

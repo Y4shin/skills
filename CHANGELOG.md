@@ -1,5 +1,12 @@
 # task-workflow
 
+## 5.4.0
+
+### Minor Changes
+
+- 97529c9: Add the `pr` skill: write a PR body from a summary visual, before and after evidence, and a merge-danger assessment. Vendored from Matt Pocock's `pr` skill in mattpocock/skills (itself crediting Dex Horthy's show-me at Humanlayer) as a promoted, model-invoked engineering skill.
+- 61e5e40: Narrow the work-repo gate to the task workflow only: gated repos strip the 10 workflow skills and register just the passive tools (`tw_open`, `tw_close`, `tw_feedback`), the skill-creator tools and `notify_user`, with `tw_open` restricted to non-gated skills; every generic skill stays usable there, and ungated repos are unchanged, as is the repo-classification config. The `docs/tasks` write lockdown no longer fires in gated repos. Peer warnings and docs now state the verified pi-subagents 0.84.0 behaviour: install pi-telemetry before dispatching subagent chains.
+
 ## 5.3.1
 
 ### Patch Changes
