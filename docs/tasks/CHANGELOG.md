@@ -72,6 +72,11 @@ title: Task Changelog
 
 
 
+
+## 2026-11-06, State the pi-subagents 0.84.0 child-tool availability shape in the warning and docs (subagent-availability-resync)
+
+The pi-subagents launch-behaviour record is corrected to the verified 0.84.0 shape: every plain name in an agent's tools allowlist is a required child tool, and a child whose required tool never registers fails its run at agent start with "requested unavailable child tools" instead of launching. The session-start pi-telemetry warning, its companion comment, the repo-gating doc section, the README install paragraph and the skill-creator reference now state this consequence and say to install pi-telemetry before dispatching the shipped chains (10 of 11 agent allowlists name its submit_feedback tool). Both peer-warning tests and the doc-content launch test are re-pinned to the corrected wording, with one new doc-content test covering the README and reference; the full suite is green (1376 of 1376) with both typechecks clean. The record stays version-pinned with a re-verify-on-upgrade note.
+
 ## 2026-11-06, Re-sync docs/repo-gating.md to the narrowed gate (repo-gating-docs-resync)
 
 docs/repo-gating.md now describes the narrowed gate as the implementation tickets pinned it: the 10-name gated skill manifest, the passive tools (tw_open, tw_close, tw_feedback) with tw_open restricted to non-gated skills, the skill-creator tools staying registered through the disclosure, notify_user in both states, the write lockdown keyed on its own workflow-enabled condition, and the /help limitation re-scoped to the ten; the disableOnRepo / per-repo-enable classification contract is unchanged. The pi-subagents launch-failure claim was verified against that package's source and corrected: a child whose allowlisted tool is unavailable still launches (no launch-time allowlist check exists), the missing tool is simply absent, and the real cost is the child's failed tw_feedback call; the session-start warning, README, and the skill-creator reference now state this verified shape, and seven doc-content tests pin the resynced narrative.
