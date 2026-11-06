@@ -1,3 +1,3 @@
 schema_version: 5
 map: selective-repo-disable
-task: subagent-availability-resync
+task: null
