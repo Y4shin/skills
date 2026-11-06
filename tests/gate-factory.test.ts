@@ -710,6 +710,39 @@ describe("factory gate", () => {
       }
       expect(skill.description).toContain("skill-creator");
     });
+
+    test("work repo: tw_open refuses a workflow skill with the refused-outcome shape and notifies", async () => {
+      const repo = setupWorkRepo();
+
+      const stub = createStub();
+      factory(stub);
+      // The declared state in a gated repo: the opener and the closer.
+      stub.setActiveTools(["tw_open", "tw_close"]);
+
+      const twOpen = registeredTwOpen(stub);
+      const result = await twOpen.execute(
+        "t1",
+        { skill: "wayfinder", effort: "ready-effort" },
+        undefined,
+        undefined,
+        { cwd: repo, ui: stub.ui },
+      );
+
+      const text = result.content[0].text as string;
+      expect(text).toMatch(/^Refused:/);
+      expect(text).toContain("gated");
+      expect(result.details.opened).toBe(false);
+      expect(result.details.reason).toContain("gated");
+      expect(result.details.legal_next).toEqual(["tw_open skill-creator"]);
+      // A refused open activates nothing.
+      expect(stub.getActiveTools()).toEqual(["tw_open", "tw_close"]);
+      // A notify in the spirit of the skill-invocation gate: same sentence
+      // family, warning level.
+      expect(stub.notifications).toContainEqual({
+        message: "task-workflow is gated in this work repo; not opening wayfinder",
+        level: "warning",
+      });
+    });
   });
 
   test("registered tw_ tools derive their label from the tw_ prefix", () => {

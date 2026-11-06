@@ -33,7 +33,9 @@ import {
   buildOpenParameters,
   conflictReason,
   duplicateReason,
+  gatedReason,
   openSkillsIn,
+  openableWhenGated,
   skillEntry,
   validateOpenArgs,
   type SkillEntry,
@@ -1252,6 +1254,8 @@ interface ToolContext {
   hasUI?: boolean;
   /** Put a yes/no question to the operator. Absent when the session has no UI. */
   confirm?(title: string, message: string): Promise<boolean>;
+  /** Best-effort operator notification, wired from the session UI when present. */
+  notify?(message: string, level: "info" | "warning" | "error"): void;
 }
 
 interface ToolInfo {
@@ -3236,6 +3240,24 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         "Also refuses a skill that is already open or conflicts with an open skill.",
       buildOpenParameters(gated),
       async (p, ctx) => {
+        // The gated restriction runs before every other check: in a work repo
+        // the opener opens only the non-gated registry entries (the schema
+        // already narrows to them), so a manifest name is refused in the
+        // opener's own refusal language whatever the tree looks like, with a
+        // notify in the spirit of the skill-invocation gate. Non-manifest
+        // names keep every existing behavior, including validateOpenArgs's
+        // unknown-skill error.
+        if (gated && GATED_SKILL_NAMES.includes(String(p.skill))) {
+          const skill = String(p.skill);
+          ctx.notify?.(`task-workflow is gated in this work repo; not opening ${skill}`, "warning");
+          const reason = gatedReason(skill);
+          const legalNext = openableWhenGated().map((s) => `tw_open ${s.name}`);
+          return outcome(refusedOuttext(reason, legalNext), {
+            opened: false,
+            reason,
+            legal_next: legalNext,
+          });
+        }
         validateOpenArgs(p);
         const entry = skillEntry(p.skill as string)!;
         const activeSet = requireActiveSet(ctx);
@@ -3706,6 +3728,9 @@ export default function (pi: ExtensionAPI) {
           ...(typeof ctx.hasUI === "boolean" ? { hasUI: ctx.hasUI } : {}),
           ...(ctx.ui?.confirm
             ? { confirm: (title: string, message: string) => ctx.ui.confirm(title, message) }
+            : {}),
+          ...(typeof ctx.ui?.notify === "function"
+            ? { notify: (message: string, level: "info" | "warning" | "error") => ctx.ui.notify(message, level) }
             : {}),
         });
         if (typeof result === "string") {
