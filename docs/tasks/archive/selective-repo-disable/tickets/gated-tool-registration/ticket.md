@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Split tool registration by gate state and re-key the write lockdown
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - gated-skill-manifest

@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Restrict tw_open to non-gated skills in gated repos
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - gated-tool-registration

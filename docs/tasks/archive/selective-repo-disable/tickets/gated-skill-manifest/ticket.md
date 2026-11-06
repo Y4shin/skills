@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Static manifest of the 10 gated workflow skills
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 size: s

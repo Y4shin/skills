@@ -2,7 +2,7 @@
 type: ticket
 subtype: bug
 title: State the pi-subagents 0.84.0 child-tool availability shape in the warning and docs
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 size: s

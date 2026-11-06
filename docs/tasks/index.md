@@ -15,7 +15,6 @@ title: docs/tasks
 - conventions-and-writer-cleanups
 - eval-scorer-feedback
 - migration-surface-polish
-- selective-repo-disable
 
 ## Archived
 
@@ -57,4 +56,5 @@ title: docs/tasks
 - pi-harness-evals
 - portable-skill-authoring
 - run-adoption-migration
+- selective-repo-disable
 - task-tools-overhaul

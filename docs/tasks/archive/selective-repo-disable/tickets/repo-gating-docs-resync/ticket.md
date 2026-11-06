@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Re-sync docs/repo-gating.md to the narrowed gate
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - tw-open-gated-restriction
