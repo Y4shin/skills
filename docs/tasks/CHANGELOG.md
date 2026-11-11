@@ -78,6 +78,19 @@ title: Task Changelog
 
 
 
+
+## 2026-11-11, Make the close-out push follow the policy and enforce the closing gate (close-out-fidelity)
+
+The effort close's push step now follows the profile's policy instead of an
+unconditional command: the brief renders a push step that names a push only when
+the policy is `always` and the phase carries a branch, and an explicit "none"
+sentence otherwise, with `flat` never pushing. The implementation phase's close-out
+defers to that line, and a prose guard bans a hand-written push anywhere in the
+phase files, worker agents, or chain scripts. The closing branch gate is now
+enforced: closing a phase whose profile row carries one from the wrong checkout
+refuses in the same shape and wording as an open refusal, before any state changes,
+and the close takes the effort and ticket it needs to resolve the template.
+
 ## 2026-11-11, Refuse rather than pass when the checkout cannot be read (guard-fail-closed)
 
 The branch guards now fail closed. When the checkout cannot be read, because the

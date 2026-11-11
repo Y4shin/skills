@@ -3,7 +3,7 @@ type: ticket
 subtype: bug
 title: Make the close-out push follow the policy and enforce the closing gate
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: s
 ---
@@ -35,3 +35,34 @@ and reported by nothing enforced.
 ## Blocked by
 
 None (can start immediately)
+
+## Implementation notes
+
+### What landed
+
+The close-out and the profile now mean what they say.
+
+- The push step is rendered from the policy, not written in the prose: the brief's
+  result text carries a `Push step:` line that names a push command only when the
+  policy is `always` and the phase carries a branch, and an explicit "none"
+  sentence with no command in every other case. `flat` names no policy, so it never
+  pushes.
+- The implementation phase's close-out lost its fenced push block and defers to
+  that line; the effort close says to push when the line names a command and names
+  the branch from the trunk-merge mode.
+- The prose guard now bans a push command in every phase file, worker agent, and
+  chain script, so a hand-written push cannot come back.
+- `tw_close` enforces the profile row's closing gate through a new close brief and
+  decision, sharing the openers' refusal wording so an open refusal and a close
+  refusal word the same condition identically. It refuses before any state
+  mutation, and the close takes the effort and ticket it needs to resolve a
+  template.
+
+### Lessons
+
+- A gate whose template needs a value must receive that value: the close now takes
+  the same pair the brief does, because `{effort}` cannot be resolved from a skill
+  name alone.
+- Banning a shape in the prose guard forces the data route. The push command moved
+  from the skill file into a rendered line, which is the same move the merge flag
+  made earlier.
