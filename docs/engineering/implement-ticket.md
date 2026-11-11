@@ -17,12 +17,23 @@ bug-only effort has none by design and is exempt), a done or blocked
 target, and a not-ready target whose blockers are unfinished, each refusal
 naming the legal next calls.
 
+**The branch step comes from the profile.** The phase's first call is
+`tw_phase_brief`, which reports the branch this phase must be on and the step
+that creates it off the trunk; `tw_open` then refuses any other checkout,
+naming the branch and the step. Per ticket the phase asks the brief again, for
+the worker that will run, and creates and checks out that ticket branch before
+it dispatches the chain. No branch name is written in the skill, and the spawn
+guard blocks an implementation spawn from anywhere else. There is no ticket
+landing branch: the chain merges the finished ticket's branch into the effort
+branch and deletes it. `docs/git-workflows.md` has the profiles and the
+settings keys.
+
 **The ticket frontier and the level loop:** the ready edge comes from
 `tw_frontier <effort-slug>` and the waves from
 `tw_dependency_levels <effort-slug>`. Tickets run one at a time, in level
 order; the levels stay strict barriers. Concurrency inside a level is not
 implemented: every chain shares the one repo working directory, so two at
-once would checkout different landing branches in the same tree. Worktree
+once would checkout different ticket branches in the same tree. Worktree
 isolation is a recorded follow-up, not current behaviour.
 
 **The per-ticket chain** is one pre-canned workflow script,
@@ -54,8 +65,9 @@ written through `tw_write_changelog` (the only writer of
 `tw_finalizable <ticket-slug>` (which also surfaces the effort graph's
 anomalies), the state pointer cleared with `tw_state_set task null` and
 committed with the ticket note (a dirty `state.yaml` would otherwise travel
-into the next chain's checkout), and the landing branch merged into main with
-`--no-ff`. A bug ticket has no
+into the next chain's checkout), and the effort branch pushed per the profile's
+push policy (the chain already merged the ticket's branch into it). A bug
+ticket has no
 closure step: `docs/bugs/` is a static archive in schema 5, and the
 implementation ticket is the defect's record.
 
@@ -119,8 +131,10 @@ CONTEXT.md, docs/standards.md, docs/testing.md), which keeps each ticket
 independent of the last one's conversation.
 
 **Where does the close-out end?**
-With the landing branch merged into main and the ticket done. The
-effort-level holistic review and the archive are `finalize-effort`'s.
+With the ticket's branch merged into the effort branch, the effort branch
+pushed per the profile's policy, and the ticket done. The effort-level holistic
+review, the archive, and the landing of the effort branch into the trunk are
+`finalize-effort`'s.
 
 ## It's working if
 
@@ -130,7 +144,8 @@ effort-level holistic review and the archive are `finalize-effort`'s.
   read-only preconditions gate before any worker launches, and a missing or
   unstable architecture document is refused by the opener, never drafted.
 - The close-out runs inline in the same run that lands each ticket: changelog
-  through `tw_write_changelog`, done through `tw_mark_done`, merged to main.
+  through `tw_write_changelog`, done through `tw_mark_done`, the effort branch
+  pushed per the profile's policy.
 - A `mode: human` ticket produces a refusal and a handback, never an
   autonomous chain.
 - Feature chains verify through read-only agents before anything lands, and

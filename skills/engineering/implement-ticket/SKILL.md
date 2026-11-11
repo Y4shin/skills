@@ -222,8 +222,9 @@ separate bash block.
 
 1. **CI gate.**
 
-   The chain left the checkout on the effort branch, because the land step
-   merged the ticket's branch into it and deleted that branch. Run the
+   The chain leaves the checkout on the effort branch, where its land step
+   merged the ticket's branch and deleted it; a profile that requires no branch
+   leaves the checkout where it found it. Run the
    project's CI command, detected from repo tooling: package.json
    scripts, Makefile, CI config, or the `docs/testing.md` protocol; ask the
    user when ambiguous. If it fails: STOP. Fix forward on the effort branch
@@ -300,8 +301,9 @@ separate bash block.
    open.
 
    Then push per the profile's push policy, which this phase's brief reports
-   next to the branch. A policy the profile sets to never means the phase
-   pushes nothing and the commits stay local.
+   next to the branch: a policy the profile sets to never means the phase
+   pushes nothing and the commits stay local, and a repository with no remote
+   has nothing to push to.
 
    ```bash
    set -e

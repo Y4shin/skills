@@ -58,8 +58,14 @@ directions. `tw_archive_effort` performs the archive move: it refuses while
 a finding still lacks a disposition, then deprecates the finished items,
 moves `docs/tasks/<effort>/` to `docs/tasks/archive/<effort>/`, updates the
 root index, and clears `docs/tasks/state.yaml`'s `map` pointer when it named
-the archived effort. The move is committed with git as the phase's last
-step.
+the archived effort. The move is committed with git before the landing step.
+
+The phase's own branch step comes from the profile: `tw_phase_brief` reports
+the branch this close must be on, the step that creates it off the trunk, the
+trunk it lands into, the profile's merge flag, its push policy, and the
+trunk-merge mode, and `tw_open` refuses any other checkout. Nothing about the
+branch is written in the skill. `docs/git-workflows.md` has the profiles and the
+settings keys.
 
 Before the archive, the close authors the effort's changesets. One entry per
 change a user of the package or product can observe, naming the workspace
@@ -75,6 +81,16 @@ workspace, a level outside the three, or a staged changeset file the reader
 cannot parse) writes nothing and names its reason. The unparseable-file
 refusal is what keeps the duplicate check honest: a reader that treated a
 failed read as an empty staged set would stage a second identical entry.
+
+## Landing the effort branch
+
+The close's last act is to land the effort branch, and the profile decides how.
+Under the `local` trunk-merge mode it merges the effort branch into the trunk
+with the profile's merge flag, deletes the effort branch, and pushes the trunk
+when the push policy allows it. Under `handoff` it does not merge and does not
+delete: it pushes the effort branch when the policy allows it and prints the
+pull request from the effort branch into the trunk, with both names filled in
+from the brief. A profile that carries no merge flag has no landing step.
 
 ## When to reach for it
 
@@ -123,7 +139,9 @@ is the only path, and it is what sets the flag the archive reads.
 
 ## It's working if
 
-- One holistic review runs per effort, it is read-only toward the code, and
+- One holistic review runs per effort, it is read-only toward the code (the
+  only git operation the close performs is landing the finished effort
+  branch), and
   its findings land in `docs/tasks/<effort>/review.md` as `type: review`.
 - Every finding ends as an implementation ticket, an accepted follow-up
   effort, or an explicit informational acceptance; none is left without a

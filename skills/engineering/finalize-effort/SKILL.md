@@ -13,8 +13,9 @@ If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises
 `finalize-effort` is the effort close. It runs one holistic review of the
 whole effort, triages every finding, and archives the effort once nothing is
 left to resolve. The review is read-only toward the code: this phase never
-edits, refactors, or lands a change. Any work the review finds belongs to a
-later ticket or a follow-up effort.
+edits, refactors, or lands a change it found. Any work the review finds belongs
+to a later ticket or a follow-up effort. The one git operation the close does
+perform is landing the finished effort branch, once everything else is done.
 
 It is model-invoked, so the model reaches for it when an effort has nothing
 left to build; the human can also run `/skill:finalize-effort

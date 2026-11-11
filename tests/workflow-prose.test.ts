@@ -24,6 +24,10 @@ function readFile(relativePath: string): string {
 
 /** The prose a phase, its resources, and its chain carry for this contract. */
 const PHASE_FILES = [
+  "skills/engineering/intake/SKILL.md",
+  "skills/engineering/wayfinder/SKILL.md",
+  "skills/engineering/to-spec/SKILL.md",
+  "skills/engineering/to-tickets/SKILL.md",
   "skills/engineering/implement-ticket/SKILL.md",
   "skills/engineering/implement-ticket/resources/feature.md",
   "skills/engineering/implement-ticket/resources/bug.md",
@@ -51,6 +55,8 @@ describe("no phase file, worker agent, or chain script states a fixed branch rul
   const shapes: Array<[string, RegExp]> = [
     ["a branch literal", /\b(?:task|ticket|effort)\/</],
     ["a named working branch", /\b(?:task|ticket|effort)\/\$\{/],
+    ["a branch template", /\b(?:task|ticket|effort)\/\{(?:effort|ticket)\}/],
+    ["a trunk name", /\b(?:main|develop)\b/],
     ["a merge flag", /--no-ff|--ff-only/],
   ];
 
