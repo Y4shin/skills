@@ -3,7 +3,7 @@ type: task
 subtype: grilling
 title: "Settle the non-negotiables: the default git workflow, its configuration home, and the wiring surface"
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 ---
 
@@ -63,3 +63,87 @@ Related records worth linking or absorbing:
 - The implement-ticket skill itself names worktree isolation as "the follow-up effort's seed, not behaviour this skill claims"; this effort is the natural home for that seed or its explicit non-goal.
 - Recent friction records from the selective-repo-disable run: the push-or-not ambiguity ("If remote exists: git push"), both land workers having to create the landing branch fresh at the merge base because no previous landing branch existed, and the chain's serial-single-tree limitation (the skill says two chains would collide because the branch model is fixed in prose). These are concrete inputs for the default-model question.
 - The effort should also decide how the release flow (`docs/releasing.md`, tags as consent) interacts with a configured git workflow, so the two do not disagree about what `main` means.
+
+## Notes
+
+## Round 3 settled (operator's answers)
+
+- **Guard mechanism:** guards only. No tool calls that create branches, no
+  extension-performed git operations. `implement-ticket` itself creates the
+  ticket branches (the landing branch and the working branch) and merges a
+  finished ticket back onto the integration branch, which the operator calls
+  the feature branch. The spawn guard is documented as a requirement: spawning
+  any of the ticket-implementation sub-agents is blocked when the checkout is
+  not on the branch that sub-agent must commit on. Where that block lives is
+  an implementation detail, not a planning decision.
+- **Changeset granularity:** deliberately not strict. Some efforts carry one
+  changeset entry, some two. This effort (the example given) has two: support
+  for a stricter git workflow, and a release pipeline built on
+  `docs/releasing.md` and changesets. The intent is a rough guideline for what
+  qualifies, and a finalization step that proposes the entries for human
+  verification before writing them.
+- **Feature branch creation point (provisional, still open):** the operator
+  wants the feature branch created either at the end of `to-tickets` or
+  between `to-tickets` and `implement-ticket`. This round did not settle which.
+- **Integration branch identity (still open):** the operator's model assumes a
+  dedicated feature branch exists for the effort. Today's model has none: the
+  branch tickets land into is the starting branch (normally `main`) for the
+  first ticket, and the previous ticket's landing branch thereafter. The
+  conflict with the intake constraint (a repo with no configuration sees no
+  change) was put back to the operator.
+
+## Round 2 settled (operator's answers)
+
+- **Git layer:** the values tool plus the gates. The extension resolves names
+  and policies; it does not perform merges. The gates must be hard
+  enforcement: "that is the whole value this package brings, that it gives us
+  a workflow that is somewhat enforced through gates, rules and whatever".
+- **Guard coverage:** `implement-ticket` and `finalize-effort` must be opened
+  on the feature branch (the operator's term for the effort's integration
+  branch). Additionally, a check at subagent spawn: the implementation
+  sub-agents are launched with an identifier for the ticket they work on, and
+  the extension refuses to spawn the child when the checkout is not on the
+  branch that child must commit on. The operator rejected an opener-only
+  guard as not precise enough to show that the workflow is enforced.
+- **Changesets:** authored at effort finalization, not per landed ticket.
+  Rejected: one changeset per ticket, because entries would be too fine to
+  read well, and because some tickets yield no useful entry at all.
+- **Release skill:** a version bump from the changesets and maintenance of a
+  root `CHANGELOG.md` happen every time, as the defaults. When
+  `docs/releasing.md` exists, its steps run on top of those defaults, for the
+  mechanical work of preparing and staging package releases.
+- **Effort boundary:** one effort. The versioning and release strand stays
+  with the branch model because the two are too intertwined to separate.
+
+## Round 1 settled (operator's answers)
+
+- **Model set:** provisionally one model, today's chained model verbatim. The
+  operator may still choose to ship several profiles: that question is held
+  open deliberately and answered at the end of Wayfinder, just before spec,
+  because the answer depends on how much effort a second profile costs. Until
+  then the plan assumes one profile and deviations from today's model are not
+  designed.
+- **Configuration home:** `.pi/settings.json`, project file and the global
+  `~/.pi/agent/settings.json` both supported.
+- **Knob set:** the four areas are acceptable: the two branch name patterns,
+  the merge flag, and the push policy. `profile` drops out while one profile
+  stands.
+- **Config delivery:** the resolution logic must not live in the skills.
+  Either the extension performs the git branch management itself as tools, or
+  it serves the resolved values (which name a branch should have, and so on)
+  through tools. Guards belong in the `tw_open` core and gate entering a
+  phase behind being on an appropriately named branch.
+- **Scope edges:** worktree isolation and parallel chains stay out. The
+  release flow comes in, as a changeset-based versioning approach: changesets
+  are authored during effort finalization, turned into changelogs, and
+  consumed by an optional release workflow that a repository declares in
+  `docs/releasing.md`. A release skill ships with a default behaviour of
+  maintaining a `CHANGELOG.md` at the repo root from the changesets, rather
+  than the release flow being hard-wired into this package.
+
+Rejected or deferred in Round 1:
+
+- Second branch profile: deferred to the end of Wayfinder, not dropped.
+- Config read by each skill as prose: rejected by the operator ("I don't want
+  to build in the resolution logic into skills").
+- A `CONTEXT.md` prose section as the config home: not chosen.
