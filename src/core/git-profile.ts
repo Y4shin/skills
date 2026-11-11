@@ -567,12 +567,12 @@ export interface CloseGateDecision {
 /**
  * Resolve what one phase's close gates on.
  *
- * A close knows the phase it closes and, unlike an open, has no target to read
- * a checkout against, so this answers from the profile alone and the caller
- * reads the checkout only when a gate resolved. A row that carries no template
- * gates nothing; a row whose template needs a value the close did not receive
- * keeps its template and resolves no branch, so the caller can refuse rather
- * than pass on a gate it could not evaluate.
+ * A close knows the phase it closes plus the effort and ticket its caller
+ * names, so this answers from the profile alone and the caller reads the
+ * checkout only once a gate resolved. A row that carries no template gates
+ * nothing; a row whose template needs a value the close did not receive keeps
+ * its template and resolves no branch, so the caller can refuse rather than
+ * pass on a gate it could not evaluate.
  */
 export function closeBrief(cwd: string, request: BriefRequest, deps: BriefDeps = {}): CloseBrief {
   const diagnostics: string[] = [];

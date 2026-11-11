@@ -67,7 +67,8 @@ complete git flag, dashes included, because it reaches a shell command verbatim;
 `push` is `always` or `never`, and absent reads as `never`.
 
 `default`: `implement-ticket` and `finalize-effort` require the effort branch
-`effort/{effort}` and also carry `closeGate: effort/{effort}`. The five
+`effort/{effort}`, and `implement-ticket` also carries `closeGate: effort/{effort}`
+(the effort close cannot: its `local` landing ends on the trunk). The five
 implementation sub-agents, `implement-preconditions`, `tdd-worker`,
 `slice-verifier`, `deviation-reporter`, and `land-worker`, require the ticket
 branch `ticket/{ticket}`. The planning phases carry no branch. Both instruction
@@ -197,8 +198,8 @@ because a hook has no result payload. The chain's host gates stay as
 defense in depth, not as the enforcement point. The `tasks`, `chain`, and
 `parallel` fanout shapes are not guarded.
 
-`result.failed` still reports the bare step name. `closeGate` is carried by both
-branch-bearing profile rows, reported by the brief, and enforced by the close:
+`result.failed` still reports the bare step name. `closeGate` is carried by
+`implement-ticket`'s profile row, reported by the brief, and enforced by the close:
 `tw_close` takes the effort the closing phase works in (and a ticket, for a row
 that gates on one), resolves the row through `closeBrief`, reads the checkout
 only when a gate resolved, and refuses in the openers' shape when the checkout
@@ -631,6 +632,14 @@ row carries a gate, and refuses when the gate cannot resolve or the checkout
 cannot be read, so a guard never passes on a condition it could not evaluate.
 `resolveTemplate` treats an empty `{effort}` as unresolvable, the rule it already
 applied to `{ticket}`, so no gate ever compares a checkout against `effort/`.
+
+The bundled effort close carries no closing gate, for a reason found while
+enforcing it: its own landing merges the effort branch into the trunk and deletes
+it before the phase closes, so a gate on `effort/{effort}` could never pass under
+the default `local` trunk-merge mode, and the default profile could never close
+an effort at all. The row keeps its branch requirement and drops the gate; the
+gate is honoured for any row an operator profile gives one, and the mechanism is
+tested through a fixture row as well as through the implementation phase.
 
 ### The push step is rendered, not written
 

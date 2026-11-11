@@ -581,10 +581,18 @@ describe("the close gate", () => {
     expect(active).not.toContain("tw_write_changelog");
   });
 
-  test("the effort close gates the same way", async () => {
-    const dir = sessionDir();
+  test("the gate is the profile row's, so an effort close that carries one gates the same way", async () => {
+    // The bundled `default` gives the effort close no closing gate: its own
+    // landing has already moved the checkout to the trunk when it closes. An
+    // operator profile that names one gets the same enforcement the
+    // implementation phase's row gets, because the gate is data, not a phase.
+    const dir = sessionDir({ git: { profile: "custom" } });
+    const profilesDir = profileFixture("custom", {
+      name: "custom",
+      phases: { "finalize-effort": { branch: "effort/{effort}", closeGate: "effort/{effort}" } },
+    });
     const checkout = fakeCheckout("effort/live-effort");
-    const ctx = openCtx(dir, [], checkout.git);
+    const ctx = openCtx(dir, [], checkout.git, { profilesDir });
     await open({ skill: "finalize-effort", effort: "live-effort" }, ctx);
     checkout.checkout("main");
 
@@ -595,6 +603,23 @@ describe("the close gate", () => {
       "the checkout is on 'main', but 'finalize-effort' closes on 'effort/live-effort'",
     );
     expect(text).toContain("Legal next: check out effort/live-effort, then close finalize-effort.");
+  });
+
+  test("the bundled effort close carries no closing gate: its landing ends on the trunk", async () => {
+    // Enforcing a gate there would make the default profile unable to close
+    // the effort at all once the local landing ran, so the row carries none.
+    const dir = sessionDir();
+    const checkout = fakeCheckout("effort/live-effort");
+    const ctx = openCtx(dir, [], checkout.git);
+    await open({ skill: "finalize-effort", effort: "live-effort" }, ctx);
+    // The local landing merges into the trunk and deletes the effort branch,
+    // so the close runs on the trunk.
+    checkout.checkout("main");
+
+    const { details } = await closeIn({ skill: "finalize-effort", effort: "live-effort" }, ctx);
+
+    expect(details.closed).toBe(true);
+    expect(details.close_gate).toBeNull();
   });
 
   test("a checkout the close cannot read refuses rather than passing", async () => {

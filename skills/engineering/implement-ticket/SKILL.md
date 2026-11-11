@@ -308,12 +308,12 @@ separate bash block.
    git add docs/tasks/ && git commit -m "docs(ticket): note {ticketSlug}"
    ```
 
-   Then push: the push is the push step this phase's brief renders, never a
-   command this file carries. The brief composes that step from the profile's
-   push policy, for the branch this phase is on. With `always` the step names
-   the command to run; with `never`, or when the profile names no policy, the
-   step names no command, so the phase pushes nothing and the commits stay
-   local. A repository with no remote has nothing to push to either way.
+   Then push exactly as the push step in this phase's brief renders it, never
+   from a command written here. That step is composed from the profile's push
+   policy, for the branch this phase is on: with `always` it names the command
+   to run, and with `never`, or when the profile names no policy, it names
+   none, so the phase pushes nothing and the commits stay local. A repository
+   with no remote has nothing to push to either way.
 
 There is **no per-ticket move**: the ticket stays in the live effort.
 Moving one ticket out would split the effort's graph scope and trip the

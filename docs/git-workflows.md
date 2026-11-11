@@ -55,10 +55,15 @@ and `{ticket}`.
 
 | Phase or agent | Branch required |
 | --- | --- |
-| `implement-ticket` | `effort/{effort}` |
+| `implement-ticket` | `effort/{effort}`, and it gates the close too |
 | `finalize-effort` | `effort/{effort}` |
 | `implement-preconditions`, `tdd-worker`, `slice-verifier`, `deviation-reporter`, `land-worker` | `ticket/{ticket}` |
 | `intake`, `wayfinder`, `to-spec`, `to-tickets` | none |
+
+Only `implement-ticket` carries a closing gate, because it is the phase that ends
+on the branch it opened on. The effort close carries a branch requirement but no
+closing gate: its `local` landing merges into the trunk and deletes the effort
+branch before it closes, so a gate on that branch could never pass.
 
 It carries the merge flag `--no-ff` and the push policy `always`, so the effort
 close merges the effort branch into the trunk with a merge commit and pushes.
@@ -111,8 +116,9 @@ refusal names and retry the same call.
   cannot release the phase from there. The close names the branch to check out,
   and retrying after it closes. Pass the effort to `tw_close` so the gate can
   resolve the branch its row names; a close that names no effort refuses rather
-  than skipping the gate. The planning phases, and every phase under `flat`,
-  carry no closing gate, so they close as before.
+  than skipping the gate. Under `default` only `implement-ticket` carries one;
+  the planning phases, the effort close, and every phase under `flat` carry
+  none, so they close as before.
 - **A checkout the session cannot read refuses the same way.** When no way to
   run git is available, or git fails, the phase does not open, a gated spawn
   is blocked, and a gated close refuses to release the phase, with a reason

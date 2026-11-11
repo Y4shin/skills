@@ -16,8 +16,7 @@
     "finalize-effort": {
       "branch": "effort/{effort}",
       "openInstructions": "",
-      "closeInstructions": "",
-      "closeGate": "effort/{effort}"
+      "closeInstructions": ""
     }
   },
   "agents": {

@@ -67,8 +67,10 @@ that policy renders, and the trunk-merge mode, and `tw_open` refuses any other
 checkout. Nothing about the branch is written in the skill. The close names the
 effort for the same reason: `tw_close` reads that profile row again, and a row
 that carries a closing gate refuses to release the phase from any other
-checkout, naming the branch to check out. `docs/git-workflows.md` has the
-profiles and the settings keys.
+checkout, naming the branch to check out. The bundled `default` carries no
+closing gate here, because the `local` landing has already moved the checkout
+onto the trunk and deleted the effort branch when this phase closes.
+`docs/git-workflows.md` has the profiles and the settings keys.
 
 Before the archive, the close authors the effort's changesets. One entry per
 change a user of the package or product can observe, naming the workspace

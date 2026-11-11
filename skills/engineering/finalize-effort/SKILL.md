@@ -42,10 +42,12 @@ toolset only when the check passes. Work only through the tools the opener discl
 a tool this phase does not disclose, call `tw_request_tool` and let the
 operator decide: never close the phase early to reopen another one for its
 tools. Close the phase with `tw_close finalize-effort`, naming the effort it
-closes: `{ skill: "finalize-effort", effort: "<effort-slug>" }`. The close is
-the second half of the branch gate, and it reads the same profile row: a phase
-whose row carries a closing gate refuses to close from any other checkout,
-naming the branch to check out, and retrying after that closes.
+closes: `{ skill: "finalize-effort", effort: "<effort-slug>" }`. The close reads
+the same profile row the open did, and a row that carries a closing gate refuses
+to close from any other checkout, naming the branch to check out. The bundled
+`default` carries no closing gate here, because the local landing has already
+moved the checkout onto the trunk and deleted the effort branch by the time this
+phase closes, so a gate on the effort branch could never pass.
 
 ## Reconcile the living architecture first
 
