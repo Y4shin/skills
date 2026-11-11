@@ -87,9 +87,9 @@ interface ResolvedProposal extends Proposal {
 }
 
 /**
- * Resolve one proposal: the workspace, the config, the validation, the generic
- * fallback, and the dedupe against what is already staged, in that order, so a
- * refusal leaves the proposal empty.
+ * Resolve one proposal: the workspace, the config, the entries themselves, and
+ * the dedupe against what is already staged, in that order, so a refusal
+ * leaves the proposal empty.
  */
 async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<ResolvedProposal> {
   const read = await readWorkspace(cwd);
@@ -97,23 +97,8 @@ async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<
   const workspace = read.workspace;
   const config = await readChangesetConfig(workspace);
   if (config.refusal !== null) return refusedProposal(config.refusal, config.diagnostics);
-  const invalid = validateEntries(changes, workspace);
-  if (invalid !== null) return refusedProposal(invalid, config.diagnostics);
-
-  const generic = changes.length === 0;
-  let requested = changes;
-  if (generic) {
-    if (workspace.root === null) {
-      return refusedProposal(
-        {
-          code: "no-root-package",
-          reason: `the workspace at ${workspace.rootDir} has no root package name, so no generic patch can be proposed`,
-        },
-        config.diagnostics,
-      );
-    }
-    requested = [{ package: workspace.root, level: "patch", summary: GENERIC_SUMMARY }];
-  }
+  const requested = resolveEntries(changes, workspace);
+  if (requested.refusal !== null) return refusedProposal(requested.refusal, config.diagnostics);
 
   const staged = await readStagedEntries(workspace);
   // A staged set that cannot be read is a refusal, not an empty set: the dedupe
@@ -124,7 +109,7 @@ async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<
   }
   const entries: ChangesetEntry[] = [];
   const skipped: ChangesetEntry[] = [];
-  for (const entry of requested) {
+  for (const entry of requested.entries) {
     // Dedupe against what is staged and against what this call already
     // accepted: one change is one entry, however often it is named.
     const duplicate =
@@ -137,10 +122,51 @@ async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<
     workspace,
     entries,
     skipped,
-    generic,
+    generic: requested.generic,
     diagnostics: [...config.diagnostics, ...staged.diagnostics],
   };
 }
+
+/**
+ * The entries a call would write, before the dedupe: the request as given, or
+ * the generic patch when the effort names nothing observable.
+ *
+ * The generic entry is built here and validated with the same rule as an
+ * explicit one. It used to be built after validation and so was the one entry
+ * exempt from the workspace check; building it first makes the check total.
+ */
+export function resolveEntries(changes: ChangesetEntry[], workspace: Workspace): EntryResolution {
+  if (changes.length > 0) {
+    const invalid = validateEntries(changes, workspace);
+    return invalid === null
+      ? { refusal: null, entries: changes, generic: false }
+      : { refusal: invalid, entries: [], generic: false };
+  }
+  if (workspace.root === null) {
+    return {
+      refusal: {
+        code: "no-root-package",
+        reason: `the workspace at ${workspace.rootDir} has no root package name, so no generic patch can be proposed`,
+      },
+      entries: [],
+      generic: true,
+    };
+  }
+  const generic: ChangesetEntry = { package: workspace.root, level: "patch", summary: GENERIC_SUMMARY };
+  const invalid = validateEntries([generic], workspace);
+  return invalid === null
+    ? { refusal: null, entries: [generic], generic: true }
+    : { refusal: invalid, entries: [], generic: true };
+}
+
+/** What a call resolves to before the dedupe: the entries, or the refusal. */
+export interface EntryResolution {
+  refusal: ChangesetsRefusal | null;
+  entries: ChangesetEntry[];
+  /** True when the generic patch answered for an effort with nothing observable. */
+  generic: boolean;
+}
+
 /** A proposal that writes nothing, carrying the refusal and what the reads noted. */
 function refusedProposal(refusal: ChangesetsRefusal, diagnostics: string[]): ResolvedProposal {
   return { refusal, workspace: null, entries: [], skipped: [], generic: false, diagnostics };
@@ -339,12 +365,18 @@ export async function readWorkspace(cwd: string): Promise<WorkspaceRead> {
       diagnostics: [],
     };
   }
+  const members = packages.packages.map((entry) => entry.packageJson.name);
+  const root = packages.rootPackage?.packageJson.name ?? null;
   return {
     refusal: null,
     workspace: {
       rootDir: packages.rootDir,
-      names: packages.packages.map((entry) => entry.packageJson.name),
-      root: packages.rootPackage?.packageJson.name ?? null,
+      // The reader's `packages` view leaves the root package out of a monorepo,
+      // so a set built from the members alone refuses an entry naming a package
+      // the workspace plainly has. The validation set is every package the
+      // reader knows about: the members plus the root.
+      names: root === null ? members : [...new Set([...members, root])],
+      root,
       reader: packages,
     },
     diagnostics: [],

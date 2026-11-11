@@ -32,7 +32,14 @@ import { afterAll, describe, expect, test } from "vitest";
 import { parseChangesetFile } from "@changesets/parse";
 
 import { createTools } from "../src/pi.js";
-import { GENERIC_SUMMARY, proposeEntries, readStagedEntries, readWorkspace } from "../src/core/changesets.js";
+import {
+  GENERIC_SUMMARY,
+  proposeEntries,
+  readStagedEntries,
+  readWorkspace,
+  resolveEntries,
+  type Workspace,
+} from "../src/core/changesets.js";
 
 const require = createRequire(import.meta.url);
 
@@ -522,6 +529,58 @@ describe("an unreadable staged entry", () => {
     expect(details.entries).toEqual([]);
     expect(changesetFiles(dir)).toEqual(["malformed.md"]);
     expect(text).toContain("Refused:");
+  });
+});
+
+// ─── Validating against every package the workspace knows ───────────────────
+
+describe("package validation", () => {
+  test("writes an entry naming the monorepo's own root package", async () => {
+    const dir = fixtureWorkspace();
+
+    const { details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/root", level: "minor", summary: "Add the shared config." }],
+      },
+      dir,
+    );
+
+    // The workspace reader leaves the root package out of its member list, so a
+    // validation set built from the members alone refuses a package the
+    // workspace plainly has.
+    expect(details.refusal).toBeNull();
+    expect(details.entries).toEqual([
+      { package: "@scope/root", level: "minor", summary: "Add the shared config." },
+    ]);
+    expect(changesetFiles(dir)).toHaveLength(1);
+    expect(changesetBytes(dir, changesetFiles(dir)[0])).toContain('"@scope/root": minor');
+  });
+
+  test("names the monorepo root package in the workspace's package set", async () => {
+    const read = await readWorkspace(fixtureWorkspace());
+
+    expect(read.workspace!.names).toHaveLength(3);
+    expect(read.workspace!.names).toEqual(expect.arrayContaining(["@scope/alpha", "@scope/beta", "@scope/root"]));
+  });
+
+  test("validates the generic entry like any other, rather than exempting it", () => {
+    // The generic entry is built, not passed in, so it used to skip validation
+    // entirely. Resolution validates it with the same rule as an explicit
+    // entry: the package it names has to be a package of the workspace.
+    const workspace = {
+      rootDir: "/nowhere",
+      names: ["@scope/alpha"],
+      root: "@scope/root",
+      reader: {},
+    } as unknown as Workspace;
+
+    const resolved = resolveEntries([], workspace);
+
+    expect(resolved.refusal!.code).toBe("unknown-package");
+    expect(resolved.refusal!.reason).toContain("@scope/root");
+    expect(resolved.entries).toEqual([]);
+    expect(resolved.generic).toBe(true);
   });
 });
 
