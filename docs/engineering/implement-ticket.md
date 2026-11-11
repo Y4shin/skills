@@ -68,9 +68,9 @@ written through `tw_write_changelog` (the only writer of
 anomalies), the state pointer cleared with `tw_state_set task null` and
 committed with the ticket note (a dirty `state.yaml` would otherwise travel
 into the next chain's checkout), and the effort branch pushed exactly as the
-push step the phase's brief renders from the profile's push policy (the chain
-already merged the ticket's branch into it). A profile whose policy is `never`
-renders no push step, so nothing leaves the machine. A bug ticket has no
+push step the phase's brief renders for it from the profile's push policy (the
+chain already merged the ticket's branch into it). A profile whose policy is
+`never` renders no push step, so nothing leaves the machine. A bug ticket has no
 closure step: `docs/bugs/` is a static archive in schema 5, and the
 implementation ticket is the defect's record.
 

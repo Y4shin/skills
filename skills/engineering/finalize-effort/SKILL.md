@@ -196,16 +196,13 @@ trunk-merge mode.
 
 **The `local` mode**, the default, merges the effort branch into the trunk with
 the merge flag the brief reports, deletes the effort branch, and pushes the
-trunk exactly as the brief's push step renders it. That step is composed from
-the same push policy: with `always` it names the command, and with `never`, or
-no policy at all, it names none, so nothing is pushed. Complete the tree first:
-the archive commit is on the effort branch, so the merge carries it.
+trunk when the brief's push step names a command. Complete the tree first: the
+archive commit is on the effort branch, so the merge carries it.
 
 **The `handoff` mode** is for a repository that forbids a local trunk merge. Do
 not merge and do not delete the effort branch. Push the effort branch when the
-brief's push step names a command (the same policy gates it), and print the
-pull-request instruction with the branch and trunk names filled in, for the
-human to open:
+brief's push step names a command, and print the pull-request instruction with
+the branch and trunk names filled in, for the human to open:
 
 > Open a pull request from `<effort-branch>` into `<trunk>`: the effort's
 tickets are landed, reviewed, and archived.
@@ -241,8 +238,8 @@ updates the root index.
    `git add docs/tasks/ && git commit -m "chore: archive <effort>"`. A close
    that leaves the archive uncommitted hands the next phase a dirty tree.
 7. Land the effort branch: merge it into the trunk with the merge flag the
-   brief reports and push per the brief's push step, or hand off per the
-   trunk-merge mode (see [Land the effort branch](#land-the-effort-branch)).
+   brief reports and push when its push step names a command, or hand off per
+   the trunk-merge mode (see [Land the effort branch](#land-the-effort-branch)).
 8. Close the phase with `tw_close finalize-effort`, naming the effort, and
    write the report.
 

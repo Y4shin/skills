@@ -139,7 +139,8 @@ commits stay local. `flat` therefore never pushes.
 
 The trunk merge is the effort close's last step. `local` merges the effort
 branch into the trunk with the profile's merge flag, deletes the effort branch,
-and pushes the trunk exactly as the brief's push step renders it. `handoff`
-skips the merge and the deletion, pushes the effort branch when the brief's push
-step names a command, and prints the pull request from the effort branch into
-the trunk.
+and pushes the trunk when the brief's push step names a command. `handoff` skips
+the merge and the deletion, pushes the effort branch when the brief's push step
+names a command, and prints the pull request from the effort branch into the
+trunk. The push step decides whether anything is pushed; the trunk-merge mode
+decides which branch a `local` landing pushes.

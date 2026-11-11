@@ -92,12 +92,13 @@ failed read as an empty staged set would stage a second identical entry.
 The close's last act is to land the effort branch, and the profile decides how.
 Under the `local` trunk-merge mode it merges the effort branch into the trunk
 with the profile's merge flag, deletes the effort branch, and pushes the trunk
-exactly as the brief's push step renders it. Under `handoff` it does not merge
+when the brief's push step names a command. Under `handoff` it does not merge
 and does not delete: it pushes the effort branch when the brief's push step
 names a command, and prints the pull request from the effort branch into the
 trunk, with both names filled in from the brief. The push step is composed from
 the profile's push policy, so a `never` policy renders none and nothing is
-pushed. A profile that carries no merge flag has no landing step.
+pushed; the trunk-merge mode decides which branch a local landing pushes. A
+profile that carries no merge flag has no landing step.
 
 ## When to reach for it
 
