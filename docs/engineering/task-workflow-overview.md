@@ -23,8 +23,10 @@ frontier and the reconcile), `/skill:to-spec` (the specification),
 per-ticket close-out: CI gate, changelog, done-marking, merge to the effort
 branch), and
 `/skill:finalize-effort` (the holistic review, finding triage, and archive).
-`/skill:setup-workflow` initializes or migrates a repo once. On-ramps merge
-onto it: `/skill:diagnosing-bugs` for something broken,
+`/skill:setup-workflow` initializes or migrates a repo once. `/skill:release`
+is off that flow: it prepares a release, the version bump and the root
+`CHANGELOG.md`, then follows the repository's own release document. On-ramps
+merge onto it: `/skill:diagnosing-bugs` for something broken,
 `/skill:improve-codebase-architecture` for a survey, `/skill:eval-review` for
 an eval suite or a failed run, and `/skill:skill-review` for an Agent Skill.
 Reference tables map

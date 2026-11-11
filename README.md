@@ -127,6 +127,7 @@ decision, or when you type it.
 - [wayfinder](./skills/engineering/wayfinder/SKILL.md)
 - [grill-me](./skills/productivity/grill-me/SKILL.md)
 - [handoff](./skills/productivity/handoff/SKILL.md)
+- [release](./skills/engineering/release/SKILL.md)
 - [teach](./skills/productivity/teach/SKILL.md)
 - [wait-what](./skills/productivity/wait-what/SKILL.md)
 

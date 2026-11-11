@@ -143,6 +143,7 @@ const SKILL_FILES = [
   "skills/engineering/skill-review/SKILL.md",
   "skills/engineering/eval-review/SKILL.md",
   "skills/engineering/pr/SKILL.md",
+  "skills/engineering/release/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -190,7 +191,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(32);
+    expect(pkg.pi.skills.length).toBe(33);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
@@ -572,7 +573,7 @@ describe("triage is retired (intake-skill)", () => {
     const pkg = JSON.parse(readFile("package.json"));
     expect(pkg.pi.skills).toContain("./skills/engineering/intake");
     expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
-    expect(pkg.pi.skills.length).toBe(32);
+    expect(pkg.pi.skills.length).toBe(33);
     expect(pkg.pi.skills.filter((s: string) => s.includes("intake") || s.includes("triage"))).toEqual([
       "./skills/engineering/intake",
     ]);
@@ -1791,6 +1792,11 @@ const SURVIVING_TOOLS = new Set([
   // workflow-prose: the read-only phase brief every branch-bearing phase asks
   // for before it opens, and the effort close reads for its landing step.
   "tw_phase_brief",
+  // release-skill: the release pair the user-invoked release skill drives, the
+  // preview and the write. Both are always declared, because no phase owns a
+  // release.
+  "tw_release_plan",
+  "tw_release_apply",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -3751,6 +3757,98 @@ describe("finalize-effort skill (finalize-effort-skill)", () => {
 
   test("no em-dash in the new prose", () => {
     for (const text of [content, page, report]) {
+      expect(text).not.toContain("\u2014");
+    }
+  });
+});
+
+// ─── release: the promoted, user-invoked release skill (release-skill) ────
+
+// A release is a deliberate human act, so the skill is user-invoked: the model
+// cannot start one. Its defaults always run (a version bump through the release
+// tools, and the root `CHANGELOG.md`), and then it follows the repository's own
+// release document as prose, because that file is the authority for the
+// mechanical work of preparing and publishing.
+describe("release skill (release-skill)", () => {
+  const content = readFile("skills/engineering/release/SKILL.md");
+  const fm = parseFrontmatter(content);
+
+  test("stays user-invoked: the model cannot start a release on its own", () => {
+    expect(fm["name"]).toBe("release");
+    // The typed command is the consent: no model decision starts a release.
+    expect(fm["disable-model-invocation"]).toBe("true");
+    expect(content).toMatch(/^disable-model-invocation: true$/m);
+  });
+
+  test("calls the plan tool, reports the plan, and applies only after confirmation", () => {
+    const plan = content.indexOf("tw_release_plan");
+    const applied = content.indexOf("tw_release_apply");
+    expect(plan, "the skill never calls tw_release_plan").toBeGreaterThan(-1);
+    expect(applied, "the skill never calls tw_release_apply").toBeGreaterThan(plan);
+    // The plan is a preview that is reported; the write waits for the yes.
+    const confirmed = content.search(/only after the (operator|human) confirms/i);
+    expect(confirmed, "the apply does not wait for a confirmation").toBeGreaterThan(plan);
+    expect(confirmed, "the confirmation must come before the apply call").toBeLessThan(applied);
+    expect(content).toMatch(/report the plan/i);
+    // The apply recomputes the plan from the tree it writes, so the report is
+    // the apply's own answer, never a claim that the preview is what landed.
+    expect(content).toMatch(/recomputes?/i);
+    expectOnlySurvivingTools(content);
+  });
+
+  test("follows the repository's release document afterwards, as the authority for publishing", () => {
+    const applied = content.indexOf("tw_release_apply");
+    const document = content.indexOf("docs/releasing.md");
+    expect(document, "the skill never reads the repository's release document").toBeGreaterThan(applied);
+    // The document is the authority, not an optional suggestion besides the
+    // defaults the skill already ran.
+    expect(content).toMatch(/authority for/i);
+    expect(content).toMatch(/read it and follow it|follow it, step by step/i);
+    // No document is not a failure: the defaults already ran, and that is the
+    // whole release here.
+    expect(content).toMatch(/when the repository has no `docs\/releasing\.md`/i);
+  });
+
+  test("refuses with the reason when the manifest or the changeset config is missing", () => {
+    // A manifest carrying only a name and a version is enough: the defaults
+    // need nothing else from it.
+    expect(content).toContain("package.json");
+    expect(content).toMatch(/a name and a version/i);
+    expect(content).toContain(".changeset/config.json");
+    // It reports the refusal's reason and stops; it does not build the missing
+    // setup itself, because a repository with no changesets setup is not one
+    // this skill versions.
+    expect(content).toMatch(/refus/i);
+    expect(content).toMatch(/reason/i);
+    expect(content).toMatch(/stop/i);
+    expect(content).toMatch(/never create|never runs? `npx changeset init`/i);
+  });
+
+  test("reports nothing to release, without a version bump", () => {
+    expect(content).toMatch(/nothing to release/i);
+    // An empty plan ends the run: no bump, no changelog section, no entry
+    // consumed.
+    expect(content).toMatch(/no version bump|nothing is bumped|does not bump/i);
+    // It never stages an entry to make a release possible: authoring belongs
+    // to the effort close, which owns the proposal.
+    expect(content).toMatch(/finalize-effort/);
+    expect(content).toMatch(/never stages?|does not stage/i);
+    expect(content).toMatch(/and stop/i);
+  });
+
+  test("is wired into the promoted set: the manifest, both READMEs, a docs page", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).toContain("./skills/engineering/release");
+    // User-invoked, so both READMEs list it under that heading.
+    expect(readFile("skills/engineering/README.md")).toContain("[release](./release/SKILL.md)");
+    expect(readFile("README.md")).toContain("[release](./skills/engineering/release/SKILL.md)");
+    // A promoted skill's human-facing page, in the one agreed shape.
+    const page = readFile("docs/engineering/release.md");
+    for (const section of DOC_PAGE_SECTIONS) {
+      expect(page, `docs/engineering/release.md is missing ${section}`).toContain(section);
+    }
+    expectOnlySurvivingTools(page);
+    for (const text of [content, page]) {
       expect(text).not.toContain("\u2014");
     }
   });
