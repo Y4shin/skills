@@ -299,8 +299,8 @@ describe("the round trip", () => {
 
     // And the seam's own reader returns the same entries, so the dedupe reads
     // what the writer wrote.
-    const workspace = await readWorkspace(dir);
-    const staged = await readStagedEntries(workspace.packages);
+    const read = await readWorkspace(dir);
+    const staged = await readStagedEntries(read.workspace!);
     expect(staged.entries.sort((a, b) => a.package.localeCompare(b.package))).toEqual(
       [...entries].sort((a, b) => a.package.localeCompare(b.package)),
     );

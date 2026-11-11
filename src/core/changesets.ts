@@ -93,8 +93,8 @@ interface ResolvedProposal extends Proposal {
  */
 async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<ResolvedProposal> {
   const read = await readWorkspace(cwd);
-  if (read.refusal !== null) return refusedProposal(read.refusal, read.diagnostics);
-  const workspace = read.packages;
+  if (read.refusal !== null || read.workspace === null) return refusedProposal(read.refusal!, read.diagnostics);
+  const workspace = read.workspace;
   const config = await readChangesetConfig(workspace);
   if (config.refusal !== null) return refusedProposal(config.refusal, config.diagnostics);
   const invalid = validateEntries(changes, workspace);
@@ -268,7 +268,7 @@ export interface Workspace {
 /** The workspace, or the reason it could not be read. */
 export interface WorkspaceRead {
   refusal: ChangesetsRefusal | null;
-  packages: Workspace;
+  workspace: Workspace | null;
   diagnostics: string[];
 }
 
@@ -286,13 +286,13 @@ export async function readWorkspace(cwd: string): Promise<WorkspaceRead> {
   } catch (e) {
     return {
       refusal: { code: "no-workspace", reason: `no workspace could be read from ${cwd}: ${(e as Error).message}` },
-      packages: { rootDir: cwd, names: [], root: null, reader: null as unknown as Packages },
+      workspace: null,
       diagnostics: [],
     };
   }
   return {
     refusal: null,
-    packages: {
+    workspace: {
       rootDir: packages.rootDir,
       names: packages.packages.map((entry) => entry.packageJson.name),
       root: packages.rootPackage?.packageJson.name ?? null,
