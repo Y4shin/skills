@@ -10,7 +10,7 @@ the tree is unchanged", and part 2 carries the escalation question.
 ## 1. What is now true
 
 Which tickets landed and closed out, and in one line each what now exists
-because of the ticket: the ticket's behaviour on the effort's landing branch,
+because of the ticket: the ticket's behaviour on the effort branch,
 its changelog entry, and its done-marking. The one skill-specific line the shape allows is the
 frontier line: which tickets remain and at which dependency level.
 

@@ -25,6 +25,12 @@
 //   ticket      required   ticket slug
 //   ticketPath  required   path to the ticket's ticket.md
 //   subtype     optional   "feature" (default) or "bug"
+//   branch      optional   the ticket branch the phase created and checked
+//                          out, resolved from the git profile; absent when the
+//                          profile requires no branch
+//   effortBranch optional  the effort branch the phase is on, resolved the
+//                          same way; the land step merges branch into it
+//   merge       optional   the profile's merge flag for the land step
 //   bugPath     optional   path to a separate bug doc, only when one exists
 //                          (schema 5 retires docs/bugs as a live substrate)
 //   reproPath   optional   path to a separate reproduction, only when one
@@ -65,6 +71,28 @@
 // run completion, so ok alone can never express refusal.
 
 const subtype = args.subtype === "bug" ? "bug" : "feature";
+
+// The branch names are the phase's resolution: a workflow script has no
+// filesystem and no tools, so it cannot read the git profile itself. The phase
+// resolves the profile's templates (tw_phase_brief answers for the worker's
+// row and for its own) and passes the names in args. A profile that requires
+// no branch passes neither, and the branch steps then assert nothing rather
+// than a name this script invented.
+const ticketBranch = typeof args.branch === "string" ? args.branch.trim() : "";
+const effortBranch = typeof args.effortBranch === "string" ? args.effortBranch.trim() : "";
+const mergeFlag = typeof args.merge === "string" ? args.merge.trim() : "";
+// The tdd step's host gate: the work leaves the ticket branch behind, and the
+// uncertainty stop leaves the file. Both halves only apply when the profile
+// requires a branch.
+const tddBranchGate =
+  ticketBranch === "" ? "" : " && git rev-parse --verify refs/heads/" + ticketBranch;
+// The land step's host gate: the deliverable is the merge into the effort
+// branch, so that branch must exist afterwards. Without a branch requirement
+// the gate falls back to the ticket doc, which the chain already proved.
+const landBranchGate =
+  effortBranch === ""
+    ? "test -f " + args.ticketPath
+    : "git rev-parse --verify refs/heads/" + effortBranch;
 
 // A bug ticket's evidence lives in its own body: schema 5 makes docs/bugs a
 // static archive, so a separate bug doc and reproduction are optional
@@ -137,22 +165,35 @@ function verifyTask(tddRef) {
 }
 
 function deviationTask(tddRef) {
-  return [
+  const lines = [
     'Report deviations for ticket "' + args.ticket + '" of effort "' + args.effort + '".',
     "",
     "Ticket doc: " + args.ticketPath,
     "Architecture: docs/tasks/" + args.effort + "/architecture.md",
     "Implementation: " + tddRef
-  ].join("\n");
+  ];
+  // The diff's base, when the profile requires a branch: the reporter is on
+  // the ticket branch and needs the branch it was created off.
+  if (effortBranch !== "") lines.push("Base branch: " + effortBranch);
+  return lines.join("\n");
 }
 
 function landTask(tddRef, verifyRef) {
-  return [
+  const lines = [
     'Land ticket "' + args.ticket + '" for effort "' + args.effort + '".',
     "Ticket doc: " + args.ticketPath,
     "TDD output: " + tddRef,
     "Verify output: " + verifyRef
-  ].join("\n");
+  ];
+  // Identity and the merge target only: the procedure for the merge lives in
+  // the land-worker's definition.
+  if (ticketBranch !== "") lines.push("Your branch (already checked out): " + ticketBranch);
+  if (effortBranch !== "") lines.push("Merge target: " + effortBranch);
+  if (mergeFlag !== "") lines.push("Merge flag: " + mergeFlag);
+  if (ticketBranch !== "" && effortBranch !== "") {
+    lines.push("Delete: " + ticketBranch + ", after the merge lands");
+  }
+  return lines.join("\n");
 }
 
 // Step keys carry the ticket slug: `<step>@<ticket>`. A workflow child's
@@ -202,19 +243,19 @@ if (!verdict(gateReceipt, "VERDICT: PASS")) {
   return { ok: false, ticket: args.ticket, subtype, failed: "gate", step: gateReceipt, refs: {} };
 }
 
-// Step 1: tdd-worker implements the ticket on the working branch
-// ticket/<ticket-slug>. The discipline differs by subtype: tdd for features,
+// Step 1: tdd-worker implements the ticket on the ticket branch the phase
+// created and checked out. The discipline differs by subtype: tdd for features,
 // diagnosing-bugs for bugs. The host gate enforces the contract's two
 // stop conditions: an uncertainty stop leaves .work/uncertainty.md
 // behind (the designed escape now fails the run, aborting the chain
-// before verify), and real work leaves the ticket/<slug> working branch
-// behind (no branch means nothing happened).
+// before verify), and real work leaves the resolved ticket branch behind
+// (no branch means nothing happened).
 const tdd = await runs.run(stepKey("tdd"), {
   agent: "tdd-worker",
   skill: subtype === "bug" ? "diagnosing-bugs" : "tdd",
   label: subtype === "bug" ? "Fix " + args.ticket : "Implement " + args.ticket,
   output: "tdd-" + args.ticket + "/result.md",
-  gate: "test ! -f " + args.ticketPath.replace(/ticket\.md$/, "") + ".work/uncertainty.md && git rev-parse --verify refs/heads/ticket/" + args.ticket,
+  gate: "test ! -f " + args.ticketPath.replace(/ticket\.md$/, "") + ".work/uncertainty.md" + tddBranchGate,
   task: subtype === "bug" ? bugTddTask() : featureTddTask()
 });
 const refs = { tdd: tdd.outputReference || tdd.output };
@@ -267,16 +308,17 @@ if (subtype === "feature") {
   }
 }
 
-// Step 3: land-worker merges the working branch into the landing branch and
-// appends the implementation note. The host gate enforces the deliverable:
-// task/<ticket-slug> must exist after landing. The ticket is NOT marked done
-// here: implement-ticket's inlined close-out owns that marking, one owner.
+// Step 3: land-worker merges the ticket branch into the effort branch and
+// deletes the ticket branch, and appends the implementation note. There is no
+// landing branch. The host gate enforces the deliverable: the resolved effort
+// branch must exist after landing. The ticket is NOT marked done here:
+// implement-ticket's inlined close-out owns that marking, one owner.
 const land = await runs.run(stepKey("land"), {
   agent: "land-worker",
   label: "Land " + args.ticket,
   timeoutMs: 900000,
   output: "land-" + args.ticket + "/result.md",
-  gate: "git rev-parse --verify refs/heads/task/" + args.ticket,
+  gate: landBranchGate,
   task: landTask(refs.tdd, refs.verify)
 });
 refs.land = land.outputReference || land.output;

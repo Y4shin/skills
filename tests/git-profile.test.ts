@@ -236,10 +236,33 @@ describe("the phase brief resolver", () => {
 
       expect(brief.kind).toBe("agent");
       expect(brief.branch).toBe("ticket/a-ticket");
-      // An agent's branch is created by the phase that dispatches it, never
-      // by the agent itself, so an agent brief carries no step.
-      expect(brief.step).toBeNull();
+      // The step names what the phase does before dispatching this agent. The
+      // agent never performs it: a worker expects the branch checked out, so
+      // the caller that asks the brief is the one that creates it.
+      expect(brief.step).toContain("create and check out ticket/a-ticket");
+      expect(brief.step).toContain("off effort/an-effort");
+      expect(brief.step).toContain(agent);
     }
+  });
+
+  test("a brief reports the trunk and the trunk-merge mode the close-out needs", () => {
+    const { globalPath, projectPath } = settingsPair();
+    writeSettings(projectPath, { taskWorkflow: { git: { trunkMerge: "handoff" } } });
+
+    const brief = phaseBrief(
+      tempDir("git-cwd"),
+      { name: "finalize-effort", effort: "an-effort" },
+      { globalSettingsPath: globalPath, projectSettingsPath: projectPath },
+    );
+
+    // The close-out merges into the trunk and reads the mode that decides
+    // whether it merges locally or hands off, so the brief carries both.
+    expect(brief.trunk).toBe("main");
+    expect(brief.trunkMerge).toBe("handoff");
+    // The profile's merge flag and push policy ride along, so the close-out
+    // never restates them in prose.
+    expect(brief.merge).toBe("no-ff");
+    expect(brief.push).toBe("always");
   });
 
   test("flat resolves nothing for any phase or agent", () => {
@@ -476,6 +499,34 @@ describe("tw_phase_brief", () => {
     expect(text).toContain("profile: default");
   });
 
+  test("answers for an implementation agent: its branch and the step that creates it", async () => {
+    const { text, details } = await brief(
+      { skill: "tdd-worker", effort: "configurable-git-workflow", ticket: "workflow-prose" },
+      sessionDir(),
+    );
+
+    // The phase creates the ticket branch before it dispatches the chain, so
+    // the brief has to answer for the worker's row as well as a phase's.
+    expect(details.kind).toBe("agent");
+    expect(details.branch).toBe("ticket/workflow-prose");
+    expect(details.branch_step).toContain("create and check out ticket/workflow-prose");
+    expect(details.branch_step).toContain("off effort/configurable-git-workflow");
+    expect(text).toContain("ticket/workflow-prose");
+    expect(text).toContain("Step:");
+  });
+
+  test("carries the trunk and the trunk-merge mode the effort close acts on", async () => {
+    const { details } = await brief(
+      { skill: "finalize-effort", effort: "configurable-git-workflow" },
+      sessionDir({ git: { trunk: { develop: "dev", main: "main" }, trunkMerge: "handoff" } }),
+    );
+
+    expect(details.trunk).toBe("dev");
+    expect(details.trunk_merge).toBe("handoff");
+    expect(details.merge).toBe("no-ff");
+    expect(details.push).toBe("always");
+  });
+
   test("reports no branch requirement for a planning phase", async () => {
     const { text, details } = await brief(
       { skill: "wayfinder", effort: "configurable-git-workflow" },
@@ -501,7 +552,7 @@ describe("tw_phase_brief", () => {
     }
   });
 
-  test("refuses a name that is not a phase, naming the phases", async () => {
+  test("refuses a name that is neither a phase nor a gated agent, naming what it accepts", async () => {
     const tools = createTools() as unknown as Record<string, { execute: Function }>;
     const result = (await tools.tw_phase_brief.execute(
       { skill: "nonsense-skill", effort: "configurable-git-workflow" },
@@ -512,6 +563,8 @@ describe("tw_phase_brief", () => {
     expect(result.text).toContain("Refused:");
     expect(result.text).toContain("wayfinder");
     expect(result.text).toContain("Legal next:");
+    // An agent the profile gates answers; a name that is neither does not.
+    expect(result.details.reason).toMatch(/phase|agent/);
   });
 
   test("reports a malformed setting as a diagnostic and answers from the default profile", async () => {

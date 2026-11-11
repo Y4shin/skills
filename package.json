@@ -21,6 +21,7 @@
     "docs/productivity",
     "docs/adr",
     "docs/repo-gating.md",
+    "docs/git-workflows.md",
     "docs/dev-env.md",
     "docs/testing.md",
     "docs/migration-target.yaml"

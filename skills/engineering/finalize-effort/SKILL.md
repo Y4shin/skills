@@ -13,8 +13,9 @@ If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises
 `finalize-effort` is the effort close. It runs one holistic review of the
 whole effort, triages every finding, and archives the effort once nothing is
 left to resolve. The review is read-only toward the code: this phase never
-edits, refactors, or lands a change. Any work the review finds belongs to a
-later ticket or a follow-up effort.
+edits, refactors, or lands a change it found. Any work the review finds belongs
+to a later ticket or a follow-up effort. The one git operation the close does
+perform is landing the finished effort branch, once everything else is done.
 
 It is model-invoked, so the model reaches for it when an effort has nothing
 left to build; the human can also run `/skill:finalize-effort
@@ -22,11 +23,21 @@ left to build; the human can also run `/skill:finalize-effort
 
 ## Open first
 
+This phase's first action is its branch step, and the branch step comes from the
+profile rather than from this file. Call `tw_phase_brief` with
+`{ skill: "finalize-effort", effort: "<effort-slug>" }`: it reports the branch
+this phase must be on, the step that creates it off the trunk when it does not
+exist yet, the trunk it lands into, the profile's merge flag and push policy,
+and the trunk-merge mode. Perform the step it reports, then open.
+
 Every run starts by opening the skill: call `tw_open` with
 `{ skill: "finalize-effort", effort: "<effort-slug>" }` (the effort slug is
 the directory name under `docs/tasks/`). The opener is the gate: it checks
 the effort is live, refuses with the legal next calls when it is not, and
-activates the toolset only when the check passes. Work only through the tools the opener discloses. When a step genuinely needs
+refuses a checkout that is not on the branch the brief reported, naming the
+current branch, the required branch, and the step that creates it. Nothing
+latches: perform that step and retry, and the open passes. It activates the
+toolset only when the check passes. Work only through the tools the opener discloses. When a step genuinely needs
 a tool this phase does not disclose, call `tw_request_tool` and let the
 operator decide: never close the phase early to reopen another one for its
 tools. Close the phase with `tw_close finalize-effort` when the run releases.
@@ -168,6 +179,30 @@ dedupe is never blind: a writer that guessed would stage a second copy of an
 entry the tree already holds, and the package would be versioned twice for
 one change.
 
+## Land the effort branch
+
+Once the archive commit lands, the effort branch is finished and the profile
+says how it lands. Every name and every decision in this step comes from this
+phase's brief, so none of them is a fixed rule here: the effort branch (the
+brief's required branch), the trunk, the merge flag, the push policy, and the
+trunk-merge mode.
+
+**The `local` mode**, the default, merges the effort branch into the trunk with
+the merge flag the brief reports, deletes the effort branch, and pushes the
+trunk when the push policy allows it. Complete the tree first: the archive
+commit is on the effort branch, so the merge carries it.
+
+**The `handoff` mode** is for a repository that forbids a local trunk merge. Do
+not merge and do not delete the effort branch. Push the effort branch when the
+push policy allows it, and print the pull-request instruction with the branch
+and trunk names filled in, for the human to open:
+
+> Open a pull request from `<effort-branch>` into `<trunk>`: the effort's
+tickets are landed, reviewed, and archived.
+
+A profile that carries no merge flag carries no landing step at all: report
+that the close leaves the branches alone, and stop there.
+
 ## Archive
 
 Archive through `tw_archive_effort`, the named archive move; never use
@@ -195,7 +230,10 @@ updates the root index.
    tree and git makes it history:
    `git add docs/tasks/ && git commit -m "chore: archive <effort>"`. A close
    that leaves the archive uncommitted hands the next phase a dirty tree.
-7. Close the phase with `tw_close finalize-effort` and write the report.
+7. Land the effort branch: merge it into the trunk with the merge flag the
+   brief reports and push per its policy, or hand off per the trunk-merge mode
+   (see [Land the effort branch](#land-the-effort-branch)).
+8. Close the phase with `tw_close finalize-effort` and write the report.
 
 ## Report
 

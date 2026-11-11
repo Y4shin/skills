@@ -1009,10 +1009,15 @@ describe("skill cross-references", () => {
     expect(content).toMatch(/changelog step must land first/i);
   });
 
-  test("the CI gate runs before the merge; a red branch is never merged", () => {
+  test("the CI gate guards the effort branch; a red branch never carries into the next chain", () => {
     const content = readFile("skills/engineering/implement-ticket/SKILL.md");
     expect(content).toMatch(/CI gate/i);
-    expect(content).toMatch(/Do not merge a red branch/i);
+    const flat = content.replace(/\s+/g, " ");
+    // The chain's land step merges the ticket branch into the effort branch
+    // only after the verify step passed, so the close-out's own gate runs on
+    // the merged result and stops the frontier before the next dispatch.
+    expect(flat).toMatch(/red effort branch never carries into the next ticket/i);
+    expect(flat).toMatch(/before the next chain is dispatched/i);
   });
 
   test("the close-out keeps Pi tool calls out of the set -e shell blocks", () => {
@@ -1021,12 +1026,12 @@ describe("skill cross-references", () => {
     let m: RegExpExecArray | null;
     let shellBlocks = 0;
     while ((m = fence.exec(content)) !== null) {
-      if (/git\s+merge\s+--no-ff/.test(m[1])) {
+      if (/set -e/.test(m[1])) {
         shellBlocks++;
         // Wrapping a Pi tool call in a set -e shell block fails with
         // command not found and aborts the close-out mid-sequence (see
         // docs/bugs/finalize-task-set-e-tool-confusion.md).
-        expect(m[1]).not.toMatch(/tw_state_set|tw_finalizable/);
+        expect(m[1]).not.toMatch(/tw_state_set|tw_finalizable|tw_phase_brief/);
       }
     }
     expect(shellBlocks).toBeGreaterThan(0);
@@ -1783,6 +1788,9 @@ const SURVIVING_TOOLS = new Set([
   // changeset-proposal-and-dedupe: the effort close's changeset writer, named
   // by the close's prose for the proposal (its dry run) and the write.
   "tw_write_changesets",
+  // workflow-prose: the read-only phase brief every branch-bearing phase asks
+  // for before it opens, and the effort close reads for its landing step.
+  "tw_phase_brief",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -2810,8 +2818,11 @@ describe("chain call shapes (shipped ticket-chain.js)", () => {
     // Host-run gates verify the deliverables model-independently.
     expect(chain).toMatch(/gate: "test -f " \+ args\.ticketPath/);
     expect(chain).toMatch(/test ! -f " \+ args\.ticketPath\.replace/);
-    expect(chain).toMatch(/git rev-parse --verify refs\/heads\/ticket\//);
-    expect(chain).toMatch(/git rev-parse --verify refs\/heads\/task\//);
+    // The host gates assert the resolved names the phase passes in, never a
+    // template of the script's own.
+    expect(chain).toMatch(/git rev-parse --verify refs\/heads\/" \+ ticketBranch/);
+    expect(chain).toMatch(/git rev-parse --verify refs\/heads\/" \+ effortBranch/);
+    expect(chain).not.toMatch(/refs\/heads\/task\//);
     expect(chain).toMatch(/deviation-reports\/" \+ args\.ticket/);
   });
 
@@ -2935,9 +2946,13 @@ describe("end-of-effort workflow (shipped end-of-effort.js)", () => {
 });
 
 describe("chain agents v4 (overhaul-execution-skills)", () => {
-  test("tdd-worker implements one ticket on a ticket/<slug> working branch", () => {
+  test("tdd-worker implements one ticket on the branch its dispatch checked out", () => {
     const content = readFile("agents/tdd-worker.md");
-    expect(content).toMatch(/ticket\/<slug>/);
+    // workflow-prose: the branch name is the profile's, so the agent states
+    // the expectation rather than a name or a creation command.
+    expect(content).toMatch(/already checked out/i);
+    expect(content).not.toMatch(/ticket\/<slug>/);
+    expect(content).not.toMatch(/git checkout -b/);
     expect(content).not.toMatch(/slice\//);
     expect(content).toMatch(/docs\/tasks\/<effort>\/architecture\.md/);
     expect(content).toMatch(/ticket doc/i);
@@ -2951,10 +2966,12 @@ describe("chain agents v4 (overhaul-execution-skills)", () => {
     expect(content).not.toMatch(/slice doc/i);
   });
 
-  test("land-worker merges the working branch into the landing branch, no archive duty", () => {
+  test("land-worker merges the ticket branch into the merge target, no archive duty", () => {
     const content = readFile("agents/land-worker.md");
-    expect(content).toMatch(/ticket\/<ticket-slug>|ticket\/<slug>/);
-    expect(content).toMatch(/task\/<ticket-slug>|task\/<slug>/);
+    // The names come from the task the phase composes, never from a literal.
+    expect(content).toMatch(/merge target/i);
+    expect(content).toMatch(/already checked out/i);
+    expect(content).not.toMatch(/task\/<ticket-slug>|task\/<slug>/);
     expect(content).not.toMatch(/slices\/archive|archive the slice/i);
     expect(content).not.toMatch(/state\.yaml/);
     expect(content).toMatch(/finalize/i);
@@ -3002,7 +3019,9 @@ describe("chain agents v4 (overhaul-execution-skills)", () => {
     expect(String(fm.defaultContext)).toBe("fresh");
     expect(content).not.toMatch(/Fork from the tdd-worker/);
     expect(content).toMatch(/deviation-reports/);
-    expect(content).toMatch(/task\/<ticket-slug>\.\.ticket\/<ticket-slug>/);
+    // The base branch is the one the task names, resolved from the profile.
+    expect(content).toMatch(/base branch/i);
+    expect(content).toMatch(/already checked out/i);
     const templates = extractFrontmatterTemplates(content);
     const report = templates.find((t) => /^type: deviation report$/m.test(t));
     expect(report).toBeDefined();
@@ -3157,7 +3176,10 @@ describe("the inlined per-ticket close-out (implement-ticket-skill)", () => {
     expect(skill).toMatch(/writer of `docs\/tasks\/CHANGELOG\.md`/);
     expect(skill).toMatch(/CI gate/i);
     expect(skill).toMatch(/red branch/i);
-    expect(skill).toMatch(/git merge --no-ff task\/<ticket-slug>/);
+    // There is no landing branch: the chain merges the ticket branch into the
+    // effort branch, and the close-out records the note and pushes.
+    expect(skill).not.toMatch(/task\/<ticket-slug>/);
+    expect(skill).toMatch(/there is no second merge here/i);
     // The source of the harvest notes: the feature copy had dropped it.
     expect(skill).toMatch(/all deviation reports/);
     expect(skill).toMatch(/combined diff/);
@@ -3172,7 +3194,7 @@ describe("the inlined per-ticket close-out (implement-ticket-skill)", () => {
       // It still names the steps so a reader knows what it is delegating, but
       // it does not re-teach them with their own numbered sequence.
       expect(content).not.toMatch(/\*\*CI gate/);
-      expect(content).not.toMatch(/git merge --no-ff task\/<ticket-slug>/);
+      expect(content).not.toMatch(/task\/<ticket-slug>/);
       expect(content).not.toMatch(/git add -A && git commit -m "docs\(ticket\): harvest/);
     });
   }

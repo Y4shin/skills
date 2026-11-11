@@ -328,6 +328,22 @@ consumer that needs the trunk name uses the expression above rather than reading
 either key directly. The divergence is recorded in the ticket's
 `## Divergence from plan` section.
 
+### The phase brief answers for an implementation agent too
+
+The phase creates each ticket's branch before it dispatches the chain, so the
+phase must learn that branch's name. The only skill-reachable resolver is the
+brief tool, and the first shape of it refused any name that was not a workflow
+phase. It now also accepts an implementation agent's name and resolves that
+agent's profile row, returning the ticket branch and the step that creates it off
+the effort branch.
+
+So a branch-bearing phase makes one call for its own brief, which names the effort
+branch, and one call per ticket for the agent row, which names the ticket branch.
+A phase brief never carries a second branch, because that would conflate two
+profile rows. A name that is neither a phase nor a gated agent keeps the existing
+refusal. This is a tool-surface addition the specification did not name, decided
+during implementation and recorded in the ticket's `## Divergence from plan`.
+
 ## Corrections recorded during implementation
 
 ### Trunk setting shape

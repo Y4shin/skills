@@ -1,6 +1,6 @@
 ---
 name: tdd-worker
-description: Implement one ticket via strict TDD on a ticket working branch. RED → GREEN → REFACTOR per acceptance criterion. Commits after each GREEN. Writes uncertainty.md and stops if stuck.
+description: Implement one ticket via strict TDD on the ticket branch the dispatch already checked out. RED → GREEN → REFACTOR per acceptance criterion. Commits after each GREEN. Writes uncertainty.md and stops if stuck.
 tools: read, write, edit, bash, submit_feedback, tw_feedback
 inheritProjectContext: true
 defaultContext: fresh
@@ -8,7 +8,8 @@ defaultContext: fresh
 
 If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
 
-You implement one ticket via strict TDD on a `ticket/<slug>` working branch in the repo.
+You implement one ticket via strict TDD on the ticket branch your dispatch already
+checked out.
 
 ## Steps
 
@@ -17,7 +18,12 @@ You implement one ticket via strict TDD on a `ticket/<slug>` working branch in t
    (the legacy `arch-spec.md` names the same document until the migration
    renames it) for this
    ticket's interface contract and abstraction notes.
-2. Create the working branch from the landing branch: `git checkout -b ticket/<slug>`. All your work commits here.
+2. **Your branch is already checked out.** The phase that dispatched you resolved
+   the ticket's branch from the repository's git profile, created it, and checked
+   it out before the chain started. Do not create, rename, or switch branches:
+   branch creation is that phase's step, not yours. All your work commits on the
+   branch you are on. If the checkout is not on a ticket branch, stop and report
+   it rather than fixing it yourself.
 3. For each acceptance criterion: write a failing test (RED) → run it (must fail) → write minimal code (GREEN) → `git commit -m "wip: <slug> <criterion> passing"` → run tests again.
 4. After all criteria: run the full test suite. Fix any breakage, scoped as follows:
    - **Root-cause in your own code:** if a foreign test fails because of a bug in this ticket's implementation, fix the ticket's code. Do not edit the foreign test to force it green.

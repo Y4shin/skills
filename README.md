@@ -162,6 +162,8 @@ decision, or when you type it.
 - [`CONTEXT.md`](./CONTEXT.md) is the vocabulary: effort, map, frontier,
   planning task, implementation ticket.
 - [`docs/repo-gating.md`](docs/repo-gating.md) is the gate in full.
+- [`docs/git-workflows.md`](docs/git-workflows.md) is the branch model in full:
+  the two bundled profiles and the three `taskWorkflow.git` keys.
 - [`docs/releasing.md`](docs/releasing.md) is the release flow in full.
 
 ## Development
