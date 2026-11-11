@@ -210,3 +210,135 @@ describe("the release dependency set", () => {
     expect(Object.keys(manifest.devDependencies)).toContain("@changesets/cli");
   });
 });
+
+// ─── The plan ───────────────────────────────────────────────────────────────
+
+describe("tw_release_plan", () => {
+  test("reports the pending entries, the versions they produce, and the changelog section text", async () => {
+    const dir = fixtureRepository({
+      changesets: {
+        "small-fix.md": changeset("@scope/fixture-pkg", "patch", "Fix the refusal text."),
+        "new-feature.md": changeset("@scope/fixture-pkg", "minor", "Add the release skill."),
+      },
+    });
+
+    const { text, details } = await plan(dir);
+
+    expect(details.refusal).toBeNull();
+    expect(details.entries).toEqual([
+      {
+        id: "new-feature",
+        summary: "Add the release skill.",
+        releases: [{ package: "@scope/fixture-pkg", level: "minor" }],
+      },
+      { id: "small-fix", summary: "Fix the refusal text.", releases: [{ package: "@scope/fixture-pkg", level: "patch" }] },
+    ]);
+    expect(details.versions).toEqual([
+      { name: "@scope/fixture-pkg", level: "minor", oldVersion: "1.0.0", newVersion: "1.1.0" },
+    ]);
+    // The section exactly as the changelog package renders it: the version
+    // heading, one heading per level, one bullet per changeset body.
+    expect(details.changelog).toEqual([
+      {
+        package: "@scope/fixture-pkg",
+        file: join(dir, "CHANGELOG.md"),
+        text:
+          "## 1.1.0\n\n### Minor Changes\n\n- Add the release skill.\n\n### Patch Changes\n\n- Fix the refusal text.",
+      },
+    ]);
+    expect(text).toContain("Add the release skill.");
+    expect(text).toContain("1.1.0");
+  });
+
+  test("writes nothing: no manifest bump, no changelog, no consumed entry", async () => {
+    const dir = oneEntryFixture();
+    const manifest = bytes(join(dir, "package.json"));
+    const entry = bytes(join(dir, ".changeset", "a-change.md"));
+
+    const { text } = await plan(dir);
+
+    expect(bytes(join(dir, "package.json"))).toBe(manifest);
+    expect(bytes(join(dir, "CHANGELOG.md"))).toBeNull();
+    expect(bytes(join(dir, ".changeset", "a-change.md"))).toBe(entry);
+    // The plan says so, so no caller mistakes it for the write.
+    expect(text.toLowerCase()).toContain("nothing has been written");
+  });
+
+  test("reports every package a monorepo versions, each with its own section", async () => {
+    const dir = fixtureWorkspace();
+    writeFileSync(
+      join(dir, ".changeset", "alpha.md"),
+      changeset("@scope/alpha", "minor", "Add the alpha reader."),
+      "utf-8",
+    );
+    writeFileSync(join(dir, ".changeset", "beta.md"), changeset("@scope/beta", "patch", "Fix the beta reader."), "utf-8");
+
+    const { details } = await plan(dir);
+
+    expect(details.refusal).toBeNull();
+    expect(details.versions).toEqual([
+      { name: "@scope/alpha", level: "minor", oldVersion: "0.1.0", newVersion: "0.2.0" },
+      { name: "@scope/beta", level: "patch", oldVersion: "0.2.0", newVersion: "0.2.1" },
+    ]);
+    expect(details.changelog.map((section: any) => section.package)).toEqual(["@scope/alpha", "@scope/beta"]);
+    expect(details.changelog[0].file).toBe(join(dir, "packages", "alpha", "CHANGELOG.md"));
+    expect(details.changelog[0].text).toContain("- Add the alpha reader.");
+  });
+});
+
+// ─── The apply ──────────────────────────────────────────────────────────────
+
+describe("tw_release_apply", () => {
+  test("bumps the manifest, inserts the changelog section, and removes the consumed entry", async () => {
+    const dir = oneEntryFixture();
+
+    const { text, details } = await apply(dir);
+
+    expect(details.refusal).toBeNull();
+    expect(JSON.parse(bytes(join(dir, "package.json"))!).version).toBe("1.1.0");
+    expect(bytes(join(dir, "CHANGELOG.md"))).toBe(
+      "# @scope/fixture-pkg\n\n## 1.1.0\n\n### Minor Changes\n\n- Add the release skill.\n",
+    );
+    expect(changesetFiles(dir)).toEqual([]);
+    expect(details.versions).toEqual([
+      { name: "@scope/fixture-pkg", level: "minor", oldVersion: "1.0.0", newVersion: "1.1.0" },
+    ]);
+    expect(details.written).toEqual([join(dir, "package.json"), join(dir, "CHANGELOG.md")]);
+    expect(details.removed).toEqual([join(dir, ".changeset", "a-change.md")]);
+    expect(text).toContain("1.1.0");
+  });
+
+  test("writes the section the plan reported, byte for byte", async () => {
+    const dir = fixtureRepository({
+      changesets: {
+        "small-fix.md": changeset("@scope/fixture-pkg", "patch", "Fix the refusal text."),
+        "new-feature.md": changeset("@scope/fixture-pkg", "minor", "Add the release skill."),
+      },
+    });
+
+    const planned = await plan(dir);
+    await apply(dir);
+
+    // The plan is the operator's view of what apply does: a plan that renders
+    // its own text would let the two disagree, so the written section is
+    // compared against the planned one.
+    const written = bytes(join(dir, "CHANGELOG.md"))!;
+    expect(written).toContain(planned.details.changelog[0].text);
+    expect(written.trimEnd().endsWith(planned.details.changelog[0].text)).toBe(true);
+  });
+
+  test("keeps the manifest's own formatting, so the diff is the version line alone", async () => {
+    const dir = fixtureRepository({
+      manifest: { name: "@scope/fixture-pkg", version: "1.0.0", description: "A fixture.", keywords: ["fixture"] },
+      changesets: { "a-change.md": changeset("@scope/fixture-pkg", "patch", "Fix the refusal text.") },
+    });
+
+    await apply(dir);
+
+    // The library edits the manifest through jsonc-parser, preserving key
+    // order and indentation, and the tested file is the library's own bytes.
+    expect(bytes(join(dir, "package.json"))).toBe(
+      '{\n  "name": "@scope/fixture-pkg",\n  "version": "1.0.1",\n  "description": "A fixture.",\n  "keywords": [\n    "fixture"\n  ]\n}\n',
+    );
+  });
+});

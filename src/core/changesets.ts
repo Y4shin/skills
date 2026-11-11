@@ -16,13 +16,26 @@
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
-import { getPackages, type Packages } from "@manypkg/get-packages";
+import { getPackages, type Package, type Packages } from "@manypkg/get-packages";
+import { applyReleasePlan } from "@changesets/apply-release-plan";
+import { assembleReleasePlan } from "@changesets/assemble-release-plan";
+import changelogGit from "@changesets/changelog-git";
 import { validateConfig } from "@changesets/config";
+import { getCommitsThatAddFiles } from "@changesets/git";
 import { readChangesets } from "@changesets/read";
 import { writeChangeset } from "@changesets/write";
-import type { Changeset, Config, NewChangeset } from "@changesets/types";
+import type {
+  Changeset,
+  ComprehensiveRelease,
+  Config,
+  NewChangeset,
+  NewChangesetWithCommit,
+  ReleasePlan,
+} from "@changesets/types";
 
 /** The three bump levels a changeset names. */
 export const CHANGE_LEVELS = ["patch", "minor", "major"] as const;
@@ -199,29 +212,10 @@ export interface StagedRead {
  * write a second copy of an entry the tree already carries.
  */
 export async function readStagedEntries(workspace: Workspace): Promise<StagedRead> {
-  let staged: NewChangeset[];
-  try {
-    staged = await readChangesets(workspace.rootDir);
-  } catch (e) {
-    // The library's message quotes the offending content but never names the
-    // file, so the refusal names the directory and the changeset files in it:
-    // the operator has to edit one of them, and this is the shortest honest
-    // path from the message to the file.
-    const dir = join(workspace.rootDir, ".changeset");
-    const detail = (e as Error).message.replace(/\s+/g, " ").trim();
-    return {
-      entries: [],
-      refusal: {
-        code: "unreadable-staged",
-        reason:
-          `the staged changesets in ${dir} could not be read${stagedFiles(dir)}, ` +
-          `so no entry can be checked against what is already staged: ${detail}`,
-      },
-      diagnostics: [],
-    };
-  }
+  const read = await readPending(workspace);
+  if (read.refusal !== null) return { entries: [], refusal: read.refusal, diagnostics: [] };
   const entries: ChangesetEntry[] = [];
-  for (const changeset of staged) {
+  for (const changeset of read.changesets) {
     for (const release of changeset.releases) {
       // A release type outside the three levels cannot match what an effort
       // proposes, so it is not part of the dedupe set.
@@ -230,6 +224,40 @@ export async function readStagedEntries(workspace: Workspace): Promise<StagedRea
     }
   }
   return { entries, refusal: null, diagnostics: [] };
+}
+
+/** What is pending in `.changeset/`, or the reason the set cannot be read. */
+export interface PendingRead {
+  changesets: NewChangeset[];
+  /** The refusal, or null when the read answered. */
+  refusal: ChangesetsRefusal | null;
+}
+
+/**
+ * Read the pending changesets as the library sees them.
+ *
+ * One read serves both paths: the authoring dedupe wants the entries
+ * flattened, and the release plan wants the changesets whole, so the refusal
+ * for a set the library cannot parse is mapped in one place.
+ */
+export async function readPending(workspace: Workspace): Promise<PendingRead> {
+  try {
+    return { changesets: await readChangesets(workspace.rootDir), refusal: null };
+  } catch (e) {
+    // The library's message quotes the offending content but never names the
+    // file, so the refusal names the directory and the changeset files in it:
+    // the operator has to edit one of them, and this is the shortest honest
+    // path from the message to the file.
+    const dir = join(workspace.rootDir, ".changeset");
+    const detail = (e as Error).message.replace(/\s+/g, " ").trim();
+    return {
+      changesets: [],
+      refusal: {
+        code: "unreadable-staged",
+        reason: `the changesets in ${dir} could not be read${stagedFiles(dir)}: ${detail}`,
+      },
+    };
+  }
 }
 
 /**
@@ -456,4 +484,472 @@ function validateEntries(entries: ChangesetEntry[], workspace: Workspace): Chang
     }
   }
   return null;
+}
+
+// ─── Release: pending entries become a version bump and a changelog ─────────
+
+/** One pending changeset, as the release plan reports it. */
+export interface PendingEntry {
+  /** The changeset file's name without `.md`: the id the tool would consume. */
+  id: string;
+  /** The entry body: what a user of the package or product can observe. */
+  summary: string;
+  /** The packages and levels this one entry releases. */
+  releases: Array<{ package: string; level: string }>;
+}
+
+/** One package's version bump, the old version and the new one. */
+export interface PackageVersion {
+  name: string;
+  level: ComprehensiveRelease["type"];
+  oldVersion: string;
+  newVersion: string;
+}
+
+/** The changelog section one package's release adds, and the file it lands in. */
+export interface ChangelogSection {
+  package: string;
+  /** The `CHANGELOG.md` the apply writes the section into. */
+  file: string;
+  /** The section text, exactly as the changelog package renders it. */
+  text: string;
+}
+
+/** Why a release call was refused. Every code is a named outcome. */
+export type ReleaseRefusalCode =
+  /** No readable manifest or workspace, so no package can be versioned. */
+  | "no-workspace"
+  /** The manifest carries no version, so a plan over it is silently empty. */
+  | "no-version"
+  /** No `.changeset/config.json`: the repository has no changesets setup. */
+  | "no-config"
+  /** The config is not JSON, or not a config the schema accepts. */
+  | "invalid-config"
+  /** A pending changeset cannot be parsed. */
+  | "unreadable-staged"
+  /** A pending changeset names a package the workspace does not have. */
+  | "unknown-package"
+  /** Reads answered but no release came out of them: nothing pending, or all skipped. */
+  | "empty-plan"
+  /** The libraries could not assemble a plan from a config they accepted. */
+  | "plan-failed";
+
+/** A release refusal: the named outcome plus the reason a caller can print. */
+export interface ReleaseRefusal {
+  code: ReleaseRefusalCode;
+  reason: string;
+}
+
+/** What a release call answers: the plan, and why there is none. */
+export interface ReleaseRead {
+  refusal: ReleaseRefusal | null;
+  /** The pending changesets the plan consumes, in id order. */
+  entries: PendingEntry[];
+  /** The version each package moves to. */
+  versions: PackageVersion[];
+  /** The changelog section each release adds, before anything is written. */
+  changelog: ChangelogSection[];
+  /** Non-fatal notes from the workspace or the config read. */
+  diagnostics: string[];
+}
+
+/** What an apply answers: the plan it applied, plus the files it touched. */
+export interface ReleaseWrite extends ReleaseRead {
+  /** Files the apply wrote: the manifests and the changelog files. */
+  written: string[];
+  /** The changeset files the apply consumed and removed. */
+  removed: string[];
+}
+
+/**
+ * Compute the release plan, writing nothing.
+ *
+ * The plan is the operator's view of the release: the pending entries, the
+ * versions they produce, and the section each package's changelog gains. An
+ * empty plan is a refusal, never a success: a manifest without a version and a
+ * private package under the default config both produce one silently, so the
+ * caller has to be told which of them happened.
+ */
+export async function planRelease(cwd: string): Promise<ReleaseRead> {
+  return readOf(await resolveRelease(cwd));
+}
+
+/**
+ * Apply the release: bump every manifest the plan names, insert each
+ * changelog section, and remove the consumed changesets.
+ *
+ * The plan is recomputed here rather than passed in, so the tree the apply
+ * writes is the tree it read: a caller cannot hand back a plan from before an
+ * operator edited a changeset.
+ */
+export async function applyRelease(cwd: string): Promise<ReleaseWrite> {
+  const resolved = await resolveRelease(cwd);
+  if (
+    resolved.refusal !== null ||
+    resolved.releasePlan === null ||
+    resolved.workspace === null ||
+    resolved.config === null
+  ) {
+    return { ...readOf(resolved), written: [], removed: [] };
+  }
+  const touched = await applyReleasePlan(
+    resolved.releasePlan,
+    resolved.workspace.reader,
+    resolved.config,
+    undefined,
+    undefined,
+  );
+  // One source for both answers: a file the apply reports here and the tree no
+  // longer has is the changeset it consumed, and one it still has is a write.
+  return {
+    ...readOf(resolved),
+    written: touched.filter((file) => existsSync(file)),
+    removed: touched.filter((file) => !existsSync(file)),
+  };
+}
+
+/** The plan-shaped half of a resolved release: what both callers report. */
+function readOf(resolved: ReleaseRead): ReleaseRead {
+  return {
+    refusal: resolved.refusal,
+    entries: resolved.entries,
+    versions: resolved.versions,
+    changelog: resolved.changelog,
+    diagnostics: resolved.diagnostics,
+  };
+}
+
+/** A resolved plan plus the state the apply reuses: the reader and the config. */
+interface ResolvedRelease extends ReleaseRead {
+  workspace: Workspace | null;
+  config: Config | null;
+  /** The library's own plan, which the apply hands straight to its writer. */
+  releasePlan: ReleasePlan | null;
+}
+
+/** A release call that writes nothing, carrying the refusal and the notes. */
+function refusedRelease(refusal: ReleaseRefusal, diagnostics: string[]): ResolvedRelease {
+  return {
+    refusal,
+    workspace: null,
+    config: null,
+    releasePlan: null,
+    entries: [],
+    versions: [],
+    changelog: [],
+    diagnostics,
+  };
+}
+
+/**
+ * One of the shared reads' refusals, in the release path's own vocabulary. Every
+ * code a workspace or config read answers with is in both sets, so this is a
+ * carry-over rather than a reinterpretation; the type system cannot see that
+ * because the authoring path has two codes the release path cannot produce.
+ */
+function asReleaseRefusal(refusal: ChangesetsRefusal): ReleaseRefusal {
+  return { code: refusal.code as ReleaseRefusalCode, reason: refusal.reason };
+}
+
+/**
+ * Resolve one release: the workspace, the config, the pending entries, the
+ * plan, and the changelog sections, in that order, so a refusal writes nothing
+ * and reports the first thing that stopped it.
+ */
+async function resolveRelease(cwd: string): Promise<ResolvedRelease> {
+  const read = await readWorkspace(cwd);
+  if (read.workspace === null || read.refusal !== null) {
+    return refusedRelease(asReleaseRefusal(read.refusal!), read.diagnostics);
+  }
+  const workspace = read.workspace;
+
+  const configRead = await readChangesetConfig(workspace);
+  if (configRead.config === null || configRead.refusal !== null) {
+    return refusedRelease(asReleaseRefusal(configRead.refusal!), configRead.diagnostics);
+  }
+  // The two forced behaviours live in one place, so the plan and the apply
+  // cannot render through different configs.
+  const config = releaseConfig(configRead.config);
+  const diagnostics = [...configRead.diagnostics];
+
+  const pending = await readPending(workspace);
+  if (pending.refusal !== null) return refusedRelease(asReleaseRefusal(pending.refusal), diagnostics);
+  if (pending.changesets.length === 0) {
+    return refusedRelease(
+      {
+        code: "empty-plan",
+        reason: `no changesets are pending in ${join(workspace.rootDir, ".changeset")}, so there is nothing to release`,
+      },
+      diagnostics,
+    );
+  }
+  const unknown = unknownPackageRefusal(pending.changesets, workspace);
+  if (unknown !== null) return refusedRelease(unknown, diagnostics);
+
+  let releasePlan: ReleasePlan;
+  try {
+    releasePlan = assembleReleasePlan(pending.changesets, workspace.reader, config, undefined, undefined);
+  } catch (e) {
+    return refusedRelease(
+      { code: "plan-failed", reason: `the changesets libraries could not assemble a release plan: ${oneLine(e)}` },
+      diagnostics,
+    );
+  }
+  if (releasePlan.releases.length === 0) {
+    return refusedRelease(emptyPlanRefusal(releasePlan, workspace, config), diagnostics);
+  }
+
+  return {
+    refusal: null,
+    workspace,
+    config,
+    releasePlan,
+    entries: releasePlan.changesets.map(pendingEntry),
+    versions: releasePlan.releases.map(packageVersion),
+    changelog: await changelogSections(releasePlan, workspace, config),
+    diagnostics,
+  };
+}
+
+/** One pending changeset as the plan reports it. */
+function pendingEntry(changeset: NewChangeset): PendingEntry {
+  return {
+    id: changeset.id,
+    summary: changeset.summary,
+    releases: changeset.releases.map((release) => ({ package: release.name, level: release.type })),
+  };
+}
+
+/** One release as the plan reports it. */
+function packageVersion(release: ComprehensiveRelease): PackageVersion {
+  return {
+    name: release.name,
+    level: release.type,
+    oldVersion: release.oldVersion ?? "",
+    newVersion: release.newVersion ?? "",
+  };
+}
+
+/**
+ * The repository's config with the two behaviours this package forces.
+ *
+ * The changelog specifier is replaced with the standalone changelog package's
+ * own module, whatever the repository's config names: a config almost always
+ * names `@changesets/cli/changelog`, which resolves only where the command
+ * line tool is installed, and a repository using this package has not
+ * installed it. Importing that tool is not an option either, because import
+ * runs its command line. The repository's changelog options are kept.
+ *
+ * Formatting is forced off. The config's default value is `"auto"`, which
+ * spawns a formatter, and a formatter that fails after the apply starts
+ * writing leaves a half-applied tree: the manifests and the changelog written,
+ * the changeset file still there.
+ */
+function releaseConfig(config: Config): Config {
+  return {
+    ...config,
+    changelog: [changelogGitSpecifier(), config.changelog === false ? null : (config.changelog[1] ?? null)],
+    format: false,
+  };
+}
+
+/** The standalone changelog package, as the specifier the writer resolves. */
+let changelogGitUrl: string | undefined;
+function changelogGitSpecifier(): string {
+  // Resolved from this module, so it answers wherever the package is
+  // installed, and memoized because the resolution is a filesystem walk.
+  changelogGitUrl ??= pathToFileURL(createRequire(import.meta.url).resolve("@changesets/changelog-git")).href;
+  return changelogGitUrl;
+}
+
+/** The bump levels in order, the scale the dependency minimum compares on. */
+const BUMP_LEVELS = ["none", "patch", "minor", "major"] as const;
+
+/** Every package the workspace reader knows about, by name. */
+function packagesByName(reader: Packages): Map<string, Package> {
+  const byName = new Map<string, Package>();
+  for (const pkg of reader.packages) byName.set(pkg.packageJson.name, pkg);
+  return byName;
+}
+
+/**
+ * The section each release adds to its package's changelog.
+ *
+ * The lines are the changelog package's own, and the commit each changeset was
+ * added in is read the same way the writer reads it, so the plan and the apply
+ * agree on the `- <sha>: ` prefix. The section assembly around those lines is
+ * mirrored here because the library does not export its renderer; the fixture
+ * comparison pins the result to what the apply writes.
+ */
+async function changelogSections(
+  releasePlan: ReleasePlan,
+  workspace: Workspace,
+  config: Config,
+): Promise<ChangelogSection[]> {
+  const byName = packagesByName(workspace.reader);
+  const released = releasePlan.releases.flatMap((release) => {
+    const pkg = byName.get(release.name);
+    return pkg === undefined ? [] : [{ ...release, packageJson: pkg.packageJson, dir: pkg.dir }];
+  });
+  const commits = await getCommitsThatAddFiles(
+    releasePlan.changesets.map((changeset) => `.changeset/${changeset.id}.md`),
+    { cwd: workspace.rootDir },
+  );
+  const changesets: NewChangesetWithCommit[] = releasePlan.changesets.map((changeset, index) => ({
+    ...changeset,
+    commit: commits[index],
+  }));
+  const opts = config.changelog === false ? null : (config.changelog[1] ?? null);
+
+  const sections: ChangelogSection[] = [];
+  for (const release of released) {
+    const text = await changelogEntry(release, released, changesets, opts, config);
+    if (text !== null) sections.push({ package: release.name, file: join(release.dir, "CHANGELOG.md"), text });
+  }
+  return sections;
+}
+
+/** A release plus the package it versions: what the changelog lines take. */
+type ReleasedPackage = ComprehensiveRelease & Pick<Package, "packageJson" | "dir">;
+
+/**
+ * One package's changelog section, rendered as the library renders it: the
+ * version heading, then one heading per level with the entry bodies as
+ * bullets, then the dependency line for what the bump pulled up.
+ */
+async function changelogEntry(
+  release: ReleasedPackage,
+  releases: ReleasedPackage[],
+  changesets: NewChangesetWithCommit[],
+  opts: Record<string, unknown> | null,
+  config: Config,
+): Promise<string | null> {
+  if (release.type === "none") return null;
+  const lines: Record<"major" | "minor" | "patch", string[]> = { major: [], minor: [], patch: [] };
+  for (const changeset of changesets) {
+    const named = changeset.releases.find((other) => other.name === release.name);
+    // A changeset that names the package at one level contributes one line to
+    // that level's heading, whatever else the same entry releases.
+    if (named !== undefined && named.type !== "none") {
+      lines[named.type].push(await changelogGit.getReleaseLine(changeset, named.type, opts));
+    }
+  }
+  const dependents = dependentReleases(release, releases, config);
+  const relevant = new Set(dependents.flatMap((dependent) => dependent.changesets));
+  lines.patch.push(
+    await changelogGit.getDependencyReleaseLine(
+      changesets.filter((changeset) => relevant.has(changeset.id)),
+      dependents,
+      opts,
+    ),
+  );
+
+  const rendered = [
+    `## ${release.newVersion}`,
+    versionSection("major", lines.major),
+    versionSection("minor", lines.minor),
+    versionSection("patch", lines.patch),
+  ].filter((line): line is string => line !== undefined);
+  if (rendered.length === 1) rendered.push("No changes in this release.");
+  return rendered.join("\n\n");
+}
+
+/** One level's heading and bullets, or undefined when the level is empty. */
+function versionSection(level: "major" | "minor" | "patch", lines: string[]): string | undefined {
+  const releaseLines = lines.filter((line) => line);
+  if (releaseLines.length === 0) return undefined;
+  let content = `### ${level[0].toUpperCase()}${level.slice(1)} Changes`;
+  let newLines = 2;
+  for (const line of releaseLines) {
+    // The library keeps at most one blank line between bullets and two after
+    // the heading, counting the newlines the line itself carries.
+    newLines += line.match(/^\n*/)?.[0].length ?? 0;
+    content += "\n".repeat(Math.min(Math.max(newLines, 1), 2)) + line.trim();
+    newLines = line.match(/\n*$/)?.[0].length ?? 0;
+  }
+  return content;
+}
+
+/**
+ * The bumped packages this release's manifest depends on.
+ *
+ * The library's rule is the same shape: a dependency or peer dependency whose
+ * new version arrived in this release counts once its bump reaches the
+ * config's minimum internal-dependency level. The out-of-range short cut and
+ * the peer-dependents option are not mirrored: the default config's minimum is
+ * `patch`, so every real bump clears the level and the two agree, and the
+ * fixture comparison is what keeps them agreeing.
+ */
+function dependentReleases(
+  release: ReleasedPackage,
+  releases: ReleasedPackage[],
+  config: Config,
+): ReleasedPackage[] {
+  return releases.filter((other) => {
+    if (other.name === release.name || other.newVersion === undefined) return false;
+    const range = release.packageJson.dependencies?.[other.name] ?? release.packageJson.peerDependencies?.[other.name];
+    if (range === undefined) return false;
+    return BUMP_LEVELS.indexOf(other.type) >= BUMP_LEVELS.indexOf(config.updateInternalDependencies);
+  });
+}
+
+/**
+ * The refusal for a pending entry naming a package the workspace does not
+ * have. The libraries throw for this one, so it is checked first: a throw from
+ * the assembly would be a crash in a tool rather than a named outcome.
+ */
+function unknownPackageRefusal(changesets: NewChangeset[], workspace: Workspace): ReleaseRefusal | null {
+  for (const changeset of changesets) {
+    for (const release of changeset.releases) {
+      if (workspace.names.includes(release.name)) continue;
+      return {
+        code: "unknown-package",
+        reason:
+          `changeset '${changeset.id}' names '${release.name}', which is not a package in this workspace` +
+          `: the workspace packages are ${workspace.names.join(", ")}`,
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * The refusal for a plan the libraries assembled as empty.
+ *
+ * A manifest without a version and a private package under the default config
+ * both produce this silently, so the reason names the one that happened: the
+ * operator's next move differs, and a bare "empty plan" would hide a manifest
+ * that cannot be versioned at all.
+ */
+function emptyPlanRefusal(releasePlan: ReleasePlan, workspace: Workspace, config: Config): ReleaseRefusal {
+  const byName = packagesByName(workspace.reader);
+  const named = [...new Set(releasePlan.changesets.flatMap((cs) => cs.releases.map((r) => r.name)))];
+  const versionless = named.filter((name) => {
+    const manifest = byName.get(name)?.packageJson as { version?: string } | undefined;
+    return typeof manifest?.version !== "string" || manifest.version === "";
+  });
+  if (versionless.length > 0) {
+    return {
+      code: "no-version",
+      reason:
+        `the release plan is empty: ${versionless.join(", ")} ` +
+        `${versionless.length === 1 ? "carries" : "carry"} no version field in ` +
+        `${versionless.length === 1 ? "its" : "their"} package.json, so the change cannot be versioned`,
+    };
+  }
+  const skipped = named.map((name) => {
+    const manifest = byName.get(name)?.packageJson as { private?: boolean } | undefined;
+    if (manifest?.private === true && !config.privatePackages.version) {
+      return `${name} is private and this config does not version private packages`;
+    }
+    if (config.ignore.includes(name)) return `${name} is in the config's ignore list`;
+    return `${name} needs no release at this level`;
+  });
+  return { code: "empty-plan", reason: `the release plan is empty: ${skipped.join("; ")}` };
+}
+
+/** An error's message on one line, for a refusal that has to read as one. */
+function oneLine(error: unknown): string {
+  const message = (error as Error)?.message ?? String(error);
+  return message.replace(/\s+/g, " ").trim();
 }
