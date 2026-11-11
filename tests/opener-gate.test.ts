@@ -223,6 +223,20 @@ afterAll(() => {
   rmSync(repo, { recursive: true, force: true });
 });
 
+/**
+ * A readable checkout seam for the opens whose profile row carries a branch:
+ * the branch gate refuses a checkout it cannot read, so a fixture that opens
+ * such a phase answers with the branch the effort template resolves to.
+ */
+function checkoutOn(branch: string) {
+  return async (gitArgs: string[]): Promise<string> => {
+    if (gitArgs.join(" ") !== "rev-parse --abbrev-ref HEAD") {
+      throw new Error(`unexpected git command: ${gitArgs.join(" ")}`);
+    }
+    return `${branch}\n`;
+  };
+}
+
 /** A tool context with an in-memory active set standing in for the session. */
 function disclosureCtx(active: string[], extra: Record<string, unknown> = {}) {
   return {
@@ -441,7 +455,7 @@ describe("the implementation gate: the architecture document", () => {
     const active = [...ALWAYS_DECLARED];
     const result = (await tools.tw_open.execute(
       { skill: "implement-ticket", effort: "v5-arch", target: "only" },
-      disclosureCtx(active),
+      disclosureCtx(active, { git: checkoutOn("effort/v5-arch") }),
     )) as ToolResult;
     expect(result.details.opened).toBe(true);
   });
@@ -450,7 +464,7 @@ describe("the implementation gate: the architecture document", () => {
     const active = [...ALWAYS_DECLARED];
     const result = (await tools.tw_open.execute(
       { skill: "implement-ticket", effort: "bug-only", target: "fix-one" },
-      disclosureCtx(active),
+      disclosureCtx(active, { git: checkoutOn("effort/bug-only") }),
     )) as ToolResult;
     expect(result.details.opened).toBe(true);
   });
@@ -469,7 +483,7 @@ describe("the implementation gate: the target ticket", () => {
     const active = [...ALWAYS_DECLARED];
     const result = (await tools.tw_open.execute(
       { skill: "implement-ticket", effort: "ready-effort", target: "one" },
-      disclosureCtx(active),
+      disclosureCtx(active, { git: checkoutOn("effort/ready-effort") }),
     )) as ToolResult;
     expect(result.details.opened).toBe(true);
     expect(result.details).toMatchObject({ skill: "implement-ticket", effort: "ready-effort", target: "one" });
@@ -482,7 +496,7 @@ describe("the implementation gate: the target ticket", () => {
     const active = [...ALWAYS_DECLARED];
     const result = (await tools.tw_open.execute(
       { skill: "implement-ticket", effort: "ready-effort", target: "three" },
-      disclosureCtx(active),
+      disclosureCtx(active, { git: checkoutOn("effort/ready-effort") }),
     )) as ToolResult;
     expect(result.details.opened).toBe(true);
   });
@@ -1008,7 +1022,13 @@ describe("the phase-to-toolset registry", () => {
       const active: string[] = [...ALWAYS_DECLARED];
       const args: Record<string, unknown> = { skill: entry.name, effort: "ready-effort" };
       if (entry.takesTarget) args.target = "one";
-      const result = (await tools.tw_open.execute(args, disclosureCtx(active))) as ToolResult;
+      // The branch-bearing rows get a readable checkout: both resolve the
+      // effort branch for this fixture, and the gate no longer passes an
+      // unreadable one.
+      const result = (await tools.tw_open.execute(
+        args,
+        disclosureCtx(active, { git: checkoutOn("effort/ready-effort") }),
+      )) as ToolResult;
       expect(result.details.opened, `${entry.name} opens`).toBe(true);
       const idleAndCloser = [...ALWAYS_DECLARED, CLOSER];
       const expected = [...new Set([...entry.toolset, CLOSER])].sort();

@@ -69,7 +69,9 @@ stands.
 agent, no instructions, no gate, no merge flag, no push policy. Phases open on
 whatever checkout they find, no spawn is blocked on a branch, and the effort
 close lands nothing, because no landing step is configured. Choose it to keep
-the branches and habits a repository already has.
+the branches and habits a repository already has, and to run the workflow in a
+directory that is not a git checkout at all, where the guards can read no
+branch.
 
 There are three branch levels in a repository with a develop branch, and two
 without one: the trunk, one **effort branch** per effort, and one **ticket
@@ -101,6 +103,11 @@ refusal names and retry the same call.
   chain, or launching one of the five implementation agents, from another
   branch fails that step before any worker starts, with a reason naming the
   branch to create and its base.
+- **A checkout the session cannot read refuses the same way.** When no way to
+  run git is available, or git fails, the phase does not open and a gated spawn
+  is blocked, with a reason naming what could not be read, instead of passing
+  with a warning. The recovery is making the read work again: the command the
+  guard runs must answer the checked-out branch.
 - **Raw `bash` git commands are not intercepted.** The phase gate and the spawn
   block are the enforcement points, so a hand-run `git checkout` moves the
   checkout and the next guarded call judges it like any other.

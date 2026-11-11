@@ -524,22 +524,25 @@ export interface CheckoutRead {
   diagnostic: string | null;
 }
 
-/** The command the branch gate reads the checkout with. */
+/** The command both enforcement points read the checkout with. */
 const CHECKOUT_COMMAND = ["rev-parse", "--abbrev-ref", "HEAD"];
+
+/** The read, phrased for a refusal's legal next. */
+const CHECKOUT_READ = `git ${CHECKOUT_COMMAND.join(" ")}`;
 
 /**
  * Read the checked-out branch through the git seam.
  *
  * A detached checkout answers `HEAD`, which reads as no branch. A seam that is
- * absent or cannot run reports a diagnostic instead of a branch: the gate must
- * not refuse on a checkout it never saw, so the caller passes the open through
- * and says in its result that the gate did not run.
+ * absent or cannot run answers no branch and a diagnostic naming what could not
+ * be read: the caller refuses on it, because a guard that cannot read the
+ * checkout cannot clear the condition it guards.
  */
 export async function readCheckout(git: GitRun | undefined): Promise<CheckoutRead> {
   if (git === undefined) {
     return {
       branch: null,
-      diagnostic: `the session offered no git seam, so the branch gate did not run (${CHECKOUT_COMMAND.join(" ")})`,
+      diagnostic: `the checkout could not be read (the session offered no git seam for '${CHECKOUT_READ}')`,
     };
   }
   try {
@@ -548,11 +551,26 @@ export async function readCheckout(git: GitRun | undefined): Promise<CheckoutRea
   } catch (e) {
     return {
       branch: null,
-      diagnostic:
-        `the checkout could not be read (git ${CHECKOUT_COMMAND.join(" ")} failed: ${(e as Error).message}), ` +
-        `so the branch gate did not run`,
+      diagnostic: `the checkout could not be read (${CHECKOUT_READ} failed: ${(e as Error).message})`,
     };
   }
+}
+
+/**
+ * The refusal for a checkout the gate could not read: what could not be read,
+ * the branch that therefore cannot be confirmed, and the one recovery. Both
+ * enforcement points build their refusal from it, so a phase and a spawn word
+ * the same condition the same way.
+ */
+export function unreadableCheckout(
+  name: string,
+  requiredBranch: string,
+  diagnostic: string,
+): { reason: string; recovery: string } {
+  return {
+    reason: `${diagnostic}, so '${name}' cannot confirm it is on '${requiredBranch}'`,
+    recovery: `make the checkout readable (${CHECKOUT_READ} must answer the checked-out branch)`,
+  };
 }
 
 /** The instruction text a profile carries for one phase, and the profile that answered. */

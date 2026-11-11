@@ -1,3 +1,3 @@
 schema_version: 5
 map: configurable-git-workflow
-task: null
+task: guard-fail-closed

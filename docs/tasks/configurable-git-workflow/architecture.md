@@ -165,11 +165,13 @@ The gate reads the checkout through `readCheckout` over the git seam. The refusa
 names the current branch, the required branch, the base to create it from, and
 the next legal call, in the shape the openers already use. Nothing latches, so
 performing the step and retrying passes. A detached checkout answers `HEAD` and
-refuses as no branch. A missing seam, or a git that fails, passes the open with a
-diagnostic in `details.diagnostics` and a `Diagnostics:` line in the result text,
-mirroring the repo gate's treatment of unreadable settings. The open's details
-therefore always carry `required_branch` (null when the phase needs none),
-`profile`, and `diagnostics`; the close's carry `diagnostics`.
+refuses as no branch. A missing seam, or a git that fails, refuses too, with the
+existing refusal shape and a reason naming what could not be read: guards block
+and do not warn, so a branch the gate cannot confirm does not open a phase. The
+cause still rides `details.diagnostics`, so what went wrong reports alongside the
+refusal. The open's details therefore always carry `required_branch` (null when
+the phase needs none), `profile`, and `diagnostics`; the close's carry
+`diagnostics`.
 
 A spawn guard, `spawnVerdict(cwd, toolName, input, deps)` in
 `src/core/spawn-guard.ts`, blocks a spawn the profile gates. One `tool_call`
@@ -187,9 +189,11 @@ A blocked spawn returns `{ block: true, reason }` rather than throwing, so that
 step fails and the child never starts, and the session continues. The reason
 names the current branch, the required branch, and the base to create it from,
 using the resolver's own `decideFromBrief`, so a spawn refusal and a phase
-refusal cannot disagree. A checkout the seam cannot read passes with a
-`ctx.ui.notify`, the same fail-open convention as the phase gate, because a hook
-has no result payload to carry a diagnostic. The chain's host gates stay as
+refusal cannot disagree. A checkout the seam cannot read blocks, the same
+fail-closed rule as the phase gate, with the reason naming what could not be
+read; a pass carries only the diagnostics of the profile and settings it was
+resolved from, and those still reach the operator through `ctx.ui.notify`,
+because a hook has no result payload. The chain's host gates stay as
 defense in depth, not as the enforcement point. The `tasks`, `chain`, and
 `parallel` fanout shapes are not guarded.
 
@@ -599,6 +603,16 @@ test could not see it because it compared the two copies of the separator rather
 than the runtime's rule. The separator is now `.`, and a test asserts that the
 built key matches the runtime's shape.
 
+### The guards fail closed on a checkout they cannot read
+
+Both enforcement points first mirrored the repo gate and passed an unreadable
+checkout through with a diagnostic, which contradicted the effort's own rule that
+guards block and do not warn. They now refuse: the open answers in its existing
+refusal shape, a gated spawn returns a block, and each reason names what could
+not be read and the one recovery, `readCheckout`'s diagnostic carrying the cause.
+`unreadableCheckout` in `src/core/git-profile.ts` builds that sentence for both,
+so a phase refusal and a spawn block word the condition the same way.
+
 ### The bundled merge flag has to carry its dashes
 
 The `default` profile first stored `merge: "no-ff"`, which reached the rendered
@@ -611,7 +625,6 @@ flag rather than a bare name.
 Recorded so the archived document does not claim more than shipped:
 
 - No profile row's `closeGate` is enforced.
-- Both enforcement points fail open when the git seam cannot read the checkout.
 - The per-child `subagent_launch` surface is unit-tested against the documented
   input shape only, because the pinned `pi-subagents` 0.84 registers no such
   tool.

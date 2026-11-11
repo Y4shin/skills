@@ -7,10 +7,11 @@
  * profile through its own directory seam, so no test here needs a repository:
  * the fixture tree is a plain directory with a `.pi/settings.json`.
  *
- * The four behaviours pinned: the pass on the required branch, the refusal on
- * any other (naming current branch, required branch, and next call), the retry
- * after the branch exists (nothing latches), and the instruction text the
- * profile carries arriving as the open's and the close's result.
+ * The behaviours pinned: the pass on the required branch, the refusal on any
+ * other (naming current branch, required branch, and next call), the refusal on
+ * a checkout the gate could not read at all (guards block, they do not warn),
+ * the retry after the branch exists (nothing latches), and the instruction text
+ * the profile carries arriving as the open's and the close's result.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -109,7 +110,7 @@ function fakeCheckout(branch: string): {
 function openCtx(
   directory: string,
   active: string[],
-  git: (args: string[]) => Promise<string>,
+  git: ((args: string[]) => Promise<string>) | undefined,
   extra: Record<string, unknown> = {},
 ) {
   return {
@@ -346,21 +347,95 @@ describe("the retry after the branch exists", () => {
     );
     expect(text).toContain("Legal next:");
   });
+});
 
-  test("a checkout the seam cannot read opens, with the gate's diagnostic in the result", async () => {
+// ─── The refusal on a checkout the gate could not read ──────────────────────
+
+/**
+ * Guards block, they do not warn. A checkout the seam cannot read is a
+ * condition the gate cannot clear, so the open is refused in the same shape as
+ * a wrong branch, and the cause still rides the details.
+ */
+describe("the open refuses on a checkout it cannot read", () => {
+  const args = { skill: "implement-ticket", effort: "live-effort", target: "one" };
+
+  test("a git that fails refuses the open, naming what could not be read", async () => {
+    const dir = sessionDir();
+    const active: string[] = [];
+    const failing = async (): Promise<string> => {
+      throw new Error("fatal: not a git repository");
+    };
+
+    const { text, details } = await open(args, openCtx(dir, active, failing));
+
+    expect(details.opened, "a checkout the gate never read never opens the phase").toBe(false);
+    expect(active, "a refused open discloses nothing").toEqual([]);
+    expect(details.required_branch).toBe("effort/live-effort");
+    expect(details.reason).toBe(
+      "the checkout could not be read (git rev-parse --abbrev-ref HEAD failed: fatal: not a git repository), " +
+        "so 'implement-ticket' cannot confirm it is on 'effort/live-effort'",
+    );
+    expect(details.legal_next).toEqual([
+      "make the checkout readable (git rev-parse --abbrev-ref HEAD must answer the checked-out branch), " +
+        "then open implement-ticket",
+    ]);
+    // The refusal is the openers' existing shape, and the cause still reports.
+    expect(text).toBe(
+      "Refused: the checkout could not be read (git rev-parse --abbrev-ref HEAD failed: fatal: not a git repository), " +
+        "so 'implement-ticket' cannot confirm it is on 'effort/live-effort'. " +
+        "Legal next: make the checkout readable (git rev-parse --abbrev-ref HEAD must answer the checked-out branch), " +
+        "then open implement-ticket.",
+    );
+    expect(details.diagnostics.join(" "), "the gate's diagnostic still reports the cause").toContain(
+      "fatal: not a git repository",
+    );
+  });
+
+  test("a missing git seam refuses the open on the same rule", async () => {
+    const dir = sessionDir();
+    const active: string[] = [];
+
+    // No seam at all: the session offers nothing to read the checkout with.
+    const { details } = await open(args, openCtx(dir, active, undefined));
+
+    expect(details.opened, "a session with no seam cannot confirm the branch either").toBe(false);
+    expect(active).toEqual([]);
+    expect(details.required_branch).toBe("effort/live-effort");
+    expect(details.reason).toContain("the checkout could not be read");
+    expect(details.reason).toContain("no git seam");
+    expect(details.reason).toContain("cannot confirm it is on 'effort/live-effort'");
+    expect(details.diagnostics.length, "the cause still reports").toBeGreaterThan(0);
+  });
+
+  test("the effort close refuses on the same condition", async () => {
     const dir = sessionDir();
     const failing = async (): Promise<string> => {
       throw new Error("fatal: not a git repository");
     };
 
-    const { text, details } = await open(
-      { skill: "implement-ticket", effort: "live-effort", target: "one" },
+    const { details } = await open(
+      { skill: "finalize-effort", effort: "live-effort" },
       openCtx(dir, [], failing),
     );
 
-    expect(details.opened, "a checkout the gate never saw never refuses").toBe(true);
-    expect(details.diagnostics.join(" ")).toContain("fatal: not a git repository");
-    expect(text).toContain("Diagnostics:");
+    expect(details.opened).toBe(false);
+    expect(details.reason).toContain("cannot confirm it is on 'effort/live-effort'");
+    expect(details.legal_next[0]).toContain("then open finalize-effort");
+  });
+
+  test("a phase the profile gives no branch still opens, and reads no checkout", async () => {
+    const dir = sessionDir();
+    const calls: string[][] = [];
+    const failing = async (gitArgs: string[]): Promise<string> => {
+      calls.push(gitArgs);
+      throw new Error("fatal: not a git repository");
+    };
+
+    const { details } = await open({ skill: "wayfinder", effort: "live-effort" }, openCtx(dir, [], failing));
+
+    expect(details.opened).toBe(true);
+    expect(details.required_branch).toBeNull();
+    expect(calls, "a phase with no branch gate never reads the checkout").toEqual([]);
   });
 });
 
