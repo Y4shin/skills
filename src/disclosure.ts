@@ -52,6 +52,34 @@ export interface SkillEntry {
 }
 
 /**
+ * The gated skill manifest: the workflow skills a work repo (gate active)
+ * disables, exactly as settled in the selective-repo-disable effort. The
+ * prompt strip, the /skill: invocation block, and tw_open's gated restriction
+ * all read this one list; there is no runtime derivation and no fallback.
+ *
+ * It mirrors the registry's workflow entries (every registry skill except
+ * skill-creator, the authoring discipline that stays openable in gated
+ * repos) plus the three workflow skills that have no registry entry because
+ * they own no toolset: task-workflow-overview, task-workflow-doctor, and
+ * workflow-failure. The consistency tests in tests/skills.test.ts pin the
+ * manifest against package.json's pi.skills basenames and the registry, so a
+ * renamed or added skill fails the suite instead of silently changing the
+ * strip.
+ */
+export const GATED_SKILL_NAMES: readonly string[] = [
+  "task-workflow-overview",
+  "setup-workflow",
+  "intake",
+  "wayfinder",
+  "to-spec",
+  "to-tickets",
+  "implement-ticket",
+  "finalize-effort",
+  "task-workflow-doctor",
+  "workflow-failure",
+];
+
+/**
  * The skill registry: one table, skill to toolset plus skill to gate. It is
  * the single source of the phase toolsets and of the opener's preconditions
  * (which gate applies); the gate evaluation itself reads the artifact tree in
@@ -361,6 +389,25 @@ export function conflictReason(skill: string, openSkill: string): string {
 }
 
 /**
+ * The registry entries a gated (work) repo keeps openable: those whose names
+ * are not in the gated manifest. Today exactly skill-creator, the authoring
+ * discipline. The opener's schema and its gated refusal both read this, so
+ * the offered surface and the enforced surface cannot drift.
+ */
+export function openableWhenGated(): SkillEntry[] {
+  return SKILL_REGISTRY.filter((s) => !GATED_SKILL_NAMES.includes(s.name));
+}
+
+/**
+ * The gated-name refusal's reason, in the opener's own refusal language: a
+ * workflow skill does not open in a work repo, whatever its phase gate would
+ * say about the tree.
+ */
+export function gatedReason(skill: string): string {
+  return `task-workflow is gated in this work repo: '${skill}' is a workflow skill and does not open here`;
+}
+
+/**
  * The opener's parameter contract: a plain object with the skill, the effort,
  * and an optional target. It is deliberately NOT a discriminated union on
  * `skill`: a provider validates the union before the handler runs, so a
@@ -368,9 +415,15 @@ export function conflictReason(skill: string, openSkill: string): string {
  * instead of the opener's own refusal naming the legal next call. The handler
  * validates the shape at runtime (validateOpenArgs) and the phase gate decides
  * whether a target is required, so every refusal reads.
+ *
+ * `gated` narrows the offered skill names to the non-gated registry entries
+ * (a work repo keeps only skill-creator openable), so the model never sees a
+ * hopeless value in the schema; the runtime refusal of a gated name stays the
+ * belt next to these suspenders.
  */
-export function buildOpenParameters(): TSchema {
-  const openable = SKILL_REGISTRY.map((s) => s.name).join(", ");
+export function buildOpenParameters(gated: boolean = false): TSchema {
+  const entries = gated ? openableWhenGated() : SKILL_REGISTRY;
+  const openable = entries.map((s) => s.name).join(", ");
   return Type.Object({
     skill: Type.String({ description: `The workflow skill to open: one of ${openable}` }),
     effort: Type.String({ description: "The effort the skill works in" }),

@@ -35,6 +35,14 @@ Run the probe from a throwaway repo holding the fixture tree the tool needs, and
 put the agent under test in `/tmp/probe/agent/agents/`. Drop this package from
 the list to reproduce a failure that only appears when it is missing.
 
+A consequence for offered-surface narrowing: narrow a parameter **description's
+enumerated list** and enforce at runtime, not through a provider-validated
+enum. A validated enum rejects a value before the tool runs, so a handler that
+must answer with a shaped refusal (`Refused: <reason>. Legal next: <call>.`)
+never gets to answer at all. The description keeps the model from seeing a
+hopeless value; the runtime refusal keeps the guaranteed response shape
+(`tw-open-gated-restriction`).
+
 ## Test protocol
 
 The task-workflow `test-runner` agent reads this section. "Run these always"
@@ -47,6 +55,25 @@ Run these always:
 - `npm run typecheck` -- type-check `src/**` without emitting
 - `npm run typecheck:tests` -- type-check `tests/**` through
   `tsconfig.test.json` (the base config includes `src/**` only)
+
+When the installed `node_modules` desyncs from `package.json` (npm marks the
+packages `invalid`), these commands fail with a fixed, pre-existing set:
+version-skew crashes in the integration harness, version smoke tests against
+the installed package, and corpus scans polluted by a checkout-local `.venv`
+(the corpus walker's skip set does not skip `.venv`, so it appears in this
+checkout but not in a fresh worktree). The
+gate is then relative: diff the failure list, and the `tsc` errors with
+positions stripped, against a clean worktree of `main`. Identical sets are
+green; any new line is the change's regression. Resync `node_modules` to
+the declared versions to clear the baseline.
+
+A ticket that verifies another package's behaviour states the version in
+its record and verifies against the lockfile-declared version, not the
+installed copy: a desynced `node_modules` can make the record false the
+moment the dependencies are resynced, and the record must then be
+corrected with the same source-backed method (`subagent-availability-resync`
+re-verified the pi-subagents child-tool availability shape for exactly
+this reason).
 
 Run if asked (by number):
 
@@ -105,7 +132,10 @@ byte-order mark.
   isolating than the integration harness and works when the harness is
   broken. See `tests/gate-factory.test.ts` (the repo-gate factory tests) for
   the pattern, it asserts which tool names register and which `on(event)`
-  handlers fire under different gate decisions._
+  handlers fire under different gate decisions._ When the registered surface
+  splits by gate state, pin both states as exact sets (no more, no fewer),
+  including registration shape (`defaultActive`, `exposure`), so a stray
+  registration fails loudly (gated-tool-registration).
 - **Iteration-loop seams (function-as-dependency):** when a loop shells out
   to an external process and parses its output, inject the step as a
   `() => Promise<Result>` function so the loop logic (convergence, caps,
@@ -272,6 +302,14 @@ suite normally; do not exclude this file.
   applies per-upgrade resources (`resources/upgrade-<from>-to-<to>.md`) in
   sequence. Structure assertions verify the skill references `upgrade-2-to-3`,
   `migration-target.yaml`, and the dry-run/backup/idempotent safety guarantees.
+- **Static keep-lists get bidirectional consistency tests.** When a behaviour
+  (prompt strip, invocation block) consumes a static list instead of deriving
+  it at runtime, pin the list against its sources in both directions: the list
+  equals the settled literal (count pinned), every entry is a `package.json`
+  `pi.skills` basename, and the registry entries outside the list are exactly
+  the expected complement. A renamed or added skill then fails the test
+  instead of silently changing the strip. See the `gated skill manifest` block
+  in `tests/skills.test.ts`.
 - **Skill helper-script testing (CLI seam):** when a skill ships executable
   helper scripts (e.g. `skills/engineering/skill-creator/scripts/*.mjs`), test them via
   `spawnSync` on the script CLI (stdout + exit code) from a dedicated vitest

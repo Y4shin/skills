@@ -24,9 +24,13 @@ For a local checkout, use `pi install /path/to/this/repo`.
 Both packages are necessary. The ticket chains use pi-subagents. Each shipped
 subagent lists `tw_feedback` and `submit_feedback` in its tool allowlist: the
 wrapper labels the row and then calls the store, and a nested call reaches only
-a tool the child has active. pi-subagents fails a child that cannot reach a
-listed tool, so without pi-telemetry the chain stops at its first gate. The
-session start shows a warning when a package is missing.
+a tool the child has active. On pi-subagents 0.84.0 every plain name in that
+allowlist is a required child tool, and a child whose allowlisted tool never
+registers fails its run at agent start with "requested unavailable child
+tools": without pi-telemetry the shipped chains do not run, because every
+chain child fails at agent start instead of recording workflow feedback.
+Install pi-telemetry before dispatching the shipped chains. The session start
+shows a warning when a package is missing.
 
 Run this command one time in each repo:
 
@@ -95,12 +99,17 @@ people. For small work, use only the disciplines: `/skill:tdd`,
 
 ## Work repos
 
-The package installs for all repos. It disables itself in a work repo, based
-on the git origin. You do not configure each repo. Read
+The package installs for all repos. It disables its workflow in a work repo,
+based on the git origin: the planning skills are stripped, the `tw_*` writers
+never register, and a gated name is refused by `tw_open`. A small passive
+surface stays (the opener, the closer, the feedback wrapper, `notify_user`,
+and skill-creator with its bundled tools), so `skill-creator` still works
+there. You do not configure each repo. Read
 [`docs/repo-gating.md`](docs/repo-gating.md).
 
-One known limitation: the skills still show in `/help` in a work repo. An
-explicit `/skill:<name>` call is blocked.
+One known limitation: the ten gated workflow skills still show in `/help` in
+a work repo (`skill-creator` is not stripped). Explicit `/skill:<name>` calls
+for those ten are blocked.
 
 ## Skills
 
@@ -131,6 +140,7 @@ decision, or when you type it.
 - [finalize-effort](./skills/engineering/finalize-effort/SKILL.md)
 - [grilling](./skills/engineering/grilling/SKILL.md)
 - [implement-ticket](./skills/engineering/implement-ticket/SKILL.md)
+- [pr](./skills/engineering/pr/SKILL.md)
 - [prototype](./skills/engineering/prototype/SKILL.md)
 - [research](./skills/engineering/research/SKILL.md)
 - [resolving-merge-conflicts](./skills/engineering/resolving-merge-conflicts/SKILL.md)

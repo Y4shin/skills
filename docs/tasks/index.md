@@ -12,13 +12,14 @@ title: docs/tasks
 - bash-tail-preview-fix
 - build-eval-creator-skill
 - coding-taste
+- configurable-git-workflow
 - conventions-and-writer-cleanups
 - eval-scorer-feedback
 - migration-surface-polish
-- selective-repo-disable
 
 ## Archived
 
+- add-pr-skill
 - adopt-mp-skills-way
 - agent-facing-workflow-docs
 - backfill-skill-docs-pages
@@ -57,4 +58,5 @@ title: docs/tasks
 - pi-harness-evals
 - portable-skill-authoring
 - run-adoption-migration
+- selective-repo-disable
 - task-tools-overhaul

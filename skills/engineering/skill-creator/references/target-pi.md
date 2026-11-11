@@ -63,21 +63,41 @@ test("has skills list", () => {
 
 ## The repo gate
 
-`task-workflow` (this package) has a **repo gate**: it auto-disables in
-work repositories. The gate reads `settings.json` for
+`task-workflow` (this package) has a **repo gate**: it disables the workflow
+in work repositories. The gate reads `settings.json` for
 `taskWorkflow.disableOnRepo` patterns and matches them against the git
-remote origin. When the gate is active, the package's skills are stripped
-from the system prompt and explicit `/skill:<name>` invocations are
-blocked.
+remote origin. When the gate is active, the ten workflow skills are stripped
+from the system prompt, the `tw_*` writers never register, explicit
+`/skill:<workflow-skill>` invocations are blocked, and `tw_open` refuses
+workflow skill names.
 
-Because `skill-creator` ships inside `task-workflow`, it inherits this
-gating. A skill you **produce** for this package also inherits the gate:
-it will not load in work repos. State this so the author isn't surprised:
-the skill works in personal repos and anywhere `task-workflow` is
-installed and not gated, but it is invisible in work repos.
+`skill-creator` is deliberately outside the gate: it is not in the gated
+skill manifest, its bundled script tools register in gated repos too, and
+`tw_open skill-creator` opens it there exactly as in a personal repo. State
+this so the author isn't surprised in the other direction: a skill you
+**produce** for this package is NOT auto-gated either. The gate's strip list
+is a static manifest of ten workflow skill names, so a new skill loads
+everywhere the package is installed, work repos included. If a produced
+skill must not load in work repos, that is a change to the manifest, which is
+a settled, reviewed change pinned by tests, not a local edit.
 
-This is a feature, not a bug, the gate keeps workflow skills out of
-unrelated work contexts.
+This is a feature, not a bug: the gate keeps the workflow skills out of
+unrelated work contexts while the authoring discipline and the skills it
+produces stay usable everywhere.
+
+## The peer packages and the subagent allowlists
+
+The ticket chains dispatch through `pi-subagents`, and the shipped subagents
+list `tw_feedback` and `submit_feedback` in their `tools` allowlists:
+`tw_feedback` is this package's feedback wrapper, and `submit_feedback` is a
+pi-telemetry tool. On pi-subagents 0.84.0 every plain name in an agent's
+`tools` allowlist is a required child tool, and a child whose allowlisted tool
+never registers fails its run at agent start with "requested unavailable child
+tools". Without pi-telemetry the shipped chains do not run, because every
+chain child fails at agent start; install it
+(`pi install npm:@y4shin/pi-telemetry`) before dispatching them. This shape is
+version-pinned to pi-subagents 0.84.0 and was verified against that version's
+source; re-verify it on an upgrade.
 
 ## Companion reference files
 

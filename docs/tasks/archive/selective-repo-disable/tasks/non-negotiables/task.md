@@ -2,7 +2,7 @@
 type: task
 subtype: grilling
 title: Grill the effort's non-goals and non-negotiable facts
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 ---

@@ -2,7 +2,7 @@
 type: task
 subtype: research
 title: Inventory tw_* tool and workflow coupling across all non-gated skills
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - non-negotiables

@@ -4,7 +4,7 @@
  */
 
 import { readFileSync, existsSync, readdirSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, test } from "vitest";
 import { parse as parseYaml } from "yaml";
@@ -12,7 +12,7 @@ import { repoRel } from "./lib/repo-paths.js";
 import { parse } from "../src/core/frontmatter.js";
 import { findAnomalies, fromFrontmatter, validateArtifact, type Artifact } from "../src/core/art.js";
 import { createTools } from "../src/pi.js";
-import { SKILL_REGISTRY } from "../src/disclosure.js";
+import { GATED_SKILL_NAMES, SKILL_REGISTRY } from "../src/disclosure.js";
 
 const PROJECT = process.cwd();
 
@@ -142,6 +142,7 @@ const SKILL_FILES = [
   "skills/engineering/to-tickets/SKILL.md",
   "skills/engineering/skill-review/SKILL.md",
   "skills/engineering/eval-review/SKILL.md",
+  "skills/engineering/pr/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -189,7 +190,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(31);
+    expect(pkg.pi.skills.length).toBe(32);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
@@ -223,6 +224,48 @@ describe("package.json", () => {
     for (const entry of top) {
       expect(["engineering", "productivity", "misc", "in-progress", "deprecated"]).toContain(entry);
     }
+  });
+});
+
+describe("gated skill manifest", () => {
+  const pkg = JSON.parse(readFile("package.json"));
+
+  // The settled gated set (the selective-repo-disable effort): the 10
+  // workflow skills a work repo disables. This literal is the independent
+  // pin: a manifest edit that is not a settled, reviewed change fails here
+  // instead of silently changing the strip.
+  const SETTLED_GATED_SKILLS = [
+    "task-workflow-overview",
+    "setup-workflow",
+    "intake",
+    "wayfinder",
+    "to-spec",
+    "to-tickets",
+    "implement-ticket",
+    "finalize-effort",
+    "task-workflow-doctor",
+    "workflow-failure",
+  ];
+
+  test("exports exactly the settled 10 names, in the settled order", () => {
+    expect([...GATED_SKILL_NAMES]).toEqual(SETTLED_GATED_SKILLS);
+  });
+
+  test("every manifest name is a pi.skills basename", () => {
+    const basenames = (pkg.pi.skills as string[]).map((s) => basename(s));
+    for (const name of GATED_SKILL_NAMES) {
+      expect(basenames, `${name} must be a pi.skills basename`).toContain(name);
+    }
+  });
+
+  test("every workflow registry skill is gated; skill-creator is the only ungated registry entry", () => {
+    // skill-creator is the authoring discipline and stays openable in
+    // a gated repo; every other registry entry is a workflow phase the gate
+    // must disable.
+    const ungatedRegistryEntries = SKILL_REGISTRY.filter(
+      (e) => !GATED_SKILL_NAMES.includes(e.name),
+    ).map((e) => e.name);
+    expect(ungatedRegistryEntries).toEqual(["skill-creator"]);
   });
 });
 
@@ -529,7 +572,7 @@ describe("triage is retired (intake-skill)", () => {
     const pkg = JSON.parse(readFile("package.json"));
     expect(pkg.pi.skills).toContain("./skills/engineering/intake");
     expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
-    expect(pkg.pi.skills.length).toBe(31);
+    expect(pkg.pi.skills.length).toBe(32);
     expect(pkg.pi.skills.filter((s: string) => s.includes("intake") || s.includes("triage"))).toEqual([
       "./skills/engineering/intake",
     ]);
@@ -1469,8 +1512,10 @@ const OLD_WILDCARD_PATTERN = new RegExp(`${OLD_PREFIX}\\*`);
 // character and any retired identifier without anything of ours being wrong.
 // `.agents` (a vendored skills checkout) and `dist` (build output) are the
 // same class as prototype-bundle: local, gitignored, never shipped (the
-// package `files` set ships neither).
-const CORPUS_SKIP_DIRS = new Set(["node_modules", ".git", "archive", "prototype-bundle", ".pi-subagents", ".work", ".agents", "dist"]);
+// package `files` set ships neither). `.venv` (a checkout-local Python
+// virtualenv) is the same class: its site-packages carry em-dashes and
+// retired tool prefixes that are not ours.
+const CORPUS_SKIP_DIRS = new Set(["node_modules", ".git", "archive", "prototype-bundle", ".pi-subagents", ".work", ".agents", ".venv", "dist"]);
 function corpusFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {

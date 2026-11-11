@@ -1,6 +1,6 @@
 {
   "name": "@y4shin/pi-task-workflow",
-  "version": "5.3.1",
+  "version": "5.4.0",
   "description": "Wayfinder grilling → task frontier → type-specific execution: a planning workflow for docs/tasks/. Pi extension.",
   "keywords": [
     "pi-package"
@@ -91,6 +91,7 @@
       "./skills/engineering/prototype",
       "./skills/engineering/research",
       "./skills/engineering/resolving-merge-conflicts",
+      "./skills/engineering/pr",
       "./skills/engineering/wizard",
       "./skills/productivity/handoff",
       "./skills/productivity/to-questionnaire",

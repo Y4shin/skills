@@ -13,10 +13,14 @@ generalization, meta-noise pruning) and then invoke `/skill-review` for a
 fresh-context multi-axis review, and finally iterate on real usage.
 
 Its bundled scripts are the workflow's one tool-owning surface: opening
-`skill-creator` nested inside a phase (`tw_open`) discloses the registered
-tools `skill_validate`, `skill_scaffold`, and `skill_discover` (each runs
-its bundled script directly, no shell) alongside the phase's own tools, and
-closing it leaves the phase untouched.
+`skill-creator` with `tw_open` (nested inside a phase, or standalone)
+discloses the registered tools `skill_validate`, `skill_scaffold`, and
+`skill_discover` (each runs its bundled script directly, no shell)
+alongside any open phase's own tools, and closing it leaves any open phase
+untouched. In a gated work repo (`taskWorkflow.disableOnRepo` match),
+where the workflow skills stay closed, `skill-creator` is the one skill
+`tw_open` still offers and its tools register there, so the authoring
+discipline keeps working there.
 
 The load-bearing ideas:
 

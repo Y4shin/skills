@@ -1,7 +1,7 @@
 ---
 type: map
 title: Loosen repo gating to task-workflow resources only
-status: stable
+status: deprecated
 ready_for_spec: true
 ---
 # Loosen repo gating to task-workflow resources only

@@ -28,11 +28,14 @@ import { fromFrontmatter, findAnomalies, dependencyLevels, TYPE_LEAF, TYPE_LEAVE
 import {
   ALWAYS_DECLARED,
   CLOSER,
+  GATED_SKILL_NAMES,
   SKILL_REGISTRY,
   buildOpenParameters,
   conflictReason,
   duplicateReason,
+  gatedReason,
   openSkillsIn,
+  openableWhenGated,
   skillEntry,
   validateOpenArgs,
   type SkillEntry,
@@ -56,21 +59,17 @@ import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { FEEDBACK_KINDS, WORKFLOW_SOURCE, feedbackCall } from "./core/feedback.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 
-// ─── Gated skill names (shared by strip + invocation gate) ─────────────────────
+// ─── Gated skill manifest sanity (session-start diagnostics) ──────────────────
 
-const FALLBACK_GATED_SKILL_NAMES = [
-  "task-workflow-overview",
-  "setup-workflow",
-  "intake",
-  "wayfinder",
-  "to-spec",
-  "to-tickets",
-  "implement-ticket",
-  "finalize-effort",
-];
-
-function loadGatedSkillNames(): { names: string[]; diagnostics: string[] } {
-  const diagnostics: string[] = [];
+/**
+ * The gated names are the static manifest exported from src/disclosure.ts;
+ * nothing is derived here. The one runtime read left is a sanity check: a
+ * broken install (package.json unreadable, pi.skills missing or not an array
+ * of strings) is worth one warning at session start. The strip and the
+ * invocation block run on the manifest regardless; the manifest-to-package
+ * consistency itself is pinned by the tests, not by this check.
+ */
+function loadSkillNameDiagnostics(): string[] {
   try {
     const pkgPath = resolvePath(
       dirname(fileURLToPath(import.meta.url)),
@@ -81,20 +80,19 @@ function loadGatedSkillNames(): { names: string[]; diagnostics: string[] } {
     const piSection = pkg.pi as Record<string, unknown> | undefined;
     const skills = piSection?.skills;
     if (Array.isArray(skills) && skills.every((s) => typeof s === "string")) {
-      return { names: (skills as string[]).map((s) => basename(s)), diagnostics };
+      return [];
     }
-    diagnostics.push(
-      "skill-strip: package.json pi.skills is missing or not an array of strings; using fallback list",
-    );
+    return [
+      "package.json pi.skills is missing or not an array of strings; the static manifest is in effect",
+    ];
   } catch (e) {
-    diagnostics.push(
-      `skill-strip: failed to read package.json pi.skills: ${(e as Error).message}; using fallback list`,
-    );
+    return [
+      `failed to read package.json pi.skills: ${(e as Error).message}; the static manifest is in effect`,
+    ];
   }
-  return { names: FALLBACK_GATED_SKILL_NAMES, diagnostics };
 }
 
-const { names: GATED_SKILL_NAMES, diagnostics: SKILL_NAME_DIAGNOSTICS } = loadGatedSkillNames();
+const SKILL_NAME_DIAGNOSTICS = loadSkillNameDiagnostics();
 
 /**
  * Block explicit `/skill:<gated-name>` invocations in a work repo. The input
@@ -1229,7 +1227,11 @@ interface Tool {
   args: Record<string, unknown>;
   /** Explicit TypeBox parameter schema; replaces the args-record conversion when present. */
   parameters?: TSchema;
-  /** Whether registration activates the tool. Only the dispatcher pair is always declared. */
+  /**
+   * Whether registration activates the tool. The dispatcher quartet
+   * (tw_open, tw_next, tw_request_tool, tw_close) is always declared; a
+   * gated repo registers only the opener and the closer.
+   */
   activeByDefault?: boolean;
   execute(args: Record<string, any>, ctx: ToolContext): Promise<string> | Promise<ToolOutcome>;
 }
@@ -1256,6 +1258,8 @@ interface ToolContext {
   hasUI?: boolean;
   /** Put a yes/no question to the operator. Absent when the session has no UI. */
   confirm?(title: string, message: string): Promise<boolean>;
+  /** Best-effort operator notification, wired from the session UI when present. */
+  notify?(message: string, level: "info" | "warning" | "error"): void;
 }
 
 interface ToolInfo {
@@ -1656,7 +1660,12 @@ function refusedOuttext(reason: string, legalNext: string[]): string {
  */
 const FEEDBACK_TOOL = "submit_feedback";
 
-/** Every tool this package registers, by name: the requestable surface. */
+/**
+ * Every tool definition the factory owns, by name: the requestable surface,
+ * built from the ungated full set. The only consumer is tw_request_tool's
+ * unknown-tool refusal, and that tool registers only where the workflow
+ * runs, so the ungated basis is exact wherever the cache is read.
+ */
 let workflowToolNamesCache: Set<string> | undefined;
 function workflowToolNames(): Set<string> {
   workflowToolNamesCache ??= new Set(Object.keys(createTools()));
@@ -1721,7 +1730,7 @@ async function recordRequestFeedback(ctx: ToolContext, data: Record<string, unkn
   }
 }
 
-export function createTools(): Record<string, Tool> {
+export function createTools(gated: boolean = false): Record<string, Tool> {
   return {
     tw_show: def(
       "Show artifact frontmatter (map, planning task, or ticket).",
@@ -3238,8 +3247,26 @@ export function createTools(): Record<string, Tool> {
         "toolset (plus tw_close) only when they pass; a refused open discloses nothing. " +
         "A wayfinder open carries only the effort; a ticket open carries the effort and the target. " +
         "Also refuses a skill that is already open or conflicts with an open skill.",
-      buildOpenParameters(),
+      buildOpenParameters(gated),
       async (p, ctx) => {
+        // The gated restriction runs before every other check: in a work repo
+        // the opener opens only the non-gated registry entries (the schema
+        // already narrows to them), so a manifest name is refused in the
+        // opener's own refusal language whatever the tree looks like, with a
+        // notify in the spirit of the skill-invocation gate. Non-manifest
+        // names keep every existing behavior, including validateOpenArgs's
+        // unknown-skill error.
+        if (gated && GATED_SKILL_NAMES.includes(String(p.skill))) {
+          const skill = String(p.skill);
+          ctx.notify?.(`task-workflow is gated in this work repo; not opening ${skill}`, "warning");
+          const reason = gatedReason(skill);
+          const legalNext = openableWhenGated().map((s) => `tw_open ${s.name}`);
+          return outcome(refusedOuttext(reason, legalNext), {
+            opened: false,
+            reason,
+            legal_next: legalNext,
+          });
+        }
         validateOpenArgs(p);
         const entry = skillEntry(p.skill as string)!;
         const activeSet = requireActiveSet(ctx);
@@ -3615,6 +3642,44 @@ export function notifyConfigPath(home: string = homedir()): string {
   return join(home, ".unipi", "config", "notify", "config.json");
 }
 
+// ─── Gate-state registration sets and the workflow-enabled condition ──────
+
+/**
+ * The tw_* tools a gated (work) repo registers: the passive set. The phase
+ * skills are stripped and every writer stays unregistered there, but the
+ * opener, the closer, and the feedback wrapper stay declared: tw_open is the
+ * activation path for the one kept discipline (skill-creator, through the
+ * gated restriction), tw_close releases it, and tw_feedback is claimed by the
+ * shipped subagent allowlists (verified against pi-subagents 0.84.0: every
+ * plain name in an agent's tools allowlist becomes a required child tool, and
+ * a child whose allowlisted tool never registers fails its run at agent start
+ * with "requested unavailable child tools", so a missing peer costs the
+ * chain's runs, not just the feedback rows). The dispatcher companions
+ * tw_next and tw_request_tool and every other tw_* tool stay unregistered in
+ * a gated repo.
+ */
+const GATED_REGISTERED_TOOLS = ["tw_open", "tw_close", "tw_feedback"] as const;
+
+/**
+ * skill-creator's bundled script tools register in gated repos too, inactive
+ * exactly as in an ungated repo: the restricted tw_open discloses them there,
+ * and without registration the disclosure would activate nothing, which is
+ * the "kept in name only" failure.
+ */
+const SKILL_CREATOR_TOOL_NAMES = ["skill_validate", "skill_scaffold", "skill_discover"] as const;
+
+/**
+ * True when the task workflow is enabled in this repo. Today this coincides
+ * with the gate being inactive, but the two are separable concerns: the tool
+ * registration branches on the gate state, while the write lockdown and the
+ * transcript declared-set replay key on the workflow being enabled, with an
+ * explicit predicate instead of the raw gate boolean. Refusal texts and
+ * exemptions are unchanged either way.
+ */
+function workflowEnabled(gate: ResolveGateResult): boolean {
+  return !gate.active;
+}
+
 // ─── Pi extension entry point ──────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
@@ -3629,100 +3694,114 @@ export default function (pi: ExtensionAPI) {
       diagnostics: [message],
     };
   }
-  const tools = createTools();
+  const tools = createTools(gate.active);
 
-  if (!gate.active) {
-    for (const [name, def] of Object.entries(tools)) {
-      const params: Record<string, any> = {};
-      for (const [k, v] of Object.entries(def.args)) {
-        const vv = v as any;
-        if (vv.type === "string") {
-          params[k] = vv.enum
-            ? Type.Union((vv.enum as string[]).map((e: string) => Type.Literal(e)))
-            : Type.String({ description: vv.description ?? "" });
-        } else if (vv.type === "boolean") {
-          params[k] = Type.Boolean({ description: vv.description ?? "" });
-        } else if (vv.type === "array") {
-          params[k] = Type.Array(Type.String({ description: vv.items?.description ?? "" }));
-        }
-        if (vv.optional && params[k]) params[k] = Type.Optional(params[k]);
+  // ── Tool registration, split by gate state ─────────────────────────
+  // The set of names each state contributes is a pure function of the gate
+  // result: an ungated repo registers the full surface, a gated one the
+  // passive set plus skill-creator's bundled tools. notify_user is generic
+  // (it reads only the user's ntfy config) and registers in both states.
+  const registeredNames = gate.active
+    ? [...GATED_REGISTERED_TOOLS, ...SKILL_CREATOR_TOOL_NAMES]
+    : Object.keys(tools);
+  for (const name of registeredNames) {
+    const def = tools[name];
+    const params: Record<string, any> = {};
+    for (const [k, v] of Object.entries(def.args)) {
+      const vv = v as any;
+      if (vv.type === "string") {
+        params[k] = vv.enum
+          ? Type.Union((vv.enum as string[]).map((e: string) => Type.Literal(e)))
+          : Type.String({ description: vv.description ?? "" });
+      } else if (vv.type === "boolean") {
+        params[k] = Type.Boolean({ description: vv.description ?? "" });
+      } else if (vv.type === "array") {
+        params[k] = Type.Array(Type.String({ description: vv.items?.description ?? "" }));
       }
-
-      pi.registerTool({
-        name,
-        label: name.replace(/^tw_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        description: def.description,
-        parameters: def.parameters ?? Type.Object(params),
-        // The bypass-free gate: every workflow tool is direct and inactive
-        // by default, activated only by the opener, except the dispatcher
-        // pair (tw_open, tw_next), which is declared in every state.
-        exposure: "direct",
-        defaultActive: def.activeByDefault ?? false,
-        async execute(_id: string, args: any, _sig: any, _upd: any, ctx: any) {
-          const result = await def.execute(args, {
-            directory: ctx.cwd,
-            getActiveTools: () => pi.getActiveTools(),
-            setActiveTools: (toolNames: string[]) => pi.setActiveTools(toolNames),
-            ...(ctx.executeTool ? { executeTool: (n: string, a: unknown) => ctx.executeTool(n, a) } : {}),
-            ...(Array.isArray(ctx.tools) ? { tools: ctx.tools } : {}),
-            ...(typeof ctx.hasUI === "boolean" ? { hasUI: ctx.hasUI } : {}),
-            ...(ctx.ui?.confirm
-              ? { confirm: (title: string, message: string) => ctx.ui.confirm(title, message) }
-              : {}),
-          });
-          if (typeof result === "string") {
-            return { content: [{ type: "text", text: result }], details: {} };
-          }
-          return { content: [{ type: "text", text: result.text }], details: result.details };
-        },
-      });
+      if (vv.optional && params[k]) params[k] = Type.Optional(params[k]);
     }
 
-    // Write lockdown: the built-in write and edit are refused on
-    // docs/tasks/**; the named tw_* tools are the only writers of the tree.
-    // A tool_call hook, so it runs in every phase regardless of the active
-    // tool set.
-    pi.on("tool_call", guardTaskTreeWrites);
-  }
-
-  // ── notify_user tool ────────────────────────────────────────────────
-  if (!gate.active) {
     pi.registerTool({
-      name: "notify_user",
-      label: "Notify User",
-      description: "Send a notification to the user's configured ntfy platform.",
-      parameters: Type.Object({
-        title: Type.Optional(Type.String({ description: "Notification title" })),
-        message: Type.String({ description: "Message body" }),
-        priority: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("normal"), Type.Literal("high")])),
-      }),
-      async execute(_id: string, params: any) {
-        const cfgPath = notifyConfigPath();
-        if (!existsSync(cfgPath)) {
-          return { content: [{ type: "text", text: "No ntfy config found." }], details: { sent: false } };
+      name,
+      label: name.replace(/^tw_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      description: def.description,
+      parameters: def.parameters ?? Type.Object(params),
+      // The bypass-free gate: every workflow tool is direct and inactive
+      // by default, activated only by the opener, except the dispatcher
+      // quartet (tw_open, tw_next, tw_request_tool, tw_close), which is
+      // always declared; a gated repo registers only the opener and the
+      // closer of the quartet.
+      exposure: "direct",
+      defaultActive: def.activeByDefault ?? false,
+      async execute(_id: string, args: any, _sig: any, _upd: any, ctx: any) {
+        const result = await def.execute(args, {
+          directory: ctx.cwd,
+          getActiveTools: () => pi.getActiveTools(),
+          setActiveTools: (toolNames: string[]) => pi.setActiveTools(toolNames),
+          ...(ctx.executeTool ? { executeTool: (n: string, a: unknown) => ctx.executeTool(n, a) } : {}),
+          ...(Array.isArray(ctx.tools) ? { tools: ctx.tools } : {}),
+          ...(typeof ctx.hasUI === "boolean" ? { hasUI: ctx.hasUI } : {}),
+          ...(ctx.ui?.confirm
+            ? { confirm: (title: string, message: string) => ctx.ui.confirm(title, message) }
+            : {}),
+          ...(typeof ctx.ui?.notify === "function"
+            ? { notify: (message: string, level: "info" | "warning" | "error") => ctx.ui.notify(message, level) }
+            : {}),
+        });
+        if (typeof result === "string") {
+          return { content: [{ type: "text", text: result }], details: {} };
         }
-        try {
-          const cfg = JSON.parse(readText(cfgPath));
-          const ntfy = cfg.ntfy;
-          if (!ntfy?.enabled || !ntfy?.topic) {
-            return { content: [{ type: "text", text: "ntfy not enabled or no topic configured." }], details: { sent: false } };
-          }
-          const url = `${(ntfy.serverUrl || "https://ntfy.sh").replace(/\/+$/, "")}/${encodeURIComponent(ntfy.topic)}`;
-          const headers: Record<string, string> = { "Content-Type": "text/plain" };
-          if (ntfy.token) headers["Authorization"] = `Bearer ${ntfy.token}`;
-          if (params.title) headers["Title"] = params.title;
-          const pMap: Record<string, number> = { low: 2, normal: 3, high: 5 };
-          headers["Priority"] = String(pMap[params.priority] ?? 3);
-          const resp = await fetch(url, { method: "POST", headers, body: params.message });
-          return {
-            content: [{ type: "text", text: resp.ok ? "Notification sent." : `Failed (HTTP ${resp.status}).` }],
-            details: { sent: resp.ok },
-          };
-        } catch (e) {
-          return { content: [{ type: "text", text: `Notification error: ${(e as Error).message}` }], details: { sent: false } };
-        }
+        return { content: [{ type: "text", text: result.text }], details: result.details };
       },
     });
+  }
+
+  // ── notify_user tool (both gate states) ─────────────────────────────
+  pi.registerTool({
+    name: "notify_user",
+    label: "Notify User",
+    description: "Send a notification to the user's configured ntfy platform.",
+    parameters: Type.Object({
+      title: Type.Optional(Type.String({ description: "Notification title" })),
+      message: Type.String({ description: "Message body" }),
+      priority: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("normal"), Type.Literal("high")])),
+    }),
+    async execute(_id: string, params: any) {
+      const cfgPath = notifyConfigPath();
+      if (!existsSync(cfgPath)) {
+        return { content: [{ type: "text", text: "No ntfy config found." }], details: { sent: false } };
+      }
+      try {
+        const cfg = JSON.parse(readText(cfgPath));
+        const ntfy = cfg.ntfy;
+        if (!ntfy?.enabled || !ntfy?.topic) {
+          return { content: [{ type: "text", text: "ntfy not enabled or no topic configured." }], details: { sent: false } };
+        }
+        const url = `${(ntfy.serverUrl || "https://ntfy.sh").replace(/\/+$/, "")}/${encodeURIComponent(ntfy.topic)}`;
+        const headers: Record<string, string> = { "Content-Type": "text/plain" };
+        if (ntfy.token) headers["Authorization"] = `Bearer ${ntfy.token}`;
+        if (params.title) headers["Title"] = params.title;
+        const pMap: Record<string, number> = { low: 2, normal: 3, high: 5 };
+        headers["Priority"] = String(pMap[params.priority] ?? 3);
+        const resp = await fetch(url, { method: "POST", headers, body: params.message });
+        return {
+          content: [{ type: "text", text: resp.ok ? "Notification sent." : `Failed (HTTP ${resp.status}).` }],
+          details: { sent: resp.ok },
+        };
+      } catch (e) {
+        return { content: [{ type: "text", text: `Notification error: ${(e as Error).message}` }], details: { sent: false } };
+      }
+    },
+  });
+
+  // Write lockdown: the built-in write and edit are refused on docs/tasks/**
+  // wherever the workflow is enabled; the named tw_* tools are the only
+  // writers of the tree. It keys on the workflow-enabled condition, not on
+  // the gate branch: the lockdown and the passive tool registration are
+  // separable conditions. A tool_call hook, so it runs in every phase
+  // regardless of the active tool set.
+  if (workflowEnabled(gate)) {
+    pi.on("tool_call", guardTaskTreeWrites);
   }
 
   pi.on("session_start", async (event, ctx) => {
@@ -3730,25 +3809,33 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.notify(`task-workflow gate: ${diagnostic}`, "info");
     }
     for (const diagnostic of SKILL_NAME_DIAGNOSTICS) {
-      ctx.ui.notify(`task-workflow: ${diagnostic}`, "warning");
+      ctx.ui.notify(`task-workflow manifest: ${diagnostic}`, "warning");
     }
     if (gate.active) {
       ctx.ui.notify(`task-workflow gate active: ${gate.reason}`, "info");
-      return;
     }
-    // Persistence: replay the transcript's declared tool set on resume and
-    // fork, so the open state survives them.
-    await restoreDeclaredSetFromTranscript(pi, ctx, event.reason);
-    // Check required peer extensions
-    const tools = pi.getAllTools();
-    if (!tools.some((t) => t.name === "subagent")) {
+    // Persistence, workflow-bound: replay the transcript's declared tool set
+    // on resume and fork, so the open state survives them. The declared set
+    // is the open/close engine's state, which only exists where the workflow
+    // runs, so a gated repo skips the replay.
+    if (workflowEnabled(gate)) {
+      await restoreDeclaredSetFromTranscript(pi, ctx, event.reason);
+    }
+    // Check required peer extensions: both matter in a gated repo too, since
+    // tw_feedback registers there (claimed by the shipped subagent
+    // allowlists) and the subagents launch there.
+    const allTools = pi.getAllTools();
+    if (!allTools.some((t) => t.name === "subagent")) {
       ctx.ui.notify("pi-subagents is not installed. Install it with: pi install npm:pi-subagents", "warning");
     }
-    if (!tools.some((t) => t.name === "submit_feedback")) {
+    if (!allTools.some((t) => t.name === "submit_feedback")) {
       ctx.ui.notify(
-        "pi-telemetry is not installed. The shipped subagents list submit_feedback in their tools allowlist, " +
-          "and pi-subagents fails a child whose allowlisted tool is unavailable, so the ticket chain will not " +
-          "launch. Install it with: pi install npm:@y4shin/pi-telemetry",
+        "pi-telemetry is not installed. The shipped subagents list submit_feedback in their tools allowlist, and " +
+          "on pi-subagents 0.84.0 every plain name in that allowlist is a required child tool: a child whose " +
+          'allowlisted tool never registers fails its run at agent start with the error "requested unavailable ' +
+          'child tools". With pi-telemetry absent, the shipped chains do not run: every chain child fails at ' +
+          "agent start instead of recording workflow feedback. " +
+          "Install it with: pi install npm:@y4shin/pi-telemetry",
         "warning",
       );
     }
