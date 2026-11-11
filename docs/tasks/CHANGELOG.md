@@ -76,6 +76,19 @@ title: Task Changelog
 
 
 
+
+## 2026-11-11, Ship the user-invoked release skill (release-skill)
+
+A new `release` skill ships as a promoted, user-invoked skill, so the model cannot
+start a release on its own. It previews the pending changesets through the plan
+tool, reports the entries, versions, and changelog sections, applies only after
+confirmation, reports the apply's own answer rather than the preview, and then
+follows the repository's own release document as prose. A missing manifest or
+changeset config is reported with its reason and nothing is created, and an empty
+plan is reported as nothing to release with no bump and no consumed entry. The
+skill owns no branch operations and never stages a changeset to force a release.
+Its eight promoted-set surfaces are wired, including both skill-count pins.
+
 ## 2026-11-11, Rewire the phase prose, worker agents, and chain to the profiles (workflow-prose)
 
 The workflow's prose no longer states a branch model. Each phase states its branch
