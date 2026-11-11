@@ -446,6 +446,23 @@ describe("tw_write_changesets validation", () => {
     ]);
   });
 
+  test("writes at the workspace root even when the session sits in a member package", async () => {
+    const dir = fixtureWorkspace();
+
+    const { details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/beta", level: "patch", summary: "Fix the beta reader." }],
+      },
+      join(dir, "packages", "beta"),
+    );
+
+    // A changeset belongs to the repository's workspace root, which is where
+    // the command line tool reads and writes it too.
+    expect(changesetFiles(dir)).toHaveLength(1);
+    expect(details.written).toEqual([join(dir, ".changeset", changesetFiles(dir)[0])]);
+  });
+
   test("refuses a package name outside the workspace, naming the workspace packages", async () => {
     const dir = fixtureWorkspace();
 
