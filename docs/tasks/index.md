@@ -13,7 +13,6 @@ title: docs/tasks
 - build-eval-creator-skill
 - code-quality-cleanup
 - coding-taste
-- configurable-git-workflow
 - conventions-and-writer-cleanups
 - eval-scorer-feedback
 - migration-surface-polish
@@ -38,6 +37,7 @@ title: docs/tasks
 - build-task-workflow-doctor-skill
 - build-tdd-reference-skill
 - compare-to-mp-skills
+- configurable-git-workflow
 - enforced-workflow-v5
 - fix-integration-harness-auth-storage
 - fold-bundle-templates-into-refs
