@@ -91,6 +91,7 @@ const FULL_TOOL_SURFACE = [
   "tw_record_out_of_scope",
   "tw_write_architecture",
   "tw_write_changelog",
+  "tw_write_changesets",
   "tw_write_review",
   "tw_write_task_note",
   "tw_write_ticket_note",

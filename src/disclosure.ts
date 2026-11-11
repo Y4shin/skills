@@ -272,11 +272,15 @@ export const SKILL_REGISTRY: SkillEntry[] = [
     // discloser) is mutually exclusive with it. tw_write_architecture is
     // disclosed because the close reconciles the living architecture against
     // what actually landed: no earlier reconcile can see the last landing.
+    // tw_write_changesets is the effort's changeset writer: the close proposes
+    // one entry per change a user can observe and writes them here after the
+    // operator confirms.
     toolset: [
       "tw_archive_effort",
       "tw_finalizable",
       "tw_write_review",
       "tw_write_architecture",
+      "tw_write_changesets",
       "tw_add_ticket",
       "tw_create_effort",
       "tw_get",

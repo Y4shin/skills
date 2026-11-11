@@ -226,6 +226,7 @@ describe("task-workflow tools", () => {
         "tw_state_set",
         "tw_write_architecture",
         "tw_write_changelog",
+        "tw_write_changesets",
         "tw_write_review",
         "tw_write_section",
         "tw_write_spec",

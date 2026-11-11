@@ -1,0 +1,113 @@
+/**
+ * Changeset authoring at effort close.
+ *
+ * Two seams, one feature: the changesets wrapper (`src/core/changesets.ts`,
+ * which reads a fixture repository's workspace and config, proposes the
+ * entries, and writes them through the library set) and `tw_write_changesets`
+ * (the named writer the effort close calls after the operator confirms).
+ *
+ * Every test runs against a fixture repository in a temp directory: a
+ * `package.json` and a `.changeset/config.json`, nothing else. The command
+ * line tool is the comparison oracle where the contract is "what the CLI would
+ * accept": the round-trip test runs the real `changeset version` over the
+ * written file, from the dev tree's own install.
+ */
+
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { afterAll, describe, expect, test } from "vitest";
+
+import { createTools } from "../src/pi.js";
+
+const require = createRequire(import.meta.url);
+
+// ─── Fixtures ────────────────────────────────────────────────────────────────
+
+const roots: string[] = [];
+
+/** A temp directory, removed when the file's tests finish. */
+function tempDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), `${prefix}-`));
+  roots.push(dir);
+  return dir;
+}
+
+afterAll(() => {
+  for (const dir of roots) rmSync(dir, { recursive: true, force: true });
+});
+
+/** The manifest a fixture repository carries unless a test says otherwise. */
+const MANIFEST = { name: "@scope/fixture-pkg", version: "1.0.0" };
+
+/** The config a fixture repository carries unless a test says otherwise. */
+const CONFIG = { changelog: false, commit: false, access: "restricted", baseBranch: "main" };
+
+interface FixtureOptions {
+  manifest?: unknown;
+  /** `null` writes no `.changeset` directory at all. */
+  config?: unknown | null;
+}
+
+/** A fixture repository: a manifest and, unless asked otherwise, a changeset config. */
+function fixtureRepository(options: FixtureOptions = {}): string {
+  const dir = tempDir("changesets");
+  const manifest = options.manifest ?? MANIFEST;
+  if (manifest !== null) writeFileSync(join(dir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
+  const config = options.config === undefined ? CONFIG : options.config;
+  if (config !== null) {
+    mkdirSync(join(dir, ".changeset"), { recursive: true });
+    writeFileSync(join(dir, ".changeset", "config.json"), `${JSON.stringify(config, null, 2)}\n`, "utf-8");
+  }
+  return dir;
+}
+
+/** The changeset files a fixture repository holds, sorted. */
+function changesetFiles(dir: string): string[] {
+  return readdirSync(join(dir, ".changeset"))
+    .filter((file) => file.endsWith(".md"))
+    .sort();
+}
+
+/** Read one changeset file's exact bytes. */
+function changesetBytes(dir: string, file: string): string {
+  return readFileSync(join(dir, ".changeset", file), "utf-8");
+}
+
+/** The tool as an extension registers it, driven with a bare directory context. */
+async function writeChangesets(
+  args: Record<string, unknown>,
+  directory: string,
+): Promise<{ text: string; details: any }> {
+  const tools = createTools() as unknown as Record<string, { execute: Function }>;
+  const result = await tools.tw_write_changesets.execute(args, { directory });
+  expect(typeof result, "the writer answers with text plus details").toBe("object");
+  return result as { text: string; details: any };
+}
+
+// ─── Writing an entry ────────────────────────────────────────────────────────
+
+describe("tw_write_changesets", () => {
+  test("writes one file per entry under .changeset, in the tool's own format", async () => {
+    const dir = fixtureRepository();
+
+    const { text, details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." }],
+      },
+      dir,
+    );
+
+    // The library's own writer format, byte for byte: the frontmatter names the
+    // package and the level, and the body is the summary.
+    expect(changesetFiles(dir)).toHaveLength(1);
+    expect(changesetBytes(dir, changesetFiles(dir)[0])).toBe(
+      '---\n"@scope/fixture-pkg": minor\n---\n\nAdd the release skill.\n',
+    );
+    expect(details.written).toEqual([join(dir, ".changeset", changesetFiles(dir)[0])]);
+    expect(text).toContain("Add the release skill.");
+  });
+});

@@ -59,6 +59,7 @@ import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { FEEDBACK_KINDS, WORKFLOW_SOURCE, feedbackCall } from "./core/feedback.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 import { phaseBrief } from "./core/git-profile.js";
+import { writeEntries, type ChangeLevel, type ChangesetEntry } from "./core/changesets.js";
 
 // ─── Gated skill manifest sanity (session-start diagnostics) ──────────────────
 
@@ -3301,6 +3302,53 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         });
       },
       { activeByDefault: true },
+    ),
+
+    // ── the changeset writer: the effort close's named writer ──
+
+    tw_write_changesets: defStructured(
+      "Write the effort's pending changeset entries under .changeset/, in the changesets tool's own format " +
+        "and with formatting disabled. Call it from the effort close after the operator confirms the proposed " +
+        "entries: one entry per change a user of the package or product can observe, each naming a workspace " +
+        "package, a level (patch, minor, major), and the summary that becomes the entry body. An effort with " +
+        "nothing observable proposes the generic performance and stability patch instead, and an identical " +
+        "entry already staged is not repeated. Refuses, writing nothing, when the repository has no " +
+        "`.changeset/config.json`, when a package name is not in the workspace, and when a level is not one " +
+        "of the three.",
+      Type.Object({
+        effort: Type.String({ description: "The effort the entries belong to" }),
+        entries: Type.Optional(
+          Type.Array(
+            Type.Object({
+              package: Type.String({ description: "The workspace package name the entry versions" }),
+              level: Type.String({ description: "The bump level: patch, minor, or major" }),
+              summary: Type.String({ description: "The entry body: what a user can observe" }),
+            }),
+          ),
+        ),
+      }),
+      async (p, ctx) => {
+        const effort = typeof p.effort === "string" ? p.effort.trim() : "";
+        if (effort === "") throw new Error("tw_write_changesets needs a non-empty effort");
+        const requested: ChangesetEntry[] = (Array.isArray(p.entries) ? p.entries : []).map((entry: any) => ({
+          package: typeof entry?.package === "string" ? entry.package.trim() : "",
+          level: (typeof entry?.level === "string" ? entry.level.trim() : "") as ChangeLevel,
+          summary: typeof entry?.summary === "string" ? entry.summary.trim() : "",
+        }));
+        const result = await writeEntries(ctx.directory, { entries: requested });
+        const lines = [`Changesets for effort '${effort}':`];
+        for (const entry of result.entries) lines.push(`- ${entry.package} ${entry.level}: ${entry.summary}`);
+        for (const file of result.written) lines.push(`Wrote ${file}`);
+        if (result.diagnostics.length > 0) lines.push(`Diagnostics: ${result.diagnostics.join("; ")}`);
+        return outcome(lines.join("\n"), {
+          effort,
+          written: result.written,
+          entries: result.entries,
+          skipped: result.skipped,
+          generic: result.generic,
+          diagnostics: result.diagnostics,
+        });
+      },
     ),
 
     // ── disclosure core: the opener, the closer, and the router ──
