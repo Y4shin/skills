@@ -1737,7 +1737,7 @@ function changesetLegalNext(code: ChangesetsRefusalCode): string {
     case "invalid-config":
       return "fix .changeset/config.json, then retry tw_write_changesets";
     case "unreadable-staged":
-      return "fix or remove the changeset file the refusal quotes, then retry tw_write_changesets";
+      return "fix or remove the unreadable changeset file in .changeset, then retry tw_write_changesets";
     case "unknown-package":
       return "retry tw_write_changesets with a package name from the workspace list in the refusal";
     case "invalid-level":

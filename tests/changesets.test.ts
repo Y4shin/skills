@@ -258,7 +258,7 @@ describe("readStagedEntries", () => {
     expect(nothing.entries).toEqual([]);
 
     const broken = fixtureRepository();
-    writeFileSync(join(broken, ".changeset", "malformed.md"), "not a changeset at all\n", "utf-8");
+    writeFileSync(join(broken, ".changeset", "broken-entry.md"), "not a changeset at all\n", "utf-8");
     const read = await readWorkspace(broken);
     const unreadable = await readStagedEntries(read.workspace!);
 
@@ -502,18 +502,18 @@ describe("an unreadable staged entry", () => {
       `---\n"@scope/fixture-pkg": patch\n---\n\n${GENERIC_SUMMARY}\n`,
       "utf-8",
     );
-    writeFileSync(join(dir, ".changeset", "malformed.md"), "not a changeset at all\n", "utf-8");
+    writeFileSync(join(dir, ".changeset", "broken-entry.md"), "not a changeset at all\n", "utf-8");
 
     const { text, details } = await writeChangesets({ effort: "configurable-git-workflow" }, dir);
 
     expect(details.refusal.code).toBe("unreadable-staged");
     expect(details.written).toEqual([]);
     expect(text).toContain("Refused:");
-    expect(text).toContain("malformed");
+    expect(text).toContain("broken-entry.md");
     // The tree holds exactly what it held: the one generic entry and the file
     // the reader could not parse. A second, identical generic entry would bump
     // the package twice for one change, so no file may be written at all.
-    expect(changesetFiles(dir)).toEqual(["already-staged.md", "malformed.md"]);
+    expect(changesetFiles(dir)).toEqual(["already-staged.md", "broken-entry.md"]);
     expect(changesetFiles(dir).filter((file) => changesetBytes(dir, file).includes(GENERIC_SUMMARY))).toEqual([
       "already-staged.md",
     ]);
@@ -521,13 +521,13 @@ describe("an unreadable staged entry", () => {
 
   test("refuses the proposal too, so the close never shows a set the write would refuse", async () => {
     const dir = fixtureRepository();
-    writeFileSync(join(dir, ".changeset", "malformed.md"), "not a changeset at all\n", "utf-8");
+    writeFileSync(join(dir, ".changeset", "broken-entry.md"), "not a changeset at all\n", "utf-8");
 
     const { text, details } = await writeChangesets({ effort: "configurable-git-workflow", dry_run: true }, dir);
 
     expect(details.refusal.code).toBe("unreadable-staged");
     expect(details.entries).toEqual([]);
-    expect(changesetFiles(dir)).toEqual(["malformed.md"]);
+    expect(changesetFiles(dir)).toEqual(["broken-entry.md"]);
     expect(text).toContain("Refused:");
   });
 });
