@@ -307,6 +307,7 @@ separate bash block.
 
    ```bash
    set -e
+   # only when the brief's push policy allows it
    git push origin <effort-branch>
    ```
 

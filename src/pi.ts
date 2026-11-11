@@ -1243,9 +1243,11 @@ interface Tool {
   /** Explicit TypeBox parameter schema; replaces the args-record conversion when present. */
   parameters?: TSchema;
   /**
-   * Whether registration activates the tool. The dispatcher quartet
-   * (tw_open, tw_next, tw_request_tool, tw_close) is always declared; a
-   * gated repo registers only the opener and the closer.
+   * Whether registration activates the tool. The always-declared set
+   * (`ALWAYS_DECLARED`: tw_open, tw_next, tw_request_tool, tw_close,
+   * tw_phase_brief, and the release pair) needs no opener; every other tool is
+   * activated by one, and a gated repo registers the opener and the closer
+   * only.
    */
   activeByDefault?: boolean;
   /**
@@ -4244,11 +4246,11 @@ export default function (pi: ExtensionAPI) {
       label: name.replace(/^tw_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
       description: def.description,
       parameters: def.parameters ?? Type.Object(params),
-      // The bypass-free gate: every workflow tool is direct and inactive
-      // by default, activated only by the opener, except the dispatcher
-      // quartet (tw_open, tw_next, tw_request_tool, tw_close), which is
-      // always declared; a gated repo registers only the opener and the
-      // closer of the quartet.
+      // The bypass-free gate: a phase tool is direct and inactive by default,
+      // activated only by the opener, except the always-declared set
+      // (`ALWAYS_DECLARED`), which needs no opener; a gated repo registers the
+      // opener and the closer only, so a gated repo keeps the passive set it
+      // had before the set grew.
       exposure: "direct",
       defaultActive: def.activeByDefault ?? false,
       ...(def.executionMode !== undefined ? { executionMode: def.executionMode } : {}),

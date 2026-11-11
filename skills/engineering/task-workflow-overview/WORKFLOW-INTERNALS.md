@@ -196,12 +196,17 @@ The machine's rules, exactly:
 
 The disclosure scopes, outermost first:
 
-1. **Always declared.** `tw_open`, `tw_next`, `tw_close`, and
-   `tw_request_tool` are active in every state, including idle. The closer
-   rides along so a session that lost track of its open set gets a refusal
-   from the tool itself instead of a missing-tool error, and the requester
-   rides along because a phase that needs a tool must be able to ask for
-   it without already having it.
+1. **Always declared.** Seven tools are active in every state, including idle:
+   `tw_open`, `tw_next`, `tw_close`, `tw_request_tool`, `tw_phase_brief`,
+   `tw_release_plan`, and `tw_release_apply`. The closer rides along so a
+   session that lost track of its open set gets a refusal from the tool itself
+   instead of a missing-tool error, and the requester rides along because a
+   phase that needs a tool must be able to ask for it without already having
+   it. The phase brief is here for the mirror-image reason: a phase asks for
+   its branch step before it opens, so no opener can be the tool's activation
+   path. The release pair is here because no phase owns a release: `release`
+   is a user-invoked skill with no registry entry, so the plan and the apply
+   run outside the open-set machine.
 2. **Phase toolsets.** Disclosed by a passing `tw_open`, revoked by
    `tw_close` where no other open skill still needs them. Every toolset in
    the registry carries `tw_feedback`.
@@ -265,7 +270,7 @@ The toolsets, verbatim from the registry in disclosure order:
 | to-spec | tw_write_spec, tw_get, tw_list, tw_feedback |
 | to-tickets | tw_write_architecture, tw_add_ticket, tw_split_ticket, tw_dependency_levels, tw_frontier, tw_map_finalizable, tw_get, tw_list, tw_feedback |
 | implement-ticket | tw_frontier, tw_dependency_levels, tw_add_ticket, tw_split_ticket, tw_mark_done, tw_write_changelog, tw_resolve_uncertainty, tw_finalizable, tw_state, tw_state_set, tw_get, tw_list, tw_write_ticket_note, tw_write_architecture, tw_write_review, tw_feedback |
-| finalize-effort | tw_archive_effort, tw_finalizable, tw_write_review, tw_write_architecture, tw_add_ticket, tw_create_effort, tw_get, tw_list, tw_feedback |
+| finalize-effort | tw_archive_effort, tw_finalizable, tw_write_review, tw_write_architecture, tw_write_changesets, tw_add_ticket, tw_create_effort, tw_get, tw_list, tw_feedback |
 | skill-creator (nested) | tw_show, skill_validate, skill_scaffold, skill_discover, tw_feedback |
 
 ### What each tool does
@@ -298,6 +303,10 @@ The toolsets, verbatim from the registry in disclosure order:
 | tw_resolve_uncertainty | implement-ticket | records a ticket's uncertainty resolution beside its .work/uncertainty.md and deletes the file |
 | tw_finalizable | implement-ticket, finalize-effort | checks an artifact is ready to finalize (workflow_state done) |
 | tw_archive_effort | finalize-effort | checks the effort is finalizable, marks the map and its done items deprecated, moves the effort under archive/ as a unit, and updates the index |
+| tw_phase_brief | always declared | the read-only brief a branch-bearing phase asks for before it opens: it takes a phase or one of the five implementation agents plus an effort, and answers with the resolved required branch, the step that creates it, the trunk, the merge flag and push policy, and the phase's instruction text |
+| tw_write_changesets | finalize-effort | writes the effort's pending changeset entries under `.changeset/` after the operator confirms the proposal; the dry run is the proposal, and an identical staged entry is never repeated |
+| tw_release_plan | always declared | computes the release plan without writing: the pending entries, the versions they produce, and the changelog sections |
+| tw_release_apply | always declared | applies a plan: bumps the manifest, writes the changelog sections, and removes the consumed changeset files |
 | tw_context | setup-workflow | returns the artifact schema (plus an optional profile) |
 | skill_validate, skill_scaffold, skill_discover | skill-creator | the bundled script tools of the skill-authoring discipline, run directly, no shell |
 

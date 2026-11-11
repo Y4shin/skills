@@ -49,6 +49,17 @@ args, and relaunch once (a second refusal goes to the user; the failure
 toolbelt never applies). Point the state file at the ticket before the
 chain runs: `tw_state_set task <ticket-slug>`.
 
+**Branch step.** The phase is on the effort branch its brief reported, and the
+open refuses from anywhere else. For each ticket, ask the brief again with the
+ticket's slug and `skill: "tdd-worker"`: it answers with the branch that worker
+requires and the step that creates it off the effort branch. This phase, not a
+worker, creates and checks that branch out before it dispatches the chain, and
+the spawn guard blocks a dispatch made from anywhere else, so a dispatch that
+skips the step fails that step instead of starting a worker on the wrong
+branch. There is no landing branch: the chain merges the finished ticket's
+branch into the effort branch and deletes it. A profile that requires no branch
+says so, and the phase dispatches directly.
+
 > **Async dispatch (hard rule):** launch this chain with `async: true`. Never
 > run a blocking/foreground subagent. After dispatching, return control; Pi
 > wakes this session on completion or attention, so no wait call is needed;
@@ -61,7 +72,7 @@ budgetMinutes = { s: 15, m: 30, l: 45, xl: 60 }
 const timeoutMs = (budgetMinutes[size] || budgetMinutes.m) * 60 * 1000
 
 // The branch this phase creates and checks out before the dispatch, and the
-effort branch it is created off.
+// effort branch it is created off.
 effortBranch = <this phase's brief branch>
 ticketBranch = tw_phase_brief({ skill: "tdd-worker", effort: effortSlug, ticket: ticketSlug }).branch
 
@@ -114,8 +125,7 @@ done-marking through `tw_mark_done` (this phase is the one owner of the
 marking), the `tw_finalizable` check, the state pointer cleared with
 `tw_state_set task null`, and the push of `<effort-branch>` per the profile's
 policy. The chain already merged the ticket's branch into the effort branch
-and deleted it. It
-is not restated here, so the copies cannot drift again.
+and deleted it. It is not restated here, so the copies cannot drift again.
 
 The bug pipeline's own rule inside that sequence: a bug ticket has no
 bug-closure step, because `docs/bugs/` is a static archive in schema 5 and

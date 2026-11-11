@@ -121,13 +121,13 @@ decision, or when you type it.
 
 - [improve-codebase-architecture](./skills/engineering/improve-codebase-architecture/SKILL.md)
 - [intake](./skills/engineering/intake/SKILL.md)
+- [release](./skills/engineering/release/SKILL.md)
 - [setup-workflow](./skills/engineering/setup-workflow/SKILL.md)
 - [to-spec](./skills/engineering/to-spec/SKILL.md)
 - [to-tickets](./skills/engineering/to-tickets/SKILL.md)
 - [wayfinder](./skills/engineering/wayfinder/SKILL.md)
 - [grill-me](./skills/productivity/grill-me/SKILL.md)
 - [handoff](./skills/productivity/handoff/SKILL.md)
-- [release](./skills/engineering/release/SKILL.md)
 - [teach](./skills/productivity/teach/SKILL.md)
 - [wait-what](./skills/productivity/wait-what/SKILL.md)
 
@@ -184,9 +184,12 @@ changeset is, what the script refuses, the two-job workflow, and the 2FA
 approval that is what puts a version live.
 
 ```bash
-npm run changeset        # declare the bump
 ./scripts/release.sh     # version, commit, tag, push
 ```
+
+The changeset is not something a release writes: the effort close authors it
+(`/skill:finalize-effort`), and `/skill:release` reports the pending entries and
+applies the version bump and the root `CHANGELOG.md` from them.
 
 Cut the release from `main`. The script refuses any other branch, so merge
 your work first, and it refuses a `main` that is behind `origin/main`.

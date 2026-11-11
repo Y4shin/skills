@@ -18,7 +18,8 @@
 //     workflow: "<this skill's dir>/scripts/ticket-chain.js",
 //     args: { ... }                                // see below
 //   })
-//   wait({ id })                                   // then read the result
+//   // Then return control: Pi wakes the session with the result, so there is
+//   // no wait call to make.
 //
 // args (plain JSON, frozen; persisted as workflow evidence, so no secrets):
 //   effort      required   effort slug

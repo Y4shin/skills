@@ -271,19 +271,6 @@ function parseOriginFromConfig(
 }
 
 /**
- * Read gate configuration from global and project settings files.
- *
- * Reads:
- *   global:  $PI_CODING_AGENT_DIR/settings.json  or  ~/.pi/agent/settings.json
- *   project: <repo-root>/.pi/settings.json
- *
- * disableOnRepo patterns are read from the global file only. The local enable
- * override (force-on / force-off) is read from the project file only. Missing
- * or unreadable files are treated as empty (fail-open). The returned
- * `diagnostics` array records malformed JSON or invalid shape, but this
- * function never throws.
- */
-/**
  * The two settings paths every reader uses: the global file beside the agent
  * dir, and the project file under the repository root. One resolution, so the
  * repo gate and the git settings block can never disagree on where settings
@@ -305,6 +292,19 @@ function settingsPaths(
   return { globalPath, projectPath };
 }
 
+/**
+ * Read gate configuration from global and project settings files.
+ *
+ * Reads:
+ *   global:  $PI_CODING_AGENT_DIR/settings.json  or  ~/.pi/agent/settings.json
+ *   project: <repo-root>/.pi/settings.json
+ *
+ * disableOnRepo patterns are read from the global file only. The local enable
+ * override (force-on / force-off) is read from the project file only. Missing
+ * or unreadable files are treated as empty (fail-open). The returned
+ * `diagnostics` array records malformed JSON or invalid shape, but this
+ * function never throws.
+ */
 export function readGateConfig(
   cwd: string,
   deps: ReadGateConfigDeps = {},

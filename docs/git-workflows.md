@@ -59,8 +59,11 @@ sub-agent an optional branch template. Templates use `{effort}` and `{ticket}`.
 | `implement-preconditions`, `tdd-worker`, `slice-verifier`, `deviation-reporter`, `land-worker` | `ticket/{ticket}` |
 | `intake`, `wayfinder`, `to-spec`, `to-tickets` | none |
 
-It carries the merge flag `no-ff` and the push policy `always`, so the effort
+It carries the merge flag `--no-ff` and the push policy `always`, so the effort
 close merges the effort branch into the trunk with a merge commit and pushes.
+The flag is stored with its dashes, so the merge step the profile renders and
+the land task the chain composes both name a flag `git merge` accepts as it
+stands.
 
 **`flat`** carries nothing anywhere: no branch requirement for any phase or
 agent, no instructions, no gate, no merge flag, no push policy. Phases open on

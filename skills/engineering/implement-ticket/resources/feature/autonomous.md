@@ -205,8 +205,8 @@ knowledge harvest (which reads the ticket doc, all deviation reports, and the
 combined diff), the changelog through `tw_write_changelog`, the done-marking
 through `tw_mark_done` (this phase is the one owner of the marking), the
 `tw_finalizable` check, the state pointer cleared with `tw_state_set task
-null`, and the push of `<effort-branch>` per the profile's policy. It
-is not restated here, so the copies cannot drift again.
+null`, and the push of `<effort-branch>` per the profile's policy. It is not
+restated here, so the copies cannot drift again.
 
 A feature ticket has no bug-closure step: `docs/bugs/` is a static archive in
 schema 5 and the implementation ticket is the defect's record.

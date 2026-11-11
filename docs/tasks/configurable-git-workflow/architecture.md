@@ -162,8 +162,9 @@ the resolved ticket branch and the effort branch, and the landing-branch step
 disappears.
 
 The release skill enters the promoted set, which means the package manifest, both
-READMEs, the docs page for its bucket, and the structure tests that pin the
-promoted set. A new documentation page describes the git profiles, the settings
+READMEs, the docs page for its bucket, the structure pins that read the manifest,
+and the eight derived surfaces those pins force (per-ticket contract 7 names
+them). A new documentation page describes the git profiles, the settings
 keys, and the two bundled profiles.
 
 ## Additional architecture for implementation
@@ -211,7 +212,11 @@ behind the tools.
   and `subagent_launch` calls for the five implementation agents.
 - **Promoted-set seams.** The manifest array, both READMEs, the bucket docs page,
   and the structure tests that pin counts and file lists are the four places a
-  new promoted skill must appear.
+  new promoted skill must appear. Because those pins read the manifest, they pull
+  eight derived surfaces with them: the migration target's `promoted_skills`
+  list, the overview skill and its docs page, the two count assertions, the
+  skill-file list, and the surviving-tools allowlist (per-ticket contract 7 names
+  them all).
 
 ### Existing abstractions to build on
 
@@ -249,8 +254,13 @@ key, a profile loader for the two bundled files, and a resolver with two
 functions: one returning a phase brief and one returning a gate decision. Ships
 `tw_phase_brief`. The brief for `implement-ticket` under `default` names the
 effort branch and the step that creates it; the brief for a planning phase
-carries no branch; the brief under `flat` carries nothing for any phase. Later
-tickets consume the resolver rather than reading settings themselves.
+carries no branch; the brief under `flat` carries nothing for any phase. The
+tool answers for an implementation agent as well as for a phase: naming one of
+the five returns that agent's profile row, the ticket branch it requires, and
+the step that creates that branch off the effort branch, because the phase
+creates each ticket's branch before the chain starts. A name that is neither a
+phase nor a gated agent keeps the refusal. Later tickets consume the resolver
+rather than reading settings themselves.
 
 **5. Changeset authoring at effort close.** Exports the entry proposal used by
 `finalize-effort` and ships `tw_write_changesets`. Contract: an entry names the
@@ -292,7 +302,16 @@ because it documents behaviour that must exist first.
 **7. The release skill.** Adds the skill file, its bucket docs page, the manifest
 entry, and both README lines. Contract: user-invoked only, calls the plan tool,
 reports the plan, calls apply on confirmation, then follows the repository's
-release document as prose. Depends on 6.
+release document as prose. Those four surfaces are not the whole set: eight
+derived pins fire alongside them, each one reading the manifest rather than a
+list of its own, so a new promoted skill also needs a `promoted_skills` entry in
+`docs/migration-target.yaml`, a route in
+`skills/engineering/task-workflow-overview/SKILL.md`, a mention on
+`docs/engineering/task-workflow-overview.md`, a new count in each of the two
+`pi.skills.length` assertions, an entry in the `SKILL_FILES` list, an allowlist
+entry in `SURVIVING_TOOLS` for any `tw_*` tool its prose names, and the
+promoted-set docs-page tests to pass, which read the manifest for the page they
+require. Depends on 6.
 
 ### Testing seam summary
 
@@ -343,28 +362,3 @@ A phase brief never carries a second branch, because that would conflate two
 profile rows. A name that is neither a phase nor a gated agent keeps the existing
 refusal. This is a tool-surface addition the specification did not name, decided
 during implementation and recorded in the ticket's `## Divergence from plan`.
-
-## Corrections recorded during implementation
-
-### Trunk setting shape
-
-The specification's configuration snippet shows `trunk` with a duplicate JSON
-key (`develop` twice), which no parser can represent. The settled intent was three
-values: a switch for whether the repository has a develop branch, and a name for
-each of the two branches. Implementation resolves it without inventing a key:
-
-```json
-{ "trunk": { "develop": false, "main": "main" } }
-```
-
-`trunk.develop` is `false` or the develop branch's name. `false` means the
-repository has no develop branch, so the trunk is `trunk.main`. A string means the
-repository's develop branch is named that, so the trunk is `trunk.develop`. The
-defaults are `{ "develop": false, "main": "main" }`, and the resolved trunk is
-`trunk.develop === false ? trunk.main : trunk.develop`.
-
-Validation accepts `false` or a non-empty string and rejects anything else,
-including `true` and `""`, with a diagnostic that falls back to the default. A
-consumer that needs the trunk name uses the expression above rather than reading
-either key directly. The divergence is recorded in the ticket's
-`## Divergence from plan` section.

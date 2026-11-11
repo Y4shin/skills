@@ -98,7 +98,7 @@ export interface LoadedProfile {
 export function loadProfile(name: string, deps: ProfileDeps = {}): LoadedProfile {
   const dir = deps.profilesDir ?? bundledProfilesDir();
   const diagnostics: string[] = [];
-  const clean = typeof name === "string" ? name.trim() : "";
+  const clean = text(name);
   if (!PROFILE_NAME.test(clean)) {
     diagnostics.push(
       `unknown git profile '${String(name)}': a profile name is lowercase letters, digits, and dashes; ` +
@@ -222,7 +222,17 @@ function stringField(
   return undefined;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
+/**
+ * The two shape guards this module and the spawn guard both read arguments
+ * with, exported so a value is read the same way by the brief, the gate, and
+ * the block: the guard asks the resolver what a spawn requires, and both must
+ * agree on what a string and an object are.
+ */
+export function text(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

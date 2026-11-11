@@ -20,8 +20,10 @@
 
 import {
   decideFromBrief,
+  isObject,
   phaseBrief,
   readCheckout,
+  text,
   ticketBrief,
   type BriefDeps,
   type GateDecision,
@@ -183,12 +185,4 @@ function blockReason(decision: GateDecision): string {
       ? `create and check out ${decision.branch}`
       : `create and check out ${decision.branch} off ${decision.base}`;
   return `Refused: ${decision.reason}. Legal next: ${create}, then dispatch again.`;
-}
-
-function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

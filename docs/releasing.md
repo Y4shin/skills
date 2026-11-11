@@ -3,11 +3,24 @@
 A `vX.Y.Z` tag starts a release. A merge to `main` releases nothing: the tag is
 the consent.
 
+Authoring a changeset is not a release step. The effort close writes it, where
+the work lands: `/skill:finalize-effort` proposes one entry per change a user can
+observe and writes the entries once you confirm, so the pending files are under
+`.changeset/` before a release starts. A change that did not come through an
+effort gets its entry by hand, in the format below.
+
 ```bash
-npm run changeset        # declare the bump level and summary
+# the changesets for this work are already staged; nothing to author here
 git commit … && git push # land the work on main
 ./scripts/release.sh     # version, commit, tag, push
 ```
+
+`/skill:release` is the workflow's route over those pending entries: it reports
+them, the versions they produce, and the changelog section, then applies the
+version bump and the root `CHANGELOG.md` on your confirmation. The commit, the
+tag, and the push still come after that, and `scripts/release.sh` performs all
+three, but it runs the version step itself as well, so it wants a tree that has
+not been bumped already: run the script or the skill, not both in one release.
 
 Then approve the staged version with 2FA. Nothing reaches the registry before
 that approval.
@@ -27,7 +40,7 @@ the source of truth for its own half when this page disagrees:
 
 ## What a changeset is
 
-Every behaviour change adds one Markdown file under `.changeset/`:
+Every behaviour change carries one Markdown file under `.changeset/`:
 
 ```markdown
 ---
