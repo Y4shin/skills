@@ -87,11 +87,12 @@ function fixtureRepository(options: FixtureOptions = {}): string {
   const dir = tempDir("release");
   writeFileSync(join(dir, "package.json"), `${JSON.stringify(options.manifest ?? MANIFEST, null, 2)}\n`, "utf-8");
   const config = options.config === undefined ? CONFIG : options.config;
+  const entries = Object.entries(options.changesets ?? {});
+  if (config !== null || entries.length > 0) mkdirSync(join(dir, ".changeset"), { recursive: true });
   if (config !== null) {
-    mkdirSync(join(dir, ".changeset"), { recursive: true });
     writeFileSync(join(dir, ".changeset", "config.json"), `${JSON.stringify(config, null, 2)}\n`, "utf-8");
   }
-  for (const [name, body] of Object.entries(options.changesets ?? {})) {
+  for (const [name, body] of entries) {
     writeFileSync(join(dir, ".changeset", name), body, "utf-8");
   }
   for (const [name, body] of Object.entries(options.files ?? {})) {
@@ -418,5 +419,47 @@ describe("formatting", () => {
         "# @scope/fixture-pkg\n\n## 1.1.0\n\n### Minor Changes\n\n- Add the release skill.\n",
       );
     }
+  });
+});
+
+// ─── The named outcomes ─────────────────────────────────────────────────────
+
+describe("a repository the release cannot run in", () => {
+  test("a missing manifest, a missing changeset config, and an empty plan are three distinct outcomes", async () => {
+    const noManifest = tempDir("release-none");
+    const noConfig = fixtureRepository({ config: null });
+    const nothingPending = fixtureRepository({});
+    const manifest = bytes(join(nothingPending, "package.json"));
+
+    const results = [await plan(noManifest), await plan(noConfig), await plan(nothingPending)];
+    const codes = results.map((result) => result.details.refusal?.code);
+
+    // Three named outcomes, never one silent no-op: the operator's next move
+    // differs for each, so each has its own code and its own reason.
+    expect(codes).toEqual(["no-workspace", "no-config", "empty-plan"]);
+    expect(new Set(codes).size).toBe(3);
+    expect(results[0].text).toContain("Refused:");
+    expect(results[0].details.refusal.reason).toContain(noManifest);
+    expect(results[1].details.refusal.reason).toContain(join(noConfig, ".changeset", "config.json"));
+    expect(results[2].details.refusal.reason).toContain("nothing to release");
+    // A named outcome reports, it does not write.
+    expect(bytes(join(nothingPending, "package.json"))).toBe(manifest);
+    expect(bytes(join(nothingPending, "CHANGELOG.md"))).toBeNull();
+  });
+
+  test("the apply refuses the same way, and writes nothing either", async () => {
+    const noConfig = fixtureRepository({
+      config: null,
+      changesets: { "a-change.md": changeset("@scope/fixture-pkg", "minor", "Add the release skill.") },
+    });
+
+    const { text, details } = await apply(noConfig);
+
+    expect(details.refusal.code).toBe("no-config");
+    expect(details.written).toEqual([]);
+    expect(details.removed).toEqual([]);
+    expect(text).toContain("Refused:");
+    expect(changesetFiles(noConfig)).toEqual(["a-change.md"]);
+    expect(JSON.parse(bytes(join(noConfig, "package.json"))!).version).toBe("1.0.0");
   });
 });
