@@ -378,8 +378,10 @@ function effortBranchOf(profile: GitProfile, request: BriefRequest): string | nu
 
 /**
  * Resolve one branch template for this effort and ticket. A template that
- * needs a ticket the caller did not give resolves nothing, with a diagnostic:
- * a literal `{ticket}` never reaches a branch name.
+ * needs an effort or a ticket the caller did not give resolves nothing, with a
+ * diagnostic: a literal `{effort}` or `{ticket}` never reaches a branch name,
+ * and a caller that cannot supply a value refuses rather than gating on
+ * `effort/`.
  */
 function resolveTemplate(
   template: string | undefined,
@@ -394,7 +396,14 @@ function resolveTemplate(
     );
     return null;
   }
-  return template.replaceAll("{effort}", request.effort.trim()).replaceAll("{ticket}", ticket);
+  const effort = request.effort.trim();
+  if (template.includes("{effort}") && effort === "") {
+    diagnostics.push(
+      `the git profile's branch template '${template}' needs an effort, and none was given for '${request.name}'`,
+    );
+    return null;
+  }
+  return template.replaceAll("{effort}", effort).replaceAll("{ticket}", ticket);
 }
 
 /**
@@ -500,11 +509,111 @@ export function decideFromBrief(
   }
   return {
     pass: false,
-    reason:
-      `the checkout is on ${current === null ? "no branch (a detached HEAD)" : `'${current}'`}, ` +
-      `but '${name}' requires '${brief.branch}'`,
+    reason: checkoutRefusal(name, current, brief.branch, "requires"),
     ...shared,
   };
+}
+
+/**
+ * The one refusal sentence both gates answer with: the checkout it judged, the
+ * name that gates, and the branch that name requires. An open and a close word
+ * the same condition the same way, so they cannot drift.
+ */
+function checkoutRefusal(
+  name: string,
+  current: string | null,
+  required: string,
+  verb: "requires" | "closes on",
+): string {
+  return (
+    `the checkout is on ${current === null ? "no branch (a detached HEAD)" : `'${current}'`}, ` +
+    `but '${name}' ${verb} '${required}'`
+  );
+}
+
+// ─── The closing gate ───────────────────────────────────────────────────────
+
+/** What a phase's close gates on, resolved without reading the checkout. */
+export interface CloseBrief {
+  /** The profile that answered, after any fallback. */
+  profile: string;
+  /** The row's close-gate template; null when the row carries none. */
+  template: string | null;
+  /** The branch the close gates on, resolved; null when the row carries none or it did not resolve. */
+  branch: string | null;
+  /** The step that makes the close pass; null when the row gates nothing. */
+  step: string | null;
+  /** Diagnostics from reading the settings and the profile. */
+  diagnostics: string[];
+}
+
+/** Whether a phase may close on the checkout given, and the refusal that says what to do when it may not. */
+export interface CloseGateDecision {
+  pass: boolean;
+  /** The profile that answered, after any fallback. */
+  profile: string;
+  /** The branch the phase's close gates on, resolved; null when the row carries none. */
+  branch: string | null;
+  /** The branch the checkout is on, as given. */
+  currentBranch: string | null;
+  /** The step that makes the close pass, for the refusal's legal next call. */
+  step: string | null;
+  /** Why the close is refused; "" when it passes. */
+  reason: string;
+  /** Diagnostics from reading the settings and the profile. */
+  diagnostics: string[];
+}
+
+/**
+ * Resolve what one phase's close gates on.
+ *
+ * A close knows the phase it closes and, unlike an open, has no target to read
+ * a checkout against, so this answers from the profile alone and the caller
+ * reads the checkout only when a gate resolved. A row that carries no template
+ * gates nothing; a row whose template needs a value the close did not receive
+ * keeps its template and resolves no branch, so the caller can refuse rather
+ * than pass on a gate it could not evaluate.
+ */
+export function closeBrief(cwd: string, request: BriefRequest, deps: BriefDeps = {}): CloseBrief {
+  const diagnostics: string[] = [];
+  const settings = readGitSettings(cwd, deps);
+  diagnostics.push(...settings.diagnostics);
+  const loaded = loadProfile(settings.profile, deps);
+  diagnostics.push(...loaded.diagnostics);
+  const template = loaded.profile.phases[request.name]?.closeGate;
+  const profile = loaded.profile.name;
+  if (template === undefined || template.trim() === "") {
+    return { profile, template: null, branch: null, step: null, diagnostics };
+  }
+  const branch = resolveTemplate(template, request, diagnostics);
+  // The branch already exists: the phase's own open created it, so the close
+  // asks the checkout to move onto it rather than to create it.
+  const step = branch === null ? null : `check out ${branch}, then close ${request.name}`;
+  return { profile, template, branch, step, diagnostics };
+}
+
+/**
+ * The decision half of the closing gate, over an already-resolved close brief:
+ * a row that gates nothing passes, the gated branch passes, and any other
+ * checkout is a refusal naming both branches. Nothing is latched.
+ */
+export function decideFromClose(
+  brief: CloseBrief,
+  name: string,
+  currentBranch: string | null,
+): CloseGateDecision {
+  const current = currentBranch?.trim() ? currentBranch.trim() : null;
+  const shared = {
+    profile: brief.profile,
+    branch: brief.branch,
+    currentBranch: current,
+    step: brief.step,
+    diagnostics: brief.diagnostics,
+  };
+  if (brief.branch === null || current === brief.branch) {
+    return { pass: true, reason: "", ...shared };
+  }
+  return { pass: false, reason: checkoutRefusal(name, current, brief.branch, "closes on"), ...shared };
 }
 
 // ─── The git seam, and the text an open or close reports ─────────────────────
