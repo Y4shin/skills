@@ -190,6 +190,25 @@ describe("the generic patch", () => {
     expect(second.details.entries).toEqual([]);
   });
 
+  test("writes one entry when the same change is proposed twice in one call", async () => {
+    const dir = fixtureRepository();
+
+    const { details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [
+          { package: "@scope/fixture-pkg", level: "patch", summary: "Fix the writer's refusal text." },
+          { package: "@scope/fixture-pkg", level: "patch", summary: "Fix the writer's refusal text." },
+        ],
+      },
+      dir,
+    );
+
+    expect(changesetFiles(dir)).toHaveLength(1);
+    expect(details.written).toHaveLength(1);
+    expect(details.skipped).toHaveLength(1);
+  });
+
   test("drops a named change that is already staged, and writes the rest", async () => {
     const dir = fixtureRepository();
     writeFileSync(

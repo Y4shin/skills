@@ -119,7 +119,11 @@ async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<
   const entries: ChangesetEntry[] = [];
   const skipped: ChangesetEntry[] = [];
   for (const entry of requested) {
-    if (staged.entries.some((other) => identical(other, entry))) skipped.push(entry);
+    // Dedupe against what is staged and against what this call already
+    // accepted: one change is one entry, however often it is named.
+    const duplicate =
+      staged.entries.some((other) => identical(other, entry)) || entries.some((other) => identical(other, entry));
+    if (duplicate) skipped.push(entry);
     else entries.push(entry);
   }
   return {
