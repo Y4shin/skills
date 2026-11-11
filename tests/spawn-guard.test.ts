@@ -81,7 +81,7 @@ interface Stub {
 function stubPi(checkout: { branch: string }): Stub {
   const handlers: Record<string, Array<(...args: any[]) => any>> = {};
   const execCalls: Stub["execCalls"] = [];
-  const api = {
+  const api: any = {
     registerTool() {},
     on(event: string, handler: (...args: any[]) => any) {
       (handlers[event] ??= []).push(handler);
