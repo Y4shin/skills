@@ -101,6 +101,11 @@ refusal names and retry the same call.
   chain, or launching one of the five implementation agents, from another
   branch fails that step before any worker starts, with a reason naming the
   branch to create and its base.
+- **A checkout the session cannot read refuses the same way.** When no way to
+  run git is available, or git fails, the phase does not open and a gated spawn
+  is blocked, with a reason naming what could not be read, instead of passing
+  with a warning. The recovery is making the read work again: the command the
+  guard runs must answer the checked-out branch.
 - **Raw `bash` git commands are not intercepted.** The phase gate and the spawn
   block are the enforcement points, so a hand-run `git checkout` moves the
   checkout and the next guarded call judges it like any other.
