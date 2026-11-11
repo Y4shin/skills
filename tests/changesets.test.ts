@@ -14,14 +14,25 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
 
+import { parseChangesetFile } from "@changesets/parse";
+
 import { createTools } from "../src/pi.js";
-import { GENERIC_SUMMARY, proposeEntries } from "../src/core/changesets.js";
+import { GENERIC_SUMMARY, proposeEntries, readStagedEntries, readWorkspace } from "../src/core/changesets.js";
 
 const require = createRequire(import.meta.url);
 
@@ -260,6 +271,62 @@ describe("tw_write_changesets", () => {
     expect(changesetBytes(dir, changesetFiles(dir)[0])).toBe(
       '---\n"@scope/fixture-pkg": minor\n---\n\nAdd the release skill.\n',
     );
+  });
+});
+
+// ─── The round trip ──────────────────────────────────────────────────────────
+
+describe("the round trip", () => {
+  test("the written files parse back to the entries that were written", async () => {
+    const dir = fixtureWorkspace();
+    const entries = [
+      { package: "@scope/alpha", level: "minor" as const, summary: "Add the alpha reader." },
+      { package: "@scope/beta", level: "patch" as const, summary: "Fix the beta reader." },
+    ];
+
+    const { details } = await writeChangesets({ effort: "configurable-git-workflow", entries }, dir);
+    expect(details.written).toHaveLength(2);
+
+    // The changesets parser reads the files back: one release each, the level
+    // and the summary exactly as they were written. The file names are the
+    // tool's generated ids, so the comparison is keyed by package, not order.
+    const parsed = changesetFiles(dir).map((file) => parseChangesetFile(changesetBytes(dir, file)));
+    expect(Object.fromEntries(parsed.flatMap((entry) => entry.releases.map((r) => [r.name, r.type])))).toEqual({
+      "@scope/alpha": "minor",
+      "@scope/beta": "patch",
+    });
+    expect(parsed.map((entry) => entry.summary).sort()).toEqual(["Add the alpha reader.", "Fix the beta reader."]);
+
+    // And the seam's own reader returns the same entries, so the dedupe reads
+    // what the writer wrote.
+    const workspace = await readWorkspace(dir);
+    const staged = await readStagedEntries(workspace.packages);
+    expect(staged.entries.sort((a, b) => a.package.localeCompare(b.package))).toEqual(
+      [...entries].sort((a, b) => a.package.localeCompare(b.package)),
+    );
+  });
+
+  test("the command line tool accepts and consumes a written entry", async () => {
+    // The strongest oracle the ticket names: the real `changeset version`, run
+    // from the dev tree's own install over a copy of the fixture, bumps the
+    // manifest and consumes the file. A file the CLI rejected would fail here.
+    const dir = fixtureRepository();
+    await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." }],
+      },
+      dir,
+    );
+    const copy = tempDir("changesets-cli");
+    cpSync(dir, copy, { recursive: true });
+    const cli = join(dirname(require.resolve("@changesets/cli/package.json")), "bin.js");
+
+    const output = execFileSync(process.execPath, [cli, "version"], { cwd: copy, encoding: "utf-8" });
+
+    expect(output).toContain("All files have been updated");
+    expect(JSON.parse(readFileSync(join(copy, "package.json"), "utf-8")).version).toBe("1.1.0");
+    expect(readdirSync(join(copy, ".changeset")).filter((file) => file.endsWith(".md"))).toEqual([]);
   });
 });
 
