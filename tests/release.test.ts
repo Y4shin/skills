@@ -541,3 +541,94 @@ describe("the fixture comparison against the command line tool", () => {
     expect(bytes(join(ours, "packages", "alpha", "CHANGELOG.md"))).toContain(alpha.text);
   });
 });
+
+// ─── The prototype's failure paths ──────────────────────────────────────────
+
+describe("the failure paths the prototype found", () => {
+  test("a manifest without a version is refused, not silently met with an empty plan", async () => {
+    const dir = fixtureRepository({
+      manifest: { name: "@scope/fixture-pkg" },
+      changesets: { "a-change.md": changeset("@scope/fixture-pkg", "minor", "Add the release skill.") },
+    });
+
+    const { text, details } = await plan(dir);
+
+    // The library assembles an empty plan here without a word. It has to be a
+    // refusal naming the manifest, because the operator's next move is to fix
+    // the manifest, not to check their changesets.
+    expect(details.refusal.code).toBe("no-version");
+    expect(details.refusal.reason).toContain("no version field");
+    expect(details.versions).toEqual([]);
+    expect(details.changelog).toEqual([]);
+    expect(text).toContain("Refused:");
+
+    // And the apply refuses the same way, leaving the tree as it found it.
+    const applied = await apply(dir);
+    expect(applied.details.refusal.code).toBe("no-version");
+    expect(changesetFiles(dir)).toEqual(["a-change.md"]);
+    expect(bytes(join(dir, "CHANGELOG.md"))).toBeNull();
+    expect(bytes(join(dir, "package.json"))).toBe('{\n  "name": "@scope/fixture-pkg"\n}\n');
+  });
+
+  test("a private package the config does not version is an empty plan naming it", async () => {
+    const dir = fixtureRepository({
+      manifest: { ...MANIFEST, private: true },
+      changesets: { "a-change.md": changeset("@scope/fixture-pkg", "minor", "Add the release skill.") },
+    });
+
+    const { text, details } = await plan(dir);
+
+    // The default config skips private packages, so the plan is empty; the
+    // reason says why, and the config key that would change it.
+    expect(details.refusal.code).toBe("empty-plan");
+    expect(details.refusal.reason).toContain("@scope/fixture-pkg is private");
+    expect(details.refusal.reason).toContain("private packages");
+    expect(text).toContain("Refused:");
+    expect(text).toContain("nothing to release");
+  });
+
+  test("a private package the config does version is released", async () => {
+    // This repository's own config sets privatePackages.version, so the same
+    // fixture with that key releases instead of refusing.
+    const dir = fixtureRepository({
+      manifest: { ...MANIFEST, private: true },
+      config: { ...CONFIG, privatePackages: { version: true, tag: true } },
+      changesets: { "a-change.md": changeset("@scope/fixture-pkg", "minor", "Add the release skill.") },
+    });
+
+    const { details } = await apply(dir);
+
+    expect(details.refusal).toBeNull();
+    expect(JSON.parse(bytes(join(dir, "package.json"))!).version).toBe("1.1.0");
+    expect(changesetFiles(dir)).toEqual([]);
+  });
+
+  test("a malformed entry is refused, naming the changeset files to fix", async () => {
+    const dir = fixtureRepository({ changesets: { "broken-entry.md": "not a changeset at all\n" } });
+
+    const { text, details } = await plan(dir);
+
+    expect(details.refusal.code).toBe("unreadable-staged");
+    expect(details.refusal.reason).toContain(join(dir, ".changeset"));
+    expect(details.refusal.reason).toContain("broken-entry.md");
+    expect(text).toContain("Refused:");
+    // The unreadable file is left exactly as it was, and nothing else appears.
+    expect(changesetFiles(dir)).toEqual(["broken-entry.md"]);
+  });
+
+  test("an unknown package name is refused, naming the workspace's packages", async () => {
+    const dir = fixtureRepository({
+      changesets: { "unknown.md": changeset("@scope/not-a-package", "patch", "A change to nothing.") },
+    });
+
+    const { text, details } = await apply(dir);
+
+    // The libraries throw for this one; a tool answers with a refusal instead.
+    expect(details.refusal.code).toBe("unknown-package");
+    expect(details.refusal.reason).toContain("@scope/not-a-package");
+    expect(details.refusal.reason).toContain("@scope/fixture-pkg");
+    expect(text).toContain("Refused:");
+    expect(changesetFiles(dir)).toEqual(["unknown.md"]);
+    expect(bytes(join(dir, "CHANGELOG.md"))).toBeNull();
+  });
+});
