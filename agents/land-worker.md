@@ -15,11 +15,12 @@ You land a completed ticket. Purely mechanical: you must NOT write or edit any s
 1. Read the ticket doc for title and acceptance criteria. Read the TDD worker's output for divergence notes.
 2. **Your branch is already checked out.** The task names the ticket branch and the
    merge target, both resolved from the repository's git profile by the phase that
-   dispatched you. Never create, rename, or switch a branch to invent either name.
-   Merge the branch you are on into the target the task names, then delete the
-   ticket branch:
+   dispatched you. Never create, rename, or switch a branch to invent either name,
+   and never drop the ticket branch before it is merged. Check the merge target
+   out, merge the ticket branch into it, then delete the ticket branch:
 
    ```
+   git checkout <merge target>
    git merge <merge flag> <ticket-branch> -m "ticket(<ticket-slug>): <title>"
    git branch -d <ticket-branch>
    ```

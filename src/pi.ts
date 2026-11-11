@@ -3472,7 +3472,7 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
           });
         }
 
-        const lines = [`Phase brief for ${skill} in effort '${effort}' (profile: ${brief.profile}).`];
+        const lines = [`Brief for ${skill} in effort '${effort}' (profile: ${brief.profile}).`];
         if (brief.branch === null) {
           lines.push(`Required branch: none; '${skill}' requires no branch.`);
         } else {
@@ -3483,7 +3483,7 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         if (brief.closeInstructions !== "") lines.push(`Closing instructions: ${brief.closeInstructions}`);
         if (brief.merge !== null) {
           lines.push(
-            `Close-out: merge with '${brief.merge}' into the trunk (${brief.trunk}), ` +
+            `Merge step: '${brief.merge}' into the trunk (${brief.trunk}), ` +
               `trunk merge mode '${brief.trunkMerge}', push '${brief.push ?? "never"}'.`,
           );
         }
