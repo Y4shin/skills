@@ -163,6 +163,64 @@ describe("tw_write_changesets", () => {
   });
 });
 
+// ─── The changeset config ─────────────────────────────────────────────────────
+
+describe("tw_write_changesets without a changeset config", () => {
+  test("refuses, naming the missing config, and writes no file", async () => {
+    const dir = fixtureRepository({ config: null });
+
+    const { text, details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/fixture-pkg", level: "patch", summary: "A change." }],
+      },
+      dir,
+    );
+
+    expect(details.refusal.code).toBe("no-config");
+    expect(details.refusal.reason).toContain(join(dir, ".changeset", "config.json"));
+    expect(text).toContain("Refused:");
+    expect(text).toContain("changeset init");
+    // A refusal leaves the tree as it found it: no `.changeset` directory, so
+    // the repository does not look half-configured afterwards.
+    expect(existsSync(join(dir, ".changeset"))).toBe(false);
+  });
+
+  test("refuses a .changeset directory that holds changesets but no config", async () => {
+    const dir = fixtureRepository({ config: null });
+    mkdirSync(join(dir, ".changeset"), { recursive: true });
+    writeFileSync(join(dir, ".changeset", "staged-change.md"), '---\n"@scope/fixture-pkg": patch\n---\n\nOld.\n', "utf-8");
+
+    const { details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/fixture-pkg", level: "patch", summary: "A change." }],
+      },
+      dir,
+    );
+
+    expect(details.refusal.code).toBe("no-config");
+    expect(changesetFiles(dir)).toEqual(["staged-change.md"]);
+  });
+
+  test("refuses a config the changesets schema rejects, with the schema's reason", async () => {
+    const dir = fixtureRepository({ config: { baseBranch: 5 } });
+
+    const { text, details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/fixture-pkg", level: "patch", summary: "A change." }],
+      },
+      dir,
+    );
+
+    expect(details.refusal.code).toBe("invalid-config");
+    expect(details.refusal.reason).toContain("config.json");
+    expect(text).toContain("Refused:");
+    expect(changesetFiles(dir)).toEqual([]);
+  });
+});
+
 // ─── Validating an entry against the workspace ───────────────────────────────
 
 describe("tw_write_changesets validation", () => {

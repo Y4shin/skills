@@ -44,6 +44,7 @@
     "evals:regenerate": "node evals/regenerate.ts"
   },
   "dependencies": {
+    "@changesets/config": "^4.0.1",
     "@changesets/types": "^7.0.0",
     "@changesets/write": "^1.0.1",
     "@manypkg/get-packages": "^3.1.0",

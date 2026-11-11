@@ -15,11 +15,13 @@
  * found it.
  */
 
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { getPackages, type Packages } from "@manypkg/get-packages";
+import { validateConfig } from "@changesets/config";
 import { writeChangeset } from "@changesets/write";
-import type { Changeset } from "@changesets/types";
+import type { Changeset, Config } from "@changesets/types";
 
 /** The three bump levels a changeset names. */
 export const CHANGE_LEVELS = ["patch", "minor", "major"] as const;
@@ -85,8 +87,10 @@ export async function writeEntries(
   const read = await readWorkspace(cwd);
   if (read.refusal !== null) return refused(read.refusal, read.diagnostics);
   const workspace = read.packages;
+  const config = await readChangesetConfig(workspace);
+  if (config.refusal !== null) return refused(config.refusal, config.diagnostics);
   const invalid = validateEntries(request.entries, workspace);
-  if (invalid !== null) return refused(invalid, read.diagnostics);
+  if (invalid !== null) return refused(invalid, config.diagnostics);
 
   const written: string[] = [];
   for (const entry of request.entries) {
@@ -103,7 +107,7 @@ export async function writeEntries(
     entries: request.entries,
     skipped: [],
     generic: false,
-    diagnostics: read.diagnostics,
+    diagnostics: config.diagnostics,
   };
 }
 
@@ -117,9 +121,11 @@ export interface Workspace {
   /** The workspace root, the directory `.changeset/` lives in. */
   rootDir: string;
   /** Every package name the workspace holds, the root package included. */
-  packages: string[];
+  names: string[];
   /** The root package's name, or null when the root declares none. */
   root: string | null;
+  /** The reader's own view: the library calls that version a workspace take it. */
+  reader: Packages;
 }
 
 /** The workspace, or the reason it could not be read. */
@@ -143,20 +149,71 @@ export async function readWorkspace(cwd: string): Promise<WorkspaceRead> {
   } catch (e) {
     return {
       refusal: { code: "no-workspace", reason: `no workspace could be read from ${cwd}: ${(e as Error).message}` },
-      packages: { rootDir: cwd, packages: [], root: null },
+      packages: { rootDir: cwd, names: [], root: null, reader: null as unknown as Packages },
       diagnostics: [],
     };
   }
-  const names = packages.packages.map((entry) => entry.packageJson.name);
   return {
     refusal: null,
     packages: {
       rootDir: packages.rootDir,
-      packages: names,
+      names: packages.packages.map((entry) => entry.packageJson.name),
       root: packages.rootPackage?.packageJson.name ?? null,
+      reader: packages,
     },
     diagnostics: [],
   };
+}
+
+/** The config a repository's changesets setup carries, or the reason it has none. */
+export interface ConfigRead {
+  refusal: ChangesetsRefusal | null;
+  config: Config | null;
+  diagnostics: string[];
+}
+
+/**
+ * Read `.changeset/config.json` from the workspace root.
+ *
+ * A missing file is a refusal, never a fallback to the library's built-in
+ * default: the default would author and version a repository that has no
+ * changesets setup at all, and its changelog specifier points at the command
+ * line tool this package deliberately does not depend on.
+ */
+export async function readChangesetConfig(workspace: Workspace): Promise<ConfigRead> {
+  const path = join(workspace.rootDir, ".changeset", "config.json");
+  if (!existsSync(path)) {
+    return {
+      refusal: {
+        code: "no-config",
+        reason: `this repository has no changeset config at ${path}, so there is nothing to author changesets against`,
+      },
+      config: null,
+      diagnostics: [],
+    };
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path, "utf-8"));
+  } catch (e) {
+    return {
+      refusal: { code: "invalid-config", reason: `${path} is not readable JSON: ${(e as Error).message}` },
+      config: null,
+      diagnostics: [],
+    };
+  }
+  const parsed = validateConfig(raw, workspace.reader);
+  if (parsed.errors !== undefined) {
+    return {
+      refusal: {
+        code: "invalid-config",
+        reason: `${path} is not a valid changeset config: ${parsed.errors.join("; ")}`,
+      },
+      config: null,
+      diagnostics: parsed.warnings,
+    };
+  }
+  return { refusal: null, config: parsed.config, diagnostics: parsed.warnings };
 }
 
 /**
@@ -171,12 +228,12 @@ function validateEntries(entries: ChangesetEntry[], workspace: Workspace): Chang
         reason: `'${String(entry.level)}' is not a changeset level: use ${CHANGE_LEVELS.join(", ")}`,
       };
     }
-    if (!workspace.packages.includes(entry.package)) {
+    if (!workspace.names.includes(entry.package)) {
       return {
         code: "unknown-package",
         reason:
           `'${entry.package}' is not a package in this workspace for entry '${entry.summary}'` +
-          `: the workspace packages are ${workspace.packages.join(", ")}`,
+          `: the workspace packages are ${workspace.names.join(", ")}`,
       };
     }
   }
