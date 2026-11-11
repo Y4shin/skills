@@ -70,6 +70,20 @@ title: Task Changelog
 
 
 
+
+## 2026-11-11, Propose and write changesets at effort close (changeset-authoring)
+
+Effort close can now write the changeset entries a release consumes. One module
+wraps the changesets library set: it reads the workspace and the changeset
+config, reads what is already staged, proposes entries, and writes them with
+formatting disabled so no formatter runs and the bytes are the library's own. A
+new `tw_write_changesets` tool is the named writer, disclosed to the effort close
+only, and refusals render in the workflow's existing shape. An effort with nothing
+user-visible proposes a generic performance and stability patch, deduped against
+what is already staged. Two gaps are recorded for a follow-up: the proposal has no
+pre-write surface yet, and the dedupe cannot see staged entries when one of them
+is malformed.
+
 ## 2026-11-11, Resolve git settings and profiles into phase briefs (profile-data-and-phase-briefs)
 
 Git behaviour now comes from data instead of prose. A repository's
