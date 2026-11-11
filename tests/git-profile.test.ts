@@ -472,9 +472,13 @@ describe("tw_phase_brief", () => {
   }
 
   /** The tool as an extension registers it: driven with a bare directory context. */
-  async function brief(args: Record<string, unknown>, directory: string): Promise<{ text: string; details: any }> {
+  async function brief(
+    args: Record<string, unknown>,
+    directory: string,
+    extra: Record<string, unknown> = {},
+  ): Promise<{ text: string; details: any }> {
     const tools = createTools() as unknown as Record<string, { execute: Function }>;
-    const result = await tools.tw_phase_brief.execute(args, { directory });
+    const result = await tools.tw_phase_brief.execute(args, { directory, ...extra });
     expect(typeof result, "the brief tool answers with text plus details").toBe("object");
     return result as { text: string; details: any };
   }
@@ -601,5 +605,90 @@ describe("tw_phase_brief", () => {
     for (const entry of SKILL_REGISTRY) {
       expect(entry.toolset, entry.name).not.toContain("tw_phase_brief");
     }
+  });
+});
+
+// ─── The push step the profile's policy renders ─────────────────────────────
+
+/**
+ * The push is a step the brief renders from the profile's push policy, not a
+ * command the phase's prose carries: `always` names the command for the branch
+ * the phase is on, and `never` (or a profile with no policy at all) names none,
+ * so the step and the prose can never disagree about whether anything is pushed.
+ */
+describe("the push step follows the profile's push policy", () => {
+  function sessionDir(settings: Record<string, unknown> = {}): string {
+    const dir = tempDir("push-repo");
+    writeSettings(join(dir, ".pi", "settings.json"), { taskWorkflow: settings });
+    return dir;
+  }
+
+  /** A profile directory holding the bundled files plus one custom profile. */
+  function customProfiles(push: unknown): string {
+    const dir = profileFixtureDir();
+    writeSettings(join(dir, "custom.json"), {
+      name: "custom",
+      ...(push === undefined ? {} : { push }),
+      phases: { "implement-ticket": { branch: "effort/{effort}" }, "finalize-effort": { branch: "effort/{effort}" } },
+    });
+    return dir;
+  }
+
+  async function brief(args: Record<string, unknown>, dir: string, profilesDir?: string) {
+    const tools = createTools() as unknown as Record<string, { execute: Function }>;
+    const result = (await tools.tw_phase_brief.execute(
+      args,
+      profilesDir === undefined ? { directory: dir } : { directory: dir, profilesDir },
+    )) as { text: string; details: any };
+    return result;
+  }
+
+  test("an always policy puts the push command in the step, for the branch the phase is on", async () => {
+    const { text, details } = await brief(
+      { skill: "implement-ticket", effort: "live-effort", ticket: "one" },
+      sessionDir(),
+    );
+
+    expect(details.push).toBe("always");
+    expect(text).toContain("Push step: git push origin effort/live-effort.");
+  });
+
+  test("a never policy renders no push command at all", async () => {
+    const { text, details } = await brief(
+      { skill: "implement-ticket", effort: "live-effort", ticket: "one" },
+      sessionDir({ git: { profile: "custom" } }),
+      customProfiles("never"),
+    );
+
+    expect(details.push).toBe("never");
+    expect(text).toContain("Push step: none; the profile's push policy is 'never', so nothing is pushed.");
+    expect(text, "no push command appears under a never policy").not.toContain("git push");
+  });
+
+  test("a profile that names no push policy renders none either, and still names the branch", async () => {
+    const { text, details } = await brief(
+      { skill: "finalize-effort", effort: "live-effort" },
+      sessionDir({ git: { profile: "flat" } }),
+    );
+
+    expect(details.push).toBeNull();
+    expect(text).toContain("Push step: none");
+    expect(text).not.toContain("git push");
+  });
+
+  test("a phase that requires no branch has nothing to push, and says so", async () => {
+    const { text } = await brief({ skill: "wayfinder", effort: "live-effort" }, sessionDir());
+
+    expect(text).toContain("Push step: none; 'wayfinder' requires no branch, so there is nothing to push.");
+    expect(text).not.toContain("git push");
+  });
+
+  test("an implementation agent's brief carries no push step: the phase pushes, not the worker", async () => {
+    const { text } = await brief(
+      { skill: "tdd-worker", effort: "live-effort", ticket: "one" },
+      sessionDir(),
+    );
+
+    expect(text).not.toContain("Push step");
   });
 });

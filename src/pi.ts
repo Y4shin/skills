@@ -1636,6 +1636,26 @@ async function closeBranchGate(
   return { gate, refusal: { reason: decision.reason, legalNext: decision.step === null ? [] : [decision.step] } };
 }
 
+/**
+ * The push step a profile's push policy renders: the command for the branch the
+ * phase is on when the policy allows a push, and no command at all when it does
+ * not. A profile that names no policy pushes nothing, which reads as 'never',
+ * the same word the merge line uses.
+ *
+ * The policy reaches the phase as data, so no phase file carries a push command
+ * and none can contradict the policy: the brief either renders one or renders
+ * none.
+ */
+function pushStepLine(brief: PhaseBrief, skill: string): string {
+  if (brief.push !== "always") {
+    return `Push step: none; the profile's push policy is '${brief.push ?? "never"}', so nothing is pushed.`;
+  }
+  if (brief.branch === null) {
+    return `Push step: none; '${skill}' requires no branch, so there is nothing to push.`;
+  }
+  return `Push step: git push origin ${brief.branch}.`;
+}
+
 /** The shared unknown-effort refusal every effort-taking phase starts with. */
 function requireLiveEffort(root: string, effort: string): GateRefusal | null {
   if (liveEffortDir(root, effort) !== null) return null;
@@ -3555,6 +3575,9 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
               `trunk merge mode '${brief.trunkMerge}', push '${brief.push ?? "never"}'.`,
           );
         }
+        // The push is a step, not a command the phase's prose fixes: the
+        // policy renders it, so a profile that forbids a push renders none.
+        if (brief.kind === "phase") lines.push(pushStepLine(brief, skill));
         if (brief.diagnostics.length > 0) lines.push(`Diagnostics: ${brief.diagnostics.join("; ")}`);
 
         return outcome(lines.join("\n"), {
