@@ -3886,10 +3886,10 @@ async function guardTaskTreeWrites(
 
 /**
  * The spawn guard: refuses a dispatch of an implementation sub-agent when the
- * checkout is not the ticket branch that child commits on, so the wrong-branch
+ * checkout is not the ticket branch that child commits on, so wrong-branch
  * work never starts. It rides the same `tool_call` hook as the write lockdown
- * (one handler, so nothing but a spawn is looked at twice) and reads the
- * checkout through the session's own exec, the seam the openers already use.
+ * (one handler, so no call is judged twice) and reads the checkout through the
+ * session's own exec, the seam the openers already use.
  *
  * A block is returned, never thrown: the call becomes an error tool result, so
  * a blocked child fails its step and the session continues.
