@@ -15,7 +15,7 @@
  * found it.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { getPackages, type Packages } from "@manypkg/get-packages";
@@ -116,6 +116,12 @@ async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<
   }
 
   const staged = await readStagedEntries(workspace);
+  // A staged set that cannot be read is a refusal, not an empty set: the dedupe
+  // is the only thing standing between the operator and a duplicate entry, and
+  // a blind dedupe writes the second copy of exactly what it could not see.
+  if (staged.refusal !== null) {
+    return refusedProposal(staged.refusal, [...config.diagnostics, ...staged.diagnostics]);
+  }
   const entries: ChangesetEntry[] = [];
   const skipped: ChangesetEntry[] = [];
   for (const entry of requested) {
@@ -135,7 +141,6 @@ async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<
     diagnostics: [...config.diagnostics, ...staged.diagnostics],
   };
 }
-
 /** A proposal that writes nothing, carrying the refusal and what the reads noted. */
 function refusedProposal(refusal: ChangesetsRefusal, diagnostics: string[]): ResolvedProposal {
   return { refusal, workspace: null, entries: [], skipped: [], generic: false, diagnostics };
@@ -172,15 +177,18 @@ export async function readStagedEntries(workspace: Workspace): Promise<StagedRea
   try {
     staged = await readChangesets(workspace.rootDir);
   } catch (e) {
-    // The library's message quotes the offending content, so the operator can
-    // find the file; it is flattened to one line for the refusal text.
+    // The library's message quotes the offending content but never names the
+    // file, so the refusal names the directory and the changeset files in it:
+    // the operator has to edit one of them, and this is the shortest honest
+    // path from the message to the file.
+    const dir = join(workspace.rootDir, ".changeset");
     const detail = (e as Error).message.replace(/\s+/g, " ").trim();
     return {
       entries: [],
       refusal: {
         code: "unreadable-staged",
         reason:
-          `the staged changesets in ${join(workspace.rootDir, ".changeset")} could not be read, ` +
+          `the staged changesets in ${dir} could not be read${stagedFiles(dir)}, ` +
           `so no entry can be checked against what is already staged: ${detail}`,
       },
       diagnostics: [],
@@ -196,6 +204,22 @@ export async function readStagedEntries(workspace: Workspace): Promise<StagedRea
     }
   }
   return { entries, refusal: null, diagnostics: [] };
+}
+
+/**
+ * The changeset files a directory holds, rendered for a refusal, or the empty
+ * string when the listing cannot be read either. A directory listing is not a
+ * parse: it only gives the operator the set of files to look at.
+ */
+function stagedFiles(dir: string): string {
+  try {
+    const files = readdirSync(dir)
+      .filter((file) => file.endsWith(".md"))
+      .sort();
+    return files.length > 0 ? ` (the changeset files there are ${files.join(", ")})` : "";
+  } catch {
+    return "";
+  }
 }
 
 /** Why a changeset call was refused. Every code is a named outcome. */

@@ -485,6 +485,46 @@ describe("the round trip", () => {
   });
 });
 
+// ─── The malformed staged entry, as a regression ─────────────────────────────
+
+describe("an unreadable staged entry", () => {
+  test("refuses the write, and no second identical generic entry appears", async () => {
+    const dir = fixtureRepository();
+    writeFileSync(
+      join(dir, ".changeset", "already-staged.md"),
+      `---\n"@scope/fixture-pkg": patch\n---\n\n${GENERIC_SUMMARY}\n`,
+      "utf-8",
+    );
+    writeFileSync(join(dir, ".changeset", "malformed.md"), "not a changeset at all\n", "utf-8");
+
+    const { text, details } = await writeChangesets({ effort: "configurable-git-workflow" }, dir);
+
+    expect(details.refusal.code).toBe("unreadable-staged");
+    expect(details.written).toEqual([]);
+    expect(text).toContain("Refused:");
+    expect(text).toContain("malformed");
+    // The tree holds exactly what it held: the one generic entry and the file
+    // the reader could not parse. A second, identical generic entry would bump
+    // the package twice for one change, so no file may be written at all.
+    expect(changesetFiles(dir)).toEqual(["already-staged.md", "malformed.md"]);
+    expect(changesetFiles(dir).filter((file) => changesetBytes(dir, file).includes(GENERIC_SUMMARY))).toEqual([
+      "already-staged.md",
+    ]);
+  });
+
+  test("refuses the proposal too, so the close never shows a set the write would refuse", async () => {
+    const dir = fixtureRepository();
+    writeFileSync(join(dir, ".changeset", "malformed.md"), "not a changeset at all\n", "utf-8");
+
+    const { text, details } = await writeChangesets({ effort: "configurable-git-workflow", dry_run: true }, dir);
+
+    expect(details.refusal.code).toBe("unreadable-staged");
+    expect(details.entries).toEqual([]);
+    expect(changesetFiles(dir)).toEqual(["malformed.md"]);
+    expect(text).toContain("Refused:");
+  });
+});
+
 // ─── The changeset config ─────────────────────────────────────────────────────
 
 describe("tw_write_changesets without a changeset config", () => {
