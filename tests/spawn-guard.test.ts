@@ -130,7 +130,53 @@ afterAll(() => {
   else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 });
 
-// ─── The outer call: identity in the chain's args ────────────────────────────
+// ─── The per-child launch: identity in the step key ──────────────────────────
+
+describe("the per-child subagent_launch call", () => {
+  test("is blocked on the same predicate, with the ticket read from the step key", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "effort/an-effort" });
+
+    const result = await fire(stub, dir, "subagent_launch", launchCall("tdd@one", "tdd-worker"));
+
+    expect(result, "the child never starts").toMatchObject({ block: true });
+    // The launch carries no effort slug, so the base reads as "the effort
+    // branch": the required branch and the checkout are still named exactly.
+    expect(result.reason).toBe(
+      "Refused: the checkout is on 'effort/an-effort', but 'tdd-worker' requires 'ticket/one'. " +
+        "Legal next: create and check out ticket/one off the effort branch, then dispatch again.",
+    );
+  });
+
+  test("every implementation agent is blocked on the launch surface", async () => {
+    const dir = sessionDir();
+    for (const agent of [
+      "implement-preconditions",
+      "tdd-worker",
+      "slice-verifier",
+      "deviation-reporter",
+      "land-worker",
+    ]) {
+      const stub = stubPi({ branch: "main" });
+      const result = await fire(stub, dir, "subagent_launch", launchCall(`step@one`, agent));
+      expect(result, `${agent} is blocked`).toMatchObject({ block: true });
+      expect(result.reason).toContain("requires 'ticket/one'");
+    }
+  });
+
+  test("passes on the ticket branch, the same way the outer call does", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "ticket/one" });
+
+    const result = await fire(stub, dir, "subagent_launch", launchCall("verify@one", "slice-verifier"));
+
+    expect(result).toBeUndefined();
+  });
+});
+
+// ─── Pass-through: anything that is not a gated implementation spawn ─────────
+
+// ─── The outer call: identity in the args, and the agent name ────────────────
 
 describe("the outer subagent call", () => {
   const identity = { effort: "an-effort", ticket: "one" };

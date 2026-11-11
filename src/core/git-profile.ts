@@ -334,8 +334,14 @@ function isTicketTemplate(template: string): boolean {
   return template.includes("{ticket}") && !template.includes("{effort}");
 }
 
-/** The profile's own effort-branch template, resolved, when it carries one. */
+/**
+ * The profile's own effort-branch template, resolved, when it carries one. A
+ * caller that has no effort slug (a workflow child's launch carries only the
+ * ticket) resolves nothing, so the base reads as "the effort branch" instead
+ * of a branch named `effort/`.
+ */
 function effortBranchOf(profile: GitProfile, request: BriefRequest): string | null {
+  if (request.effort.trim() === "") return null;
   const template = Object.values(profile.phases).find(
     (row) => row.branch !== undefined && row.branch.includes("{effort}") && !isTicketTemplate(row.branch),
   )?.branch;
