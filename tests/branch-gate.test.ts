@@ -187,4 +187,22 @@ describe("the open refuses on the wrong branch", () => {
         "Legal next: create and check out effort/live-effort off the trunk (main), then open implement-ticket.",
     );
   });
+
+  test("the effort close refuses on the same condition", async () => {
+    const dir = sessionDir();
+    const active: string[] = [];
+
+    const { text, details } = await open(
+      { skill: "finalize-effort", effort: "live-effort" },
+      openCtx(dir, active, fakeCheckout("main").git),
+    );
+
+    expect(details.opened).toBe(false);
+    expect(active).toEqual([]);
+    expect(details.required_branch).toBe("effort/live-effort");
+    expect(text).toBe(
+      "Refused: the checkout is on 'main', but 'finalize-effort' requires 'effort/live-effort'. " +
+        "Legal next: create and check out effort/live-effort off the trunk (main), then open finalize-effort.",
+    );
+  });
 });
