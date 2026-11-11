@@ -75,6 +75,21 @@ title: Task Changelog
 
 
 
+
+## 2026-11-11, Rewire the phase prose, worker agents, and chain to the profiles (workflow-prose)
+
+The workflow's prose no longer states a branch model. Each phase states its branch
+step and the gate that follows it, the five worker agents expect their branch to be
+already checked out, and the chain merges a ticket branch into the effort branch
+using names and a merge flag it is handed. The effort close lands the effort branch
+on the trunk with the profile's flag, or prints the pull-request instruction when a
+repository declares that it cannot merge locally. A new prose guard test reads every
+phase file, resource, chain script, and worker agent and fails on a branch literal,
+an interpolation, a template placeholder, a trunk name, or a merge flag, so the
+hardcoded model cannot creep back. A new docs page covers the two profiles, the
+three settings keys, and the refusal behaviour. The change also caught a data
+defect: the bundled profile's merge value lacked its dashes.
+
 ## 2026-11-11, Turn pending changesets into a version bump and a changelog through tools (release-mechanics)
 
 Pending changesets now become a version bump and a root changelog through two
