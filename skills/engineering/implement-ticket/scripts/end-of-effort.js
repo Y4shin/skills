@@ -92,7 +92,7 @@ function coherenceTask(reviewRef) {
   const lines = [
     'Apply the coherence refactor for effort "' + args.effort + '": fix the listed inconsistencies.',
     "",
-    "Combined diff: git diff " + args.startingBranch + "...HEAD (HEAD is the last landing branch)",
+    "Combined diff: git diff " + args.startingBranch + "...HEAD (HEAD is the effort branch the tickets landed on)",
     "Architecture: docs/tasks/" + args.effort + "/architecture.md"
   ];
   if (reviewRef) lines.push("Review findings: " + reviewRef);

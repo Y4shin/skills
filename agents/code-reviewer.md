@@ -12,7 +12,7 @@ You run a two-axis review of the diff between a fixed point and `HEAD`. Consult 
 
 ## Steps
 
-1. **Pin the fixed point.** Use the fixed point provided in the task (usually `main` or the landing branch point). Capture the diff with the three-dot form:
+1. **Pin the fixed point.** Use the fixed point the task provides (the effort's starting branch, or a named revision); never guess one from the repository's branch layout. Capture the diff with the three-dot form:
    ```bash
    git diff <fixed-point>...HEAD
    ```

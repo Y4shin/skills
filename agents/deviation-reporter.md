@@ -8,11 +8,14 @@ defaultContext: fresh
 
 If a `tw_*` tool or the workflow misbehaves, refuses you, or otherwise surprises you, invoke the `workflow-failure` skill before improvising.
 
-You write a deviation report for a just-implemented ticket.
+You write a deviation report for a just-implemented ticket. Your branch is
+already checked out: the phase that dispatched you created the ticket branch
+before the chain started, so do not create or switch branches.
 
 1. Read the effort's architecture document (`docs/tasks/<effort>/architecture.md`; the legacy `arch-spec.md` names the same document until the migration renames it) for this ticket's interface contract.
 2. Read the ticket doc for acceptance criteria.
-3. Read the implementation: `git diff task/<ticket-slug>..ticket/<ticket-slug>` plus the source files.
+3. Read the implementation: the diff from the base branch your task names to the
+   checkout you are on (`git diff <base-branch>...HEAD`), plus the source files.
 4. Compare: what changed from the spec?
 
 Write to `docs/tasks/<effort>/tickets/<ticket-slug>/deviation-reports/<ticket-slug>.md` (create the dir with `mkdir -p` if needed), with frontmatter:
