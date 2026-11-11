@@ -3553,9 +3553,6 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         // The profile's opening instructions ride the open's result: the one
         // channel that reaches the model at the point the phase starts.
         if (gate.brief.openInstructions !== "") opened.push(gate.brief.openInstructions);
-        if (gate.brief.branch !== null) {
-          opened.push(`Required branch: ${gate.brief.branch} (checked out).`);
-        }
         if (gate.brief.diagnostics.length > 0) opened.push(`Diagnostics: ${gate.brief.diagnostics.join("; ")}`);
         return outcome(
           opened.join("\n"),

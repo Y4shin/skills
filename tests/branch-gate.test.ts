@@ -199,6 +199,42 @@ describe("the injected git seam", () => {
     ]);
     expect(details.opened).toBe(true);
   });
+
+  test("the registered opener runs git through the session's exec, against the session directory", async () => {
+    const dir = sessionDir();
+    const calls: Array<{ command: string; args: string[]; options: any }> = [];
+    const { api, tools } = stubPi();
+    api.exec = async (command: string, args: string[], options: any) => {
+      calls.push({ command, args, options });
+      return { stdout: "effort/live-effort\n", stderr: "", code: 0, killed: false };
+    };
+    factory(api);
+    const registered = tools.find((tool) => tool.name === "tw_open");
+    const active: string[] = [];
+
+    const result = await registered.execute(
+      "call-1",
+      { skill: "implement-ticket", effort: "live-effort", target: "one" },
+      undefined,
+      undefined,
+      {
+        cwd: dir,
+        tools: [],
+        executeTool: async () => ({ isError: false }),
+        getActiveTools: () => [...active],
+        setActiveTools: (names: string[]) => {
+          active.splice(0, active.length, ...names);
+        },
+        ui: { notify() {} },
+      },
+    );
+
+    expect(calls).toEqual([
+      { command: "git", args: ["rev-parse", "--abbrev-ref", "HEAD"], options: { cwd: dir } },
+    ]);
+    expect(result.details.opened).toBe(true);
+    expect(result.content[0].text).toContain("Opened implement-ticket");
+  });
 });
 
 // ─── The refusal on the wrong branch ─────────────────────────────────────────
