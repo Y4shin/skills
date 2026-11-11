@@ -1791,6 +1791,11 @@ const SURVIVING_TOOLS = new Set([
   // workflow-prose: the read-only phase brief every branch-bearing phase asks
   // for before it opens, and the effort close reads for its landing step.
   "tw_phase_brief",
+  // release-skill: the release pair the user-invoked release skill drives, the
+  // preview and the write. Both are always declared, because no phase owns a
+  // release.
+  "tw_release_plan",
+  "tw_release_apply",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -3772,6 +3777,22 @@ describe("release skill (release-skill)", () => {
     // The typed command is the consent: no model decision starts a release.
     expect(fm["disable-model-invocation"]).toBe("true");
     expect(content).toMatch(/^disable-model-invocation: true$/m);
+  });
+
+  test("calls the plan tool, reports the plan, and applies only after confirmation", () => {
+    const plan = content.indexOf("tw_release_plan");
+    const applied = content.indexOf("tw_release_apply");
+    expect(plan, "the skill never calls tw_release_plan").toBeGreaterThan(-1);
+    expect(applied, "the skill never calls tw_release_apply").toBeGreaterThan(plan);
+    // The plan is a preview that is reported; the write waits for the yes.
+    const confirmed = content.search(/only after the (operator|human) confirms/i);
+    expect(confirmed, "the apply does not wait for a confirmation").toBeGreaterThan(plan);
+    expect(confirmed, "the confirmation must come before the apply call").toBeLessThan(applied);
+    expect(content).toMatch(/report the plan/i);
+    // The apply recomputes the plan from the tree it writes, so the report is
+    // the apply's own answer, never a claim that the preview is what landed.
+    expect(content).toMatch(/recomputes?/i);
+    expectOnlySurvivingTools(content);
   });
 });
 
