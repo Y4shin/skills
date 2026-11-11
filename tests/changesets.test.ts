@@ -370,6 +370,24 @@ describe("tw_write_changesets without a changeset config", () => {
     expect(changesetFiles(dir)).toEqual(["staged-change.md"]);
   });
 
+  test("refuses a config file that is not JSON at all", async () => {
+    const dir = fixtureRepository({ config: null });
+    mkdirSync(join(dir, ".changeset"), { recursive: true });
+    writeFileSync(join(dir, ".changeset", "config.json"), "{ not json\n", "utf-8");
+
+    const { details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/fixture-pkg", level: "patch", summary: "A change." }],
+      },
+      dir,
+    );
+
+    expect(details.refusal.code).toBe("invalid-config");
+    expect(details.refusal.reason).toContain("not readable JSON");
+    expect(changesetFiles(dir)).toEqual([]);
+  });
+
   test("refuses a config the changesets schema rejects, with the schema's reason", async () => {
     const dir = fixtureRepository({ config: { baseBranch: 5 } });
 

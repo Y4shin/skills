@@ -1669,7 +1669,7 @@ function changesetLegalNext(code: ChangesetsRefusalCode): string {
     case "invalid-config":
       return "fix .changeset/config.json, then retry tw_write_changesets";
     case "unknown-package":
-      return "retry tw_write_changesets naming two of the workspace packages as they are listed above";
+      return "retry tw_write_changesets with a package name from the workspace list in the refusal";
     case "invalid-level":
       return "retry tw_write_changesets with patch, minor, or major";
     case "no-root-package":
