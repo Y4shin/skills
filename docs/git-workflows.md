@@ -63,9 +63,10 @@ It carries the merge flag `no-ff` and the push policy `always`, so the effort
 close merges the effort branch into the trunk with a merge commit and pushes.
 
 **`flat`** carries nothing anywhere: no branch requirement for any phase or
-agent, no instructions, no gate, no merge flag, no push policy. The workflow
-still runs, and it does its own git work in no particular place: use it to keep
-existing branches and habits.
+agent, no instructions, no gate, no merge flag, no push policy. Phases open on
+whatever checkout they find, no spawn is blocked on a branch, and the effort
+close lands nothing, because no landing step is configured. Choose it to keep
+the branches and habits a repository already has.
 
 There are three branch levels in a repository with a develop branch, and two
 without one: the trunk, one **effort branch** per effort, and one **ticket
