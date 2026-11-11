@@ -1780,6 +1780,9 @@ const SURVIVING_TOOLS = new Set([
   // request-tool-approval: the sanctioned route to a tool a phase does not
   // disclose. Always declared, so phase prose names it where it states the rule.
   "tw_request_tool",
+  // changeset-proposal-and-dedupe: the effort close's changeset writer, named
+  // by the close's prose for the proposal (its dry run) and the write.
+  "tw_write_changesets",
 ]);
 
 function toolNamesIn(content: string): string[] {
@@ -3692,6 +3695,17 @@ describe("finalize-effort skill (finalize-effort-skill)", () => {
     expect(content).toContain("origin_effort");
     expect(content).toContain("follow_up");
     expect(content).toMatch(/one copy, not two|moved, not copied/i);
+  });
+
+  test("proposes the changesets and writes them only after the human confirms", () => {
+    expect(content).toContain("tw_write_changesets");
+    // The proposal is the dry run: one resolution, shown before anything lands.
+    expect(content).toContain("dry_run: true");
+    expect(content).toMatch(/only after the human confirms/i);
+    expect(content).toMatch(/writes nothing/i);
+    // The malformed-entry refusal is what keeps the dedupe honest, so the prose
+    // names it rather than leaving a silent duplicate as the failure mode.
+    expect(content).toMatch(/cannot parse|unreadable/i);
   });
 
   test("archives through the named tool, never the shell", () => {

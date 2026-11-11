@@ -60,7 +60,14 @@ import { FEEDBACK_KINDS, WORKFLOW_SOURCE, feedbackCall } from "./core/feedback.j
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 import { phaseBrief, phaseText, readCheckout, decideFromBrief, type GitRun, type PhaseBrief } from "./core/git-profile.js";
 import { isSpawnCall, spawnVerdict } from "./core/spawn-guard.js";
-import { writeEntries, type ChangeLevel, type ChangesetEntry, type ChangesetsRefusalCode } from "./core/changesets.js";
+import {
+  proposeEntries,
+  writeEntries,
+  type ChangeLevel,
+  type ChangesetEntry,
+  type ChangesetsRefusalCode,
+  type WriteOutcome,
+} from "./core/changesets.js";
 
 // ─── Gated skill manifest sanity (session-start diagnostics) ──────────────────
 
@@ -1729,6 +1736,8 @@ function changesetLegalNext(code: ChangesetsRefusalCode): string {
       return "run 'npx changeset init' in the repository, then retry tw_write_changesets";
     case "invalid-config":
       return "fix .changeset/config.json, then retry tw_write_changesets";
+    case "unreadable-staged":
+      return "fix or remove the unreadable changeset file in .changeset, then retry tw_write_changesets";
     case "unknown-package":
       return "retry tw_write_changesets with a package name from the workspace list in the refusal";
     case "invalid-level":
@@ -3401,7 +3410,9 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         "nothing observable proposes the generic performance and stability patch instead, and an identical " +
         "entry already staged is not repeated. Refuses, writing nothing, when the repository has no " +
         "`.changeset/config.json`, when a package name is not in the workspace, and when a level is not one " +
-        "of the three.",
+        "of the three. Pass dry_run for the proposal: it answers with the entries it would write, the entries " +
+        "already staged that it would not repeat, and whether the generic entry applies, and it writes " +
+        "nothing, so the close can show the operator what it is about to write.",
       Type.Object({
         effort: Type.String({ description: "The effort the entries belong to" }),
         entries: Type.Optional(
@@ -3413,58 +3424,81 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
             }),
           ),
         ),
+        dry_run: Type.Optional(
+          Type.Boolean({
+            description: "Return the proposal without writing anything, for the operator to confirm first",
+          }),
+        ),
       }),
       async (p, ctx) => {
         const effort = typeof p.effort === "string" ? p.effort.trim() : "";
         if (effort === "") throw new Error("tw_write_changesets needs a non-empty effort");
+        const dryRun = p.dry_run === true;
         const requested: ChangesetEntry[] = (Array.isArray(p.entries) ? p.entries : []).map((entry: any) => ({
           package: typeof entry?.package === "string" ? entry.package.trim() : "",
           level: (typeof entry?.level === "string" ? entry.level.trim() : "") as ChangeLevel,
           summary: typeof entry?.summary === "string" ? entry.summary.trim() : "",
         }));
-        const result = await writeEntries(ctx.directory, { entries: requested });
-        if (result.refusal !== null) {
-          const { reason, code } = result.refusal;
+        // One resolution answers both surfaces: the dry run is the same
+        // workspace read, config read, validation, generic fallback, and
+        // dedupe, stopped before the write, so the proposal cannot describe a
+        // different set of entries than the write would land.
+        const resolved = dryRun
+          ? await proposeEntries(ctx.directory, { changes: requested })
+          : await writeEntries(ctx.directory, { entries: requested });
+        if (resolved.refusal !== null) {
+          const { reason, code } = resolved.refusal;
           return outcome(refusedOuttext(reason, [changesetLegalNext(code)]), {
             effort,
-            refusal: result.refusal,
+            dry_run: dryRun,
+            refusal: resolved.refusal,
             written: [],
             entries: [],
             skipped: [],
             generic: false,
-            diagnostics: result.diagnostics,
+            diagnostics: resolved.diagnostics,
           });
         }
+        const written = dryRun ? [] : (resolved as WriteOutcome).written;
         const lines: string[] = [];
-        if (result.generic) {
+        if (resolved.generic) {
           lines.push(
             `Nothing a user can observe in effort '${effort}': the generic performance and stability patch ` +
-              `is the entry.`,
+              (dryRun ? "is the proposed entry." : "is the entry."),
           );
+        } else if (dryRun) {
+          lines.push(`Proposed changesets for effort '${effort}', nothing written yet:`);
         } else {
           lines.push(`Changesets for effort '${effort}':`);
         }
-        for (const entry of result.entries) lines.push(`- ${entry.package} ${entry.level}: ${entry.summary}`);
-        for (const entry of result.skipped) {
+        for (const entry of resolved.entries) lines.push(`- ${entry.package} ${entry.level}: ${entry.summary}`);
+        for (const entry of resolved.skipped) {
           lines.push(`Already staged, not repeated: ${entry.package} ${entry.level}: ${entry.summary}`);
         }
-        for (const file of result.written) lines.push(`Wrote ${file}`);
-        if (result.written.length === 0) {
+        for (const file of written) lines.push(`Wrote ${file}`);
+        if (dryRun) {
           lines.push(
-            result.skipped.length > 0
+            resolved.entries.length === 0
+              ? "Nothing to write: every proposed entry is already staged."
+              : "Call tw_write_changesets again, without dry_run, once the operator confirms these entries.",
+          );
+        } else if (written.length === 0) {
+          lines.push(
+            resolved.skipped.length > 0
               ? "Nothing to write: every proposed entry is already staged."
               : "Nothing to write.",
           );
         }
-        if (result.diagnostics.length > 0) lines.push(`Diagnostics: ${result.diagnostics.join("; ")}`);
+        if (resolved.diagnostics.length > 0) lines.push(`Diagnostics: ${resolved.diagnostics.join("; ")}`);
         return outcome(lines.join("\n"), {
           effort,
+          dry_run: dryRun,
           refusal: null,
-          written: result.written,
-          entries: result.entries,
-          skipped: result.skipped,
-          generic: result.generic,
-          diagnostics: result.diagnostics,
+          written,
+          entries: resolved.entries,
+          skipped: resolved.skipped,
+          generic: resolved.generic,
+          diagnostics: resolved.diagnostics,
         });
       },
     ),
