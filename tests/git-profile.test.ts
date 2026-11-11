@@ -472,13 +472,9 @@ describe("tw_phase_brief", () => {
   }
 
   /** The tool as an extension registers it: driven with a bare directory context. */
-  async function brief(
-    args: Record<string, unknown>,
-    directory: string,
-    extra: Record<string, unknown> = {},
-  ): Promise<{ text: string; details: any }> {
+  async function brief(args: Record<string, unknown>, directory: string): Promise<{ text: string; details: any }> {
     const tools = createTools() as unknown as Record<string, { execute: Function }>;
-    const result = await tools.tw_phase_brief.execute(args, { directory, ...extra });
+    const result = await tools.tw_phase_brief.execute(args, { directory });
     expect(typeof result, "the brief tool answers with text plus details").toBe("object");
     return result as { text: string; details: any };
   }
@@ -634,13 +630,18 @@ describe("the push step follows the profile's push policy", () => {
     return dir;
   }
 
-  async function brief(args: Record<string, unknown>, dir: string, profilesDir?: string) {
+  /** The tool over a directory plus, for a fixture profile, its own profile directory. */
+  async function brief(
+    args: Record<string, unknown>,
+    directory: string,
+    profilesDir?: string,
+  ): Promise<{ text: string; details: any }> {
     const tools = createTools() as unknown as Record<string, { execute: Function }>;
-    const result = (await tools.tw_phase_brief.execute(
+    const result = await tools.tw_phase_brief.execute(
       args,
-      profilesDir === undefined ? { directory: dir } : { directory: dir, profilesDir },
-    )) as { text: string; details: any };
-    return result;
+      profilesDir === undefined ? { directory } : { directory, profilesDir },
+    );
+    return result as { text: string; details: any };
   }
 
   test("an always policy puts the push command in the step, for the branch the phase is on", async () => {
