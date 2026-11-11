@@ -3550,12 +3550,12 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         const disclosed = next.filter((tool) => !active.includes(tool));
         await recordSkillTelemetry(ctx, entry.name, p.effort as string, p.target as string | undefined);
         const opened = [`Opened ${entry.name}: now active ${disclosed.join(", ")}.`];
+        // The profile's opening instructions ride the open's result: the one
+        // channel that reaches the model at the point the phase starts.
+        if (gate.brief.openInstructions !== "") opened.push(gate.brief.openInstructions);
         if (gate.brief.branch !== null) {
           opened.push(`Required branch: ${gate.brief.branch} (checked out).`);
         }
-        // The profile's opening instructions ride the open's result, the one
-        // channel that reaches the model at the point the phase starts.
-        if (gate.brief.openInstructions !== "") opened.push(gate.brief.openInstructions);
         if (gate.brief.diagnostics.length > 0) opened.push(`Diagnostics: ${gate.brief.diagnostics.join("; ")}`);
         return outcome(
           opened.join("\n"),
@@ -3609,14 +3609,16 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         const next = activeAfterClose(active, entry, remaining);
         activeSet.set(next);
         const removed = active.filter((tool) => !next.includes(tool));
-        // The profile's closing instructions ride the close's result, the one
-        // channel that reaches the model as the phase ends. They are read from
-        // the profile alone: a close resolves no branch, because reading the
+        // The profile's closing instructions ride the close's result, the
+        // channel that reaches the model as the phase ends. They come from the
+        // profile alone: a close resolves no branch, because reading the
         // checkout is the open's job.
-        const text = phaseText(ctx.directory, entry.name, ctx.profilesDir === undefined ? {} : { profilesDir: ctx.profilesDir });
-        const lines = [
-          `Closed ${entry.name}: removed ${removed.length > 0 ? removed.join(", ") : "nothing"}.`,
-        ];
+        const text = phaseText(
+          ctx.directory,
+          entry.name,
+          ctx.profilesDir === undefined ? {} : { profilesDir: ctx.profilesDir },
+        );
+        const lines = [`Closed ${entry.name}: removed ${removed.length > 0 ? removed.join(", ") : "nothing"}.`];
         if (text.close !== "") lines.push(text.close);
         if (text.diagnostics.length > 0) lines.push(`Diagnostics: ${text.diagnostics.join("; ")}`);
         return outcome(lines.join("\n"), {

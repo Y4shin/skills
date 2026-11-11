@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { dump } from "../src/core/frontmatter.js";
 import { createTools } from "../src/pi.js";
+import factory from "../src/pi.js";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -71,8 +72,15 @@ function sessionDir(settings: Record<string, unknown> = {}): string {
   return dir;
 }
 
+/** Write one profile file into a fixture profiles directory, and return the directory. */
+function profileFixture(name: string, profile: unknown): string {
+  const dir = tempDir("branch-gate-profiles");
+  writeJson(join(dir, `${name}.json`), profile);
+  return dir;
+}
+
 /**
- * The injected git seam: answers the checkout read from a mutable branch, and
+ * An injected git seam: answers the checkout read from a mutable branch, and
  * records every command it was asked to run. `"HEAD"` is a detached checkout.
  */
 function fakeCheckout(branch: string): {
@@ -122,6 +130,37 @@ async function open(
 ): Promise<{ text: string; details: any }> {
   const tools = createTools() as unknown as Record<string, { execute: Function }>;
   return (await tools.tw_open.execute(args, ctx)) as { text: string; details: any };
+}
+
+/** Drive one close through the tool as the extension registers it. */
+async function close(
+  skill: string,
+  ctx: ReturnType<typeof openCtx>,
+): Promise<{ text: string; details: any }> {
+  const tools = createTools() as unknown as Record<string, { execute: Function }>;
+  return (await tools.tw_close.execute({ skill }, ctx)) as { text: string; details: any };
+}
+
+/** A stub extension API: enough for the factory's registration pass. */
+function stubPi(): { api: any; tools: any[] } {
+  const tools: any[] = [];
+  const active: string[] = [];
+  return {
+    tools,
+    api: {
+      registerTool(tool: any) {
+        tools.push(tool);
+      },
+      on() {},
+      getAllTools: () => tools,
+      getActiveTools: () => [...active],
+      setActiveTools(names: string[]) {
+        active.splice(0, active.length, ...names);
+      },
+      exec: async () => ({ stdout: "", stderr: "", code: 0, killed: false }),
+      ui: { notify() {} },
+    },
+  };
 }
 
 afterAll(() => {
@@ -204,5 +243,134 @@ describe("the open refuses on the wrong branch", () => {
       "Refused: the checkout is on 'main', but 'finalize-effort' requires 'effort/live-effort'. " +
         "Legal next: create and check out effort/live-effort off the trunk (main), then open finalize-effort.",
     );
+  });
+});
+
+// ─── The retry: nothing latches ──────────────────────────────────────────────
+
+describe("the retry after the branch exists", () => {
+  test("the same open passes once the checkout is on the required branch", async () => {
+    const dir = sessionDir();
+    const checkout = fakeCheckout("main");
+    const active: string[] = [];
+    const ctx = openCtx(dir, active, checkout.git);
+    const args = { skill: "implement-ticket", effort: "live-effort", target: "one" };
+
+    const refused = await open(args, ctx);
+    expect(refused.details.opened).toBe(false);
+
+    // The model performs the step the refusal named, then retries the open.
+    checkout.checkout("effort/live-effort");
+    const retried = await open(args, ctx);
+
+    expect(retried.details.opened).toBe(true);
+    expect(retried.details.skill).toBe("implement-ticket");
+    expect(active, "the retried open activates the phase's toolset").toContain("tw_write_changelog");
+    expect(active).toContain("tw_close");
+  });
+
+  test("a phase the profile gives no branch opens on any checkout", async () => {
+    const dir = sessionDir();
+    const active: string[] = [];
+
+    const { details } = await open(
+      { skill: "wayfinder", effort: "live-effort" },
+      openCtx(dir, active, fakeCheckout("main").git),
+    );
+
+    expect(details.opened).toBe(true);
+    expect(details.required_branch).toBeNull();
+  });
+
+  test("a detached checkout refuses, naming no branch rather than a wrong one", async () => {
+    const dir = sessionDir();
+
+    const { text, details } = await open(
+      { skill: "implement-ticket", effort: "live-effort", target: "one" },
+      openCtx(dir, [], fakeCheckout("HEAD").git),
+    );
+
+    expect(details.opened).toBe(false);
+    expect(details.reason).toBe(
+      "the checkout is on no branch (a detached HEAD), but 'implement-ticket' requires 'effort/live-effort'",
+    );
+    expect(text).toContain("Legal next:");
+  });
+
+  test("a checkout the seam cannot read opens, with the gate's diagnostic in the result", async () => {
+    const dir = sessionDir();
+    const failing = async (): Promise<string> => {
+      throw new Error("fatal: not a git repository");
+    };
+
+    const { text, details } = await open(
+      { skill: "implement-ticket", effort: "live-effort", target: "one" },
+      openCtx(dir, [], failing),
+    );
+
+    expect(details.opened, "a checkout the gate never saw never refuses").toBe(true);
+    expect(details.diagnostics.join(" ")).toContain("fatal: not a git repository");
+    expect(text).toContain("Diagnostics:");
+  });
+});
+
+// ─── The profile's instruction text, delivered as the tool result ────────────
+
+describe("the profile's instruction text", () => {
+  const profile = {
+    name: "custom",
+    phases: {
+      "implement-ticket": {
+        branch: "effort/{effort}",
+        openInstructions: "Start from the ticket's acceptance criteria, and state the seams you will test.",
+        closeInstructions: "Record the ticket's notes before you close it.",
+      },
+      "finalize-effort": { branch: "effort/{effort}", closeInstructions: "Print the close-out report." },
+    },
+  };
+
+  test("the open delivers the phase's opening instructions as its result text", async () => {
+    const dir = sessionDir({ git: { profile: "custom" } });
+    const profilesDir = profileFixture("custom", profile);
+
+    const { text, details } = await open(
+      { skill: "implement-ticket", effort: "live-effort", target: "one" },
+      openCtx(dir, [], fakeCheckout("effort/live-effort").git, { profilesDir }),
+    );
+
+    expect(details.opened).toBe(true);
+    expect(text).toContain(profile.phases["implement-ticket"].openInstructions);
+  });
+
+  test("the close delivers the phase's closing instructions as its result text", async () => {
+    const dir = sessionDir({ git: { profile: "custom" } });
+    const profilesDir = profileFixture("custom", profile);
+    const ctx = openCtx(dir, [], fakeCheckout("effort/live-effort").git, { profilesDir });
+
+    await open({ skill: "implement-ticket", effort: "live-effort", target: "one" }, ctx);
+    const { text, details } = await close("implement-ticket", ctx);
+
+    expect(details.closed).toBe(true);
+    expect(text).toContain(profile.phases["implement-ticket"].closeInstructions);
+  });
+});
+
+// ─── Sequential execution ─────────────────────────────────────────────────
+
+describe("sequential execution mode", () => {
+  test("both openers declare it, so a sibling call cannot race them", () => {
+    const tools = createTools() as unknown as Record<string, { executionMode?: string }>;
+
+    expect(tools.tw_open.executionMode).toBe("sequential");
+    expect(tools.tw_close.executionMode).toBe("sequential");
+  });
+
+  test("registration passes it to every opener the extension registers", () => {
+    const { api, tools } = stubPi();
+    factory(api);
+    const byName = new Map(tools.map((tool) => [tool.name, tool]));
+
+    expect((byName.get("tw_open") as any)?.executionMode).toBe("sequential");
+    expect((byName.get("tw_close") as any)?.executionMode).toBe("sequential");
   });
 });
