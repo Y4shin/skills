@@ -342,3 +342,81 @@ describe("tw_release_apply", () => {
     );
   });
 });
+
+// ─── The changelog specifier ────────────────────────────────────────────────
+
+describe("the changelog specifier", () => {
+  test("renders through the standalone changelog package whatever specifier the config names", async () => {
+    // The command line tool's own specifier resolves only where the tool is
+    // installed, and no fixture installs it; the third specifier is installed
+    // nowhere at all; the fourth asks for no changelog, which a release still
+    // maintains. All four have to render the same section.
+    const specifiers: unknown[] = [
+      "@changesets/cli/changelog",
+      ["@changesets/changelog-git", null],
+      "@scope/not-installed-changelog",
+      false,
+    ];
+    const renderings: Array<string | null> = [];
+
+    for (const changelog of specifiers) {
+      const dir = oneEntryFixture({ config: { ...CONFIG, changelog } });
+      const { details } = await apply(dir);
+
+      expect(details.refusal, JSON.stringify(changelog)).toBeNull();
+      renderings.push(bytes(join(dir, "CHANGELOG.md")));
+    }
+
+    expect(new Set(renderings).size).toBe(1);
+    expect(renderings[0]).toContain("## 1.1.0");
+    expect(renderings[0]).toContain("- Add the release skill.");
+  });
+
+  test("reports the same section in the plan, whatever the config names", async () => {
+    const sections: Array<string | null> = [];
+    for (const changelog of ["@changesets/cli/changelog", "@scope/not-installed-changelog"]) {
+      const dir = oneEntryFixture({ config: { ...CONFIG, changelog } });
+      const { details } = await plan(dir);
+
+      expect(details.refusal).toBeNull();
+      sections.push(details.changelog[0].text);
+    }
+
+    expect(sections[0]).toBe(sections[1]);
+  });
+});
+
+// ─── Formatting ─────────────────────────────────────────────────────────────
+
+describe("formatting", () => {
+  test("is disabled, so no formatter subprocess runs over the released tree", async () => {
+    // The config's default formatting value is "auto", which spawns a
+    // formatter, and a formatter that fails after the apply starts writing
+    // leaves a half-applied tree: the manifest and the changelog written, the
+    // changeset file still there. The fixture declares prettier and carries a
+    // formatter shim on the local bin path, so a run that let either value
+    // through would leave a marker.
+    for (const config of [{ ...CONFIG }, { ...CONFIG, format: "prettier" }]) {
+      const dir = oneEntryFixture({
+        config,
+        manifest: { ...MANIFEST, devDependencies: { prettier: "^3.0.0" } },
+        files: { ".prettierrc.json": "{}\n" },
+      });
+      const marker = join(dir, "FORMATTER_RAN");
+      mkdirSync(join(dir, "node_modules", ".bin"), { recursive: true });
+      writeFileSync(join(dir, "node_modules", ".bin", "prettier"), `#!/bin/sh\necho "$@" >> '${marker}'\n`, {
+        mode: 0o755,
+      });
+
+      const { details } = await apply(dir);
+
+      expect(details.refusal, JSON.stringify(config.format)).toBeNull();
+      expect(existsSync(marker), "no formatter should run over a released tree").toBe(false);
+      // And the bytes are the changelog package's own: the headed file, then
+      // the section, one trailing newline.
+      expect(bytes(join(dir, "CHANGELOG.md"))).toBe(
+        "# @scope/fixture-pkg\n\n## 1.1.0\n\n### Minor Changes\n\n- Add the release skill.\n",
+      );
+    }
+  });
+});
