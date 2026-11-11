@@ -58,7 +58,15 @@ import { renderMigrationReport } from "./migrate-report.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { FEEDBACK_KINDS, WORKFLOW_SOURCE, feedbackCall } from "./core/feedback.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
-import { phaseBrief, phaseText, readCheckout, decideFromBrief, type GitRun, type PhaseBrief } from "./core/git-profile.js";
+import {
+  decideFromBrief,
+  phaseBrief,
+  phaseText,
+  readCheckout,
+  unreadableCheckout,
+  type GitRun,
+  type PhaseBrief,
+} from "./core/git-profile.js";
 import { isSpawnCall, spawnVerdict } from "./core/spawn-guard.js";
 import {
   applyRelease,
@@ -1542,9 +1550,9 @@ function phaseGate(
  * step that creates it cannot drift from what a brief reports.
  *
  * The checkout is read through the tool context's git seam, so a fake answers
- * it in tests. A seam that is absent or cannot run does not refuse: the open
- * proceeds and its result carries the diagnostic, exactly as the repo gate
- * falls open on settings it cannot read.
+ * it in tests. A checkout the seam cannot read refuses too: guards block and do
+ * not warn, so a phase whose branch cannot be confirmed does not open, and the
+ * diagnostic naming the cause rides the details.
  */
 async function branchGate(
   ctx: ToolContext,
@@ -1561,7 +1569,13 @@ async function branchGate(
   if (brief.branch === null) return { brief, refusal: null };
   const checkout = await readCheckout(ctx.git);
   if (checkout.diagnostic !== null) {
-    return { brief: { ...brief, diagnostics: [...brief.diagnostics, checkout.diagnostic] }, refusal: null };
+    // The checkout was never read, so the branch was never confirmed: the open
+    // is refused, in the same shape as a wrong branch, and the cause reports.
+    const unreadable = unreadableCheckout(entry.name, brief.branch, checkout.diagnostic);
+    return {
+      brief: { ...brief, diagnostics: [...brief.diagnostics, checkout.diagnostic] },
+      refusal: { reason: unreadable.reason, legalNext: [`${unreadable.recovery}, then open ${entry.name}`] },
+    };
   }
   const decision = decideFromBrief(brief, entry.name, checkout.branch);
   if (decision.pass) return { brief, refusal: null };
