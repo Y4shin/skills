@@ -695,9 +695,9 @@ export interface PhaseText {
 }
 
 /**
- * The instruction text for one phase, resolved without a checkout: a close
- * knows the phase it closes and the effort it closes, but reading the checkout
- * is the open's job, so this answers from the profile alone.
+ * The instruction text for one phase, resolved without a checkout: this answers
+ * from the profile alone, and the close's gate is the one read that judges the
+ * checkout, so a phase the profile gives no gate reads none.
  */
 export function phaseText(cwd: string, name: string, deps: BriefDeps = {}): PhaseText {
   const diagnostics: string[] = [];

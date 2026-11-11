@@ -3921,8 +3921,8 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         const removed = active.filter((tool) => !next.includes(tool));
         // The profile's closing instructions ride the close's result, the
         // channel that reaches the model as the phase ends. They come from the
-        // profile alone: a close resolves no branch, because reading the
-        // checkout is the open's job.
+        // profile alone; the gate above is what reads the checkout, and only
+        // when the row carries one.
         const text = phaseText(
           ctx.directory,
           entry.name,
