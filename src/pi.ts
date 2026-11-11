@@ -3425,10 +3425,15 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         "no open phase, so it is the first call of any branch-bearing phase. The branch comes from the " +
         "repository's git profile (taskWorkflow.git in settings); a malformed key, a missing profile, or an " +
         "unknown profile name falls back to 'default' with a diagnostic rather than failing. A phase the " +
-        "profile gives no branch reports no requirement. Pass the ticket slug when the phase works one ticket.",
+        "profile gives no branch reports no requirement. Pass the ticket slug when the phase works one ticket. " +
+        "Ask it for an implementation agent (tdd-worker and its siblings) to learn the branch that agent's " +
+        "phase must create and check out before dispatching it. The answer also carries the trunk, the " +
+        "profile's merge flag and push policy, and the trunk-merge mode, which the effort close acts on.",
       Type.Object({
         skill: Type.String({
-          description: `The workflow phase to ask about: one of ${SKILL_REGISTRY.map((s) => s.name).join(", ")}`,
+          description:
+            `The workflow phase to ask about (${SKILL_REGISTRY.map((s) => s.name).join(", ")}), or an ` +
+            `implementation agent the profile gives a branch`,
         }),
         effort: Type.String({ description: "The effort the phase works in" }),
         ticket: Type.Optional(
@@ -3438,8 +3443,8 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
       async (p, ctx) => {
         const phases = SKILL_REGISTRY.map((s) => s.name);
         const skill = typeof p.skill === "string" ? p.skill.trim() : "";
-        if (!skillEntry(skill)) {
-          const reason = `'${skill}' is not a workflow phase: the phases are ${phases.join(", ")}`;
+        if (skill === "") {
+          const reason = `no name was given: pass a workflow phase or an implementation agent`;
           return outcome(refusedOuttext(reason, [`retry tw_phase_brief with one of the phases`]), {
             reason,
             legal_next: phases,
@@ -3453,6 +3458,19 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
           { name: skill, effort, ticket },
           ctx.profilesDir === undefined ? {} : { profilesDir: ctx.profilesDir },
         );
+        // A phase opens; an implementation agent is dispatched onto a branch
+        // its phase created. Both answer from the profile, so the phase that
+        // must create a worker's branch asks the worker's row. Any other name
+        // is refused: nothing in the profile names it.
+        if (brief.kind === "unknown") {
+          const reason =
+            `'${skill}' is neither a workflow phase nor an implementation agent the git profile names: ` +
+            `the phases are ${phases.join(", ")}`;
+          return outcome(refusedOuttext(reason, [`retry tw_phase_brief with one of the phases`]), {
+            reason,
+            legal_next: phases,
+          });
+        }
 
         const lines = [`Phase brief for ${skill} in effort '${effort}' (profile: ${brief.profile}).`];
         if (brief.branch === null) {
@@ -3463,6 +3481,12 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         }
         lines.push(`Instructions: ${brief.openInstructions === "" ? "none" : brief.openInstructions}`);
         if (brief.closeInstructions !== "") lines.push(`Closing instructions: ${brief.closeInstructions}`);
+        if (brief.merge !== null) {
+          lines.push(
+            `Close-out: merge with '${brief.merge}' into the trunk (${brief.trunk}), ` +
+              `trunk merge mode '${brief.trunkMerge}', push '${brief.push ?? "never"}'.`,
+          );
+        }
         if (brief.diagnostics.length > 0) lines.push(`Diagnostics: ${brief.diagnostics.join("; ")}`);
 
         return outcome(lines.join("\n"), {
@@ -3478,6 +3502,8 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
           close_gate: brief.closeGate,
           merge: brief.merge,
           push: brief.push,
+          trunk: brief.trunk,
+          trunk_merge: brief.trunkMerge,
           diagnostics: brief.diagnostics,
         });
       },

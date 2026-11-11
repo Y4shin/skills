@@ -23,7 +23,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { readGitSettings, trunkName, type GitSettings, type ReadGateConfigDeps } from "./repo-gate.js";
+import { readGitSettings, trunkName, type GitSettings, type ReadGateConfigDeps, type TrunkMergeMode } from "./repo-gate.js";
 
 /** The profiles the package ships, selected by `taskWorkflow.git.profile`. */
 export const BUNDLED_PROFILES = ["default", "flat"] as const;
@@ -268,6 +268,10 @@ export interface PhaseBrief {
   merge: string | null;
   /** The profile's push policy, or null. */
   push: string | null;
+  /** The trunk the effort close merges into, resolved from the settings. */
+  trunk: string;
+  /** Whether the effort close merges locally or hands off to a pull request. */
+  trunkMerge: TrunkMergeMode;
   /** Diagnostics from reading the settings and the profile. */
   diagnostics: string[];
 }
@@ -294,9 +298,11 @@ export function phaseBrief(cwd: string, request: BriefRequest, deps: BriefDeps =
   const kind: PhaseBrief["kind"] = phase !== undefined ? "phase" : agent !== undefined ? "agent" : "unknown";
   const branch = resolveTemplate(row?.branch, request, diagnostics);
   const base = branch === null ? null : branchBase(row!.branch!, request, settings, profile);
-  // Only a phase creates its own branch: a sub-agent is dispatched onto a
-  // branch the phase already checked out, so it gets no step.
-  const step = kind === "phase" && branch !== null ? `create and check out ${branch} off ${base}, then open ${request.name}` : null;
+  // The step names who performs it. A phase creates its own branch and then
+  // opens; an agent's row carries the step the phase performs before it
+  // dispatches that agent, because the agent itself expects the branch to be
+  // checked out already.
+  const step = branch === null ? null : branchStep(branch, base, kind, request.name);
 
   return {
     profile: profile.name,
@@ -309,8 +315,20 @@ export function phaseBrief(cwd: string, request: BriefRequest, deps: BriefDeps =
     closeGate: phase === undefined ? null : resolveTemplate(phase.closeGate, request, diagnostics),
     merge: profile.merge ?? null,
     push: profile.push ?? null,
+    trunk: trunkName(settings.trunk),
+    trunkMerge: settings.trunkMerge,
     diagnostics,
   };
+}
+
+/**
+ * What produces a required branch, phrased for the caller that performs it: a
+ * phase creates its branch and then opens, while a sub-agent's branch is
+ * created by the phase that dispatches it.
+ */
+function branchStep(branch: string, base: string | null, kind: PhaseBrief["kind"], name: string): string {
+  const create = base === null ? `create and check out ${branch}` : `create and check out ${branch} off ${base}`;
+  return kind === "agent" ? `${create}, then dispatch ${name}` : `${create}, then open ${name}`;
 }
 
 /**
@@ -387,19 +405,22 @@ export function ticketBrief(cwd: string, request: BriefRequest, deps: BriefDeps 
   const profile = loaded.profile;
   const template = Object.values(profile.agents).find((row) => row.branch?.includes("{ticket}"))?.branch;
   const branch = resolveTemplate(template, request, diagnostics);
+  const base = branch === null ? null : branchBase(template!, request, settings, profile);
   return {
     profile: profile.name,
     kind: "agent",
     branch,
     // A sub-agent never creates its own branch: the phase it is dispatched
-    // from already checked it out, so the brief carries the base only.
-    step: null,
-    base: branch === null ? null : branchBase(template!, request, settings, profile),
+    // from already checked it out, so the step names that phase's action.
+    step: branch === null ? null : branchStep(branch, base, "agent", request.name),
+    base,
     openInstructions: "",
     closeInstructions: "",
     closeGate: null,
     merge: profile.merge ?? null,
     push: profile.push ?? null,
+    trunk: trunkName(settings.trunk),
+    trunkMerge: settings.trunkMerge,
     diagnostics,
   };
 }
