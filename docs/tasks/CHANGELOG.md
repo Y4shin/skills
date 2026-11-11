@@ -71,6 +71,20 @@ title: Task Changelog
 
 
 
+
+## 2026-11-11, Refuse the two branch-bearing phases from the wrong branch (branch-gates)
+
+The implementation phase and the effort close now refuse to open from the wrong
+checkout. One generic gate compares the checkout with the branch the git profile
+resolves for that phase, so under the bundled `default` profile those are the two
+guarded phases and under an operator profile it is whichever phases carry a
+branch. The refusal names the current branch, the required branch, and the step
+that creates it, in the workflow's existing shape, and nothing latches, so
+creating the branch and retrying passes. The profile's opening and closing
+instruction text now arrives through the open and close results, and both openers
+run in sequential execution mode so a close cannot race a sibling call. A git
+execution seam in the tool context keeps every gate test free of a repository.
+
 ## 2026-11-11, Propose and write changesets at effort close (changeset-authoring)
 
 Effort close can now write the changeset entries a release consumes. One module
