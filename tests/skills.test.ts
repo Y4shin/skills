@@ -2791,11 +2791,11 @@ describe("chain call shapes (shipped ticket-chain.js)", () => {
   });
 
   test("the chain gates preconditions before any worker launches", () => {
-    expect(chain).toMatch(/await runs\.run\("gate"/);
+    expect(chain).toMatch(/await runs\.run\(stepKey\("gate"\)/);
     expect(chain).toMatch(/agent: "implement-preconditions"/);
     expect(chain).toMatch(/failed: "gate"/);
     // The gate step precedes the tdd step in the script.
-    expect(chain.indexOf('runs.run("gate"')).toBeLessThan(chain.indexOf('runs.run("tdd"'));
+    expect(chain.indexOf('runs.run(stepKey("gate")')).toBeLessThan(chain.indexOf('runs.run(stepKey("tdd")'));
   });
 
   test("refusals are enforced, not trusted: verdicts fail closed and deliverables are host-gated", () => {
@@ -2827,9 +2827,9 @@ describe("chain call shapes (shipped ticket-chain.js)", () => {
   });
 
   test("the chain script uses keyed awaited runs.run, no retired chain API", () => {
-    expect(chain).toMatch(/await runs\.run\("tdd"/);
-    expect(chain).toMatch(/await runs\.run\("verify"/);
-    expect(chain).toMatch(/await runs\.run\("land"/);
+    expect(chain).toMatch(/await runs\.run\(stepKey\("tdd"\)/);
+    expect(chain).toMatch(/await runs\.run\(stepKey\("verify"\)/);
+    expect(chain).toMatch(/await runs\.run\(stepKey\("land"\)/);
     expect(chain).not.toMatch(/\bas:\s*"/);
     expect(chain).not.toMatch(/\{outputs\./);
     expect(chain).not.toMatch(/\(runs\)\s*=>/);
