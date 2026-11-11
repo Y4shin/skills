@@ -22,8 +22,21 @@ import { Type, type TSchema } from "typebox";
  * its branch step before it opens, so no opener can be the tool's activation
  * path, and it belongs to no toolset (a toolset membership would make a closed
  * phase derive as open).
+ *
+ * The release pair is here because no phase owns it: `release` is a
+ * user-invoked skill with no registry entry, so the plan and the apply are
+ * called outside the open-set machine entirely, and a registry membership
+ * would be a phase that does not exist.
  */
-export const ALWAYS_DECLARED = ["tw_open", "tw_next", "tw_request_tool", "tw_close", "tw_phase_brief"] as const;
+export const ALWAYS_DECLARED = [
+  "tw_open",
+  "tw_next",
+  "tw_request_tool",
+  "tw_close",
+  "tw_phase_brief",
+  "tw_release_plan",
+  "tw_release_apply",
+] as const;
 
 /**
  * The closer: declared in every state too, so a session that lost track of its

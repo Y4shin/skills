@@ -55,7 +55,9 @@ let globalSettings: { dir: string; cleanup: () => void } | undefined;
  * notify_user. The registered surface in an ungated repo is unchanged by the
  * gate-state split, so a deleted or added tool fails here. tw_phase_brief sits
  * with the dispatcher quartet because it is declared in every state too: a
- * phase asks for its brief before it opens.
+ * phase asks for its brief before it opens, and the release pair sits there for
+ * the same reason: `release` is user-invoked and owns no phase that could
+ * disclose them.
  */
 const FULL_TOOL_SURFACE = [
   "skill_discover",
@@ -66,6 +68,8 @@ const FULL_TOOL_SURFACE = [
   "tw_request_tool",
   "tw_close",
   "tw_phase_brief",
+  "tw_release_plan",
+  "tw_release_apply",
   "tw_show",
   "tw_get",
   "tw_list",

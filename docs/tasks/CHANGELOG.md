@@ -74,6 +74,22 @@ title: Task Changelog
 
 
 
+
+## 2026-11-11, Turn pending changesets into a version bump and a changelog through tools (release-mechanics)
+
+Pending changesets now become a version bump and a root changelog through two
+tools, with the changesets command line tool not installed. The plan tool reports
+the pending entries, the versions they produce, and the changelog section text,
+and writes nothing; the apply tool bumps the manifest, inserts the section, and
+removes the consumed entries, recomputing the plan rather than trusting one handed
+back. Both go through the same seam as authoring, so workspace and config reading
+are shared, and the changelog renders through the standalone changelog package
+whatever specifier a repository's config names. An empty plan, a missing manifest,
+and a missing changeset config are distinct named refusals rather than silent
+no-ops. The changesets libraries and the workspace reader became runtime
+dependencies; the command line tool stays a dev dependency, and a test fails if the
+seam imports a module that is not declared.
+
 ## 2026-11-11, Propose changesets before writing, and keep the dedupe honest (changeset-proposal-and-dedupe)
 
 Effort close now proposes its changeset entries before writing any. A dry-run mode
