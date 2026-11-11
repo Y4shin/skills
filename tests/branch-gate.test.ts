@@ -161,3 +161,30 @@ describe("the injected git seam", () => {
     expect(details.opened).toBe(true);
   });
 });
+
+// ─── The refusal on the wrong branch ─────────────────────────────────────────
+
+describe("the open refuses on the wrong branch", () => {
+  test("the implementation open on the trunk names the current branch, the effort branch, and the step", async () => {
+    const dir = sessionDir();
+    const active: string[] = [];
+
+    const { text, details } = await open(
+      { skill: "implement-ticket", effort: "live-effort", target: "one" },
+      openCtx(dir, active, fakeCheckout("main").git),
+    );
+
+    expect(details.opened, "the open is refused").toBe(false);
+    expect(active, "a refused open discloses nothing").toEqual([]);
+    expect(details.required_branch).toBe("effort/live-effort");
+    expect(details.reason).toBe("the checkout is on 'main', but 'implement-ticket' requires 'effort/live-effort'");
+    expect(details.legal_next).toEqual([
+      "create and check out effort/live-effort off the trunk (main), then open implement-ticket",
+    ]);
+    // The refusal renders in the opener vocabulary every other refusal uses.
+    expect(text).toBe(
+      "Refused: the checkout is on 'main', but 'implement-ticket' requires 'effort/live-effort'. " +
+        "Legal next: create and check out effort/live-effort off the trunk (main), then open implement-ticket.",
+    );
+  });
+});
