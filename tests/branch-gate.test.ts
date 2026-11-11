@@ -7,10 +7,11 @@
  * profile through its own directory seam, so no test here needs a repository:
  * the fixture tree is a plain directory with a `.pi/settings.json`.
  *
- * The four behaviours pinned: the pass on the required branch, the refusal on
- * any other (naming current branch, required branch, and next call), the retry
- * after the branch exists (nothing latches), and the instruction text the
- * profile carries arriving as the open's and the close's result.
+ * The behaviours pinned: the pass on the required branch, the refusal on any
+ * other (naming current branch, required branch, and next call), the refusal on
+ * a checkout the gate could not read at all (guards block, they do not warn),
+ * the retry after the branch exists (nothing latches), and the instruction text
+ * the profile carries arriving as the open's and the close's result.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -109,7 +110,7 @@ function fakeCheckout(branch: string): {
 function openCtx(
   directory: string,
   active: string[],
-  git: (args: string[]) => Promise<string>,
+  git: ((args: string[]) => Promise<string>) | undefined,
   extra: Record<string, unknown> = {},
 ) {
   return {
@@ -346,7 +347,6 @@ describe("the retry after the branch exists", () => {
     );
     expect(text).toContain("Legal next:");
   });
-
 });
 
 // ─── The refusal on a checkout the gate could not read ──────────────────────
@@ -395,7 +395,8 @@ describe("the open refuses on a checkout it cannot read", () => {
     const dir = sessionDir();
     const active: string[] = [];
 
-    const { details } = await open(args, openCtx(dir, active, undefined as unknown as (a: string[]) => Promise<string>));
+    // No seam at all: the session offers nothing to read the checkout with.
+    const { details } = await open(args, openCtx(dir, active, undefined));
 
     expect(details.opened, "a session with no seam cannot confirm the branch either").toBe(false);
     expect(active).toEqual([]);

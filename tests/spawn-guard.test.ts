@@ -10,6 +10,9 @@
  * The guard lives in the extension's `tool_call` handler and reads the
  * checkout through the session's git seam, so every test here runs against a
  * stub extension API and a fake `exec`: no repository is needed.
+ *
+ * A checkout the seam cannot read is blocked on the same rule as a wrong
+ * branch, because guards block and do not warn.
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
