@@ -73,3 +73,16 @@ has been written.
 Never create the missing file, never run `npx changeset init` on the
 operator's behalf, and never bump a manifest the refusal did not name. A
 missing `.changeset/config.json` is a hard error, not a default.
+
+## Nothing to release
+
+An empty plan is its own answer, and it is not a failure: the repository has
+nothing pending, so nothing moves. Say that plainly, that there is nothing to
+release, and stop. No version bump happens, no changelog section is written,
+and no changeset file is consumed. The refusal's reason names the case when
+it is not simply an empty `.changeset/`.
+
+Never stage a changeset to make a release possible. Authoring belongs to the
+effort close, where `/skill:finalize-effort` proposes the entries for the work
+that just landed and writes them once the human confirms. A release that
+staged its own entry would version a change nobody described.
