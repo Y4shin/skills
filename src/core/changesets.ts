@@ -127,6 +127,14 @@ async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<
   };
 }
 
+/** What a call resolves to before the dedupe: the entries, or the refusal. */
+export interface EntryResolution {
+  refusal: ChangesetsRefusal | null;
+  entries: ChangesetEntry[];
+  /** True when the generic patch answered for an effort with nothing observable. */
+  generic: boolean;
+}
+
 /**
  * The entries a call would write, before the dedupe: the request as given, or
  * the generic patch when the effort names nothing observable.
@@ -157,14 +165,6 @@ export function resolveEntries(changes: ChangesetEntry[], workspace: Workspace):
   return invalid === null
     ? { refusal: null, entries: [generic], generic: true }
     : { refusal: invalid, entries: [], generic: true };
-}
-
-/** What a call resolves to before the dedupe: the entries, or the refusal. */
-export interface EntryResolution {
-  refusal: ChangesetsRefusal | null;
-  entries: ChangesetEntry[];
-  /** True when the generic patch answered for an effort with nothing observable. */
-  generic: boolean;
 }
 
 /** A proposal that writes nothing, carrying the refusal and what the reads noted. */
