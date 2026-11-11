@@ -318,6 +318,20 @@ describe("the retry after the branch exists", () => {
     expect(details.required_branch).toBeNull();
   });
 
+  test("the flat profile requires no branch, so the trunk opens the implementation phase", async () => {
+    const dir = sessionDir({ git: { profile: "flat" } });
+    const active: string[] = [];
+
+    const { details } = await open(
+      { skill: "implement-ticket", effort: "live-effort", target: "one" },
+      openCtx(dir, active, fakeCheckout("main").git),
+    );
+
+    expect(details.profile).toBe("flat");
+    expect(details.opened).toBe(true);
+    expect(details.required_branch).toBeNull();
+  });
+
   test("a detached checkout refuses, naming no branch rather than a wrong one", async () => {
     const dir = sessionDir();
 
