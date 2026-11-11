@@ -69,6 +69,22 @@ title: Task Changelog
 
 
 
+
+## 2026-11-11, Resolve git settings and profiles into phase briefs (profile-data-and-phase-briefs)
+
+Git behaviour now comes from data instead of prose. A repository's
+`taskWorkflow.git` settings (profile, trunk, trunk merge mode) and the two
+bundled profiles resolve through one resolver into a phase brief: the branch a
+phase must be on, the step that creates it, and the instruction text. A new
+read-only `tw_phase_brief` tool reports that brief before a phase opens, and the
+same resolution produces the gate refusal, so the two cannot drift. The `default`
+profile names an effort branch for the implementation and close phases and a
+ticket branch for the five implementation agents; `flat` names nothing. Malformed
+settings, a missing profile, and an unknown profile name each diagnose and fall
+back rather than throw. The specification's `trunk` snippet turned out to repeat a
+JSON key, so the operator-approved shape is `{ develop: false | string, main:
+string }`.
+
 ## 2026-11-06, Vendor the pr skill into the promoted set (vendor-pr-skill)
 
 Vendors the upstream `pr` skill (mattpocock/skills, itself credited to Dex Horthy's show-me at Humanlayer) into the promoted engineering bucket, byte-close: frontmatter intact (verbatim trigger description, credits block), body unchanged except the house preamble that the reference-coverage-suite test seam forces onto every promoted skill. Wires all nine promoted-set surfaces in one change: the manifest at 32 with both count pins, the migration target, both READMEs' Model-invoked groups, the four-section docs page carrying the full provenance chain, the router's Standalone bullet and Actions row, the structure-test file-list entry, and a minor changeset. Suite green (23 files, 1362 tests; both typechecks clean). A fresh install now auto-invokes `pr` when its agent writes a PR body.
