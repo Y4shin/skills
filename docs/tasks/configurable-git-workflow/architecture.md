@@ -64,7 +64,7 @@ Every field except `name` is optional. The placeholder vocabulary is `{effort}`
 and `{ticket}`. The trunk is a literal name, so it needs none. These field names
 are the contract for any operator-authored custom profile. `merge` carries the
 complete git flag, dashes included, because it reaches a shell command verbatim;
-`push` is `always` or absent.
+`push` is `always` or `never`, and absent reads as `never`.
 
 `default`: `implement-ticket` and `finalize-effort` require the effort branch
 `effort/{effort}` and also carry `closeGate: effort/{effort}`. The five
@@ -124,11 +124,11 @@ off the effort branch, then dispatches `ticket-chain.js` with `branch`,
 `effortBranch`, and `merge` in its arguments.
 
 `finalize-effort` opens on the effort branch. Its close-out merges the effort
-branch into the trunk with the profile's merge flag and pushes per the policy;
-the brief carries `trunk` and `trunkMerge`, so the close-out restates neither. In
-`handoff` mode it skips the merge and the branch deletion, pushes when the policy
-allows, and prints the pull-request instruction with the branch and trunk names
-filled in.
+branch into the trunk with the profile's merge flag and pushes the push step the
+brief renders; the brief carries `trunk` and `trunkMerge`, so the close-out
+restates neither. In `handoff` mode it skips the merge and the branch deletion,
+pushes when the brief's push step names a command, and prints the pull-request
+instruction with the branch and trunk names filled in.
 
 The chain composes both of its host gates from the branch names it was handed,
 keeps its step names and step order, and builds its step keys as
@@ -171,7 +171,7 @@ and do not warn, so a branch the gate cannot confirm does not open a phase. The
 cause still rides `details.diagnostics`, so what went wrong reports alongside the
 refusal. The open's details therefore always carry `required_branch` (null when
 the phase needs none), `profile`, and `diagnostics`; the close's carry
-`diagnostics`.
+`close_gate`, `profile`, and `diagnostics`.
 
 A spawn guard, `spawnVerdict(cwd, toolName, input, deps)` in
 `src/core/spawn-guard.ts`, blocks a spawn the profile gates. One `tool_call`
@@ -198,8 +198,13 @@ defense in depth, not as the enforcement point. The `tasks`, `chain`, and
 `parallel` fanout shapes are not guarded.
 
 `result.failed` still reports the bare step name. `closeGate` is carried by both
-branch-bearing profile rows, reported by the brief, and enforced by nothing,
-because no ticket in this effort names a closing branch gate.
+branch-bearing profile rows, reported by the brief, and enforced by the close:
+`tw_close` takes the effort the closing phase works in (and a ticket, for a row
+that gates on one), resolves the row through `closeBrief`, reads the checkout
+only when a gate resolved, and refuses in the openers' shape when the checkout
+is elsewhere. Nothing latches, so checking the gated branch out and retrying
+closes. A gate the call cannot resolve, and a checkout the seam cannot read,
+both refuse: the same fail-closed rule the open and the spawn block follow.
 
 Opening and closing run in sequential execution mode, so a close cannot race a
 sibling tool call in the same message. Raw `bash` git commands are not
@@ -613,6 +618,29 @@ not be read and the one recovery, `readCheckout`'s diagnostic carrying the cause
 `unreadableCheckout` in `src/core/git-profile.ts` builds that sentence for both,
 so a phase refusal and a spawn block word the condition the same way.
 
+### The closing gate needs the effort at the close
+
+`closeGate` shipped as authored data with no behaviour, because the close tool
+took only a skill name and a gate template needs an effort to resolve. Rather
+than infer the effort from the checkout (which cannot name the branch a refusal
+must name) or add a second state channel beside the active tool set, `tw_close`
+gained an optional `effort` and `ticket`, the same pair `tw_phase_brief` takes,
+and `src/core/git-profile.ts` gained `closeBrief` and `decideFromClose` beside
+`phaseBrief` and `decideFromBrief`. The close reads the checkout only when the
+row carries a gate, and refuses when the gate cannot resolve or the checkout
+cannot be read, so a guard never passes on a condition it could not evaluate.
+`resolveTemplate` treats an empty `{effort}` as unresolvable, the rule it already
+applied to `{ticket}`, so no gate ever compares a checkout against `effort/`.
+
+### The push step is rendered, not written
+
+The close-out carried a `git push` command in a fenced block while its own
+sentence said a `never` policy pushes nothing. The push is now a step the brief
+renders from the profile's policy: `always` names the command for the branch the
+phase is on, and `never` or an absent policy names none. No phase file carries a
+push command, and the prose guard bans one, so the sentence and the step cannot
+disagree again.
+
 ### The bundled merge flag has to carry its dashes
 
 The `default` profile first stored `merge: "no-ff"`, which reached the rendered
@@ -624,7 +652,6 @@ flag rather than a bare name.
 
 Recorded so the archived document does not claim more than shipped:
 
-- No profile row's `closeGate` is enforced.
 - The per-child `subagent_launch` surface is unit-tested against the documented
   input shape only, because the pinned `pi-subagents` 0.84 registers no such
   tool.
