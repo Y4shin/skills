@@ -110,4 +110,33 @@ describe("tw_write_changesets", () => {
     expect(details.written).toEqual([join(dir, ".changeset", changesetFiles(dir)[0])]);
     expect(text).toContain("Add the release skill.");
   });
+
+  test("disables formatting, so no formatter runs over the written file", async () => {
+    // The config's default formatting value is "auto", which spawns a formatter
+    // and leaves a half-applied tree when the formatter fails. The fixture
+    // declares prettier and carries a formatter shim on the local bin path, so
+    // a write that let the default through would run it and leave a marker.
+    const dir = fixtureRepository({ manifest: { ...MANIFEST, devDependencies: { prettier: "^3.0.0" } } });
+    writeFileSync(join(dir, ".prettierrc.json"), "{}\n", "utf-8");
+    const marker = join(dir, "FORMATTER_RAN");
+    mkdirSync(join(dir, "node_modules", ".bin"), { recursive: true });
+    writeFileSync(join(dir, "node_modules", ".bin", "prettier"), `#!/bin/sh\necho "$@" >> '${marker}'\n`, {
+      mode: 0o755,
+    });
+
+    await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." }],
+      },
+      dir,
+    );
+
+    expect(existsSync(marker), "no formatter should run over a written changeset").toBe(false);
+    // And the bytes are the library's own, unformatted: one frontmatter line,
+    // one blank line, the summary, one trailing newline.
+    expect(changesetBytes(dir, changesetFiles(dir)[0])).toBe(
+      '---\n"@scope/fixture-pkg": minor\n---\n\nAdd the release skill.\n',
+    );
+  });
 });
