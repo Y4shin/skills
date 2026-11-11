@@ -160,11 +160,12 @@ function landTask(tddRef, verifyRef) {
 // machine-readable ticket identity at the per-child launch, and the spawn
 // guard reads the slug from it. The separator is the extension's
 // KEY_SEPARATOR (src/core/spawn-guard.ts); a workflow script cannot import it,
-// so the character is written here too, and a test pins the two together. A
-// colon would read better, but a key can name an output file, and a colon is
-// not a legal filename character on Windows.
+// so the character is written here too, and a test pins the two together. It
+// must be legal in a workflow step key: the runtime accepts only letters,
+// digits, '.', '_' and '-', so '@' and ':' fail the run before any child
+// starts.
 function stepKey(step) {
-  return step + "@" + args.ticket;
+  return step + "." + args.ticket;
 }
 
 // Step 0: preconditions gate. implement-preconditions is read-only

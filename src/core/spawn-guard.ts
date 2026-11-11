@@ -31,10 +31,12 @@ import {
 
 /**
  * The separator a workflow step key uses between the step name and the ticket
- * slug: `tdd@one`. A colon would read better but a key can name an output file,
- * and a colon is not a legal filename character on Windows.
+ * slug: `tdd.one`. The workflow runtime accepts only letters, digits, `.`, `_`
+ * and `-` in a key, starting with a letter or digit, so a separator like `@` or
+ * `:` fails the run before any child starts. A dot reads well, is legal in a
+ * key, and is legal in a filename on every platform.
  */
-export const KEY_SEPARATOR = "@";
+export const KEY_SEPARATOR = ".";
 
 /** What a spawn call says about the work it starts. */
 export interface SpawnIdentity {

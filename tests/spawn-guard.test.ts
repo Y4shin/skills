@@ -216,7 +216,7 @@ describe("the per-child subagent_launch call", () => {
     const dir = sessionDir();
     const stub = stubPi({ branch: "effort/an-effort" });
 
-    const result = await fire(stub, dir, "subagent_launch", launchCall("tdd@one", "tdd-worker"));
+    const result = await fire(stub, dir, "subagent_launch", launchCall(`tdd${KEY_SEPARATOR}one`, "tdd-worker"));
 
     expect(result, "the child never starts").toMatchObject({ block: true });
     // The launch carries no effort slug, so the base reads as "the effort
@@ -237,7 +237,7 @@ describe("the per-child subagent_launch call", () => {
       "land-worker",
     ]) {
       const stub = stubPi({ branch: "main" });
-      const result = await fire(stub, dir, "subagent_launch", launchCall(`step@one`, agent));
+      const result = await fire(stub, dir, "subagent_launch", launchCall(`step${KEY_SEPARATOR}one`, agent));
       expect(result, `${agent} is blocked`).toMatchObject({ block: true });
       expect(result.reason).toContain("requires 'ticket/one'");
     }
@@ -247,7 +247,7 @@ describe("the per-child subagent_launch call", () => {
     const dir = sessionDir();
     const stub = stubPi({ branch: "ticket/one" });
 
-    const result = await fire(stub, dir, "subagent_launch", launchCall("verify@one", "slice-verifier"));
+    const result = await fire(stub, dir, "subagent_launch", launchCall(`verify${KEY_SEPARATOR}one`, "slice-verifier"));
 
     expect(result).toBeUndefined();
   });
@@ -263,7 +263,10 @@ describe("the chain's step keys", () => {
 
   test("every step key embeds the ticket slug, so no launch is anonymous", () => {
     // One helper builds every key, and it is the ticket that rides along.
-    expect(chain).toMatch(/function stepKey\(step\) \{\s*return step \+ "@" \+ args\.ticket;\s*\}/);
+    const separator = KEY_SEPARATOR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    expect(chain).toMatch(
+      new RegExp(`function stepKey\\(step\\) \\{\\s*return step \\+ "${separator}" \\+ args\\.ticket;\\s*\\}`),
+    );
     for (const step of ["gate", "gate-retry", "tdd", "verify", "deviation", "land"]) {
       expect(chain, `the ${step} step key carries the ticket`).toContain(`stepKey("${step}")`);
     }
@@ -277,22 +280,28 @@ describe("the chain's step keys", () => {
     expect(ticketFromKey(`gate-retry${KEY_SEPARATOR}a-ticket`)).toBe("a-ticket");
     // A slug never carries the separator, so the last one wins.
     expect(ticketFromKey(`step${KEY_SEPARATOR}two${KEY_SEPARATOR}one`)).toBe("one");
-    for (const anonymous of ["tdd", "", "tdd@", 42, null, undefined, { key: "tdd@one" }]) {
+    for (const anonymous of ["tdd", "", `tdd${KEY_SEPARATOR}`, 42, null, undefined, { key: `tdd${KEY_SEPARATOR}one` }]) {
       expect(ticketFromKey(anonymous), String(anonymous)).toBe("");
     }
   });
 
-  test("the chain writes the separator the guard reads", () => {
+  test("the chain writes the separator the guard reads, and the runtime accepts it", () => {
     // A workflow script cannot import the extension module, so the character is
     // written in both places; this is what keeps the two from drifting.
     expect(chain).toContain(`step + "${KEY_SEPARATOR}" + args.ticket`);
+    // The workflow runtime rejects a run key that is outside
+    // [A-Za-z0-9._-] or does not start with a letter or digit. An illegal
+    // separator fails the whole chain before any child starts, and no unit
+    // test that only compares the two copies of the character can see it.
+    expect(KEY_SEPARATOR).toMatch(/^[._-]$/);
+    expect(`tdd${KEY_SEPARATOR}one`).toMatch(/^[A-Za-z0-9][A-Za-z0-9._-]*$/);
   });
 
   test("a key built the way the chain builds it carries the ticket the guard reads", async () => {
     const dir = sessionDir();
     const stub = stubPi({ branch: "main" });
 
-    // The script's `step + "@" + args.ticket`, from the shared separator.
+    // The script's `step + "." + args.ticket`, from the shared separator.
     const key = ["tdd", "one"].join(KEY_SEPARATOR);
     const result = await fire(stub, dir, "subagent_launch", launchCall(key, "tdd-worker"));
 
@@ -326,7 +335,7 @@ describe("calls the guard must leave untouched", () => {
     const dir = sessionDir();
     const stub = stubPi({ branch: "main" });
 
-    const result = await fire(stub, dir, "subagent_launch", launchCall("review@one", "code-reviewer"));
+    const result = await fire(stub, dir, "subagent_launch", launchCall(`review${KEY_SEPARATOR}one`, "code-reviewer"));
 
     expect(result).toBeUndefined();
     expect(stub.execCalls).toEqual([]);
@@ -385,7 +394,7 @@ describe("calls the guard must leave untouched", () => {
 
     expect(await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity))).toBeUndefined();
     expect(await fire(stub, dir, "subagent", chainLaunch(identity))).toBeUndefined();
-    expect(await fire(stub, dir, "subagent_launch", launchCall("tdd@one", "tdd-worker"))).toBeUndefined();
+    expect(await fire(stub, dir, "subagent_launch", launchCall(`tdd${KEY_SEPARATOR}one`, "tdd-worker"))).toBeUndefined();
     expect(stub.execCalls, "a profile with no branch gate reads no checkout").toEqual([]);
   });
 
@@ -416,7 +425,7 @@ describe("a blocked spawn fails its step and the session continues", () => {
     // A returned block becomes an error tool result for that call alone; a
     // thrown error would not be the same shape for the workflow that started
     // the child.
-    await expect(fire(stub, dir, "subagent_launch", launchCall("tdd@one", "tdd-worker"))).resolves.toMatchObject({
+    await expect(fire(stub, dir, "subagent_launch", launchCall(`tdd${KEY_SEPARATOR}one`, "tdd-worker"))).resolves.toMatchObject({
       block: true,
     });
   });
