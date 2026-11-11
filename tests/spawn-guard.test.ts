@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import factory from "../src/pi.js";
-import { KEY_SEPARATOR } from "../src/core/spawn-guard.js";
+import { KEY_SEPARATOR, ticketFromKey } from "../src/core/spawn-guard.js";
 
 /** The repo root, in POSIX form, for the structure assertions over the chain. */
 const PROJECT = fileURLToPath(new URL("..", import.meta.url));
@@ -71,6 +71,7 @@ interface Stub {
   api: any;
   handlers: Record<string, Array<(...args: any[]) => any>>;
   execCalls: Array<{ command: string; args: string[]; options: any }>;
+  notices: string[];
 }
 
 /**
@@ -81,6 +82,7 @@ interface Stub {
 function stubPi(checkout: { branch: string }): Stub {
   const handlers: Record<string, Array<(...args: any[]) => any>> = {};
   const execCalls: Stub["execCalls"] = [];
+  const notices: string[] = [];
   const api: any = {
     registerTool() {},
     on(event: string, handler: (...args: any[]) => any) {
@@ -98,12 +100,14 @@ function stubPi(checkout: { branch: string }): Stub {
       return { stdout: `${checkout.branch}\n`, stderr: "", code: 0, killed: false };
     },
     ui: {
-      notify() {},
+      notify(message: string) {
+        notices.push(message);
+      },
       confirm: async () => true,
     },
   };
   factory(api);
-  return { api, handlers, execCalls };
+  return { api, handlers, execCalls, notices };
 }
 
 /** Fire the extension's one `tool_call` handler, as pi does before the tool runs. */
@@ -268,6 +272,16 @@ describe("the chain's step keys", () => {
     expect(chain).not.toMatch(/key: "/);
   });
 
+  test("the key's slug is the text after the last separator, and nothing else is a slug", () => {
+    expect(ticketFromKey(`tdd${KEY_SEPARATOR}one`)).toBe("one");
+    expect(ticketFromKey(`gate-retry${KEY_SEPARATOR}a-ticket`)).toBe("a-ticket");
+    // A slug never carries the separator, so the last one wins.
+    expect(ticketFromKey(`step${KEY_SEPARATOR}two${KEY_SEPARATOR}one`)).toBe("one");
+    for (const anonymous of ["tdd", "", "tdd@", 42, null, undefined, { key: "tdd@one" }]) {
+      expect(ticketFromKey(anonymous), String(anonymous)).toBe("");
+    }
+  });
+
   test("a key built the way the chain builds it carries the ticket the guard reads", async () => {
     const dir = sessionDir();
     const stub = stubPi({ branch: "main" });
@@ -377,6 +391,10 @@ describe("calls the guard must leave untouched", () => {
     const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
 
     expect(result, "a gate that never saw the checkout never blocks").toBeUndefined();
+    expect(
+      stub.notices.join("\n"),
+      "a guard that did not run says so, instead of passing silently",
+    ).toContain("fatal: not a git repository");
   });
 });
 

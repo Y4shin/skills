@@ -3914,7 +3914,13 @@ async function guardSpawn(
       },
     },
   );
-  if (verdict.pass) return undefined;
+  if (verdict.pass) {
+    // A pass that carries a diagnostic is a guard that did not run: the spawn
+    // proceeds, and the operator hears why the checkout was never read, the
+    // same way the openers report a gate they could not apply.
+    for (const diagnostic of verdict.diagnostics) ctx.ui.notify(`task-workflow spawn guard: ${diagnostic}`, "info");
+    return undefined;
+  }
   return { block: true, reason: verdict.reason };
 }
 
