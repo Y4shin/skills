@@ -620,11 +620,11 @@ describe("the push step follows the profile's push policy", () => {
   }
 
   /** A profile directory holding the bundled files plus one custom profile. */
-  function customProfiles(push: unknown): string {
+  function customProfiles(push: string): string {
     const dir = profileFixtureDir();
     writeSettings(join(dir, "custom.json"), {
       name: "custom",
-      ...(push === undefined ? {} : { push }),
+      push,
       phases: { "implement-ticket": { branch: "effort/{effort}" }, "finalize-effort": { branch: "effort/{effort}" } },
     });
     return dir;
