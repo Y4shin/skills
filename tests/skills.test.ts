@@ -3756,6 +3756,25 @@ describe("finalize-effort skill (finalize-effort-skill)", () => {
   });
 });
 
+// ─── release: the promoted, user-invoked release skill (release-skill) ────
+
+// A release is a deliberate human act, so the skill is user-invoked: the model
+// cannot start one. Its defaults always run (a version bump through the release
+// tools, and the root `CHANGELOG.md`), and then it follows the repository's own
+// release document as prose, because that file is the authority for the
+// mechanical work of preparing and publishing.
+describe("release skill (release-skill)", () => {
+  const content = readFile("skills/engineering/release/SKILL.md");
+  const fm = parseFrontmatter(content);
+
+  test("stays user-invoked: the model cannot start a release on its own", () => {
+    expect(fm["name"]).toBe("release");
+    // The typed command is the consent: no model decision starts a release.
+    expect(fm["disable-model-invocation"]).toBe("true");
+    expect(content).toMatch(/^disable-model-invocation: true$/m);
+  });
+});
+
 // ─── docs-resync (enforced workflow v5) ──────────────────────────────
 
 // Arch spec entry 20: shipped prose matches shipped v5. Every pin below
