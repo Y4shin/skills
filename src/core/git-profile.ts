@@ -388,8 +388,24 @@ export interface GateDecision {
  * and retry. Nothing is latched.
  */
 export function gateDecision(cwd: string, request: GateRequest, deps: BriefDeps = {}): GateDecision {
-  const brief = phaseBrief(cwd, request, deps);
-  const current = request.currentBranch?.trim() ? request.currentBranch.trim() : null;
+  return decideFromBrief(phaseBrief(cwd, request, deps), request.name, request.currentBranch);
+}
+
+/**
+ * The decision half of `gateDecision`, over an already-resolved brief: the
+ * opener resolves one brief and asks two questions of it (what did the profile
+ * carry, may this checkout proceed), so neither question re-reads the settings.
+ *
+ * The same rule as `gateDecision`: no required branch passes, the required
+ * branch passes, anything else is a refusal naming both branches. Nothing is
+ * latched.
+ */
+export function decideFromBrief(
+  brief: PhaseBrief,
+  name: string,
+  currentBranch: string | null,
+): GateDecision {
+  const current = currentBranch?.trim() ? currentBranch.trim() : null;
   const base = {
     profile: brief.profile,
     branch: brief.branch,
@@ -404,7 +420,87 @@ export function gateDecision(cwd: string, request: GateRequest, deps: BriefDeps 
     pass: false,
     reason:
       `the checkout is on ${current === null ? "no branch (a detached HEAD)" : `'${current}'`}, ` +
-      `but '${request.name}' requires '${brief.branch}'`,
+      `but '${name}' requires '${brief.branch}'`,
     ...base,
+  };
+}
+
+// ─── The git seam, and the text an open or close reports ─────────────────────
+
+/**
+ * Run one git command against the session directory and return its stdout.
+ * The tool context supplies it, so the gates and their tests never need a
+ * repository: a fake answers the one read below.
+ */
+export type GitRun = (args: string[]) => Promise<string>;
+
+/** What reading the checkout produced, and what it could not read. */
+export interface CheckoutRead {
+  /** The branch checked out now; null when the checkout is detached or unknown. */
+  branch: string | null;
+  /** Why the checkout could not be read; null on a successful read. */
+  diagnostic: string | null;
+}
+
+/** The command the branch gate reads the checkout with. */
+const CHECKOUT_COMMAND = ["rev-parse", "--abbrev-ref", "HEAD"];
+
+/**
+ * Read the checked-out branch through the git seam.
+ *
+ * A detached checkout answers `HEAD`, which reads as no branch. A seam that is
+ * absent or cannot run reports a diagnostic instead of a branch: the gate must
+ * not refuse on a checkout it never saw, so the caller passes the open through
+ * and says in its result that the gate did not run.
+ */
+export async function readCheckout(git: GitRun | undefined): Promise<CheckoutRead> {
+  if (git === undefined) {
+    return {
+      branch: null,
+      diagnostic: `the session offered no git seam, so the branch gate did not run (${CHECKOUT_COMMAND.join(" ")})`,
+    };
+  }
+  try {
+    const out = (await git([...CHECKOUT_COMMAND])).trim();
+    return { branch: out === "" || out === "HEAD" ? null : out, diagnostic: null };
+  } catch (e) {
+    return {
+      branch: null,
+      diagnostic:
+        `the checkout could not be read (git ${CHECKOUT_COMMAND.join(" ")} failed: ${(e as Error).message}), ` +
+        `so the branch gate did not run`,
+    };
+  }
+}
+
+/** The instruction text a profile carries for one phase, and the profile that answered. */
+export interface PhaseText {
+  /** The profile that answered, after any fallback. */
+  profile: string;
+  /** The text delivered when the phase opens; "" when the profile carries none. */
+  open: string;
+  /** The text delivered when the phase closes; "" when the profile carries none. */
+  close: string;
+  /** Diagnostics from reading the settings and the profile. */
+  diagnostics: string[];
+}
+
+/**
+ * The instruction text for one phase, resolved without a checkout: a close
+ * knows the phase it closes and the effort it closes, but reading the checkout
+ * is the open's job, so this answers from the profile alone.
+ */
+export function phaseText(cwd: string, name: string, deps: BriefDeps = {}): PhaseText {
+  const diagnostics: string[] = [];
+  const settings = readGitSettings(cwd, deps);
+  diagnostics.push(...settings.diagnostics);
+  const loaded = loadProfile(settings.profile, deps);
+  diagnostics.push(...loaded.diagnostics);
+  const phase = loaded.profile.phases[name];
+  return {
+    profile: loaded.profile.name,
+    open: phase?.openInstructions ?? "",
+    close: phase?.closeInstructions ?? "",
+    diagnostics,
   };
 }
