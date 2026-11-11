@@ -23,9 +23,8 @@ the versions they produce, and the changelog section each release adds.
 Report the plan to the operator: the entries, the versions, and the section
 text, so the release can be reviewed before anything lands.
 
-A refused plan writes nothing either. Report the refusal's reason and stop;
-the reason names which of the three it is, a missing manifest, a missing
-`.changeset/config.json`, or a pending entry the release cannot read.
+A refused plan writes nothing either. Report the refusal's reason, as the
+tool gave it, and stop: the reason names what to fix.
 
 ## 2. Apply on confirmation
 
@@ -79,8 +78,9 @@ missing `.changeset/config.json` is a hard error, not a default.
 An empty plan is its own answer, and it is not a failure: the repository has
 nothing pending, so nothing moves. Say that plainly, that there is nothing to
 release, and stop. No version bump happens, no changelog section is written,
-and no changeset file is consumed. The refusal's reason names the case when
-it is not simply an empty `.changeset/`.
+and no changeset file is consumed. The reason names the case when nothing is
+pending and the plan is still empty, such as a private package this config
+does not version.
 
 Never stage a changeset to make a release possible. Authoring belongs to the
 effort close, where `/skill:finalize-effort` proposes the entries for the work
