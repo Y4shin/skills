@@ -15,7 +15,7 @@
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import {
   BUNDLED_PROFILES,
@@ -25,6 +25,8 @@ import {
   phaseBrief,
 } from "../src/core/git-profile.js";
 import { GIT_SETTINGS_DEFAULTS, readGitSettings, trunkName } from "../src/core/repo-gate.js";
+import { SKILL_REGISTRY } from "../src/disclosure.js";
+import { createTools } from "../src/pi.js";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -422,5 +424,118 @@ describe("the profile fallbacks", () => {
     expect(brief.profile).toBe("default");
     expect(brief.branch).toBe("effort/an-effort");
     expect(brief.diagnostics.join("\n")).toContain("profile");
+  });
+});
+
+// ─── tw_phase_brief: the read-only brief any phase asks for before opening ──
+
+describe("tw_phase_brief", () => {
+  /** The session directory: a temp repo selecting a profile, nothing else. */
+  function sessionDir(settings: Record<string, unknown> = {}): string {
+    const dir = tempDir("brief-repo");
+    writeSettings(join(dir, ".pi", "settings.json"), { taskWorkflow: settings });
+    return dir;
+  }
+
+  /** The tool as an extension registers it: driven with a bare directory context. */
+  async function brief(args: Record<string, unknown>, directory: string): Promise<{ text: string; details: any }> {
+    const tools = createTools() as unknown as Record<string, { execute: Function }>;
+    const result = await tools.tw_phase_brief.execute(args, { directory });
+    expect(typeof result, "the brief tool answers with text plus details").toBe("object");
+    return result as { text: string; details: any };
+  }
+
+  let previousAgentDir: string | undefined;
+
+  beforeAll(() => {
+    previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+    // An empty agent dir: the global settings of the machine running the
+    // suite never leak into a brief.
+    process.env.PI_CODING_AGENT_DIR = tempDir("brief-agent");
+  });
+
+  afterAll(() => {
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+  });
+
+  test("names the effort branch, the step that creates it off the trunk, and the instruction text", async () => {
+    const { text, details } = await brief(
+      { skill: "implement-ticket", effort: "configurable-git-workflow", ticket: "profile-data-and-phase-briefs" },
+      sessionDir(),
+    );
+
+    expect(details.branch).toBe("effort/configurable-git-workflow");
+    expect(details.branch_step).toContain("create and check out effort/configurable-git-workflow");
+    expect(details.branch_step).toContain("the trunk (main)");
+    // Both bundled profiles carry empty instruction fields, so the brief
+    // reports that plainly rather than inventing text.
+    expect(details.instructions).toBe("");
+    expect(text).toContain("effort/configurable-git-workflow");
+    expect(text).toContain("Instructions: none");
+    expect(text).toContain("profile: default");
+  });
+
+  test("reports no branch requirement for a planning phase", async () => {
+    const { text, details } = await brief(
+      { skill: "wayfinder", effort: "configurable-git-workflow" },
+      sessionDir(),
+    );
+
+    expect(details.branch).toBeNull();
+    expect(details.branch_step).toBeNull();
+    expect(text).toContain("Required branch: none");
+    expect(text).toContain("requires no branch");
+  });
+
+  test("carries nothing for any phase when the repository selects flat", async () => {
+    const dir = sessionDir({ git: { profile: "flat" } });
+    for (const skill of PHASES) {
+      const { text, details } = await brief({ skill, effort: "configurable-git-workflow", ticket: "a-ticket" }, dir);
+
+      expect(details.branch, skill).toBeNull();
+      expect(details.branch_step, skill).toBeNull();
+      expect(details.close_gate, skill).toBeNull();
+      expect(details.instructions, skill).toBe("");
+      expect(text).toContain("Required branch: none");
+    }
+  });
+
+  test("refuses a name that is not a phase, naming the phases", async () => {
+    const tools = createTools() as unknown as Record<string, { execute: Function }>;
+    const result = (await tools.tw_phase_brief.execute(
+      { skill: "nonsense-skill", effort: "configurable-git-workflow" },
+      { directory: sessionDir() },
+    )) as { text: string; details: any };
+
+    expect(result.details.reason).toContain("nonsense-skill");
+    expect(result.text).toContain("Refused:");
+    expect(result.text).toContain("wayfinder");
+    expect(result.text).toContain("Legal next:");
+  });
+
+  test("reports a malformed setting as a diagnostic and answers from the default profile", async () => {
+    const { text, details } = await brief(
+      { skill: "implement-ticket", effort: "configurable-git-workflow" },
+      sessionDir({ git: { profile: "flat", trunkMerge: "squash" } }),
+    );
+
+    // The malformed key falls back to the documented default, so the flat
+    // selection still stands and the brief says so.
+    expect(details.profile).toBe("flat");
+    expect(details.branch).toBeNull();
+    expect(details.diagnostics.join("\n")).toContain("trunkMerge");
+    expect(text).toContain("Diagnostics:");
+  });
+
+  test("is declared in every state and belongs to no phase toolset", () => {
+    const tools = createTools() as unknown as Record<string, { activeByDefault?: boolean }>;
+    // A phase asks for its brief before it opens, so the tool cannot wait for
+    // an opener to activate it.
+    expect(tools.tw_phase_brief.activeByDefault).toBe(true);
+    // And no toolset lists it, so its presence can never derive a phase as open.
+    for (const entry of SKILL_REGISTRY) {
+      expect(entry.toolset, entry.name).not.toContain("tw_phase_brief");
+    }
   });
 });
