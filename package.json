@@ -44,6 +44,11 @@
     "evals:regenerate": "node evals/regenerate.ts"
   },
   "dependencies": {
+    "@changesets/config": "^4.0.1",
+    "@changesets/read": "^1.0.1",
+    "@changesets/types": "^7.0.0",
+    "@changesets/write": "^1.0.1",
+    "@manypkg/get-packages": "^3.1.0",
     "yaml": "^2.9.1"
   },
   "peerDependencies": {
@@ -54,6 +59,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
+    "@changesets/parse": "^1.0.0",
     "@earendil-works/pi-ai": "^1.0.3",
     "@earendil-works/pi-coding-agent": "^1.4.0",
     "@types/node": "^24.19.2",
