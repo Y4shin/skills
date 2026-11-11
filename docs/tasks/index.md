@@ -11,6 +11,7 @@ title: docs/tasks
 - architecture-tracking
 - bash-tail-preview-fix
 - build-eval-creator-skill
+- code-quality-cleanup
 - coding-taste
 - configurable-git-workflow
 - conventions-and-writer-cleanups
