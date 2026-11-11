@@ -44,7 +44,11 @@
     "evals:regenerate": "node evals/regenerate.ts"
   },
   "dependencies": {
+    "@changesets/apply-release-plan": "^8.1.1",
+    "@changesets/assemble-release-plan": "^7.0.0",
+    "@changesets/changelog-git": "^1.0.0",
     "@changesets/config": "^4.0.1",
+    "@changesets/git": "^4.0.1",
     "@changesets/read": "^1.0.1",
     "@changesets/types": "^7.0.0",
     "@changesets/write": "^1.0.1",

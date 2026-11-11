@@ -218,6 +218,8 @@ describe("task-workflow tools", () => {
         "tw_open",
         "tw_phase_brief",
         "tw_record_out_of_scope",
+        "tw_release_apply",
+        "tw_release_plan",
         "tw_request_tool",
         "tw_resolve_uncertainty",
         "tw_show",
