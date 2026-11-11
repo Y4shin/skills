@@ -282,3 +282,148 @@ describe("the outer subagent call", () => {
     expect(result.reason).toContain("the checkout is on no branch (a detached HEAD)");
   });
 });
+
+describe("calls the guard must leave untouched", () => {
+  const identity = { effort: "an-effort", ticket: "one" };
+
+  test.each([
+    "code-reviewer",
+    "coherence-refactorer",
+    "spec-reconciler",
+    "architecture-scout",
+    "test-runner",
+  ])("a dispatch of %s passes, and the checkout is never read", async (agent) => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+
+    const result = await fire(stub, dir, "subagent", directSpawn(agent, identity));
+
+    expect(result).toBeUndefined();
+    expect(stub.execCalls, "an ungated agent costs no git call").toEqual([]);
+  });
+
+  test("a launch of an agent outside the profile passes untouched", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+
+    const result = await fire(stub, dir, "subagent_launch", launchCall("review@one", "code-reviewer"));
+
+    expect(result).toBeUndefined();
+    expect(stub.execCalls).toEqual([]);
+  });
+
+  test("a chain launch with no ticket identity passes untouched", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+
+    // The effort close's workflow carries the effort only: no ticket, no
+    // ticket branch to require.
+    const result = await fire(stub, dir, "subagent", {
+      async: true,
+      workflow: "skills/engineering/implement-ticket/scripts/end-of-effort.js",
+      args: { effort: "an-effort", startingBranch: "main" },
+    });
+
+    expect(result).toBeUndefined();
+    expect(stub.execCalls).toEqual([]);
+  });
+
+  test("an implementation agent dispatched with no ticket passes untouched", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+
+    const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", { effort: "an-effort" }));
+
+    expect(result, "no ticket means no ticket branch to require").toBeUndefined();
+    expect(stub.execCalls).toEqual([]);
+  });
+
+  test("a step key with no slug passes untouched", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+
+    const result = await fire(stub, dir, "subagent_launch", launchCall("tdd", "tdd-worker"));
+
+    expect(result).toBeUndefined();
+    expect(stub.execCalls).toEqual([]);
+  });
+
+  test("any other tool is never looked at by the spawn guard", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+
+    for (const toolName of ["bash", "read", "tw_get", "tw_open"]) {
+      const result = await fire(stub, dir, toolName, { command: "git checkout main" });
+      expect(result, toolName).toBeUndefined();
+    }
+    expect(stub.execCalls).toEqual([]);
+  });
+
+  test("the flat profile requires no branch, so every spawn passes on any checkout", async () => {
+    const dir = sessionDir({ git: { profile: "flat" } });
+    const stub = stubPi({ branch: "main" });
+
+    expect(await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity))).toBeUndefined();
+    expect(await fire(stub, dir, "subagent", chainLaunch(identity))).toBeUndefined();
+    expect(await fire(stub, dir, "subagent_launch", launchCall("tdd@one", "tdd-worker"))).toBeUndefined();
+    expect(stub.execCalls, "a profile with no branch gate reads no checkout").toEqual([]);
+  });
+
+  test("a checkout the seam cannot read passes, rather than refusing a spawn it never saw", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+    stub.api.exec = async () => ({ stdout: "", stderr: "fatal: not a git repository", code: 128, killed: false });
+
+    const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
+
+    expect(result, "a gate that never saw the checkout never blocks").toBeUndefined();
+  });
+});
+
+// ─── The block is a step failure, not a session failure ──────────────────────
+
+describe("a blocked spawn fails its step and the session continues", () => {
+  const identity = { effort: "an-effort", ticket: "one" };
+
+  test("the guard answers a block result instead of throwing", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+
+    // A returned block becomes an error tool result for that call alone; a
+    // thrown error would not be the same shape for the workflow that started
+    // the child.
+    await expect(fire(stub, dir, "subagent_launch", launchCall("tdd@one", "tdd-worker"))).resolves.toMatchObject({
+      block: true,
+    });
+  });
+
+  test("nothing latches: after a block the same call passes once the checkout moves", async () => {
+    const dir = sessionDir();
+    const checkout = { branch: "main" };
+    const stub = stubPi(checkout);
+    const call = () => fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
+
+    expect(await call()).toMatchObject({ block: true });
+
+    // The model performs the step the refusal named, then dispatches again.
+    checkout.branch = "ticket/one";
+    expect(await call()).toBeUndefined();
+  });
+
+  test("the session keeps working after a block: other guards and other calls still answer", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+    const statePath = join(dir, "docs", "tasks", "state.yaml");
+    mkdirSync(dirname(statePath), { recursive: true });
+    writeFileSync(statePath, "schema_version: 5\nmap: null\ntask: null\n", "utf-8");
+
+    expect(await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity))).toMatchObject({ block: true });
+
+    // The write lockdown still refuses inside the tree, and a call outside it
+    // still passes: one blocked spawn changed nothing else about the session.
+    expect(await fire(stub, dir, "write", { path: "docs/tasks/an-effort/map.md", content: "x" })).toMatchObject({
+      block: true,
+    });
+    expect(await fire(stub, dir, "write", { path: "src/app.ts", content: "x" })).toBeUndefined();
+  });
+});
