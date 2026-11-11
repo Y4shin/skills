@@ -44,7 +44,11 @@ next calls). It activates the toolset only when they pass. Work only through the
 opener discloses. When a step genuinely needs a tool this phase does not
 disclose, call `tw_request_tool` and let the operator decide: never close the
 phase early to reopen another one for its tools. Close the phase with
-`tw_close implement-ticket` when the run releases.
+`tw_close implement-ticket`, naming the effort it works in:
+`{ skill: "implement-ticket", effort: "<effort-slug>" }`. The close is the
+second half of the branch gate, and it reads the same profile row: a phase
+whose row carries a closing gate refuses to close from any other checkout,
+naming the branch to check out, and retrying after that closes.
 
 The opener reads `docs/tasks/<effort>/architecture.md` (or the legacy
 `arch-spec.md`, which the schema-5 migration renames; the refusal names the
@@ -294,22 +298,22 @@ separate bash block.
 
    First write the note the land-worker reported through
    `tw_write_ticket_note` (selector: the ticket doc, note: its
-   `## Implementation note`), and commit it here: `git add docs/tasks/ &&
-   git commit -m "docs(ticket): note {ticketSlug}"`. The `git add docs/tasks/`
+   `## Implementation note`), then commit it here. The `git add docs/tasks/`
    covers the note and the `state.yaml` pointer cleared in step 7, so both land
    in this commit. The worker cannot write the note: its session has no phase
    open.
 
-   Then push per the profile's push policy, which this phase's brief reports
-   next to the branch: a policy the profile sets to never means the phase
-   pushes nothing and the commits stay local, and a repository with no remote
-   has nothing to push to.
-
    ```bash
    set -e
-   # only when the brief's push policy allows it
-   git push origin <effort-branch>
+   git add docs/tasks/ && git commit -m "docs(ticket): note {ticketSlug}"
    ```
+
+   Then push: the push is the push step this phase's brief renders, never a
+   command this file carries. The brief composes that step from the profile's
+   push policy, for the branch this phase is on. With `always` the step names
+   the command to run; with `never`, or when the profile names no policy, the
+   step names no command, so the phase pushes nothing and the commits stay
+   local. A repository with no remote has nothing to push to either way.
 
 There is **no per-ticket move**: the ticket stays in the live effort.
 Moving one ticket out would split the effort's graph scope and trip the
