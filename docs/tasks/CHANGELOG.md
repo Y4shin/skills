@@ -72,6 +72,19 @@ title: Task Changelog
 
 
 
+
+## 2026-11-11, Block implementation agent spawns on the wrong ticket branch (spawn-block)
+
+The implementation chain now refuses to start from the wrong checkout. One
+profile-driven guard decides at both the outer dispatch and the per-child launch,
+using the same resolver as the phase gate so a spawn refusal and a phase refusal
+cannot disagree: the outer call names the gated agent and the ticket, and the
+per-child call reads the ticket from a step key that embeds the slug. A refusal
+names the current and required branches in the workflow's existing shape and blocks
+that step while the session continues, and an unreadable checkout passes with a
+notification rather than blocking on a missing fact. Nothing enumerates the five
+agents in code, so `flat` blocks nothing and a future profile decides its own set.
+
 ## 2026-11-11, Refuse the two branch-bearing phases from the wrong branch (branch-gates)
 
 The implementation phase and the effort close now refuse to open from the wrong
