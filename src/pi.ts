@@ -1736,6 +1736,8 @@ function changesetLegalNext(code: ChangesetsRefusalCode): string {
       return "run 'npx changeset init' in the repository, then retry tw_write_changesets";
     case "invalid-config":
       return "fix .changeset/config.json, then retry tw_write_changesets";
+    case "unreadable-staged":
+      return "fix or remove the changeset file the refusal quotes, then retry tw_write_changesets";
     case "unknown-package":
       return "retry tw_write_changesets with a package name from the workspace list in the refusal";
     case "invalid-level":

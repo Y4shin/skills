@@ -149,22 +149,42 @@ function identical(a: ChangesetEntry, b: ChangesetEntry): boolean {
 /** What is already staged in `.changeset/`, plus what reading it had to report. */
 export interface StagedRead {
   entries: ChangesetEntry[];
+  /**
+   * The refusal, or null when the read answered. An empty `entries` with a null
+   * refusal means nothing is staged; a refusal means the staged set exists and
+   * could not be read, which is a different thing.
+   */
+  refusal: ChangesetsRefusal | null;
   diagnostics: string[];
 }
 
 /**
  * Read the pending changesets as entries, one per release they name.
  *
- * An unreadable staged entry is a diagnostic, not a refusal: the dedupe can
- * only be as good as the tree it reads, and the release path reports the real
- * problem when it consumes the file.
+ * The two answers are kept apart: a repository with nothing staged returns no
+ * entries and no refusal, while a staged set the library cannot parse is a
+ * named refusal. The library parses every file at once, so one malformed entry
+ * costs the whole set, and a dedupe that read that as "nothing staged" would
+ * write a second copy of an entry the tree already carries.
  */
 export async function readStagedEntries(workspace: Workspace): Promise<StagedRead> {
   let staged: NewChangeset[];
   try {
     staged = await readChangesets(workspace.rootDir);
   } catch (e) {
-    return { entries: [], diagnostics: [`the staged changesets could not be read: ${(e as Error).message}`] };
+    // The library's message quotes the offending content, so the operator can
+    // find the file; it is flattened to one line for the refusal text.
+    const detail = (e as Error).message.replace(/\s+/g, " ").trim();
+    return {
+      entries: [],
+      refusal: {
+        code: "unreadable-staged",
+        reason:
+          `the staged changesets in ${join(workspace.rootDir, ".changeset")} could not be read, ` +
+          `so no entry can be checked against what is already staged: ${detail}`,
+      },
+      diagnostics: [],
+    };
   }
   const entries: ChangesetEntry[] = [];
   for (const changeset of staged) {
@@ -175,7 +195,7 @@ export async function readStagedEntries(workspace: Workspace): Promise<StagedRea
       entries.push({ package: release.name, level: release.type as ChangeLevel, summary: changeset.summary });
     }
   }
-  return { entries, diagnostics: [] };
+  return { entries, refusal: null, diagnostics: [] };
 }
 
 /** Why a changeset call was refused. Every code is a named outcome. */
@@ -183,6 +203,7 @@ export type ChangesetsRefusalCode =
   | "no-workspace"
   | "no-config"
   | "invalid-config"
+  | "unreadable-staged"
   | "unknown-package"
   | "invalid-level"
   | "no-root-package";

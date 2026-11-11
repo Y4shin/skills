@@ -239,6 +239,48 @@ describe("the generic patch", () => {
   });
 });
 
+// ─── Reading the staged set ─────────────────────────────────────────────────
+
+describe("readStagedEntries", () => {
+  test("separates nothing staged from a staged set it could not read", async () => {
+    const empty = await readWorkspace(fixtureRepository());
+    const nothing = await readStagedEntries(empty.workspace!);
+
+    // An empty staged set is an answer: the dedupe ran and found nothing.
+    expect(nothing.refusal).toBeNull();
+    expect(nothing.entries).toEqual([]);
+
+    const broken = fixtureRepository();
+    writeFileSync(join(broken, ".changeset", "malformed.md"), "not a changeset at all\n", "utf-8");
+    const read = await readWorkspace(broken);
+    const unreadable = await readStagedEntries(read.workspace!);
+
+    // An unreadable staged set is not an empty one: it is a named refusal, so
+    // no caller can mistake "could not read" for "nothing staged".
+    expect(unreadable.refusal).not.toBeNull();
+    expect(unreadable.refusal!.code).toBe("unreadable-staged");
+    expect(unreadable.refusal!.reason).toContain(join(broken, ".changeset"));
+    expect(unreadable.entries).toEqual([]);
+  });
+
+  test("reads a staged set that parses, with no refusal", async () => {
+    const dir = fixtureRepository();
+    writeFileSync(
+      join(dir, ".changeset", "staged-change.md"),
+      '---\n"@scope/fixture-pkg": minor\n---\n\nAdd the release skill.\n',
+      "utf-8",
+    );
+    const read = await readWorkspace(dir);
+
+    const staged = await readStagedEntries(read.workspace!);
+
+    expect(staged.refusal).toBeNull();
+    expect(staged.entries).toEqual([
+      { package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." },
+    ]);
+  });
+});
+
 // ─── The pre-write proposal ─────────────────────────────────────────────────
 
 describe("tw_write_changesets with dry_run", () => {
