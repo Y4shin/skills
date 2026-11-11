@@ -17,7 +17,7 @@
 
 import { join } from "node:path";
 
-import { getPackages } from "@manypkg/get-packages";
+import { getPackages, type Packages } from "@manypkg/get-packages";
 import { writeChangeset } from "@changesets/write";
 import type { Changeset } from "@changesets/types";
 
@@ -70,6 +70,10 @@ export interface WriteOutcome {
 /**
  * Write one changeset file per entry under `.changeset/`.
  *
+ * Every entry is validated against the workspace before anything is written, so
+ * a refused call writes no file at all: a half-written batch of entries is
+ * worse than none, because the operator confirmed a set and got part of it.
+ *
  * Formatting is forced off: the config's default value is "auto", which spawns
  * a formatter, and a formatter failure leaves a half-applied tree. The library
  * writes the file, so the bytes are the command line tool's own.
@@ -78,14 +82,103 @@ export async function writeEntries(
   cwd: string,
   request: { entries: ChangesetEntry[] },
 ): Promise<WriteOutcome> {
+  const read = await readWorkspace(cwd);
+  if (read.refusal !== null) return refused(read.refusal, read.diagnostics);
+  const workspace = read.packages;
+  const invalid = validateEntries(request.entries, workspace);
+  if (invalid !== null) return refused(invalid, read.diagnostics);
+
   const written: string[] = [];
   for (const entry of request.entries) {
     const changeset: Changeset = {
       summary: entry.summary,
       releases: [{ name: entry.package, type: entry.level }],
     };
-    const id = await writeChangeset(changeset, cwd, { format: false });
-    written.push(join(cwd, ".changeset", `${id}.md`));
+    const id = await writeChangeset(changeset, workspace.rootDir, { format: false });
+    written.push(join(workspace.rootDir, ".changeset", `${id}.md`));
   }
-  return { refusal: null, written, entries: request.entries, skipped: [], generic: false, diagnostics: [] };
+  return {
+    refusal: null,
+    written,
+    entries: request.entries,
+    skipped: [],
+    generic: false,
+    diagnostics: read.diagnostics,
+  };
+}
+
+/** A write that wrote nothing, carrying the refusal and what the reads noted. */
+function refused(refusal: ChangesetsRefusal, diagnostics: string[]): WriteOutcome {
+  return { refusal, written: [], entries: [], skipped: [], generic: false, diagnostics };
+}
+
+/** The workspace a repository versions: its package names and its own manifest. */
+export interface Workspace {
+  /** The workspace root, the directory `.changeset/` lives in. */
+  rootDir: string;
+  /** Every package name the workspace holds, the root package included. */
+  packages: string[];
+  /** The root package's name, or null when the root declares none. */
+  root: string | null;
+}
+
+/** The workspace, or the reason it could not be read. */
+export interface WorkspaceRead {
+  refusal: ChangesetsRefusal | null;
+  packages: Workspace;
+  diagnostics: string[];
+}
+
+/**
+ * Read the workspace through the workspace reader.
+ *
+ * A repository without a readable manifest is a named refusal: an entry's
+ * package name can only be validated against the workspace, so no workspace
+ * means no entry.
+ */
+export async function readWorkspace(cwd: string): Promise<WorkspaceRead> {
+  let packages: Packages;
+  try {
+    packages = await getPackages(cwd);
+  } catch (e) {
+    return {
+      refusal: { code: "no-workspace", reason: `no workspace could be read from ${cwd}: ${(e as Error).message}` },
+      packages: { rootDir: cwd, packages: [], root: null },
+      diagnostics: [],
+    };
+  }
+  const names = packages.packages.map((entry) => entry.packageJson.name);
+  return {
+    refusal: null,
+    packages: {
+      rootDir: packages.rootDir,
+      packages: names,
+      root: packages.rootPackage?.packageJson.name ?? null,
+    },
+    diagnostics: [],
+  };
+}
+
+/**
+ * The first reason one of the entries cannot be written, or null when every
+ * entry names a workspace package and a real level.
+ */
+function validateEntries(entries: ChangesetEntry[], workspace: Workspace): ChangesetsRefusal | null {
+  for (const entry of entries) {
+    if (!CHANGE_LEVELS.includes(entry.level)) {
+      return {
+        code: "invalid-level",
+        reason: `'${String(entry.level)}' is not a changeset level: use ${CHANGE_LEVELS.join(", ")}`,
+      };
+    }
+    if (!workspace.packages.includes(entry.package)) {
+      return {
+        code: "unknown-package",
+        reason:
+          `'${entry.package}' is not a package in this workspace for entry '${entry.summary}'` +
+          `: the workspace packages are ${workspace.packages.join(", ")}`,
+      };
+    }
+  }
+  return null;
 }

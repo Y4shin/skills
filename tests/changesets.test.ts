@@ -64,6 +64,28 @@ function fixtureRepository(options: FixtureOptions = {}): string {
   return dir;
 }
 
+/**
+ * A fixture workspace: a private root package and two member packages, the
+ * shape a repository that versions more than one package has.
+ */
+function fixtureWorkspace(): string {
+  const dir = fixtureRepository({
+    manifest: { name: "@scope/root", version: "1.0.0", private: true, workspaces: ["packages/*"] },
+  });
+  // The workspace reader recognises an npm monorepo by its workspaces field
+  // and its lockfile, so a two-member workspace carries both.
+  writeFileSync(join(dir, "package-lock.json"), `${JSON.stringify({ lockfileVersion: 3, packages: {} }, null, 2)}\n`, "utf-8");
+  for (const [name, version] of [
+    ["@scope/alpha", "0.1.0"],
+    ["@scope/beta", "0.2.0"],
+  ]) {
+    const memberDir = join(dir, "packages", name.replace("@scope/", ""));
+    mkdirSync(memberDir, { recursive: true });
+    writeFileSync(join(memberDir, "package.json"), `${JSON.stringify({ name, version }, null, 2)}\n`, "utf-8");
+  }
+  return dir;
+}
+
 /** The changeset files a fixture repository holds, sorted. */
 function changesetFiles(dir: string): string[] {
   return readdirSync(join(dir, ".changeset"))
@@ -138,5 +160,67 @@ describe("tw_write_changesets", () => {
     expect(changesetBytes(dir, changesetFiles(dir)[0])).toBe(
       '---\n"@scope/fixture-pkg": minor\n---\n\nAdd the release skill.\n',
     );
+  });
+});
+
+// ─── Validating an entry against the workspace ───────────────────────────────
+
+describe("tw_write_changesets validation", () => {
+  test("writes an entry naming any workspace package, not only the root", async () => {
+    const dir = fixtureWorkspace();
+
+    const { details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/alpha", level: "patch", summary: "Fix the alpha reader." }],
+      },
+      dir,
+    );
+
+    expect(changesetFiles(dir)).toHaveLength(1);
+    expect(changesetBytes(dir, changesetFiles(dir)[0])).toContain('"@scope/alpha": patch');
+    expect(details.entries).toEqual([
+      { package: "@scope/alpha", level: "patch", summary: "Fix the alpha reader." },
+    ]);
+  });
+
+  test("refuses a package name outside the workspace, naming the workspace packages", async () => {
+    const dir = fixtureWorkspace();
+
+    const { text, details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [
+          { package: "@scope/alpha", level: "patch", summary: "A real change." },
+          { package: "@scope/not-a-package", level: "patch", summary: "A change to nothing." },
+        ],
+      },
+      dir,
+    );
+
+    // A refusal is a refusal, not a partial write: the valid entry in the same
+    // call did not land either.
+    expect(changesetFiles(dir)).toEqual([]);
+    expect(details.refusal.code).toBe("unknown-package");
+    expect(details.refusal.reason).toContain("@scope/not-a-package");
+    expect(text).toContain("Refused:");
+    expect(text).toContain("@scope/alpha");
+  });
+
+  test("refuses a level that is not patch, minor, or major", async () => {
+    const dir = fixtureWorkspace();
+
+    const { text, details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/alpha", level: "huge", summary: "An oversized change." }],
+      },
+      dir,
+    );
+
+    expect(changesetFiles(dir)).toEqual([]);
+    expect(details.refusal.code).toBe("invalid-level");
+    expect(text).toContain("huge");
+    expect(text).toContain("patch, minor, or major");
   });
 });

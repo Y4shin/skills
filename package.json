@@ -46,6 +46,7 @@
   "dependencies": {
     "@changesets/types": "^7.0.0",
     "@changesets/write": "^1.0.1",
+    "@manypkg/get-packages": "^3.1.0",
     "yaml": "^2.9.1"
   },
   "peerDependencies": {
