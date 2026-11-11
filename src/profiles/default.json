@@ -1,0 +1,30 @@
+{
+  "name": "default",
+  "merge": "no-ff",
+  "push": "always",
+  "phases": {
+    "intake": {},
+    "wayfinder": {},
+    "to-spec": {},
+    "to-tickets": {},
+    "implement-ticket": {
+      "branch": "effort/{effort}",
+      "openInstructions": "",
+      "closeInstructions": "",
+      "closeGate": "effort/{effort}"
+    },
+    "finalize-effort": {
+      "branch": "effort/{effort}",
+      "openInstructions": "",
+      "closeInstructions": "",
+      "closeGate": "effort/{effort}"
+    }
+  },
+  "agents": {
+    "implement-preconditions": { "branch": "ticket/{ticket}" },
+    "tdd-worker": { "branch": "ticket/{ticket}" },
+    "slice-verifier": { "branch": "ticket/{ticket}" },
+    "deviation-reporter": { "branch": "ticket/{ticket}" },
+    "land-worker": { "branch": "ticket/{ticket}" }
+  }
+}
