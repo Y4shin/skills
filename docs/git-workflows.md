@@ -47,8 +47,9 @@ wrongly: the resolver falls back to `default` and says so.
 Two profiles ship as flat JSON files in the package, `src/profiles/default.json`
 and `src/profiles/flat.json`. Each carries, per phase, an optional branch
 template, optional opening and closing instructions, and an optional closing
-branch gate, plus a merge flag and a push policy, and per implementation
-sub-agent an optional branch template. Templates use `{effort}` and `{ticket}`.
+branch gate, plus a merge flag and a push policy of `always` or `never`, and per
+implementation sub-agent an optional branch template. Templates use `{effort}`
+and `{ticket}`.
 
 **`default`** is the profile a repository that configures nothing gets.
 
@@ -59,6 +60,11 @@ sub-agent an optional branch template. Templates use `{effort}` and `{ticket}`.
 | `implement-preconditions`, `tdd-worker`, `slice-verifier`, `deviation-reporter`, `land-worker` | `ticket/{ticket}` |
 | `intake`, `wayfinder`, `to-spec`, `to-tickets` | none |
 
+Only `implement-ticket` carries a closing gate, because it is the phase that ends
+on the branch it opened on. The effort close carries a branch requirement but no
+closing gate: its `local` landing merges into the trunk and deletes the effort
+branch before it closes, so a gate on that branch could never pass.
+
 It carries the merge flag `--no-ff` and the push policy `always`, so the effort
 close merges the effort branch into the trunk with a merge commit and pushes.
 The flag is stored with its dashes, so the merge step the profile renders and
@@ -66,12 +72,12 @@ the land task the chain composes both name a flag `git merge` accepts as it
 stands.
 
 **`flat`** carries nothing anywhere: no branch requirement for any phase or
-agent, no instructions, no gate, no merge flag, no push policy. Phases open on
-whatever checkout they find, no spawn is blocked on a branch, and the effort
-close lands nothing, because no landing step is configured. Choose it to keep
-the branches and habits a repository already has, and to run the workflow in a
-directory that is not a git checkout at all, where the guards can read no
-branch.
+agent, no instructions, no opening or closing gate, no merge flag, no push
+policy. Phases open on whatever checkout they find, no spawn is blocked on a
+branch, and the effort close lands nothing, because no landing step is
+configured. Choose it to keep the branches and habits a repository already has,
+and to run the workflow in a directory that is not a git checkout at all, where
+the guards can read no branch.
 
 There are three branch levels in a repository with a develop branch, and two
 without one: the trunk, one **effort branch** per effort, and one **ticket
@@ -103,17 +109,37 @@ refusal names and retry the same call.
   chain, or launching one of the five implementation agents, from another
   branch fails that step before any worker starts, with a reason naming the
   branch to create and its base.
+- **A phase the profile gates on closing refuses to close from anywhere else.**
+  The closing gate is the second half of the branch gate: a run that drifted off
+  its branch after the open (a worker's checkout, a hand-run `git checkout`)
+  cannot release the phase from there. The close names the branch to check out,
+  and retrying after it closes. Pass the effort to `tw_close` so the gate can
+  resolve the branch its row names; a close that names no effort refuses rather
+  than skipping the gate. Under `default` only `implement-ticket` carries one;
+  the planning phases, the effort close, and every phase under `flat` carry
+  none, so they close as before.
 - **A checkout the session cannot read refuses the same way.** When no way to
-  run git is available, or git fails, the phase does not open and a gated spawn
-  is blocked, with a reason naming what could not be read, instead of passing
-  with a warning. The recovery is making the read work again: the command the
-  guard runs must answer the checked-out branch.
+  run git is available, or git fails, the phase does not open, a gated spawn
+  is blocked, and a gated close refuses to release the phase, with a reason
+  naming what could not be read, instead of passing with a warning. The
+  recovery is making the read work again: the command the guard runs must
+  answer the checked-out branch.
 - **Raw `bash` git commands are not intercepted.** The phase gate and the spawn
   block are the enforcement points, so a hand-run `git checkout` moves the
   checkout and the next guarded call judges it like any other.
 
+## What is pushed
+
+The phase brief renders the push step from the profile's push policy, so nothing
+in the skills carries a push command. With `always` the step names the command
+for the branch the phase is on; with `never`, or with a profile that names no
+policy at all, the step names no command, so the phase pushes nothing and the
+commits stay local. `flat` therefore never pushes.
+
 The trunk merge is the effort close's last step. `local` merges the effort
 branch into the trunk with the profile's merge flag, deletes the effort branch,
-and pushes the trunk when the push policy allows it. `handoff` skips the merge
-and the deletion, pushes the effort branch when the policy allows it, and prints
-the pull request from the effort branch into the trunk.
+and pushes the trunk when the brief's push step names a command. `handoff` skips
+the merge and the deletion, pushes the effort branch when the brief's push step
+names a command, and prints the pull request from the effort branch into the
+trunk. The push step decides whether anything is pushed; the trunk-merge mode
+decides which branch a `local` landing pushes.

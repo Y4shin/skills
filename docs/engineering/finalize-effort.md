@@ -62,10 +62,15 @@ the archived effort. The move is committed with git before the landing step.
 
 The phase's own branch step comes from the profile: `tw_phase_brief` reports
 the branch this close must be on, the step that creates it off the trunk, the
-trunk it lands into, the profile's merge flag, its push policy, and the
-trunk-merge mode, and `tw_open` refuses any other checkout. Nothing about the
-branch is written in the skill. `docs/git-workflows.md` has the profiles and the
-settings keys.
+trunk it lands into, the profile's merge flag, its push policy, the push step
+that policy renders, and the trunk-merge mode, and `tw_open` refuses any other
+checkout. Nothing about the branch is written in the skill. The close names the
+effort for the same reason: `tw_close` reads that profile row again, and a row
+that carries a closing gate refuses to release the phase from any other
+checkout, naming the branch to check out. The bundled `default` carries no
+closing gate here, because the `local` landing has already moved the checkout
+onto the trunk and deleted the effort branch when this phase closes.
+`docs/git-workflows.md` has the profiles and the settings keys.
 
 Before the archive, the close authors the effort's changesets. One entry per
 change a user of the package or product can observe, naming the workspace
@@ -87,10 +92,13 @@ failed read as an empty staged set would stage a second identical entry.
 The close's last act is to land the effort branch, and the profile decides how.
 Under the `local` trunk-merge mode it merges the effort branch into the trunk
 with the profile's merge flag, deletes the effort branch, and pushes the trunk
-when the push policy allows it. Under `handoff` it does not merge and does not
-delete: it pushes the effort branch when the policy allows it and prints the
-pull request from the effort branch into the trunk, with both names filled in
-from the brief. A profile that carries no merge flag has no landing step.
+when the brief's push step names a command. Under `handoff` it does not merge
+and does not delete: it pushes the effort branch when the brief's push step
+names a command, and prints the pull request from the effort branch into the
+trunk, with both names filled in from the brief. The push step is composed from
+the profile's push policy, so a `never` policy renders none and nothing is
+pushed; the trunk-merge mode decides which branch a local landing pushes. A
+profile that carries no merge flag has no landing step.
 
 ## When to reach for it
 

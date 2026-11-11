@@ -58,6 +58,9 @@ describe("no phase file, worker agent, or chain script states a fixed branch rul
     ["a branch template", /\b(?:task|ticket|effort)\/\{(?:effort|ticket)\}/],
     ["a trunk name", /\b(?:main|develop)\b/],
     ["a merge flag", /--no-ff|--ff-only/],
+    // The push is the brief's step, rendered from the profile's policy: a
+    // command written here would push whatever the policy says.
+    ["a push command", /\bgit push\b/],
   ];
 
   test.each([...PHASE_FILES, ...WORKER_AGENTS])("%s carries no hardcoded branch model", (file) => {
@@ -196,5 +199,45 @@ describe("the docs page describes the profiles, the keys, and the refusal behavi
     const pkg = JSON.parse(readFile("package.json"));
     expect(pkg.files).toContain(PAGE);
     expect(readFile("README.md")).toContain(PAGE);
+  });
+});
+
+// ─── The push step and the closing gate ─────────────────────────────────────
+
+/**
+ * The push is the push step the brief renders from the profile's push policy,
+ * so a phase file states the rule and carries no command; and a phase the
+ * profile gates on closing says so, because a close that is refused from the
+ * wrong checkout is a step the phase has to perform, not a surprise.
+ */
+describe("the push step is the brief's, and the closing gate is stated", () => {
+  const IMPLEMENT = "skills/engineering/implement-ticket/SKILL.md";
+  const CLOSE = "skills/engineering/finalize-effort/SKILL.md";
+
+  test("the implementation phase pushes exactly the push step the brief renders", () => {
+    const skill = readFile(IMPLEMENT);
+
+    expect(skill).toMatch(/push step/i);
+    // The policy's two branches are both stated, and the never branch pushes
+    // nothing, which is what the block used to contradict.
+    expect(skill).toMatch(/never/i);
+    expect(skill).toMatch(/pushes nothing|push nothing/i);
+  });
+
+  test("the effort close's landing follows the same push step", () => {
+    const skill = readFile(CLOSE);
+
+    expect(skill).toMatch(/push step/i);
+    expect(skill).toMatch(/push policy|policy/i);
+  });
+
+  test.each([IMPLEMENT, CLOSE])("%s states the closing gate and the effort the close names", (file) => {
+    const content = readFile(file);
+
+    // The close is the second half of the gate, and it needs the effort to
+    // resolve the branch its profile row gates on.
+    expect(content).toMatch(/clos(e|ing) gate|closes on/i);
+    expect(content).toMatch(/tw_close/);
+    expect(content).toMatch(/effort-slug/);
   });
 });

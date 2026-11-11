@@ -142,6 +142,15 @@ async function close(
   return (await tools.tw_close.execute({ skill }, ctx)) as { text: string; details: any };
 }
 
+/** Drive one close that names the effort the closing phase works in. */
+async function closeIn(
+  args: Record<string, unknown>,
+  ctx: ReturnType<typeof openCtx>,
+): Promise<{ text: string; details: any }> {
+  const tools = createTools() as unknown as Record<string, { execute: Function }>;
+  return (await tools.tw_close.execute(args, ctx)) as { text: string; details: any };
+}
+
 /** A stub extension API: enough for the factory's registration pass. */
 function stubPi(): { api: any; tools: any[] } {
   const tools: any[] = [];
@@ -497,5 +506,223 @@ describe("sequential execution mode", () => {
 
     expect((byName.get("tw_open") as any)?.executionMode).toBe("sequential");
     expect((byName.get("tw_close") as any)?.executionMode).toBe("sequential");
+  });
+});
+
+// ─── The close gate ─────────────────────────────────────────────────────────
+
+/**
+ * A phase whose profile row carries a closing gate may only close from the
+ * branch that row names. The close is the second half of the branch gate: a
+ * run that drifted off its branch after the open (a worker's checkout, a hand
+ * run `git checkout`) cannot release the phase from there. The refusal is the
+ * openers' own shape, nothing latches, and a phase whose row carries no gate
+ * closes from wherever it is.
+ */
+describe("the close gate", () => {
+  /** Open the implementation phase on its branch, and close it from the checkout given. */
+  async function openedAndClosed(checkoutBranch: string) {
+    const dir = sessionDir();
+    const checkout = fakeCheckout("effort/live-effort");
+    const active: string[] = [];
+    const ctx = openCtx(dir, active, checkout.git);
+    const opened = await open(
+      { skill: "implement-ticket", effort: "live-effort", target: "one" },
+      ctx,
+    );
+    expect(opened.details.opened).toBe(true);
+    // The checkout moves after the open, as a ticket branch would.
+    checkout.checkout(checkoutBranch);
+    const result = await closeIn({ skill: "implement-ticket", effort: "live-effort" }, ctx);
+    return { ...result, active, checkout, ctx };
+  }
+
+  test("the close on the branch the row gates on passes and reports the gate", async () => {
+    const dir = sessionDir();
+    const checkout = fakeCheckout("effort/live-effort");
+    const active: string[] = [];
+    const ctx = openCtx(dir, active, checkout.git);
+    await open({ skill: "implement-ticket", effort: "live-effort", target: "one" }, ctx);
+
+    const { text, details } = await closeIn({ skill: "implement-ticket", effort: "live-effort" }, ctx);
+
+    expect(details.closed).toBe(true);
+    expect(details.close_gate).toBe("effort/live-effort");
+    expect(details.profile).toBe("default");
+    expect(text).toContain("Closed implement-ticket");
+    expect(active, "the closed phase releases its toolset").not.toContain("tw_write_changelog");
+  });
+
+  test("the close from another checkout refuses, naming the current branch, the gate branch, and the next call", async () => {
+    const { text, details, active } = await openedAndClosed("main");
+
+    expect(details.closed, "the close is refused").toBe(false);
+    expect(details.close_gate).toBe("effort/live-effort");
+    expect(details.reason).toBe("the checkout is on 'main', but 'implement-ticket' closes on 'effort/live-effort'");
+    expect(details.legal_next).toEqual(["check out effort/live-effort, then close implement-ticket"]);
+    expect(text).toBe(
+      "Refused: the checkout is on 'main', but 'implement-ticket' closes on 'effort/live-effort'. " +
+        "Legal next: check out effort/live-effort, then close implement-ticket.",
+    );
+    // A refused close leaves the phase open: its toolset is untouched.
+    expect(active).toContain("tw_write_changelog");
+  });
+
+  test("nothing latches: checking the branch out and retrying closes", async () => {
+    const { details, active, checkout, ctx } = await openedAndClosed("ticket/one");
+    expect(details.closed).toBe(false);
+
+    // The model performs the step the refusal named, then retries the close.
+    checkout.checkout("effort/live-effort");
+    const retried = await closeIn({ skill: "implement-ticket", effort: "live-effort" }, ctx);
+
+    expect(retried.details.closed).toBe(true);
+    expect(retried.text).toContain("Closed implement-ticket");
+    expect(active).not.toContain("tw_write_changelog");
+  });
+
+  test("the gate is the profile row's, so an effort close that carries one gates the same way", async () => {
+    // The bundled `default` gives the effort close no closing gate: its own
+    // landing has already moved the checkout to the trunk when it closes. An
+    // operator profile that names one gets the same enforcement the
+    // implementation phase's row gets, because the gate is data, not a phase.
+    const dir = sessionDir({ git: { profile: "custom" } });
+    const profilesDir = profileFixture("custom", {
+      name: "custom",
+      phases: { "finalize-effort": { branch: "effort/{effort}", closeGate: "effort/{effort}" } },
+    });
+    const checkout = fakeCheckout("effort/live-effort");
+    const ctx = openCtx(dir, [], checkout.git, { profilesDir });
+    await open({ skill: "finalize-effort", effort: "live-effort" }, ctx);
+    checkout.checkout("main");
+
+    const { text, details } = await closeIn({ skill: "finalize-effort", effort: "live-effort" }, ctx);
+
+    expect(details.closed).toBe(false);
+    expect(details.reason).toBe(
+      "the checkout is on 'main', but 'finalize-effort' closes on 'effort/live-effort'",
+    );
+    expect(text).toContain("Legal next: check out effort/live-effort, then close finalize-effort.");
+  });
+
+  test("the bundled effort close carries no closing gate: its landing ends on the trunk", async () => {
+    // Enforcing a gate there would make the default profile unable to close
+    // the effort at all once the local landing ran, so the row carries none.
+    const dir = sessionDir();
+    const checkout = fakeCheckout("effort/live-effort");
+    const ctx = openCtx(dir, [], checkout.git);
+    await open({ skill: "finalize-effort", effort: "live-effort" }, ctx);
+    // The local landing merges into the trunk and deletes the effort branch,
+    // so the close runs on the trunk.
+    checkout.checkout("main");
+
+    const { details } = await closeIn({ skill: "finalize-effort", effort: "live-effort" }, ctx);
+
+    expect(details.closed).toBe(true);
+    expect(details.close_gate).toBeNull();
+  });
+
+  test("a checkout the close cannot read refuses rather than passing", async () => {
+    const dir = sessionDir();
+    const failing = async (): Promise<string> => {
+      throw new Error("fatal: not a git repository");
+    };
+    const active: string[] = [];
+    const ctx = openCtx(dir, active, fakeCheckout("effort/live-effort").git);
+    await open({ skill: "implement-ticket", effort: "live-effort", target: "one" }, ctx);
+
+    const { text, details } = await closeIn(
+      { skill: "implement-ticket", effort: "live-effort" },
+      openCtx(dir, active, failing),
+    );
+
+    expect(details.closed, "a checkout the close never read never releases the phase").toBe(false);
+    expect(details.reason).toBe(
+      "the checkout could not be read (git rev-parse --abbrev-ref HEAD failed: fatal: not a git repository), " +
+        "so 'implement-ticket' cannot confirm it is on 'effort/live-effort'",
+    );
+    expect(text).toContain(
+      "Legal next: make the checkout readable (git rev-parse --abbrev-ref HEAD must answer the checked-out branch), " +
+        "then close implement-ticket.",
+    );
+    expect(active, "the phase stays open").toContain("tw_write_changelog");
+  });
+
+  test("a close that names no effort cannot resolve its gate, and refuses naming what it needs", async () => {
+    const dir = sessionDir();
+    const checkout = fakeCheckout("effort/live-effort");
+    const ctx = openCtx(dir, [], checkout.git);
+    await open({ skill: "implement-ticket", effort: "live-effort", target: "one" }, ctx);
+    // The open read the checkout; the close is what must not.
+    checkout.calls.length = 0;
+
+    const { text, details } = await close("implement-ticket", ctx);
+
+    expect(details.closed).toBe(false);
+    expect(details.reason).toBe(
+      "'implement-ticket' closes on a branch this close could not resolve ('effort/{effort}'): " +
+        "name the effort the phase works in",
+    );
+    expect(details.legal_next).toEqual(["retry tw_close implement-ticket with the effort"]);
+    expect(text).toContain("Refused:");
+    // The unresolved gate never reads the checkout: there is nothing to compare.
+    expect(checkout.calls, "an unresolved gate reads no checkout").toEqual([]);
+  });
+
+  test("a gate only a ticket can resolve refuses naming the ticket when the close names none", async () => {
+    const dir = sessionDir({ git: { profile: "custom" } });
+    const profilesDir = profileFixture("custom", {
+      name: "custom",
+      phases: { "implement-ticket": { branch: "effort/{effort}", closeGate: "ticket/{ticket}" } },
+    });
+    const checkout = fakeCheckout("effort/live-effort");
+    const ctx = openCtx(dir, [], checkout.git, { profilesDir });
+    await open({ skill: "implement-ticket", effort: "live-effort", target: "one" }, ctx);
+    // The checkout drifted onto a ticket branch after the open, as a worker's
+    // checkout would leave it.
+    checkout.checkout("ticket/one");
+    checkout.calls.length = 0;
+
+    const { details } = await closeIn({ skill: "implement-ticket", effort: "live-effort" }, ctx);
+
+    expect(details.closed).toBe(false);
+    expect(details.reason).toContain("('ticket/{ticket}')");
+    expect(details.reason).toContain("name the ticket the phase works on");
+    expect(details.legal_next).toEqual(["retry tw_close implement-ticket with the ticket"]);
+    expect(checkout.calls, "an unresolved gate reads no checkout").toEqual([]);
+  });
+
+  test("the planning phases close with no effort and no gate", async () => {
+    const dir = sessionDir();
+    const calls: string[][] = [];
+    const failing = async (args: string[]): Promise<string> => {
+      calls.push(args);
+      throw new Error("fatal: not a git repository");
+    };
+    const active: string[] = [];
+    const ctx = openCtx(dir, active, failing);
+    await open({ skill: "wayfinder", effort: "live-effort" }, ctx);
+
+    const { details } = await close("wayfinder", ctx);
+
+    expect(details.closed, "a phase whose row carries no close gate closes").toBe(true);
+    expect(details.close_gate).toBeNull();
+    // No close gate, so the close never reads the checkout.
+    expect(calls).toEqual([]);
+  });
+
+  test("the flat profile gates no close, so a gated phase closes from the trunk with no effort", async () => {
+    const dir = sessionDir({ git: { profile: "flat" } });
+    const checkout = fakeCheckout("main");
+    const active: string[] = [];
+    const ctx = openCtx(dir, active, checkout.git);
+    await open({ skill: "implement-ticket", effort: "live-effort", target: "one" }, ctx);
+
+    const { details } = await close("implement-ticket", ctx);
+
+    expect(details.closed).toBe(true);
+    expect(details.close_gate).toBeNull();
+    expect(details.profile).toBe("flat");
+    expect(checkout.calls, "a profile with no close gate reads no checkout").toEqual([]);
   });
 });

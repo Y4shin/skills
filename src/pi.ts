@@ -59,11 +59,14 @@ import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { FEEDBACK_KINDS, WORKFLOW_SOURCE, feedbackCall } from "./core/feedback.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 import {
+  closeBrief,
   decideFromBrief,
+  decideFromClose,
   phaseBrief,
   phaseText,
   readCheckout,
   unreadableCheckout,
+  type CloseBrief,
   type GitRun,
   type PhaseBrief,
 } from "./core/git-profile.js";
@@ -1582,6 +1585,79 @@ async function branchGate(
   // The legal next call is the step that produces the branch, so a model that
   // performs it and retries lands on the same open.
   return { brief, refusal: { reason: decision.reason, legalNext: decision.step === null ? [] : [decision.step] } };
+}
+
+/**
+ * The closing gate behind tw_close: a profile row may carry the branch its
+ * phase's close gates on, so a run that drifted off that branch after the open
+ * cannot release the phase from there. The close resolves the row first and
+ * reads the checkout only when a gate resolved, so a phase the profile does not
+ * gate reads nothing at all.
+ *
+ * A gate this call cannot resolve refuses rather than passing: the template
+ * needs an effort (or a ticket) the close did not receive, and a guard that
+ * cannot evaluate its condition does not clear it. A checkout the seam cannot
+ * read refuses the same way, with the cause in the details.
+ */
+async function closeBranchGate(
+  ctx: ToolContext,
+  entry: SkillEntry,
+  args: { effort?: unknown; ticket?: unknown },
+): Promise<{ gate: CloseBrief; refusal: GateRefusal | null }> {
+  const request = {
+    name: entry.name,
+    effort: String(args.effort ?? ""),
+    ticket: typeof args.ticket === "string" && args.ticket.trim() !== "" ? args.ticket.trim() : undefined,
+  };
+  const deps = ctx.profilesDir === undefined ? {} : { profilesDir: ctx.profilesDir };
+  const gate = closeBrief(ctx.directory, request, deps);
+  if (gate.template === null) return { gate, refusal: null };
+  if (gate.branch === null) {
+    // The row gates the close and the template needs a value this call did not
+    // receive. A guard that cannot evaluate its condition does not clear it, so
+    // the close refuses and names the value the caller has to pass.
+    const needs = gate.template.includes("{ticket}") ? "ticket" : "effort";
+    return {
+      gate,
+      refusal: {
+        reason:
+          `'${entry.name}' closes on a branch this close could not resolve ('${gate.template}'): ` +
+          `name the ${needs} the phase works ${needs === "ticket" ? "on" : "in"}`,
+        legalNext: [`retry tw_close ${entry.name} with the ${needs}`],
+      },
+    };
+  }
+  const checkout = await readCheckout(ctx.git);
+  if (checkout.diagnostic !== null) {
+    const unreadable = unreadableCheckout(entry.name, gate.branch, checkout.diagnostic);
+    return {
+      gate: { ...gate, diagnostics: [...gate.diagnostics, checkout.diagnostic] },
+      refusal: { reason: unreadable.reason, legalNext: [`${unreadable.recovery}, then close ${entry.name}`] },
+    };
+  }
+  const decision = decideFromClose(gate, entry.name, checkout.branch);
+  if (decision.pass) return { gate, refusal: null };
+  return { gate, refusal: { reason: decision.reason, legalNext: decision.step === null ? [] : [decision.step] } };
+}
+
+/**
+ * The push step a profile's push policy renders: the command for the branch the
+ * phase is on when the policy allows a push, and no command at all when it does
+ * not. A profile that names no policy pushes nothing, which reads as 'never',
+ * the same word the merge line uses.
+ *
+ * The policy reaches the phase as data, so no phase file carries a push command
+ * and none can contradict the policy: the brief either renders one or renders
+ * none.
+ */
+function pushStepLine(brief: PhaseBrief, skill: string): string {
+  if (brief.push !== "always") {
+    return `Push step: none; the profile's push policy is '${brief.push ?? "never"}', so nothing is pushed.`;
+  }
+  if (brief.branch === null) {
+    return `Push step: none; '${skill}' requires no branch, so there is nothing to push.`;
+  }
+  return `Push step: git push origin ${brief.branch}.`;
 }
 
 /** The shared unknown-effort refusal every effort-taking phase starts with. */
@@ -3503,6 +3579,9 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
               `trunk merge mode '${brief.trunkMerge}', push '${brief.push ?? "never"}'.`,
           );
         }
+        // The push is a step, not a command the phase's prose fixes: the
+        // policy renders it, so a profile that forbids a push renders none.
+        if (brief.kind === "phase") lines.push(pushStepLine(brief, skill));
         if (brief.diagnostics.length > 0) lines.push(`Diagnostics: ${brief.diagnostics.join("; ")}`);
 
         return outcome(lines.join("\n"), {
@@ -3783,8 +3862,19 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
     tw_close: defStructured(
       "Close a named open workflow skill, removing the tools no other open skill still needs. " +
         "Declared in every state, including idle: closing a skill that is not open is refused with the " +
-        "legal next call instead of a missing-tool error. Other open skills stay open.",
-      Type.Object({ skill: Type.String({ description: "The workflow skill to close" }) }),
+        "legal next call instead of a missing-tool error. Other open skills stay open. A phase whose git " +
+        "profile row carries a closing gate refuses to close unless the checkout is on the branch that row " +
+        "names, so pass the effort the phase works in (and the ticket, for a row that gates on one); the " +
+        "refusal names the branch to check out, and retrying after it closes.",
+      Type.Object({
+        skill: Type.String({ description: "The workflow skill to close" }),
+        effort: Type.Optional(
+          Type.String({ description: "The effort the closing phase works in, for a phase whose profile row gates the close on a branch" }),
+        ),
+        ticket: Type.Optional(
+          Type.String({ description: "The ticket slug, for a phase whose profile row gates the close on one" }),
+        ),
+      }),
       async (p, ctx) => {
         const entry = typeof p.skill === "string" ? skillEntry(p.skill) : undefined;
         if (!entry) {
@@ -3810,14 +3900,29 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
             { closed: false, reason: `'${entry.name}' is not open`, open: [...open] },
           );
         }
+        // The closing gate: the row may carry the branch this phase closes on,
+        // so a checkout that drifted off it cannot release the phase. A phase
+        // whose row carries no gate reads no checkout and closes as before.
+        const gate = await closeBranchGate(ctx, entry, { effort: p.effort, ticket: p.ticket });
+        if (gate.refusal !== null) {
+          return outcome(refusedOuttext(gate.refusal.reason, gate.refusal.legalNext), {
+            closed: false,
+            reason: gate.refusal.reason,
+            legal_next: gate.refusal.legalNext,
+            close_gate: gate.gate.branch,
+            profile: gate.gate.profile,
+            open: [...open],
+            diagnostics: gate.gate.diagnostics,
+          });
+        }
         const remaining = new Set([...open].filter((name) => name !== entry.name));
         const next = activeAfterClose(active, entry, remaining);
         activeSet.set(next);
         const removed = active.filter((tool) => !next.includes(tool));
         // The profile's closing instructions ride the close's result, the
         // channel that reaches the model as the phase ends. They come from the
-        // profile alone: a close resolves no branch, because reading the
-        // checkout is the open's job.
+        // profile alone; the gate above is what reads the checkout, and only
+        // when the row carries one.
         const text = phaseText(
           ctx.directory,
           entry.name,
@@ -3832,6 +3937,8 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
           removed,
           active: next,
           open: [...remaining],
+          close_gate: gate.gate.branch,
+          profile: gate.gate.profile,
           diagnostics: text.diagnostics,
         });
       },

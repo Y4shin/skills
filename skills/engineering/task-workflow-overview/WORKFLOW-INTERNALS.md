@@ -232,7 +232,11 @@ The disclosure scopes, outermost first:
   `tw_close`. It repeats the current state when a refusal has left you
   unsure where you are.
 - **`tw_close`** releases a named open skill, removing the tools no other
-  open skill still needs, and refuses the name that is not open.
+  open skill still needs, and refuses the name that is not open. It takes the
+  effort a closing phase works in (and a ticket, for a profile row that gates
+  on one): a phase whose git-profile row carries a closing gate refuses to
+  close from any other checkout, naming the branch to check out, and retrying
+  after that closes. A phase whose row carries no gate closes as before.
 - **`tw_request_tool`** asks the operator for one tool the open phase does
   not disclose. Refused when no phase is open, when the tool is unknown or
   already active, when it is declared in every state already, when
@@ -303,7 +307,7 @@ The toolsets, verbatim from the registry in disclosure order:
 | tw_resolve_uncertainty | implement-ticket | records a ticket's uncertainty resolution beside its .work/uncertainty.md and deletes the file |
 | tw_finalizable | implement-ticket, finalize-effort | checks an artifact is ready to finalize (workflow_state done) |
 | tw_archive_effort | finalize-effort | checks the effort is finalizable, marks the map and its done items deprecated, moves the effort under archive/ as a unit, and updates the index |
-| tw_phase_brief | always declared | the read-only brief a branch-bearing phase asks for before it opens: it takes a phase or one of the five implementation agents plus an effort, and answers with the resolved required branch, the step that creates it, the trunk, the merge flag and push policy, and the phase's instruction text |
+| tw_phase_brief | always declared | the read-only brief a branch-bearing phase asks for before it opens: it takes a phase or one of the five implementation agents plus an effort, and answers with the resolved required branch, the step that creates it, the trunk, the merge flag and push policy, the push step that policy renders (a command under `always`, none under `never`), and the phase's instruction text |
 | tw_write_changesets | finalize-effort | writes the effort's pending changeset entries under `.changeset/` after the operator confirms the proposal; the dry run is the proposal, and an identical staged entry is never repeated |
 | tw_release_plan | always declared | computes the release plan without writing: the pending entries, the versions they produce, and the changelog sections |
 | tw_release_apply | always declared | applies a plan: bumps the manifest, writes the changelog sections, and removes the consumed changeset files |
@@ -338,7 +342,10 @@ The shapes, by surface:
   non-empty effort.
 - **The closer's refusals.** A name that is not an openable skill; a name
   that is not open (when nothing is open, the legal next is `tw_open`;
-  otherwise the open set is named).
+  otherwise the open set is named); a checkout that is not on the branch the
+  phase's profile row gates its close on (the branch to check out, then the
+  close, is the legal next); a close gate the call cannot resolve because it
+  named no effort; a checkout the git seam cannot read.
 - **The requester's refusals.** No open skill; an unknown tool; a tool
   already declared or already active; a grant that would make another
   skill look open (the skill is named); no interactive UI to ask; the

@@ -28,7 +28,8 @@ profile rather than from this file. Call `tw_phase_brief` with
 `{ skill: "finalize-effort", effort: "<effort-slug>" }`: it reports the branch
 this phase must be on, the step that creates it off the trunk when it does not
 exist yet, the trunk it lands into, the profile's merge flag and push policy,
-and the trunk-merge mode. Perform the step it reports, then open.
+the push step that policy renders, and the trunk-merge mode. Perform the step it
+reports, then open.
 
 Every run starts by opening the skill: call `tw_open` with
 `{ skill: "finalize-effort", effort: "<effort-slug>" }` (the effort slug is
@@ -40,7 +41,13 @@ latches: perform that step and retry, and the open passes. It activates the
 toolset only when the check passes. Work only through the tools the opener discloses. When a step genuinely needs
 a tool this phase does not disclose, call `tw_request_tool` and let the
 operator decide: never close the phase early to reopen another one for its
-tools. Close the phase with `tw_close finalize-effort` when the run releases.
+tools. Close the phase with `tw_close finalize-effort`, naming the effort it
+closes: `{ skill: "finalize-effort", effort: "<effort-slug>" }`. The close reads
+the same profile row the open did, and a row that carries a closing gate refuses
+to close from any other checkout, naming the branch to check out. The bundled
+`default` carries no closing gate here, because the local landing has already
+moved the checkout onto the trunk and deleted the effort branch by the time this
+phase closes, so a gate on the effort branch could never pass.
 
 ## Reconcile the living architecture first
 
@@ -189,13 +196,13 @@ trunk-merge mode.
 
 **The `local` mode**, the default, merges the effort branch into the trunk with
 the merge flag the brief reports, deletes the effort branch, and pushes the
-trunk when the push policy allows it. Complete the tree first: the archive
-commit is on the effort branch, so the merge carries it.
+trunk when the brief's push step names a command. Complete the tree first: the
+archive commit is on the effort branch, so the merge carries it.
 
 **The `handoff` mode** is for a repository that forbids a local trunk merge. Do
 not merge and do not delete the effort branch. Push the effort branch when the
-push policy allows it, and print the pull-request instruction with the branch
-and trunk names filled in, for the human to open:
+brief's push step names a command, and print the pull-request instruction with
+the branch and trunk names filled in, for the human to open:
 
 > Open a pull request from `<effort-branch>` into `<trunk>`: the effort's
 tickets are landed, reviewed, and archived.
@@ -231,9 +238,10 @@ updates the root index.
    `git add docs/tasks/ && git commit -m "chore: archive <effort>"`. A close
    that leaves the archive uncommitted hands the next phase a dirty tree.
 7. Land the effort branch: merge it into the trunk with the merge flag the
-   brief reports and push per its policy, or hand off per the trunk-merge mode
-   (see [Land the effort branch](#land-the-effort-branch)).
-8. Close the phase with `tw_close finalize-effort` and write the report.
+   brief reports and push when its push step names a command, or hand off per
+   the trunk-merge mode (see [Land the effort branch](#land-the-effort-branch)).
+8. Close the phase with `tw_close finalize-effort`, naming the effort, and
+   write the report.
 
 ## Report
 
