@@ -58,7 +58,7 @@ import { renderMigrationReport } from "./migrate-report.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { FEEDBACK_KINDS, WORKFLOW_SOURCE, feedbackCall } from "./core/feedback.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
-import { phaseBrief } from "./core/git-profile.js";
+import { phaseBrief, phaseText, readCheckout, decideFromBrief, type GitRun, type PhaseBrief } from "./core/git-profile.js";
 import { writeEntries, type ChangeLevel, type ChangesetEntry, type ChangesetsRefusalCode } from "./core/changesets.js";
 
 // ─── Gated skill manifest sanity (session-start diagnostics) ──────────────────
@@ -1235,6 +1235,13 @@ interface Tool {
    * gated repo registers only the opener and the closer.
    */
   activeByDefault?: boolean;
+  /**
+   * The tool's execution mode when registered. "sequential" opts the tool out
+   * of the harness's parallel tool batch, so a sibling call in the same
+   * message cannot run before or after it: the openers need it, because an
+   * open activates tools and a close releases them.
+   */
+  executionMode?: "sequential";
   execute(args: Record<string, any>, ctx: ToolContext): Promise<string> | Promise<ToolOutcome>;
 }
 
@@ -1258,6 +1265,17 @@ interface ToolContext {
   tools?: readonly ToolInfo[];
   /** True when the session has dialog-capable UI (interactive or RPC mode). */
   hasUI?: boolean;
+  /**
+   * Run one git command against the session directory and return its stdout.
+   * The branch gates read the checkout through it, so every gate test runs
+   * without a repository; the session wires it to the harness's exec.
+   */
+  git?: GitRun;
+  /**
+   * The directory the git profiles are read from: the package's own by
+   * default. The seam the profile fixtures are injected through.
+   */
+  profilesDir?: string;
   /** Put a yes/no question to the operator. Absent when the session has no UI. */
   confirm?(title: string, message: string): Promise<boolean>;
   /** Best-effort operator notification, wired from the session UI when present. */
@@ -1278,9 +1296,16 @@ function defStructured(
   description: string,
   parameters: TSchema,
   exec: (args: any, ctx: ToolContext) => Promise<ToolOutcome>,
-  options: { activeByDefault?: boolean } = {},
+  options: { activeByDefault?: boolean; executionMode?: "sequential" } = {},
 ): Tool {
-  return { description, args: {}, parameters, activeByDefault: options.activeByDefault, execute: exec };
+  return {
+    description,
+    args: {},
+    parameters,
+    activeByDefault: options.activeByDefault,
+    executionMode: options.executionMode,
+    execute: exec,
+  };
 }
 
 const Str = (d: string) => ({ type: "string" as const, description: d });
@@ -1493,6 +1518,41 @@ function phaseGate(
       return requireTicketTarget(root, effort, effortDir, graph, args.target);
     }
   }
+}
+
+/**
+ * The branch gate behind tw_open: the profile gives some phases a branch, and
+ * such a phase refuses to open unless the checkout is on it. The gate and the
+ * brief resolve the same profile row, so the refusal's required branch and the
+ * step that creates it cannot drift from what a brief reports.
+ *
+ * The checkout is read through the tool context's git seam, so a fake answers
+ * it in tests. A seam that is absent or cannot run does not refuse: the open
+ * proceeds and its result carries the diagnostic, exactly as the repo gate
+ * falls open on settings it cannot read.
+ */
+async function branchGate(
+  ctx: ToolContext,
+  entry: SkillEntry,
+  args: { effort?: unknown; target?: unknown },
+): Promise<{ brief: PhaseBrief; refusal: GateRefusal | null }> {
+  const request = {
+    name: entry.name,
+    effort: String(args.effort ?? ""),
+    ticket: typeof args.target === "string" && args.target.trim() !== "" ? args.target.trim() : undefined,
+  };
+  const deps = ctx.profilesDir === undefined ? {} : { profilesDir: ctx.profilesDir };
+  const brief = phaseBrief(ctx.directory, request, deps);
+  if (brief.branch === null) return { brief, refusal: null };
+  const checkout = await readCheckout(ctx.git);
+  if (checkout.diagnostic !== null) {
+    return { brief: { ...brief, diagnostics: [...brief.diagnostics, checkout.diagnostic] }, refusal: null };
+  }
+  const decision = decideFromBrief(brief, entry.name, checkout.branch);
+  if (decision.pass) return { brief, refusal: null };
+  // The legal next call is the step that produces the branch, so a model that
+  // performs it and retries lands on the same open.
+  return { brief, refusal: { reason: decision.reason, legalNext: decision.step === null ? [] : [decision.step] } };
 }
 
 /** The shared unknown-effort refusal every effort-taking phase starts with. */
@@ -3294,7 +3354,11 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         const effort = typeof p.effort === "string" ? p.effort.trim() : "";
         if (effort === "") throw new Error("tw_phase_brief needs a non-empty effort");
         const ticket = typeof p.ticket === "string" && p.ticket.trim() !== "" ? p.ticket.trim() : undefined;
-        const brief = phaseBrief(ctx.directory, { name: skill, effort, ticket });
+        const brief = phaseBrief(
+          ctx.directory,
+          { name: skill, effort, ticket },
+          ctx.profilesDir === undefined ? {} : { profilesDir: ctx.profilesDir },
+        );
 
         const lines = [`Phase brief for ${skill} in effort '${effort}' (profile: ${brief.profile}).`];
         if (brief.branch === null) {
@@ -3459,7 +3523,9 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
           });
         }
         // The opener is the gate: the phase precondition runs before anything
-        // is disclosed, so a refused open leaves the toolset closed.
+        // is disclosed, so a refused open leaves the toolset closed. The tree
+        // precondition comes first, then the branch gate: a phase the profile
+        // gives a branch refuses unless the checkout is on it.
         const refusal = phaseGate(findRoot(ctx.directory), entry, p);
         if (refusal !== null) {
           return outcome(refusedOuttext(refusal.reason, refusal.legalNext), {
@@ -3468,16 +3534,45 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
             legal_next: refusal.legalNext,
           });
         }
+        const gate = await branchGate(ctx, entry, p);
+        if (gate.refusal !== null) {
+          return outcome(refusedOuttext(gate.refusal.reason, gate.refusal.legalNext), {
+            opened: false,
+            reason: gate.refusal.reason,
+            legal_next: gate.refusal.legalNext,
+            required_branch: gate.brief.branch,
+            profile: gate.brief.profile,
+            diagnostics: gate.brief.diagnostics,
+          });
+        }
         const next = [...new Set([...active, ...entry.toolset, CLOSER])].sort();
         activeSet.set(next);
         const disclosed = next.filter((tool) => !active.includes(tool));
         await recordSkillTelemetry(ctx, entry.name, p.effort as string, p.target as string | undefined);
+        const opened = [`Opened ${entry.name}: now active ${disclosed.join(", ")}.`];
+        if (gate.brief.branch !== null) {
+          opened.push(`Required branch: ${gate.brief.branch} (checked out).`);
+        }
+        // The profile's opening instructions ride the open's result, the one
+        // channel that reaches the model at the point the phase starts.
+        if (gate.brief.openInstructions !== "") opened.push(gate.brief.openInstructions);
+        if (gate.brief.diagnostics.length > 0) opened.push(`Diagnostics: ${gate.brief.diagnostics.join("; ")}`);
         return outcome(
-          `Opened ${entry.name}: now active ${disclosed.join(", ")}.`,
-          { opened: true, skill: entry.name, effort: p.effort, target: p.target, disclosed, active: next },
+          opened.join("\n"),
+          {
+            opened: true,
+            skill: entry.name,
+            effort: p.effort,
+            target: p.target,
+            disclosed,
+            active: next,
+            required_branch: gate.brief.branch,
+            profile: gate.brief.profile,
+            diagnostics: gate.brief.diagnostics,
+          },
         );
       },
-      { activeByDefault: true },
+      { activeByDefault: true, executionMode: "sequential" },
     ),
 
     tw_close: defStructured(
@@ -3514,12 +3609,26 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         const next = activeAfterClose(active, entry, remaining);
         activeSet.set(next);
         const removed = active.filter((tool) => !next.includes(tool));
-        return outcome(
+        // The profile's closing instructions ride the close's result, the one
+        // channel that reaches the model as the phase ends. They are read from
+        // the profile alone: a close resolves no branch, because reading the
+        // checkout is the open's job.
+        const text = phaseText(ctx.directory, entry.name, ctx.profilesDir === undefined ? {} : { profilesDir: ctx.profilesDir });
+        const lines = [
           `Closed ${entry.name}: removed ${removed.length > 0 ? removed.join(", ") : "nothing"}.`,
-          { closed: true, skill: entry.name, removed, active: next, open: [...remaining] },
-        );
+        ];
+        if (text.close !== "") lines.push(text.close);
+        if (text.diagnostics.length > 0) lines.push(`Diagnostics: ${text.diagnostics.join("; ")}`);
+        return outcome(lines.join("\n"), {
+          closed: true,
+          skill: entry.name,
+          removed,
+          active: next,
+          open: [...remaining],
+          diagnostics: text.diagnostics,
+        });
       },
-      { activeByDefault: true },
+      { activeByDefault: true, executionMode: "sequential" },
     ),
 
     tw_next: defStructured(
@@ -3898,11 +4007,21 @@ export default function (pi: ExtensionAPI) {
       // closer of the quartet.
       exposure: "direct",
       defaultActive: def.activeByDefault ?? false,
+      ...(def.executionMode !== undefined ? { executionMode: def.executionMode } : {}),
       async execute(_id: string, args: any, _sig: any, _upd: any, ctx: any) {
         const result = await def.execute(args, {
           directory: ctx.cwd,
           getActiveTools: () => pi.getActiveTools(),
           setActiveTools: (toolNames: string[]) => pi.setActiveTools(toolNames),
+          // The git seam the branch gates read the checkout through: the
+          // session's own exec, so no gate grows its own process spawning.
+          git: async (gitArgs: string[]) => {
+            const ran = await pi.exec("git", gitArgs, { cwd: ctx.cwd });
+            if (ran.code !== 0) {
+              throw new Error(ran.stderr.trim() || `git ${gitArgs.join(" ")} exited ${ran.code}`);
+            }
+            return ran.stdout;
+          },
           ...(ctx.executeTool ? { executeTool: (n: string, a: unknown) => ctx.executeTool(n, a) } : {}),
           ...(Array.isArray(ctx.tools) ? { tools: ctx.tools } : {}),
           ...(typeof ctx.hasUI === "boolean" ? { hasUI: ctx.hasUI } : {}),
