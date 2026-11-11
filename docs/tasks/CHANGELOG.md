@@ -73,6 +73,19 @@ title: Task Changelog
 
 
 
+
+## 2026-11-11, Propose changesets before writing, and keep the dedupe honest (changeset-proposal-and-dedupe)
+
+Effort close now proposes its changeset entries before writing any. A dry-run mode
+on the writer runs the same workspace read, config read, validation, generic
+fallback, and dedupe as a real write and stops before touching the filesystem, so
+the operator sees the entries and what was already staged before anything lands.
+The staged-entry read now distinguishes "nothing staged" from "could not read",
+so one malformed file refuses the write instead of silently emptying the dedupe set
+and letting a duplicate generic entry through. Package validation includes a
+monorepo's root package, and the effort close's prose and report resource state the
+propose, confirm, write flow.
+
 ## 2026-11-11, Block implementation agent spawns on the wrong ticket branch (spawn-block)
 
 The implementation chain now refuses to start from the wrong checkout. One
