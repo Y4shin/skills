@@ -1613,13 +1613,17 @@ async function closeBranchGate(
   const gate = closeBrief(ctx.directory, request, deps);
   if (gate.template === null) return { gate, refusal: null };
   if (gate.branch === null) {
+    // The row gates the close and the template needs a value this call did not
+    // receive. A guard that cannot evaluate its condition does not clear it, so
+    // the close refuses and names the value the caller has to pass.
+    const needs = gate.template.includes("{ticket}") ? "ticket" : "effort";
     return {
       gate,
       refusal: {
         reason:
           `'${entry.name}' closes on a branch this close could not resolve ('${gate.template}'): ` +
-          `name the effort the phase works in`,
-        legalNext: [`retry tw_close ${entry.name} with the effort`],
+          `name the ${needs} the phase works ${needs === "ticket" ? "on" : "in"}`,
+        legalNext: [`retry tw_close ${entry.name} with the ${needs}`],
       },
     };
   }

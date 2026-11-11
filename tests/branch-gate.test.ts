@@ -669,6 +669,29 @@ describe("the close gate", () => {
     expect(checkout.calls, "an unresolved gate reads no checkout").toEqual([]);
   });
 
+  test("a gate only a ticket can resolve refuses naming the ticket when the close names none", async () => {
+    const dir = sessionDir({ git: { profile: "custom" } });
+    const profilesDir = profileFixture("custom", {
+      name: "custom",
+      phases: { "implement-ticket": { branch: "effort/{effort}", closeGate: "ticket/{ticket}" } },
+    });
+    const checkout = fakeCheckout("effort/live-effort");
+    const ctx = openCtx(dir, [], checkout.git, { profilesDir });
+    await open({ skill: "implement-ticket", effort: "live-effort", target: "one" }, ctx);
+    // The checkout drifted onto a ticket branch after the open, as a worker's
+    // checkout would leave it.
+    checkout.checkout("ticket/one");
+    checkout.calls.length = 0;
+
+    const { details } = await closeIn({ skill: "implement-ticket", effort: "live-effort" }, ctx);
+
+    expect(details.closed).toBe(false);
+    expect(details.reason).toContain("('ticket/{ticket}')");
+    expect(details.reason).toContain("name the ticket the phase works on");
+    expect(details.legal_next).toEqual(["retry tw_close implement-ticket with the ticket"]);
+    expect(checkout.calls, "an unresolved gate reads no checkout").toEqual([]);
+  });
+
   test("the planning phases close with no effort and no gate", async () => {
     const dir = sessionDir();
     const calls: string[][] = [];
