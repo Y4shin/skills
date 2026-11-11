@@ -93,8 +93,8 @@ broken install.
 
 - `phaseBrief(cwd, { name, effort, ticket? }, deps)` returns
   `{ profile, kind, branch, step, base, trunk, trunkMerge, openInstructions,
-  closeInstructions, closeGate, merge, push, diagnostics }`, where `kind` is
-  `phase`, `agent`, or `unknown`.
+  closeInstructions, closeGate, merge, push, diagnostics }`, where the `kind`
+  field takes the values `phase`, `agent`, or `unknown`.
 - `ticketBrief` asks the profile's ticket-scoped rows, the form the spawn guard
   uses when it has a ticket and names no agent.
 - `gateDecision(cwd, { ...request, currentBranch }, deps)` returns
