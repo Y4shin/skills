@@ -302,3 +302,53 @@ seam. The changeset tickets run against fixture repositories copied from this
 one, with the command line tool available in the dev tree as the comparison
 oracle. The promoted-set ticket is covered by the existing structure tests, which
 check the manifest, the READMEs, the docs page, and the count pins together.
+
+## Corrections recorded during implementation
+
+### Trunk setting shape
+
+The specification's configuration snippet shows `trunk` with a duplicate JSON
+key (`develop` twice), which no parser can represent. The settled intent was three
+values: a switch for whether the repository has a develop branch, and a name for
+each of the two branches. Implementation resolves it without inventing a key:
+
+```json
+{ "trunk": { "develop": false, "main": "main" } }
+```
+
+`trunk.develop` is `false` or the develop branch's name. `false` means the
+repository has no develop branch, so the trunk is `trunk.main`. A string means the
+repository's develop branch is named that, so the trunk is `trunk.develop`. The
+defaults are `{ "develop": false, "main": "main" }`, and the resolved trunk is
+`trunk.develop === false ? trunk.main : trunk.develop`.
+
+Validation accepts `false` or a non-empty string and rejects anything else,
+including `true` and `""`, with a diagnostic that falls back to the default. A
+consumer that needs the trunk name uses the expression above rather than reading
+either key directly. The divergence is recorded in the ticket's
+`## Divergence from plan` section.
+
+## Corrections recorded during implementation
+
+### Trunk setting shape
+
+The specification's configuration snippet shows `trunk` with a duplicate JSON
+key (`develop` twice), which no parser can represent. The settled intent was three
+values: a switch for whether the repository has a develop branch, and a name for
+each of the two branches. Implementation resolves it without inventing a key:
+
+```json
+{ "trunk": { "develop": false, "main": "main" } }
+```
+
+`trunk.develop` is `false` or the develop branch's name. `false` means the
+repository has no develop branch, so the trunk is `trunk.main`. A string means the
+repository's develop branch is named that, so the trunk is `trunk.develop`. The
+defaults are `{ "develop": false, "main": "main" }`, and the resolved trunk is
+`trunk.develop === false ? trunk.main : trunk.develop`.
+
+Validation accepts `false` or a non-empty string and rejects anything else,
+including `true` and `""`, with a diagnostic that falls back to the default. A
+consumer that needs the trunk name uses the expression above rather than reading
+either key directly. The divergence is recorded in the ticket's
+`## Divergence from plan` section.

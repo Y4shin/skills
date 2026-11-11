@@ -58,6 +58,7 @@ import { renderMigrationReport } from "./migrate-report.js";
 import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { FEEDBACK_KINDS, WORKFLOW_SOURCE, feedbackCall } from "./core/feedback.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
+import { phaseBrief } from "./core/git-profile.js";
 
 // ─── Gated skill manifest sanity (session-start diagnostics) ──────────────────
 
@@ -3237,6 +3238,69 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         if (p.json === true) args.push("--json");
         return outcome(runSkillScript("discover_skill.mjs", args, ctx.directory), {});
       },
+    ),
+
+    // ── the phase brief: what a phase needs before it opens ──
+
+    tw_phase_brief: defStructured(
+      "Ask what a phase needs before opening it: the branch it must be checked out on, the step that creates " +
+        "that branch, and the phase's instruction text. Read-only: it opens nothing, writes nothing, and needs " +
+        "no open phase, so it is the first call of any branch-bearing phase. The branch comes from the " +
+        "repository's git profile (taskWorkflow.git in settings); a malformed key, a missing profile, or an " +
+        "unknown profile name falls back to 'default' with a diagnostic rather than failing. A phase the " +
+        "profile gives no branch reports no requirement. Pass the ticket slug when the phase works one ticket.",
+      Type.Object({
+        skill: Type.String({
+          description: `The workflow phase to ask about: one of ${SKILL_REGISTRY.map((s) => s.name).join(", ")}`,
+        }),
+        effort: Type.String({ description: "The effort the phase works in" }),
+        ticket: Type.Optional(
+          Type.String({ description: "The ticket slug, for a phase that works one ticket" }),
+        ),
+      }),
+      async (p, ctx) => {
+        const phases = SKILL_REGISTRY.map((s) => s.name);
+        const skill = typeof p.skill === "string" ? p.skill.trim() : "";
+        if (!skillEntry(skill)) {
+          const reason = `'${skill}' is not a workflow phase: the phases are ${phases.join(", ")}`;
+          return outcome(refusedOuttext(reason, [`retry tw_phase_brief with one of the phases`]), {
+            reason,
+            legal_next: phases,
+          });
+        }
+        const effort = typeof p.effort === "string" ? p.effort.trim() : "";
+        if (effort === "") throw new Error("tw_phase_brief needs a non-empty effort");
+        const ticket = typeof p.ticket === "string" && p.ticket.trim() !== "" ? p.ticket.trim() : undefined;
+        const brief = phaseBrief(ctx.directory, { name: skill, effort, ticket });
+
+        const lines = [`Phase brief for ${skill} in effort '${effort}' (profile: ${brief.profile}).`];
+        if (brief.branch === null) {
+          lines.push(`Required branch: none; '${skill}' requires no branch.`);
+        } else {
+          lines.push(`Required branch: ${brief.branch}.`);
+          if (brief.step !== null) lines.push(`Step: ${brief.step}.`);
+        }
+        lines.push(`Instructions: ${brief.openInstructions === "" ? "none" : brief.openInstructions}`);
+        if (brief.closeInstructions !== "") lines.push(`Closing instructions: ${brief.closeInstructions}`);
+        if (brief.diagnostics.length > 0) lines.push(`Diagnostics: ${brief.diagnostics.join("; ")}`);
+
+        return outcome(lines.join("\n"), {
+          skill,
+          effort,
+          ticket,
+          profile: brief.profile,
+          kind: brief.kind,
+          branch: brief.branch,
+          branch_step: brief.step,
+          instructions: brief.openInstructions,
+          closing_instructions: brief.closeInstructions,
+          close_gate: brief.closeGate,
+          merge: brief.merge,
+          push: brief.push,
+          diagnostics: brief.diagnostics,
+        });
+      },
+      { activeByDefault: true },
     ),
 
     // ── disclosure core: the opener, the closer, and the router ──

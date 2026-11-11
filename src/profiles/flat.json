@@ -1,0 +1,18 @@
+{
+  "name": "flat",
+  "phases": {
+    "intake": {},
+    "wayfinder": {},
+    "to-spec": {},
+    "to-tickets": {},
+    "implement-ticket": {},
+    "finalize-effort": {}
+  },
+  "agents": {
+    "implement-preconditions": {},
+    "tdd-worker": {},
+    "slice-verifier": {},
+    "deviation-reporter": {},
+    "land-worker": {}
+  }
+}
