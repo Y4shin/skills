@@ -25,6 +25,7 @@ import {
   readCheckout,
   text,
   ticketBrief,
+  unreadableCheckout,
   type BriefDeps,
   type GateDecision,
   type GitRun,
@@ -109,7 +110,9 @@ export type SpawnVerdict =
  * an agent the profile gives no branch, and a spawn with no ticket identity to
  * resolve a branch from. A spawn the profile does gate is blocked unless the
  * checkout is on the required branch, with the refusal naming the branch the
- * checkout is on, the branch to create, and what to do next.
+ * checkout is on, the branch to create, and what to do next. A checkout the
+ * seam cannot read is blocked the same way, naming what could not be read, so a
+ * guard that cannot confirm the branch never waves the spawn through.
  */
 export async function spawnVerdict(
   cwd: string,
@@ -129,10 +132,26 @@ export async function spawnVerdict(
 
   const checkout = await readCheckout(deps.git);
   if (checkout.diagnostic !== null) {
-    // The checkout was never read, so it is never refused: the spawn proceeds
-    // and the diagnostic travels with the pass, exactly as the phase gate
-    // falls open on a seam it cannot read.
-    return { pass: true, diagnostics: [...brief.diagnostics, checkout.diagnostic] };
+    // The checkout was never read, so the ticket branch was never confirmed:
+    // the spawn is blocked, in the same shape as a wrong branch, because a
+    // guard that cannot read the checkout cannot clear the condition it guards.
+    const unreadable = unreadableCheckout(
+      identity.agent === "" ? "the chain" : identity.agent,
+      brief.branch,
+      checkout.diagnostic,
+    );
+    const diagnostics = [...brief.diagnostics, checkout.diagnostic];
+    return {
+      pass: false,
+      reason: `Refused: ${unreadable.reason}. Legal next: ${unreadable.recovery}, then dispatch again.`,
+      decision: {
+        agent: identity.agent,
+        branch: brief.branch,
+        currentBranch: null,
+        profile: brief.profile,
+        diagnostics,
+      },
+    };
   }
 
   const decision = decideFromBrief(brief, identity.agent === "" ? "the chain" : identity.agent, checkout.branch);

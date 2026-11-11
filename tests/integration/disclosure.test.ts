@@ -334,7 +334,14 @@ describe("disclosure core: telemetry absorption", () => {
     const s = await createTaskSession({
       extensions: [taskWorkflow],
       customTools: [fakeTelemetry],
-      projectFiles: fixtureFiles(),
+      // This fixture session gates no branch: the harness offers no git seam to
+      // fake, and the guard now refuses a checkout it cannot read, so the
+      // fixture selects the profile that requires none. The gate itself is
+      // covered by tests/branch-gate.test.ts and tests/spawn-guard.test.ts.
+      projectFiles: {
+        ...fixtureFiles(),
+        ".pi/settings.json": JSON.stringify({ taskWorkflow: { git: { profile: "flat" } } }),
+      },
     });
     sessions.push(s);
 

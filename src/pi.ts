@@ -4122,9 +4122,10 @@ async function guardSpawn(
     },
   );
   if (verdict.pass) {
-    // A pass that carries a diagnostic is a guard that did not run: the spawn
-    // proceeds, and the operator hears why the checkout was never read, the
-    // same way the openers report a gate they could not apply.
+    // A pass can still carry a diagnostic, but only one about the profile or
+    // the settings it was resolved from, never about the checkout: a checkout
+    // the seam cannot read blocks the spawn. The operator hears what the guard
+    // had to report while it let the call through.
     for (const diagnostic of verdict.diagnostics) ctx.ui.notify(`task-workflow spawn guard: ${diagnostic}`, "info");
     return undefined;
   }

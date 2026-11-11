@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import factory from "../src/pi.js";
-import { KEY_SEPARATOR, ticketFromKey } from "../src/core/spawn-guard.js";
+import { KEY_SEPARATOR, spawnVerdict, ticketFromKey } from "../src/core/spawn-guard.js";
 
 /** The repo root, in POSIX form, for the structure assertions over the chain. */
 const PROJECT = fileURLToPath(new URL("..", import.meta.url));
@@ -206,6 +206,90 @@ describe("the outer subagent call", () => {
 
     expect(result.block).toBe(true);
     expect(result.reason).toContain("the checkout is on no branch (a detached HEAD)");
+  });
+
+  test("a dispatch and a chain launch on the ticket branch pass untouched", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "ticket/one" });
+
+    expect(await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity))).toBeUndefined();
+    expect(await fire(stub, dir, "subagent", chainLaunch(identity))).toBeUndefined();
+    expect(stub.notices, "a gate that ran clean reports nothing").toEqual([]);
+  });
+});
+
+// ─── The block on a checkout the guard could not read ──────────────────────
+
+/**
+ * Guards block, they do not warn. A checkout the seam cannot read is a
+ * condition the guard cannot clear, so the spawn is blocked in the same shape
+ * as a wrong branch, with the cause named in the reason.
+ */
+describe("the spawn block on a checkout it cannot read", () => {
+  const identity = { effort: "an-effort", ticket: "one" };
+
+  test("a git that fails blocks the spawn, naming what could not be read", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+    stub.api.exec = async () => ({ stdout: "", stderr: "fatal: not a git repository", code: 128, killed: false });
+
+    const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
+
+    expect(result, "a checkout the guard never read never spawns").toMatchObject({ block: true });
+    expect(result.reason).toBe(
+      "Refused: the checkout could not be read (git rev-parse --abbrev-ref HEAD failed: fatal: not a git repository), " +
+        "so 'tdd-worker' cannot confirm it is on 'ticket/one'. " +
+        "Legal next: make the checkout readable (git rev-parse --abbrev-ref HEAD must answer the checked-out branch), " +
+        "then dispatch again.",
+    );
+  });
+
+  test("a missing git seam blocks the spawn on the same rule", async () => {
+    const dir = sessionDir();
+
+    // No seam at all: the guard has nothing to read the checkout with.
+    const verdict = await spawnVerdict(dir, "subagent", directSpawn("tdd-worker", identity));
+
+    expect(verdict.pass, "a guard that cannot read the checkout does not pass").toBe(false);
+    if (verdict.pass) return;
+    expect(verdict.reason).toContain("the checkout could not be read");
+    expect(verdict.reason).toContain("no git seam");
+    expect(verdict.reason).toContain("cannot confirm it is on 'ticket/one'");
+    expect(verdict.reason).toContain("Legal next:");
+    expect(verdict.decision.diagnostics.join(" "), "the cause still reports").toContain("no git seam");
+  });
+
+  test("the chain launch is blocked on the same condition, and names the chain", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+    stub.api.exec = async () => ({ stdout: "", stderr: "fatal: not a git repository", code: 128, killed: false });
+
+    const result = await fire(stub, dir, "subagent", chainLaunch(identity));
+
+    expect(result).toMatchObject({ block: true });
+    expect(result.reason).toContain("so 'the chain' cannot confirm it is on 'ticket/one'");
+  });
+
+  test("the per-child launch is blocked on the same condition", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+    stub.api.exec = async () => ({ stdout: "", stderr: "fatal: not a git repository", code: 128, killed: false });
+
+    const result = await fire(stub, dir, "subagent_launch", launchCall(`tdd${KEY_SEPARATOR}one`, "tdd-worker"));
+
+    expect(result).toMatchObject({ block: true });
+    expect(result.reason).toContain("cannot confirm it is on 'ticket/one'");
+  });
+
+  test("an ungated spawn still passes when the checkout cannot be read", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+    stub.api.exec = async () => ({ stdout: "", stderr: "fatal: not a git repository", code: 128, killed: false });
+
+    // A profile that gates nothing needs no checkout read, so a broken read
+    // cannot block work the profile never gated.
+    expect(await fire(stub, dir, "subagent", directSpawn("code-reviewer", identity))).toBeUndefined();
+    expect(stub.execCalls).toEqual([]);
   });
 });
 
@@ -398,19 +482,6 @@ describe("calls the guard must leave untouched", () => {
     expect(stub.execCalls, "a profile with no branch gate reads no checkout").toEqual([]);
   });
 
-  test("a checkout the seam cannot read passes, rather than refusing a spawn it never saw", async () => {
-    const dir = sessionDir();
-    const stub = stubPi({ branch: "main" });
-    stub.api.exec = async () => ({ stdout: "", stderr: "fatal: not a git repository", code: 128, killed: false });
-
-    const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
-
-    expect(result, "a gate that never saw the checkout never blocks").toBeUndefined();
-    expect(
-      stub.notices.join("\n"),
-      "a guard that did not run says so, instead of passing silently",
-    ).toContain("fatal: not a git repository");
-  });
 });
 
 // ─── The block is a step failure, not a session failure ──────────────────────
