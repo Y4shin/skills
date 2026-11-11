@@ -894,19 +894,28 @@ function dependentReleases(
 }
 
 /**
- * The refusal for a pending entry naming a package the workspace does not
- * have. The libraries throw for this one, so it is checked first: a throw from
- * the assembly would be a crash in a tool rather than a named outcome.
+ * The refusal for a pending entry naming a package the release cannot version.
+ *
+ * The libraries throw for this one, so it is checked first: a throw from the
+ * assembly would be a crash in a tool rather than a named outcome. Two names
+ * are unversionable, and they differ in what the operator can do about it: a
+ * name the workspace does not have at all, and a monorepo's root package,
+ * which the workspace has but a changesets setup does not release. The second
+ * is how a generic entry authored against a private root ends up, so its
+ * reason names the packages the release does cover.
  */
 function unknownPackageRefusal(changesets: NewChangeset[], workspace: Workspace): ReleaseRefusal | null {
+  const releasable = workspace.reader.packages.map((pkg) => pkg.packageJson.name);
   for (const changeset of changesets) {
     for (const release of changeset.releases) {
-      if (workspace.names.includes(release.name)) continue;
+      if (releasable.includes(release.name)) continue;
       return {
         code: "unknown-package",
-        reason:
-          `changeset '${changeset.id}' names '${release.name}', which is not a package in this workspace` +
-          `: the workspace packages are ${workspace.names.join(", ")}`,
+        reason: workspace.names.includes(release.name)
+          ? `changeset '${changeset.id}' names '${release.name}', the workspace's root package, which a ` +
+            `monorepo's changesets setup does not version: the packages it versions are ${releasable.join(", ")}`
+          : `changeset '${changeset.id}' names '${release.name}', which is not a package in this workspace` +
+            `: the workspace packages are ${workspace.names.join(", ")}`,
       };
     }
   }

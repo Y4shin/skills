@@ -397,7 +397,8 @@ describe("formatting", () => {
     // changeset file still there. The fixture declares prettier and carries a
     // formatter shim on the local bin path, so a run that let either value
     // through would leave a marker.
-    for (const config of [{ ...CONFIG }, { ...CONFIG, format: "prettier" }]) {
+    const configs: Array<Record<string, unknown>> = [{ ...CONFIG }, { ...CONFIG, format: "prettier" }];
+    for (const config of configs) {
       const dir = oneEntryFixture({
         config,
         manifest: { ...MANIFEST, devDependencies: { prettier: "^3.0.0" } },
@@ -630,5 +631,28 @@ describe("the failure paths the prototype found", () => {
     expect(text).toContain("Refused:");
     expect(changesetFiles(dir)).toEqual(["unknown.md"]);
     expect(bytes(join(dir, "CHANGELOG.md"))).toBeNull();
+  });
+});
+
+describe("a changeset naming a package the release cannot version", () => {
+  test("refuses a monorepo's root package, naming the packages the release covers", async () => {
+    // The effort close's generic entry names the workspace root, and a
+    // monorepo's changesets setup does not version that package: the libraries
+    // throw for it, so it is a refusal naming what a release can cover.
+    const dir = fixtureWorkspace();
+    writeFileSync(
+      join(dir, ".changeset", "generic.md"),
+      changeset("@scope/root", "patch", "Performance and stability improvements."),
+      "utf-8",
+    );
+
+    const { text, details } = await plan(dir);
+
+    expect(details.refusal.code).toBe("unknown-package");
+    expect(details.refusal.reason).toContain("@scope/root");
+    expect(details.refusal.reason).toContain("does not version");
+    expect(details.refusal.reason).toContain("@scope/alpha");
+    expect(text).toContain("Refused:");
+    expect(changesetFiles(dir)).toEqual(["generic.md"]);
   });
 });
