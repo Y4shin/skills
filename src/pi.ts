@@ -59,6 +59,7 @@ import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { FEEDBACK_KINDS, WORKFLOW_SOURCE, feedbackCall } from "./core/feedback.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 import { phaseBrief } from "./core/git-profile.js";
+import { writeEntries, type ChangeLevel, type ChangesetEntry, type ChangesetsRefusalCode } from "./core/changesets.js";
 
 // ─── Gated skill manifest sanity (session-start diagnostics) ──────────────────
 
@@ -1652,6 +1653,28 @@ function refusedOuttext(reason: string, legalNext: string[]): string {
   return legalNext.length > 0
     ? `Refused: ${reason}. Legal next: ${legalNext.join("; ")}.`
     : `Refused: ${reason}.`;
+}
+
+/**
+ * The one legal next call for a refused changeset write, per named outcome.
+ * Each refusal says what to do so the caller can perform it and retry: create
+ * the missing config, name a real package, use a real level.
+ */
+function changesetLegalNext(code: ChangesetsRefusalCode): string {
+  switch (code) {
+    case "no-workspace":
+      return "retry tw_write_changesets from the repository root";
+    case "no-config":
+      return "run 'npx changeset init' in the repository, then retry tw_write_changesets";
+    case "invalid-config":
+      return "fix .changeset/config.json, then retry tw_write_changesets";
+    case "unknown-package":
+      return "retry tw_write_changesets with a package name from the workspace list in the refusal";
+    case "invalid-level":
+      return "retry tw_write_changesets with patch, minor, or major";
+    case "no-root-package":
+      return "retry tw_write_changesets naming a workspace package explicitly";
+  }
 }
 
 /**
@@ -3301,6 +3324,84 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
         });
       },
       { activeByDefault: true },
+    ),
+
+    // ── the changeset writer: the effort close's named writer ──
+
+    tw_write_changesets: defStructured(
+      "Write the effort's pending changeset entries under .changeset/, in the changesets tool's own format " +
+        "and with formatting disabled. Call it from the effort close after the operator confirms the proposed " +
+        "entries: one entry per change a user of the package or product can observe, each naming a workspace " +
+        "package, a level (patch, minor, major), and the summary that becomes the entry body. An effort with " +
+        "nothing observable proposes the generic performance and stability patch instead, and an identical " +
+        "entry already staged is not repeated. Refuses, writing nothing, when the repository has no " +
+        "`.changeset/config.json`, when a package name is not in the workspace, and when a level is not one " +
+        "of the three.",
+      Type.Object({
+        effort: Type.String({ description: "The effort the entries belong to" }),
+        entries: Type.Optional(
+          Type.Array(
+            Type.Object({
+              package: Type.String({ description: "The workspace package name the entry versions" }),
+              level: Type.String({ description: "The bump level: patch, minor, or major" }),
+              summary: Type.String({ description: "The entry body: what a user can observe" }),
+            }),
+          ),
+        ),
+      }),
+      async (p, ctx) => {
+        const effort = typeof p.effort === "string" ? p.effort.trim() : "";
+        if (effort === "") throw new Error("tw_write_changesets needs a non-empty effort");
+        const requested: ChangesetEntry[] = (Array.isArray(p.entries) ? p.entries : []).map((entry: any) => ({
+          package: typeof entry?.package === "string" ? entry.package.trim() : "",
+          level: (typeof entry?.level === "string" ? entry.level.trim() : "") as ChangeLevel,
+          summary: typeof entry?.summary === "string" ? entry.summary.trim() : "",
+        }));
+        const result = await writeEntries(ctx.directory, { entries: requested });
+        if (result.refusal !== null) {
+          const { reason, code } = result.refusal;
+          return outcome(refusedOuttext(reason, [changesetLegalNext(code)]), {
+            effort,
+            refusal: result.refusal,
+            written: [],
+            entries: [],
+            skipped: [],
+            generic: false,
+            diagnostics: result.diagnostics,
+          });
+        }
+        const lines: string[] = [];
+        if (result.generic) {
+          lines.push(
+            `Nothing a user can observe in effort '${effort}': the generic performance and stability patch ` +
+              `is the entry.`,
+          );
+        } else {
+          lines.push(`Changesets for effort '${effort}':`);
+        }
+        for (const entry of result.entries) lines.push(`- ${entry.package} ${entry.level}: ${entry.summary}`);
+        for (const entry of result.skipped) {
+          lines.push(`Already staged, not repeated: ${entry.package} ${entry.level}: ${entry.summary}`);
+        }
+        for (const file of result.written) lines.push(`Wrote ${file}`);
+        if (result.written.length === 0) {
+          lines.push(
+            result.skipped.length > 0
+              ? "Nothing to write: every proposed entry is already staged."
+              : "Nothing to write.",
+          );
+        }
+        if (result.diagnostics.length > 0) lines.push(`Diagnostics: ${result.diagnostics.join("; ")}`);
+        return outcome(lines.join("\n"), {
+          effort,
+          refusal: null,
+          written: result.written,
+          entries: result.entries,
+          skipped: result.skipped,
+          generic: result.generic,
+          diagnostics: result.diagnostics,
+        });
+      },
     ),
 
     // ── disclosure core: the opener, the closer, and the router ──
