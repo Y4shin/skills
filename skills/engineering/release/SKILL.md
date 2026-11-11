@@ -55,3 +55,21 @@ replace a step it names with the way another repository does it.
 
 When the repository has no `docs/releasing.md`, there is nothing further to
 follow: report the versions and the changelog section that landed, and stop.
+
+## When the repository is not set up for it
+
+Two files are the whole setup, and a repository missing either one gets a
+refusal. Report the refusal's reason, as the tool gave it, and stop. Nothing
+has been written.
+
+- A `package.json` at the repository root carrying a name and a version. That
+  is all it needs: no scripts, no dependencies, no entry point. A manifest
+  without a version cannot be bumped, and the refusal names it.
+- A `.changeset/config.json`, which is the repository saying it versions
+  through changesets. Its absence is not a gap to fill with a built-in
+  default: that would version a repository that has no changesets setup at
+  all.
+
+Never create the missing file, never run `npx changeset init` on the
+operator's behalf, and never bump a manifest the refusal did not name. A
+missing `.changeset/config.json` is a hard error, not a default.
