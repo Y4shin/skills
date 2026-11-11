@@ -1,6 +1,6 @@
 ---
 name: implement-ticket
-description: "Autonomous. Owns the implementation phase: reads the effort's architecture document, works the ticket frontier in dependency levels, dispatches the per-ticket chain per ticket, and closes each landed ticket out inline (CI gate, knowledge harvest, changelog, done-marking, merge to the effort's landing branch). The successor to the ticket half of the retired implementation router and the retired close-out skill."
+description: "Autonomous. Owns the implementation phase: reads the effort's architecture document, works the ticket frontier in dependency levels, dispatches the per-ticket chain per ticket, and closes each landed ticket out inline (CI gate, knowledge harvest, changelog, done-marking, push of the effort branch). The successor to the ticket half of the retired implementation router and the retired close-out skill."
 ---
 
 # Implement Ticket
@@ -19,9 +19,24 @@ ready; the human can also run `/skill:implement-ticket` explicitly.
 
 ## Open first
 
+This phase's first action is its branch step, and the branch step comes from
+the profile rather than from this file. Call `tw_phase_brief` with
+`{ skill: "implement-ticket", effort: "<effort-slug>", ticket: "<ticket-slug>" }`
+before anything else: it reports the branch this phase must be on, the step
+that creates that branch off the trunk when it does not exist yet, and the
+phase's instruction text. Perform the step it reports, then open. A repository
+whose profile names different branches needs no edit here.
+
 Every run starts by opening the skill: call `tw_open` with
 `{ skill: "implement-ticket", effort: "<effort-slug>", target: "<ticket-slug>" }`.
-The opener is the gate: it checks the effort's work state (ticket generation
+The opener is the gate, and the branch is the first half of it: a checkout that
+is not on the branch the brief reported is refused, naming the branch the
+checkout is on, the required branch, and the step that creates it. Nothing
+latches, so creating that branch off the trunk and retrying the open passes. A
+run that skipped the brief is refused by the same check, and both read one
+resolver, so the brief and the refusal cannot disagree.
+
+The opener's other checks: it checks the effort's work state (ticket generation
 ran, work remains), the architecture document (a missing or unstable one is
 refused here and is never drafted below), and the target ticket's readiness
 (a ticket that is done, blocked, or not yet ready is refused with the legal
@@ -60,7 +75,7 @@ level N+1 starts only after every ticket in level N has landed.
 **The loop is serial: tickets run one at a time, in level order.** The levels
 stay barriers, and no two chains ever run at once. Every chain shares the one
 repo working directory, so a second chain at the same time would `git
-checkout` a different `task/<ticket-slug>` branch in the same tree, and the
+checkout` a different ticket branch in the same tree, and the
 per-ticket `tw_state_set task <slug>` would be last-writer-wins. Worktree
 isolation is the follow-up effort's seed, not behaviour this skill claims.
 
@@ -79,14 +94,23 @@ by the write guard.
 > control; Pi wakes this session on completion or attention, so no wait call
 > is needed to receive the result.
 
-**Branch model.** Each ticket lands on its own **landing branch**
-`task/<ticket-slug>`, created off the branch the previous ticket's chain
-landed on (the effort's starting branch, typically main, for the first
-ticket), so a chain sees the code its blockers delivered. The tdd-worker
-commits checkpoints on the **working branch** `ticket/<ticket-slug>`, created
-off the landing branch; the land-worker merges it back with `--no-ff` and
-deletes it. The close-out merges back into that same branch, written below as
-`<effort-branch>`.
+**Branch step.** The phase is on the effort branch its brief reported, and the
+open refuses from anywhere else. For each ticket, ask the brief again with the
+ticket's slug and the worker that will run (`skill: "tdd-worker"` for the
+implementation step): it answers with the branch that worker requires and the
+step that creates it off the effort branch. **This phase creates and checks that
+branch out before it dispatches the chain, not a worker**: every worker expects
+its branch already checked out, and the spawn guard blocks an
+implementation spawn made from anywhere else, naming the branch to create and
+nothing else, so a dispatch that skips the step fails that step instead of
+starting a worker on the wrong branch. There is no landing branch: the chain
+merges the finished ticket's branch into the effort branch and deletes it, so
+the next ticket's branch is created off the effort branch and sees the code
+its blockers delivered. A profile that requires no branch says so, and the
+phase dispatches directly.
+
+`<effort-branch>` below is the branch the brief reported, never a name written
+here.
 
 **Communication via context pointers.** Communicate to and from subagents
 primarily through context pointers (to the architecture document, ticket
@@ -120,6 +144,16 @@ size = tw_get(ticketPath, "size") || "m"
 budgetMinutes = { s: 15, m: 30, l: 45, xl: 60 }
 const timeoutMs = (budgetMinutes[size] || budgetMinutes.m) * 60 * 1000
 
+// The two branch names the chain's host gates assert. A workflow script has
+// no filesystem and no tools, so the phase resolves the profile's templates
+// and passes the names in. The ticket branch is created here, by this phase,
+// before the dispatch; a profile that requires no branch passes neither name
+// and the chain asserts no branch.
+effortBranch = <this phase's brief branch>
+ticketBranch = tw_phase_brief(
+    { skill: "tdd-worker", effort: effortSlug, ticket: ticketSlug }
+).branch
+
 // Resolve the chain script's path against this skill's directory,
 // then launch it once per ticket.
 runId = subagent({
@@ -136,6 +170,12 @@ runId = subagent({
         ticket: ticketSlug,
         ticketPath: ticketPath,
         subtype: "<feature|bug>",
+        // The resolved branch names: the chain's host gates assert these and
+        // the land step merges one into the other. The merge flag is the
+        // profile's too, so the chain never writes one down.
+        branch: ticketBranch,
+        effortBranch: effortBranch,
+        merge: <this phase's brief merge flag>,
         // bug only, optional: a separate bug doc and reproduction path,
         // passed only when the ticket body names them. Schema 5 keeps the
         // defect record in the ticket body, so most bug tickets pass neither.
@@ -182,15 +222,13 @@ separate bash block.
 
 1. **CI gate.**
 
-   ```
-   git checkout task/<ticket-slug>
-   git merge <effort-branch> 2>/dev/null || true
-   ```
-
-   Run the project's CI command, detected from repo tooling: package.json
+   The chain left the checkout on the effort branch, because the land step
+   merged the ticket's branch into it and deleted that branch. Run the
+   project's CI command, detected from repo tooling: package.json
    scripts, Makefile, CI config, or the `docs/testing.md` protocol; ask the
-   user when ambiguous. If it fails: STOP. Fix forward on the landing
-   branch. Do not merge a red branch.
+   user when ambiguous. If it fails: STOP. Fix forward on the effort branch
+   before the next chain is dispatched. A red effort branch never carries into
+   the next ticket.
 
    Fix-forward is a designed-for adjustment, record that it fired so its
    frequency can be correlated. Call `tw_feedback({ kind: "expected", data })`
@@ -248,26 +286,27 @@ separate bash block.
    never leave `docs/tasks/state.yaml` dirty across the next chain's
    checkout.
 
-8. **Merge the landing branch into the effort's branch** (shell, safe under
-   `set -e`), where `<effort-branch>` is the branch the previous ticket
-   landed on, not the literal `main` unless `main` is that branch:
+8. **Record the note on the effort branch** (shell, safe under `set -e`).
+   There is no second merge here: the chain already merged the ticket's branch
+   into `<effort-branch>` and deleted it, so the checkout is on the branch
+   this phase must leave its work on.
 
    First write the note the land-worker reported through
    `tw_write_ticket_note` (selector: the ticket doc, note: its
-   `## Implementation note`), while the landing branch is checked out, and
-   commit it there: `git add docs/tasks/ && git commit -m "docs(ticket):
-   note {ticketSlug}"`. The `git add docs/tasks/` covers the note and the
-   `state.yaml` pointer cleared in step 7, so both land in this commit. The
-   worker cannot write the note: its session has no phase open.
+   `## Implementation note`), and commit it here: `git add docs/tasks/ &&
+   git commit -m "docs(ticket): note {ticketSlug}"`. The `git add docs/tasks/`
+   covers the note and the `state.yaml` pointer cleared in step 7, so both land
+   in this commit. The worker cannot write the note: its session has no phase
+   open.
+
+   Then push per the profile's push policy, which this phase's brief reports
+   next to the branch. A policy the profile sets to never means the phase
+   pushes nothing and the commits stay local.
 
    ```bash
    set -e
-   git checkout <effort-branch>
-   git merge --no-ff task/<ticket-slug> -m "ticket: finalize {ticketSlug}"
-   git branch -d task/<ticket-slug>
+   git push origin <effort-branch>
    ```
-
-   If remote exists: `git push origin <effort-branch>`
 
 There is **no per-ticket move**: the ticket stays in the live effort.
 Moving one ticket out would split the effort's graph scope and trip the

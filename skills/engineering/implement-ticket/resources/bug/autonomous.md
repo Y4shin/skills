@@ -60,8 +60,20 @@ size = tw_get(ticketPath, "size") || "m"
 budgetMinutes = { s: 15, m: 30, l: 45, xl: 60 }
 const timeoutMs = (budgetMinutes[size] || budgetMinutes.m) * 60 * 1000
 
+// The branch this phase creates and checks out before the dispatch, and the
+effort branch it is created off.
+effortBranch = <this phase's brief branch>
+ticketBranch = tw_phase_brief({ skill: "tdd-worker", effort: effortSlug, ticket: ticketSlug }).branch
+
 // Resolve the chain script's path against this skill's directory,
 // then launch it once per ticket.
+//
+// branch and effortBranch are the resolved branch names: a workflow script
+// has no filesystem and no tools, so this phase resolves the profile's
+// templates (tw_phase_brief names the worker's branch, this phase's own brief
+// names the effort branch) and passes them in. This phase creates and checks
+// out branch before the dispatch. A profile that requires no branch passes
+// neither name and the chain asserts no branch.
 runId = subagent({
     async: true,
     timeoutMs,
@@ -75,6 +87,9 @@ runId = subagent({
         ticket: ticketSlug,
         ticketPath: ticketPath,
         subtype: "bug",
+        branch: ticketBranch,
+        effortBranch: effortBranch,
+        merge: <this phase's brief merge flag>,
         // optional: only when the ticket body names separate evidence paths
         bugPath: bugPath,
         reproPath: reproPath
@@ -97,7 +112,9 @@ it in this same run, before the next ticket's dispatch: the CI gate, the
 knowledge harvest, the changelog through `tw_write_changelog`, the
 done-marking through `tw_mark_done` (this phase is the one owner of the
 marking), the `tw_finalizable` check, the state pointer cleared with
-`tw_state_set task null`, and the `--no-ff` merge into `<effort-branch>`. It
+`tw_state_set task null`, and the push of `<effort-branch>` per the profile's
+policy. The chain already merged the ticket's branch into the effort branch
+and deleted it. It
 is not restated here, so the copies cannot drift again.
 
 The bug pipeline's own rule inside that sequence: a bug ticket has no

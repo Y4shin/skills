@@ -49,14 +49,17 @@ of ready, unfinished tickets (all blockers done). Call
 the same one `tw_frontier <effort-slug>` exposes: a level is a wave of tickets
 whose blockers are all in prior levels.
 
-**Branch model.** Each ticket lands on its own **landing branch**
-`task/<ticket-slug>`, created off the branch the previous ticket's chain
-landed on (the effort's starting branch, typically main, for the first
-ticket), so a chain sees the code its blockers delivered. The tdd-worker
-commits checkpoints on the **working branch** `ticket/<ticket-slug>`, created
-off the landing branch; the land-worker merges it back with `--no-ff` and
-deletes it. The close-out merges back into that same branch, written below as
-`<effort-branch>`.
+**Branch step.** The phase is on the effort branch its brief reported, and the
+open refuses from anywhere else. For each ticket, ask the brief again with the
+ticket's slug and the worker that will run, and it answers with the branch
+that worker requires and the step that creates it off the effort branch. This
+phase, not a worker, creates and checks that branch out before it dispatches
+the chain: every worker expects its branch already checked out, and the spawn
+guard blocks an implementation spawn made from anywhere else, naming the
+branch to create. There is no landing branch. The chain merges the finished
+ticket's branch into the effort branch and deletes it, so the next ticket's
+branch is created off the effort branch and sees the code its blockers
+delivered. `<effort-branch>` below is the branch the brief reported.
 
 **Communication via context pointers.** Communicate to and from subagents
 primarily through context pointers (to the architecture document, ticket
@@ -67,7 +70,7 @@ already available via pointers; pass the pointer, not the content.
 **strict barriers**: level N+1 starts only after every ticket in level N has
 landed and closed out, one ticket at a time. Nothing implements level concurrency: every chain
 shares the repo working directory, so two chains at once would checkout
-different landing branches in one tree and the per-ticket `tw_state_set task`
+different ticket branches in one tree and the per-ticket `tw_state_set task`
 would be last-writer-wins. Worktree isolation is the follow-up effort's seed,
 recorded in the effort's architecture document, not behaviour this pipeline
 claims.
@@ -102,6 +105,16 @@ for each level in levels:
         // Point the state file at the ticket its chain is about to run.
         tw_state_set task <ticket-slug>
 
+        // The two branch names the chain's host gates assert. A workflow
+        // script has no filesystem and no tools, so the phase resolves the
+        // profile's templates and passes the names in; a profile that
+        // requires no branch passes neither and the chain asserts none.
+        effortBranch = <this phase's brief branch>
+        ticketBranch = tw_phase_brief({
+            skill: "tdd-worker", effort: effortSlug, ticket: ticket
+        }).branch
+        // This phase creates and checks out ticketBranch before dispatching.
+
         // Resolve the chain script's path against this skill's directory,
         // then launch it once per ticket.
         runId = subagent({
@@ -117,7 +130,12 @@ for each level in levels:
                 effort: effortSlug,
                 ticket: ticket,
                 ticketPath: ticketPath,
-                subtype: "feature"
+                subtype: "feature",
+                // The resolved names, and the profile's merge flag: the chain
+                // asserts the branches and merges one into the other.
+                branch: ticketBranch,
+                effortBranch: effortBranch,
+                merge: <this phase's brief merge flag>
             }
         })
 
@@ -158,7 +176,9 @@ for each level in levels:
 
         // The close-out runs inline, in this same run, before the next
         // dispatch: CI gate, knowledge harvest, changelog, done-marking,
-        // close-out, merge to <effort-branch>. The one-owner rule holds: this phase's
+        // close-out, and the push of <effort-branch> per the profile's policy.
+        // The chain already merged the ticket's branch into the effort branch
+        // and deleted it. The one-owner rule holds: this phase's
         // close-out is the only thing that marks a ticket done (Step 2b).
         // The uncertainty path is
         // docs/tasks/${effortSlug}/tickets/${ticket}/.work/uncertainty.md.
@@ -185,8 +205,8 @@ knowledge harvest (which reads the ticket doc, all deviation reports, and the
 combined diff), the changelog through `tw_write_changelog`, the done-marking
 through `tw_mark_done` (this phase is the one owner of the marking), the
 `tw_finalizable` check, the state pointer cleared with `tw_state_set task
-null`, and the `--no-ff` merge into `<effort-branch>`. It is not restated
-here, so the copies cannot drift again.
+null`, and the push of `<effort-branch>` per the profile's policy. It
+is not restated here, so the copies cannot drift again.
 
 A feature ticket has no bug-closure step: `docs/bugs/` is a static archive in
 schema 5 and the implementation ticket is the defect's record.

@@ -1,6 +1,6 @@
 ---
 name: land-worker
-description: Merge a completed ticket working branch into the ticket's landing branch, report an implementation note for the calling phase to write, and commit. May NOT write or modify any source code, tests, config files, or the ticket doc.
+description: Merge the completed ticket branch into the merge target the task names and delete it, report an implementation note for the calling phase to write, and commit. May NOT write or modify any source code, tests, config files, or the ticket doc.
 tools: read, bash, submit_feedback, tw_feedback
 inheritProjectContext: true
 defaultContext: fresh
@@ -13,12 +13,20 @@ You land a completed ticket. Purely mechanical: you must NOT write or edit any s
 ## Steps
 
 1. Read the ticket doc for title and acceptance criteria. Read the TDD worker's output for divergence notes.
-2. Merge the working branch into the landing branch:
+2. **Your branch is already checked out.** The task names the ticket branch and the
+   merge target, both resolved from the repository's git profile by the phase that
+   dispatched you. Never create, rename, or switch a branch to invent either name.
+   Merge the branch you are on into the target the task names, then delete the
+   ticket branch:
+
    ```
-   git checkout task/<ticket-slug>
-   git merge --no-ff ticket/<ticket-slug> -m "ticket(<ticket-slug>): <title>"
-   git branch -d ticket/<ticket-slug>
+   git merge <merge flag> <ticket-branch> -m "ticket(<ticket-slug>): <title>"
+   git branch -d <ticket-branch>
    ```
+
+   `<merge flag>` is the flag the task carries. When the task names no merge
+   target, the profile requires no branch: there is nothing to merge and nothing
+   to delete, so record that and continue to step 3.
 3. Compose the implementation note and return it in your output under a
    `## Implementation note` heading. Do not write it: an agent's tool list
    cannot load the extension that registers the writer, and the built-in `edit`
