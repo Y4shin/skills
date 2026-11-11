@@ -20,13 +20,17 @@ import { join } from "node:path";
 
 import { getPackages, type Packages } from "@manypkg/get-packages";
 import { validateConfig } from "@changesets/config";
+import { readChangesets } from "@changesets/read";
 import { writeChangeset } from "@changesets/write";
-import type { Changeset, Config } from "@changesets/types";
+import type { Changeset, Config, NewChangeset } from "@changesets/types";
 
 /** The three bump levels a changeset names. */
 export const CHANGE_LEVELS = ["patch", "minor", "major"] as const;
 
 export type ChangeLevel = (typeof CHANGE_LEVELS)[number];
+
+/** The entry an effort with nothing a user can observe proposes instead. */
+export const GENERIC_SUMMARY = "Performance and stability improvements.";
 
 /** One changeset entry, as the effort close proposes it. */
 export interface ChangesetEntry {
@@ -36,6 +40,138 @@ export interface ChangesetEntry {
   level: ChangeLevel;
   /** The entry body: what a user of the package or product can observe. */
   summary: string;
+}
+
+/** What an effort proposes, once the generic fallback and the dedupe have run. */
+export interface Proposal {
+  /** The refusal, or null when the proposal stands. */
+  refusal: ChangesetsRefusal | null;
+  /** The entries still to write: the proposal minus what is already staged. */
+  entries: ChangesetEntry[];
+  /** Proposed entries dropped because an identical one is already staged. */
+  skipped: ChangesetEntry[];
+  /** True when the generic patch answered for an effort with nothing observable. */
+  generic: boolean;
+  /** Non-fatal notes from the workspace or the config read. */
+  diagnostics: string[];
+}
+
+/**
+ * Propose the entries an effort's close should write.
+ *
+ * An effort with nothing a user can observe proposes the generic performance
+ * and stability patch. Either way the proposal is deduped against what is
+ * already staged: an identical entry is not repeated, because a second copy
+ * would version the package twice for one change.
+ *
+ * Nothing here writes: the effort close prints the proposal and the operator
+ * confirms it before `writeEntries` runs.
+ */
+export async function proposeEntries(
+  cwd: string,
+  request: { changes: ChangesetEntry[] },
+): Promise<Proposal> {
+  const resolved = await resolveProposal(cwd, request.changes);
+  return {
+    refusal: resolved.refusal,
+    entries: resolved.entries,
+    skipped: resolved.skipped,
+    generic: resolved.generic,
+    diagnostics: resolved.diagnostics,
+  };
+}
+
+/** A proposal plus the workspace it was resolved against, for the write path. */
+interface ResolvedProposal extends Proposal {
+  workspace: Workspace | null;
+}
+
+/**
+ * Resolve one proposal: the workspace, the config, the validation, the generic
+ * fallback, and the dedupe against what is already staged, in that order, so a
+ * refusal leaves the proposal empty.
+ */
+async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<ResolvedProposal> {
+  const read = await readWorkspace(cwd);
+  if (read.refusal !== null) return refusedProposal(read.refusal, read.diagnostics);
+  const workspace = read.packages;
+  const config = await readChangesetConfig(workspace);
+  if (config.refusal !== null) return refusedProposal(config.refusal, config.diagnostics);
+  const invalid = validateEntries(changes, workspace);
+  if (invalid !== null) return refusedProposal(invalid, config.diagnostics);
+
+  const generic = changes.length === 0;
+  let requested = changes;
+  if (generic) {
+    if (workspace.root === null) {
+      return refusedProposal(
+        {
+          code: "no-root-package",
+          reason: `the workspace at ${workspace.rootDir} has no root package name, so no generic patch can be proposed`,
+        },
+        config.diagnostics,
+      );
+    }
+    requested = [{ package: workspace.root, level: "patch", summary: GENERIC_SUMMARY }];
+  }
+
+  const staged = await readStagedEntries(workspace);
+  const entries: ChangesetEntry[] = [];
+  const skipped: ChangesetEntry[] = [];
+  for (const entry of requested) {
+    if (staged.entries.some((other) => identical(other, entry))) skipped.push(entry);
+    else entries.push(entry);
+  }
+  return {
+    refusal: null,
+    workspace,
+    entries,
+    skipped,
+    generic,
+    diagnostics: [...config.diagnostics, ...staged.diagnostics],
+  };
+}
+
+/** A proposal that writes nothing, carrying the refusal and what the reads noted. */
+function refusedProposal(refusal: ChangesetsRefusal, diagnostics: string[]): ResolvedProposal {
+  return { refusal, workspace: null, entries: [], skipped: [], generic: false, diagnostics };
+}
+
+/** True when two entries would write the same changeset. */
+function identical(a: ChangesetEntry, b: ChangesetEntry): boolean {
+  return a.package === b.package && a.level === b.level && a.summary.trim() === b.summary.trim();
+}
+
+/** What is already staged in `.changeset/`, plus what reading it had to report. */
+export interface StagedRead {
+  entries: ChangesetEntry[];
+  diagnostics: string[];
+}
+
+/**
+ * Read the pending changesets as entries, one per release they name.
+ *
+ * An unreadable staged entry is a diagnostic, not a refusal: the dedupe can
+ * only be as good as the tree it reads, and the release path reports the real
+ * problem when it consumes the file.
+ */
+export async function readStagedEntries(workspace: Workspace): Promise<StagedRead> {
+  let staged: NewChangeset[];
+  try {
+    staged = await readChangesets(workspace.rootDir);
+  } catch (e) {
+    return { entries: [], diagnostics: [`the staged changesets could not be read: ${(e as Error).message}`] };
+  }
+  const entries: ChangesetEntry[] = [];
+  for (const changeset of staged) {
+    for (const release of changeset.releases) {
+      // A release type outside the three levels cannot match what an effort
+      // proposes, so it is not part of the dedupe set.
+      if (!CHANGE_LEVELS.includes(release.type as ChangeLevel)) continue;
+      entries.push({ package: release.name, level: release.type as ChangeLevel, summary: changeset.summary });
+    }
+  }
+  return { entries, diagnostics: [] };
 }
 
 /** Why a changeset call was refused. Every code is a named outcome. */
@@ -70,11 +206,13 @@ export interface WriteOutcome {
 }
 
 /**
- * Write one changeset file per entry under `.changeset/`.
+ * Write the entries this effort proposes, under `.changeset/`.
  *
- * Every entry is validated against the workspace before anything is written, so
- * a refused call writes no file at all: a half-written batch of entries is
- * worse than none, because the operator confirmed a set and got part of it.
+ * An empty request proposes the generic patch, and any entry identical to one
+ * already staged is dropped. Every entry is validated against the workspace
+ * before anything is written, so a refused call writes no file at all: a
+ * half-written batch of entries is worse than none, because the operator
+ * confirmed a set and got part of it.
  *
  * Formatting is forced off: the config's default value is "auto", which spawns
  * a formatter, and a formatter failure leaves a half-applied tree. The library
@@ -84,16 +222,20 @@ export async function writeEntries(
   cwd: string,
   request: { entries: ChangesetEntry[] },
 ): Promise<WriteOutcome> {
-  const read = await readWorkspace(cwd);
-  if (read.refusal !== null) return refused(read.refusal, read.diagnostics);
-  const workspace = read.packages;
-  const config = await readChangesetConfig(workspace);
-  if (config.refusal !== null) return refused(config.refusal, config.diagnostics);
-  const invalid = validateEntries(request.entries, workspace);
-  if (invalid !== null) return refused(invalid, config.diagnostics);
-
+  const resolved = await resolveProposal(cwd, request.entries);
+  if (resolved.refusal !== null || resolved.workspace === null) {
+    return {
+      refusal: resolved.refusal,
+      written: [],
+      entries: [],
+      skipped: resolved.skipped,
+      generic: resolved.generic,
+      diagnostics: resolved.diagnostics,
+    };
+  }
+  const workspace = resolved.workspace;
   const written: string[] = [];
-  for (const entry of request.entries) {
+  for (const entry of resolved.entries) {
     const changeset: Changeset = {
       summary: entry.summary,
       releases: [{ name: entry.package, type: entry.level }],
@@ -104,16 +246,11 @@ export async function writeEntries(
   return {
     refusal: null,
     written,
-    entries: request.entries,
-    skipped: [],
-    generic: false,
-    diagnostics: config.diagnostics,
+    entries: resolved.entries,
+    skipped: resolved.skipped,
+    generic: resolved.generic,
+    diagnostics: resolved.diagnostics,
   };
-}
-
-/** A write that wrote nothing, carrying the refusal and what the reads noted. */
-function refused(refusal: ChangesetsRefusal, diagnostics: string[]): WriteOutcome {
-  return { refusal, written: [], entries: [], skipped: [], generic: false, diagnostics };
 }
 
 /** The workspace a repository versions: its package names and its own manifest. */

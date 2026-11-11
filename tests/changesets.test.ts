@@ -21,6 +21,7 @@ import { dirname, join } from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
 
 import { createTools } from "../src/pi.js";
+import { GENERIC_SUMMARY, proposeEntries } from "../src/core/changesets.js";
 
 const require = createRequire(import.meta.url);
 
@@ -108,6 +109,105 @@ async function writeChangesets(
   expect(typeof result, "the writer answers with text plus details").toBe("object");
   return result as { text: string; details: any };
 }
+
+// ─── The generic patch and the dedupe ────────────────────────────────────────
+
+describe("the generic patch", () => {
+  test("is proposed for an effort with nothing a user can observe", async () => {
+    const dir = fixtureRepository();
+
+    const proposal = await proposeEntries(dir, { changes: [] });
+
+    expect(proposal.refusal).toBeNull();
+    expect(proposal.generic).toBe(true);
+    expect(proposal.entries).toEqual([
+      { package: "@scope/fixture-pkg", level: "patch", summary: GENERIC_SUMMARY },
+    ]);
+    expect(proposal.skipped).toEqual([]);
+  });
+
+  test("is not proposed when the effort names changes a user can observe", async () => {
+    const dir = fixtureRepository();
+
+    const proposal = await proposeEntries(dir, {
+      changes: [{ package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." }],
+    });
+
+    expect(proposal.generic).toBe(false);
+    expect(proposal.entries).toEqual([
+      { package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." },
+    ]);
+  });
+
+  test("is not repeated when an identical entry is already staged", async () => {
+    const dir = fixtureRepository();
+    writeFileSync(
+      join(dir, ".changeset", "already-staged.md"),
+      `---\n"@scope/fixture-pkg": patch\n---\n\n${GENERIC_SUMMARY}\n`,
+      "utf-8",
+    );
+
+    const proposal = await proposeEntries(dir, { changes: [] });
+
+    // The proposal stands, but there is nothing left to write: the same entry
+    // is already staged, and a second copy would version the package twice.
+    expect(proposal.refusal).toBeNull();
+    expect(proposal.entries).toEqual([]);
+    expect(proposal.generic).toBe(true);
+    expect(proposal.skipped).toEqual([
+      { package: "@scope/fixture-pkg", level: "patch", summary: GENERIC_SUMMARY },
+    ]);
+  });
+
+  test("is staged by the writer when nothing is proposed, and not a second time", async () => {
+    const dir = fixtureRepository();
+
+    const first = await writeChangesets({ effort: "configurable-git-workflow" }, dir);
+    expect(changesetFiles(dir)).toHaveLength(1);
+    expect(first.details.generic).toBe(true);
+    expect(changesetBytes(dir, changesetFiles(dir)[0])).toBe(
+      `---\n"@scope/fixture-pkg": patch\n---\n\n${GENERIC_SUMMARY}\n`,
+    );
+
+    const second = await writeChangesets({ effort: "configurable-git-workflow" }, dir);
+    expect(changesetFiles(dir)).toHaveLength(1);
+    expect(second.details.written).toEqual([]);
+    expect(second.details.skipped).toHaveLength(1);
+    expect(second.text).toContain("already staged");
+    // Nothing was written the second time: the entry is reported as skipped,
+    // not as an entry the call wrote.
+    expect(second.details.entries).toEqual([]);
+  });
+
+  test("drops a named change that is already staged, and writes the rest", async () => {
+    const dir = fixtureRepository();
+    writeFileSync(
+      join(dir, ".changeset", "already-staged.md"),
+      '---\n"@scope/fixture-pkg": minor\n---\n\nAdd the release skill.\n',
+      "utf-8",
+    );
+
+    const { details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [
+          { package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." },
+          { package: "@scope/fixture-pkg", level: "patch", summary: "Fix the writer's refusal text." },
+        ],
+      },
+      dir,
+    );
+
+    expect(details.skipped).toEqual([
+      { package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." },
+    ]);
+    expect(details.written).toHaveLength(1);
+    expect(changesetFiles(dir)).toHaveLength(2);
+    expect(changesetBytes(dir, changesetFiles(dir).find((file) => file !== "already-staged.md")!)).toBe(
+      '---\n"@scope/fixture-pkg": patch\n---\n\nFix the writer\'s refusal text.\n',
+    );
+  });
+});
 
 // ─── Writing an entry ────────────────────────────────────────────────────────
 

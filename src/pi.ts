@@ -3370,9 +3370,27 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
             diagnostics: result.diagnostics,
           });
         }
-        const lines = [`Changesets for effort '${effort}':`];
+        const lines: string[] = [];
+        if (result.generic) {
+          lines.push(
+            `Nothing a user can observe in effort '${effort}': the generic performance and stability patch ` +
+              `is the entry.`,
+          );
+        } else {
+          lines.push(`Changesets for effort '${effort}':`);
+        }
         for (const entry of result.entries) lines.push(`- ${entry.package} ${entry.level}: ${entry.summary}`);
+        for (const entry of result.skipped) {
+          lines.push(`Already staged, not repeated: ${entry.package} ${entry.level}: ${entry.summary}`);
+        }
         for (const file of result.written) lines.push(`Wrote ${file}`);
+        if (result.written.length === 0) {
+          lines.push(
+            result.skipped.length > 0
+              ? "Nothing to write: every proposed entry is already staged."
+              : "Nothing to write.",
+          );
+        }
         if (result.diagnostics.length > 0) lines.push(`Diagnostics: ${result.diagnostics.join("; ")}`);
         return outcome(lines.join("\n"), {
           effort,
