@@ -251,6 +251,13 @@ export interface PhaseBrief {
   branch: string | null;
   /** The step that produces the branch, generated from the template; null when there is none. */
   step: string | null;
+  /**
+   * What the required branch is created off: the trunk for an effort-level
+   * template, the effort branch for a ticket-level one. Null when the profile
+   * requires no branch. It is resolved beside `step`, so the step and a
+   * spawn refusal cannot disagree about the base.
+   */
+  base: string | null;
   /** The phase's opening instruction text; "" when the profile carries none. */
   openInstructions: string;
   /** The phase's closing instruction text; "" when the profile carries none. */
@@ -286,15 +293,17 @@ export function phaseBrief(cwd: string, request: BriefRequest, deps: BriefDeps =
   const row = phase ?? agent;
   const kind: PhaseBrief["kind"] = phase !== undefined ? "phase" : agent !== undefined ? "agent" : "unknown";
   const branch = resolveTemplate(row?.branch, request, diagnostics);
+  const base = branch === null ? null : branchBase(row!.branch!, request, settings, profile);
   // Only a phase creates its own branch: a sub-agent is dispatched onto a
   // branch the phase already checked out, so it gets no step.
-  const step = kind === "phase" && branch !== null ? branchStep(row!.branch!, branch, request, settings, profile) : null;
+  const step = kind === "phase" && branch !== null ? `create and check out ${branch} off ${base}, then open ${request.name}` : null;
 
   return {
     profile: profile.name,
     kind,
     branch,
     step,
+    base,
     openInstructions: phase?.openInstructions ?? "",
     closeInstructions: phase?.closeInstructions ?? "",
     closeGate: phase === undefined ? null : resolveTemplate(phase.closeGate, request, diagnostics),
@@ -305,21 +314,19 @@ export function phaseBrief(cwd: string, request: BriefRequest, deps: BriefDeps =
 }
 
 /**
- * The step that produces a phase's branch. A template naming the effort is
- * created off the trunk; one naming a ticket is created off the effort branch
- * the profile also carries, because the ticket level sits on top of it.
+ * What a required branch is created off: a template naming the ticket sits on
+ * top of the effort level, so its base is the effort branch the profile also
+ * carries; an effort-level template sits on the trunk.
  */
-function branchStep(
+function branchBase(
   template: string,
-  branch: string,
   request: BriefRequest,
   settings: GitSettings,
   profile: GitProfile,
 ): string {
-  const base = isTicketTemplate(template)
+  return isTicketTemplate(template)
     ? effortBranchOf(profile, request) ?? "the effort branch"
     : `the trunk (${trunkName(settings.trunk)})`;
-  return `create and check out ${branch} off ${base}, then open ${request.name}`;
 }
 
 /** True when a template names the ticket level rather than the effort level. */
@@ -327,8 +334,14 @@ function isTicketTemplate(template: string): boolean {
   return template.includes("{ticket}") && !template.includes("{effort}");
 }
 
-/** The profile's own effort-branch template, resolved, when it carries one. */
+/**
+ * The profile's own effort-branch template, resolved, when it carries one. A
+ * caller that has no effort slug (a workflow child's launch carries only the
+ * ticket) resolves nothing, so the base reads as "the effort branch" instead
+ * of a branch named `effort/`.
+ */
 function effortBranchOf(profile: GitProfile, request: BriefRequest): string | null {
+  if (request.effort.trim() === "") return null;
   const template = Object.values(profile.phases).find(
     (row) => row.branch !== undefined && row.branch.includes("{effort}") && !isTicketTemplate(row.branch),
   )?.branch;
@@ -356,6 +369,41 @@ function resolveTemplate(
   return template.replaceAll("{effort}", request.effort.trim()).replaceAll("{ticket}", ticket);
 }
 
+/**
+ * The brief for a ticket's own work, without a named agent.
+ *
+ * A workflow launch names the ticket and not the child that will run, so the
+ * guard cannot ask an agent's row: it asks the profile for the branch its
+ * ticket-scoped rows require. The first agent row carrying a ticket template
+ * answers, because a ticket's work happens on one branch; the answer rides the
+ * `PhaseBrief` shape so the guard's predicate is one function, not two.
+ */
+export function ticketBrief(cwd: string, request: BriefRequest, deps: BriefDeps = {}): PhaseBrief {
+  const diagnostics: string[] = [];
+  const settings = readGitSettings(cwd, deps);
+  diagnostics.push(...settings.diagnostics);
+  const loaded = loadProfile(settings.profile, deps);
+  diagnostics.push(...loaded.diagnostics);
+  const profile = loaded.profile;
+  const template = Object.values(profile.agents).find((row) => row.branch?.includes("{ticket}"))?.branch;
+  const branch = resolveTemplate(template, request, diagnostics);
+  return {
+    profile: profile.name,
+    kind: "agent",
+    branch,
+    // A sub-agent never creates its own branch: the phase it is dispatched
+    // from already checked it out, so the brief carries the base only.
+    step: null,
+    base: branch === null ? null : branchBase(template!, request, settings, profile),
+    openInstructions: "",
+    closeInstructions: "",
+    closeGate: null,
+    merge: profile.merge ?? null,
+    push: profile.push ?? null,
+    diagnostics,
+  };
+}
+
 /** The checkout a gate decision is asked about. */
 export interface GateRequest extends BriefRequest {
   /** The branch checked out now, or null when the checkout is detached or unknown. */
@@ -373,6 +421,8 @@ export interface GateDecision {
   currentBranch: string | null;
   /** The step that produces the required branch, for the refusal's legal next call. */
   step: string | null;
+  /** What the required branch is created off; null when the profile gates nothing here. */
+  base: string | null;
   /** Why the checkout is refused; "" when it passes. */
   reason: string;
   /** Diagnostics from reading the settings and the profile. */
@@ -406,22 +456,23 @@ export function decideFromBrief(
   currentBranch: string | null,
 ): GateDecision {
   const current = currentBranch?.trim() ? currentBranch.trim() : null;
-  const base = {
+  const shared = {
     profile: brief.profile,
     branch: brief.branch,
     currentBranch: current,
     step: brief.step,
+    base: brief.base,
     diagnostics: brief.diagnostics,
   };
   if (brief.branch === null || current === brief.branch) {
-    return { pass: true, reason: "", ...base };
+    return { pass: true, reason: "", ...shared };
   }
   return {
     pass: false,
     reason:
       `the checkout is on ${current === null ? "no branch (a detached HEAD)" : `'${current}'`}, ` +
       `but '${name}' requires '${brief.branch}'`,
-    ...base,
+    ...shared,
   };
 }
 

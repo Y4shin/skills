@@ -155,6 +155,18 @@ function landTask(tddRef, verifyRef) {
   ].join("\n");
 }
 
+// Step keys carry the ticket slug: `<step>@<ticket>`. A workflow child's
+// `args` never reach a `tool_call` handler, so the key is the only
+// machine-readable ticket identity at the per-child launch, and the spawn
+// guard reads the slug from it. The separator is the extension's
+// KEY_SEPARATOR (src/core/spawn-guard.ts); a workflow script cannot import it,
+// so the character is written here too, and a test pins the two together. A
+// colon would read better, but a key can name an output file, and a colon is
+// not a legal filename character on Windows.
+function stepKey(step) {
+  return step + "@" + args.ticket;
+}
+
 // Step 0: preconditions gate. implement-preconditions is read-only
 // (tools: read, tw_feedback); it refuses when the ticket doc does not
 // exist or does not match these args. Enforcement is layered: the child's
@@ -163,7 +175,7 @@ function landTask(tddRef, verifyRef) {
 // the ticket doc is missing. A gate refusal is not a worker failure: the
 // caller re-resolves the ticket and rebuilds the args; the failure
 // toolbelt never applies.
-const gate = await runs.run("gate", {
+const gate = await runs.run(stepKey("gate"), {
   agent: "implement-preconditions",
   label: "Check " + args.ticket + " preconditions",
   timeoutMs: 300000,
@@ -177,7 +189,7 @@ if (gate.ok === true && !verdict(gate, "VERDICT: PASS") && !verdict(gate, "VERDI
   // toolbelt never applies), and it keeps a single stray completion from
   // stopping the phase while the caller digs through harness internals. A
   // stated refusal is never re-dispatched: the refusal is the answer.
-  gateReceipt = await runs.run("gate-retry", {
+  gateReceipt = await runs.run(stepKey("gate-retry"), {
     agent: "implement-preconditions",
     label: "Re-check " + args.ticket + " preconditions",
     timeoutMs: 300000,
@@ -196,7 +208,7 @@ if (!verdict(gateReceipt, "VERDICT: PASS")) {
 // behind (the designed escape now fails the run, aborting the chain
 // before verify), and real work leaves the ticket/<slug> working branch
 // behind (no branch means nothing happened).
-const tdd = await runs.run("tdd", {
+const tdd = await runs.run(stepKey("tdd"), {
   agent: "tdd-worker",
   skill: subtype === "bug" ? "diagnosing-bugs" : "tdd",
   label: subtype === "bug" ? "Fix " + args.ticket : "Implement " + args.ticket,
@@ -214,7 +226,7 @@ if (!tdd.ok) {
 if (subtype === "feature") {
   const pair = await runs.all([
     {
-      key: "verify",
+      key: stepKey("verify"),
       agent: "slice-verifier",
       label: "Verify " + args.ticket,
       // A hung child must fail its own step, not eat the ticket's whole budget.
@@ -223,7 +235,7 @@ if (subtype === "feature") {
       task: verifyTask(refs.tdd)
     },
     {
-      key: "deviation",
+      key: stepKey("deviation"),
       agent: "deviation-reporter",
       label: "Report " + args.ticket + " deviations",
       timeoutMs: 900000,
@@ -241,7 +253,7 @@ if (subtype === "feature") {
     return { ok: false, ticket: args.ticket, subtype, failed: "deviation", step: pair[1], refs };
   }
 } else {
-  const verify = await runs.run("verify", {
+  const verify = await runs.run(stepKey("verify"), {
     agent: "slice-verifier",
     label: "Verify " + args.ticket,
     timeoutMs: 900000,
@@ -258,7 +270,7 @@ if (subtype === "feature") {
 // appends the implementation note. The host gate enforces the deliverable:
 // task/<ticket-slug> must exist after landing. The ticket is NOT marked done
 // here: implement-ticket's inlined close-out owns that marking, one owner.
-const land = await runs.run("land", {
+const land = await runs.run(stepKey("land"), {
   agent: "land-worker",
   label: "Land " + args.ticket,
   timeoutMs: 900000,
