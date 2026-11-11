@@ -55,7 +55,7 @@ and `{ticket}`.
 
 | Phase or agent | Branch required |
 | --- | --- |
-| `implement-ticket` | `effort/{effort}`, and it gates the close too |
+| `implement-ticket` | `effort/{effort}` |
 | `finalize-effort` | `effort/{effort}` |
 | `implement-preconditions`, `tdd-worker`, `slice-verifier`, `deviation-reporter`, `land-worker` | `ticket/{ticket}` |
 | `intake`, `wayfinder`, `to-spec`, `to-tickets` | none |
@@ -73,12 +73,11 @@ stands.
 
 **`flat`** carries nothing anywhere: no branch requirement for any phase or
 agent, no instructions, no opening or closing gate, no merge flag, no push
-policy. Phases open on
-whatever checkout they find, no spawn is blocked on a branch, and the effort
-close lands nothing, because no landing step is configured. Choose it to keep
-the branches and habits a repository already has, and to run the workflow in a
-directory that is not a git checkout at all, where the guards can read no
-branch.
+policy. Phases open on whatever checkout they find, no spawn is blocked on a
+branch, and the effort close lands nothing, because no landing step is
+configured. Choose it to keep the branches and habits a repository already has,
+and to run the workflow in a directory that is not a git checkout at all, where
+the guards can read no branch.
 
 There are three branch levels in a repository with a develop branch, and two
 without one: the trunk, one **effort branch** per effort, and one **ticket
