@@ -77,6 +77,18 @@ title: Task Changelog
 
 
 
+
+## 2026-11-11, Refuse rather than pass when the checkout cannot be read (guard-fail-closed)
+
+The branch guards now fail closed. When the checkout cannot be read, because the
+git seam is absent or the command fails, opening a branch-bearing phase is refused
+in the openers' existing shape and a profile-gated spawn is blocked with a reason,
+instead of passing with a diagnostic or a notification. A readable but wrong branch
+and a detached checkout behave as before. One shared helper words the refusal for
+both the opener and the spawn guard so they cannot disagree, the underlying cause
+stays in the diagnostics, and the git-workflows page names the `flat` profile as
+the option for a directory that is not a git checkout.
+
 ## 2026-11-11, Ship the user-invoked release skill (release-skill)
 
 A new `release` skill ships as a promoted, user-invoked skill, so the model cannot

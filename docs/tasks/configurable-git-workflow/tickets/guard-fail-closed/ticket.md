@@ -3,7 +3,7 @@ type: ticket
 subtype: bug
 title: Refuse rather than pass when the checkout cannot be read
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: s
 ---
@@ -33,3 +33,30 @@ guards block and do not warn.
 ## Blocked by
 
 None (can start immediately)
+
+## Implementation notes
+
+### What landed
+
+Both enforcement points now fail closed. When the git seam cannot read the
+checkout, a phase open refuses in the openers' shape and a profile-gated spawn is
+blocked with a reason, instead of passing with a diagnostic or a notification. A
+readable-but-wrong branch and a detached checkout behave as before.
+
+- `readCheckout` answers one cause line for both failure modes, and
+  `unreadableCheckout()` builds the shared reason and recovery, so the opener and
+  the spawn guard word the same condition identically.
+- The open gates on that refusal and still carries the underlying cause in
+  `details.diagnostics`. The spawn verdict returns a block with the cause in the
+  decision.
+- `docs/git-workflows.md` gained the refusal bullet and names `flat` for a
+  directory that is not a git checkout.
+- The architecture document lost the fail-open convention and gained a correction
+  entry, so the living record matches the shipped rule.
+
+### Lessons
+
+- The two old tests that expected a seam-absent pass were replaced, not weakened:
+  they now pin the refusal text, the legal next, and the carried cause.
+- Naming `flat` as the escape hatch matters: without it, a repository that is not a
+  git checkout has no profile that opens at all.
