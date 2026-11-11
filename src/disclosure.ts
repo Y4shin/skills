@@ -17,9 +17,13 @@ import { Type, type TSchema } from "typebox";
 /**
  * Tools declared in every state, independent of the open set. The tool
  * requester rides along because a phase can need a tool its own toolset does
- * not disclose, and asking for it must never depend on having it.
+ * not disclose, and asking for it must never depend on having it. The phase
+ * brief is here for the same reason in the other direction: a phase asks for
+ * its branch step before it opens, so no opener can be the tool's activation
+ * path, and it belongs to no toolset (a toolset membership would make a closed
+ * phase derive as open).
  */
-export const ALWAYS_DECLARED = ["tw_open", "tw_next", "tw_request_tool", "tw_close"] as const;
+export const ALWAYS_DECLARED = ["tw_open", "tw_next", "tw_request_tool", "tw_close", "tw_phase_brief"] as const;
 
 /**
  * The closer: declared in every state too, so a session that lost track of its

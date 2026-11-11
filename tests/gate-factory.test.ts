@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { GATED_SKILL_NAMES, SKILL_REGISTRY, openSkillsIn } from "../src/disclosure.js";
+import { ALWAYS_DECLARED, GATED_SKILL_NAMES, SKILL_REGISTRY, openSkillsIn } from "../src/disclosure.js";
 import factory from "../src/pi.js";
 
 // ─── Mock control for fail-open throw scenario ───────────────────────────────
@@ -53,7 +53,9 @@ let globalSettings: { dir: string; cleanup: () => void } | undefined;
  * The full tool surface an ungated (personal) repo registers, exactly: every
  * tw_* tool from the factory, skill-creator's bundled script tools, and
  * notify_user. The registered surface in an ungated repo is unchanged by the
- * gate-state split, so a deleted or added tool fails here.
+ * gate-state split, so a deleted or added tool fails here. tw_phase_brief sits
+ * with the dispatcher quartet because it is declared in every state too: a
+ * phase asks for its brief before it opens.
  */
 const FULL_TOOL_SURFACE = [
   "skill_discover",
@@ -63,6 +65,7 @@ const FULL_TOOL_SURFACE = [
   "tw_next",
   "tw_request_tool",
   "tw_close",
+  "tw_phase_brief",
   "tw_show",
   "tw_get",
   "tw_list",
@@ -976,20 +979,22 @@ describe("factory gate", () => {
   });
 
   describe("disclosure registration", () => {
-    test("the dispatcher quartet registers always-declared; every other workflow tool registers gated", () => {
+    test("the always-declared tools register always-declared; every other workflow tool registers gated", () => {
       setupPersonalRepo();
       const stub = createStub();
       factory(stub);
 
-      const byName = new Map(stub.tools.map((t: any) => [t.name, t]));
-      for (const name of ["tw_open", "tw_next", "tw_request_tool", "tw_close"]) {
+        const byName = new Map(stub.tools.map((t: any) => [t.name, t]));
+      for (const name of ALWAYS_DECLARED) {
         expect(byName.get(name)?.defaultActive, `${name} is declared in every state`).toBe(true);
         expect(byName.get(name)?.exposure, `${name} is direct`).toBe("direct");
       }
       // The bypass-free combination the prototype proved: direct (never
       // reachable through tool_search) and off until the opener activates it.
+      // Everything declared in every state (the dispatcher quartet and the
+      // phase brief) is the stated exception.
       for (const name of FULL_TOOL_SURFACE.filter(
-        (n) => n.startsWith("tw_") && !["tw_open", "tw_next", "tw_request_tool", "tw_close"].includes(n),
+        (n) => n.startsWith("tw_") && !(ALWAYS_DECLARED as readonly string[]).includes(n),
       )) {
         expect(byName.get(name)?.defaultActive, `${name} is off until an opener activates it`).toBe(false);
         expect(byName.get(name)?.exposure, `${name} is direct, never deferred`).toBe("direct");
