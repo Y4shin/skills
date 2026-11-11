@@ -342,7 +342,10 @@ The shapes, by surface:
   non-empty effort.
 - **The closer's refusals.** A name that is not an openable skill; a name
   that is not open (when nothing is open, the legal next is `tw_open`;
-  otherwise the open set is named).
+  otherwise the open set is named); a checkout that is not on the branch the
+  phase's profile row gates its close on (the branch to check out, then the
+  close, is the legal next); a close gate the call cannot resolve because it
+  named no effort; a checkout the git seam cannot read.
 - **The requester's refusals.** No open skill; an unknown tool; a tool
   already declared or already active; a grant that would make another
   skill look open (the skill is named); no interactive UI to ask; the
