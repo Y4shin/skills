@@ -12,12 +12,17 @@
  * stub extension API and a fake `exec`: no repository is needed.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import factory from "../src/pi.js";
+import { KEY_SEPARATOR } from "../src/core/spawn-guard.js";
+
+/** The repo root, in POSIX form, for the structure assertions over the chain. */
+const PROJECT = fileURLToPath(new URL("..", import.meta.url));
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -171,6 +176,38 @@ describe("the per-child subagent_launch call", () => {
     const result = await fire(stub, dir, "subagent_launch", launchCall("verify@one", "slice-verifier"));
 
     expect(result).toBeUndefined();
+  });
+});
+
+// ─── The chain's step keys: the identity that survives the per-child call ────
+
+describe("the chain's step keys", () => {
+  const chain = readFileSync(
+    join(PROJECT, "skills/engineering/implement-ticket/scripts/ticket-chain.js"),
+    "utf-8",
+  );
+
+  test("every step key embeds the ticket slug, so no launch is anonymous", () => {
+    // One helper builds every key, and it is the ticket that rides along.
+    expect(chain).toMatch(/function stepKey\(step\) \{\s*return step \+ "@" \+ args\.ticket;\s*\}/);
+    for (const step of ["gate", "gate-retry", "tdd", "verify", "deviation", "land"]) {
+      expect(chain, `the ${step} step key carries the ticket`).toContain(`stepKey("${step}")`);
+    }
+    // No step is left with a bare literal key: those carry no identity at all.
+    expect(chain).not.toMatch(/runs\.run\("/);
+    expect(chain).not.toMatch(/key: "/);
+  });
+
+  test("a key built the way the chain builds it carries the ticket the guard reads", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+
+    // The script's `step + "@" + args.ticket`, from the shared separator.
+    const key = ["tdd", "one"].join(KEY_SEPARATOR);
+    const result = await fire(stub, dir, "subagent_launch", launchCall(key, "tdd-worker"));
+
+    expect(result).toMatchObject({ block: true });
+    expect(result.reason).toContain("requires 'ticket/one'");
   });
 });
 
