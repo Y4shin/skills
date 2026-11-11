@@ -1,6 +1,6 @@
 {
   "name": "default",
-  "merge": "no-ff",
+  "merge": "--no-ff",
   "push": "always",
   "phases": {
     "intake": {},

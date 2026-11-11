@@ -181,6 +181,17 @@ describe("bundled profiles", () => {
     }
   });
 
+  test("a bundled profile's merge value is a complete merge flag", () => {
+    // The value rides into a shell command as-is, so `no-ff` would produce
+    // `git merge no-ff <branch>` and fail. A flag has to carry its dashes.
+    for (const name of BUNDLED_PROFILES) {
+      const { profile } = loadProfile(name);
+      if (profile.merge) {
+        expect(profile.merge, `${name}.merge`).toMatch(/^--[a-z][a-z-]*$/);
+      }
+    }
+  });
+
   test("both bundled profiles carry empty instruction fields and no branch for the planning phases", () => {
     for (const name of BUNDLED_PROFILES) {
       const { profile } = loadProfile(name);
@@ -261,7 +272,7 @@ describe("the phase brief resolver", () => {
     expect(brief.trunkMerge).toBe("handoff");
     // The profile's merge flag and push policy ride along, so the close-out
     // never restates them in prose.
-    expect(brief.merge).toBe("no-ff");
+    expect(brief.merge).toBe("--no-ff");
     expect(brief.push).toBe("always");
   });
 
@@ -523,7 +534,7 @@ describe("tw_phase_brief", () => {
 
     expect(details.trunk).toBe("dev");
     expect(details.trunk_merge).toBe("handoff");
-    expect(details.merge).toBe("no-ff");
+    expect(details.merge).toBe("--no-ff");
     expect(details.push).toBe("always");
   });
 
