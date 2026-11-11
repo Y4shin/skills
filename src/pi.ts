@@ -59,6 +59,7 @@ import { FrontmatterError, ResolutionError } from "./core/err.js";
 import { FEEDBACK_KINDS, WORKFLOW_SOURCE, feedbackCall } from "./core/feedback.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 import { phaseBrief, phaseText, readCheckout, decideFromBrief, type GitRun, type PhaseBrief } from "./core/git-profile.js";
+import { isSpawnCall, spawnVerdict } from "./core/spawn-guard.js";
 import { writeEntries, type ChangeLevel, type ChangesetEntry, type ChangesetsRefusalCode } from "./core/changesets.js";
 
 // ─── Gated skill manifest sanity (session-start diagnostics) ──────────────────
@@ -3884,6 +3885,53 @@ async function guardTaskTreeWrites(
 }
 
 /**
+ * The spawn guard: refuses a dispatch of an implementation sub-agent when the
+ * checkout is not the ticket branch that child commits on, so the wrong-branch
+ * work never starts. It rides the same `tool_call` hook as the write lockdown
+ * (one handler, so nothing but a spawn is looked at twice) and reads the
+ * checkout through the session's own exec, the seam the openers already use.
+ *
+ * A block is returned, never thrown: the call becomes an error tool result, so
+ * a blocked child fails its step and the session continues.
+ */
+async function guardSpawn(
+  pi: ExtensionAPI,
+  event: ToolCallEvent,
+  ctx: ExtensionContext,
+): Promise<ToolCallEventResult | undefined> {
+  if (!isSpawnCall(event.toolName)) return undefined;
+  const verdict = await spawnVerdict(
+    ctx.cwd,
+    event.toolName,
+    event.input as Record<string, unknown>,
+    {
+      git: async (gitArgs: string[]) => {
+        const ran = await pi.exec("git", gitArgs, { cwd: ctx.cwd });
+        if (ran.code !== 0) {
+          throw new Error(ran.stderr.trim() || `git ${gitArgs.join(" ")} exited ${ran.code}`);
+        }
+        return ran.stdout;
+      },
+    },
+  );
+  if (verdict.pass) return undefined;
+  return { block: true, reason: verdict.reason };
+}
+
+/**
+ * The whole `tool_call` hook: the write lockdown first (it answers from the
+ * path alone), then the spawn guard. One handler keeps the registered hook
+ * count stable, and keeps every non-spawn call away from the spawn predicate.
+ */
+async function guardToolCall(
+  pi: ExtensionAPI,
+  event: ToolCallEvent,
+  ctx: ExtensionContext,
+): Promise<ToolCallEventResult | undefined> {
+  return (await guardTaskTreeWrites(event, ctx)) ?? guardSpawn(pi, event, ctx);
+}
+
+/**
  * Re-assert the declared tool set the session transcript records, so the open
  * state survives resume and fork on the branch. The transcript is the
  * persistence source: pi restores it on /tree navigation; on resume and fork
@@ -4084,7 +4132,7 @@ export default function (pi: ExtensionAPI) {
   // separable conditions. A tool_call hook, so it runs in every phase
   // regardless of the active tool set.
   if (workflowEnabled(gate)) {
-    pi.on("tool_call", guardTaskTreeWrites);
+    pi.on("tool_call", (event, ctx) => guardToolCall(pi, event, ctx));
   }
 
   pi.on("session_start", async (event, ctx) => {
