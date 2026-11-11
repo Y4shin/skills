@@ -40,3 +40,18 @@ It bumps the manifest, inserts the changelog section, and removes the
 consumed changesets, and it writes nothing at all when it refuses. Report
 the files it wrote and the files it removed, and stop when it refuses, naming
 the same reason the plan would have.
+
+## 3. Follow the repository's release document
+
+The bump and the changelog are this skill's own defaults, and they run every
+time. The rest of the release belongs to the repository: when the repository
+has a `docs/releasing.md`, read it and follow it, step by step.
+
+That file is the authority for the mechanical work of preparing and
+publishing. Where it names a script, a workflow, an approval step, or an
+environment, run that, in its order. It is prose, so read it before acting
+rather than assuming what a release in this repository involves, and never
+replace a step it names with the way another repository does it.
+
+When the repository has no `docs/releasing.md`, there is nothing further to
+follow: report the versions and the changelog section that landed, and stop.
