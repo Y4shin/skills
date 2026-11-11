@@ -32,7 +32,14 @@ import { afterAll, describe, expect, test } from "vitest";
 import { parseChangesetFile } from "@changesets/parse";
 
 import { createTools } from "../src/pi.js";
-import { GENERIC_SUMMARY, proposeEntries, readStagedEntries, readWorkspace } from "../src/core/changesets.js";
+import {
+  GENERIC_SUMMARY,
+  proposeEntries,
+  readStagedEntries,
+  readWorkspace,
+  resolveEntries,
+  type Workspace,
+} from "../src/core/changesets.js";
 
 const require = createRequire(import.meta.url);
 
@@ -239,6 +246,142 @@ describe("the generic patch", () => {
   });
 });
 
+// ─── Reading the staged set ─────────────────────────────────────────────────
+
+describe("readStagedEntries", () => {
+  test("separates nothing staged from a staged set it could not read", async () => {
+    const empty = await readWorkspace(fixtureRepository());
+    const nothing = await readStagedEntries(empty.workspace!);
+
+    // An empty staged set is an answer: the dedupe ran and found nothing.
+    expect(nothing.refusal).toBeNull();
+    expect(nothing.entries).toEqual([]);
+
+    const broken = fixtureRepository();
+    writeFileSync(join(broken, ".changeset", "broken-entry.md"), "not a changeset at all\n", "utf-8");
+    const read = await readWorkspace(broken);
+    const unreadable = await readStagedEntries(read.workspace!);
+
+    // An unreadable staged set is not an empty one: it is a named refusal, so
+    // no caller can mistake "could not read" for "nothing staged".
+    expect(unreadable.refusal).not.toBeNull();
+    expect(unreadable.refusal!.code).toBe("unreadable-staged");
+    expect(unreadable.refusal!.reason).toContain(join(broken, ".changeset"));
+    expect(unreadable.entries).toEqual([]);
+  });
+
+  test("reads a staged set that parses, with no refusal", async () => {
+    const dir = fixtureRepository();
+    writeFileSync(
+      join(dir, ".changeset", "staged-change.md"),
+      '---\n"@scope/fixture-pkg": minor\n---\n\nAdd the release skill.\n',
+      "utf-8",
+    );
+    const read = await readWorkspace(dir);
+
+    const staged = await readStagedEntries(read.workspace!);
+
+    expect(staged.refusal).toBeNull();
+    expect(staged.entries).toEqual([
+      { package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." },
+    ]);
+  });
+});
+
+// ─── The pre-write proposal ─────────────────────────────────────────────────
+
+describe("tw_write_changesets with dry_run", () => {
+  test("returns the entries it would write, and touches nothing", async () => {
+    const dir = fixtureRepository();
+
+    const { text, details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        dry_run: true,
+        entries: [{ package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." }],
+      },
+      dir,
+    );
+
+    expect(details.dry_run).toBe(true);
+    expect(details.entries).toEqual([
+      { package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." },
+    ]);
+    expect(details.skipped).toEqual([]);
+    expect(details.generic).toBe(false);
+    expect(details.written).toEqual([]);
+    // Nothing was written: the operator confirms the proposal first.
+    expect(changesetFiles(dir)).toEqual([]);
+    expect(text).toContain("Add the release skill.");
+  });
+
+  test("reports the generic entry as the proposal for an effort with nothing observable", async () => {
+    const dir = fixtureRepository();
+
+    const { text, details } = await writeChangesets({ effort: "configurable-git-workflow", dry_run: true }, dir);
+
+    expect(details.generic).toBe(true);
+    expect(details.entries).toEqual([
+      { package: "@scope/fixture-pkg", level: "patch", summary: GENERIC_SUMMARY },
+    ]);
+    expect(changesetFiles(dir)).toEqual([]);
+    expect(text).toContain(GENERIC_SUMMARY);
+  });
+
+  test("reports an identical staged entry as skipped, so the operator sees it before the write", async () => {
+    const dir = fixtureRepository();
+    writeFileSync(
+      join(dir, ".changeset", "already-staged.md"),
+      `---\n"@scope/fixture-pkg": patch\n---\n\n${GENERIC_SUMMARY}\n`,
+      "utf-8",
+    );
+
+    const { text, details } = await writeChangesets({ effort: "configurable-git-workflow", dry_run: true }, dir);
+
+    expect(details.entries).toEqual([]);
+    expect(details.skipped).toEqual([
+      { package: "@scope/fixture-pkg", level: "patch", summary: GENERIC_SUMMARY },
+    ]);
+    expect(details.generic).toBe(true);
+    expect(changesetFiles(dir)).toEqual(["already-staged.md"]);
+    expect(text).toContain("already staged");
+  });
+
+  test("refuses exactly as the write does, and writes nothing", async () => {
+    const dir = fixtureRepository({ config: null });
+
+    const { text, details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        dry_run: true,
+        entries: [{ package: "@scope/fixture-pkg", level: "patch", summary: "A change." }],
+      },
+      dir,
+    );
+
+    expect(details.refusal.code).toBe("no-config");
+    expect(details.written).toEqual([]);
+    expect(text).toContain("Refused:");
+    expect(existsSync(join(dir, ".changeset"))).toBe(false);
+  });
+
+  test("writes the confirmed entries when the flag is absent", async () => {
+    const dir = fixtureRepository();
+
+    const { details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." }],
+      },
+      dir,
+    );
+
+    expect(details.dry_run).toBe(false);
+    expect(details.written).toHaveLength(1);
+    expect(changesetFiles(dir)).toHaveLength(1);
+  });
+});
+
 // ─── Writing an entry ────────────────────────────────────────────────────────
 
 describe("tw_write_changesets", () => {
@@ -346,6 +489,98 @@ describe("the round trip", () => {
     expect(output).toContain("All files have been updated");
     expect(JSON.parse(readFileSync(join(copy, "package.json"), "utf-8")).version).toBe("1.1.0");
     expect(readdirSync(join(copy, ".changeset")).filter((file) => file.endsWith(".md"))).toEqual([]);
+  });
+});
+
+// ─── The malformed staged entry, as a regression ─────────────────────────────
+
+describe("an unreadable staged entry", () => {
+  test("refuses the write, and no second identical generic entry appears", async () => {
+    const dir = fixtureRepository();
+    writeFileSync(
+      join(dir, ".changeset", "already-staged.md"),
+      `---\n"@scope/fixture-pkg": patch\n---\n\n${GENERIC_SUMMARY}\n`,
+      "utf-8",
+    );
+    writeFileSync(join(dir, ".changeset", "broken-entry.md"), "not a changeset at all\n", "utf-8");
+
+    const { text, details } = await writeChangesets({ effort: "configurable-git-workflow" }, dir);
+
+    expect(details.refusal.code).toBe("unreadable-staged");
+    expect(details.written).toEqual([]);
+    expect(text).toContain("Refused:");
+    expect(text).toContain("broken-entry.md");
+    // The tree holds exactly what it held: the one generic entry and the file
+    // the reader could not parse. A second, identical generic entry would bump
+    // the package twice for one change, so no file may be written at all.
+    expect(changesetFiles(dir)).toEqual(["already-staged.md", "broken-entry.md"]);
+    expect(changesetFiles(dir).filter((file) => changesetBytes(dir, file).includes(GENERIC_SUMMARY))).toEqual([
+      "already-staged.md",
+    ]);
+  });
+
+  test("refuses the proposal too, so the close never shows a set the write would refuse", async () => {
+    const dir = fixtureRepository();
+    writeFileSync(join(dir, ".changeset", "broken-entry.md"), "not a changeset at all\n", "utf-8");
+
+    const { text, details } = await writeChangesets({ effort: "configurable-git-workflow", dry_run: true }, dir);
+
+    expect(details.refusal.code).toBe("unreadable-staged");
+    expect(details.entries).toEqual([]);
+    expect(changesetFiles(dir)).toEqual(["broken-entry.md"]);
+    expect(text).toContain("Refused:");
+  });
+});
+
+// ─── Validating against every package the workspace knows ───────────────────
+
+describe("package validation", () => {
+  test("writes an entry naming the monorepo's own root package", async () => {
+    const dir = fixtureWorkspace();
+
+    const { details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/root", level: "minor", summary: "Add the shared config." }],
+      },
+      dir,
+    );
+
+    // The workspace reader leaves the root package out of its member list, so a
+    // validation set built from the members alone refuses a package the
+    // workspace plainly has.
+    expect(details.refusal).toBeNull();
+    expect(details.entries).toEqual([
+      { package: "@scope/root", level: "minor", summary: "Add the shared config." },
+    ]);
+    expect(changesetFiles(dir)).toHaveLength(1);
+    expect(changesetBytes(dir, changesetFiles(dir)[0])).toContain('"@scope/root": minor');
+  });
+
+  test("names the monorepo root package in the workspace's package set", async () => {
+    const read = await readWorkspace(fixtureWorkspace());
+
+    expect(read.workspace!.names).toHaveLength(3);
+    expect(read.workspace!.names).toEqual(expect.arrayContaining(["@scope/alpha", "@scope/beta", "@scope/root"]));
+  });
+
+  test("validates the generic entry like any other, rather than exempting it", () => {
+    // The generic entry is built, not passed in, so it used to skip validation
+    // entirely. Resolution validates it with the same rule as an explicit
+    // entry: the package it names has to be a package of the workspace.
+    const workspace = {
+      rootDir: "/nowhere",
+      names: ["@scope/alpha"],
+      root: "@scope/root",
+      reader: {},
+    } as unknown as Workspace;
+
+    const resolved = resolveEntries([], workspace);
+
+    expect(resolved.refusal!.code).toBe("unknown-package");
+    expect(resolved.refusal!.reason).toContain("@scope/root");
+    expect(resolved.entries).toEqual([]);
+    expect(resolved.generic).toBe(true);
   });
 });
 

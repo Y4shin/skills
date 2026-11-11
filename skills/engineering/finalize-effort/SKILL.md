@@ -138,6 +138,36 @@ the archive.
 A follow-up is never created on the model's own initiative, and never
 before the human says yes.
 
+## Author the changesets
+
+The effort's changesets are what a user of the package or product can
+observe: one entry per observable change, naming the workspace package, the
+bump level, and the summary that becomes the entry body. Refactors, tests,
+and internal docs are not changesets. An effort with nothing observable gets
+the generic performance and stability patch instead, and an identical entry
+that is already staged is not repeated.
+
+The human confirms the entries, so the proposal comes first and the write
+second:
+
+1. Call `tw_write_changesets` with `effort`, the proposed `entries`, and
+   `dry_run: true`. It writes nothing and answers with the entries it would
+   write, the entries it would skip as already staged, and whether the
+   generic entry applies.
+2. Show that answer in the close-out report, entries verbatim, so the human
+   confirms the exact entries and not a description of them.
+3. Call `tw_write_changesets` again with the same arguments and no
+   `dry_run`, only after the human confirms. It writes one file per entry
+   under `.changeset/` and reports what landed and what was skipped.
+
+A refusal names its reason and writes nothing: no `.changeset/config.json`,
+a package that is not in the workspace, a level that is not patch, minor, or
+major, or a staged changeset file the reader cannot parse. Fix or remove
+what the refusal names and retry. The unparseable-file refusal exists so the
+dedupe is never blind: a writer that guessed would stage a second copy of an
+entry the tree already holds, and the package would be versioned twice for
+one change.
+
 ## Archive
 
 Archive through `tw_archive_effort`, the named archive move; never use
@@ -156,14 +186,16 @@ updates the root index.
    large.
 4. Create accepted follow-ups with `origin_effort`, then move the findings
    with `tw_write_review` and `follow_up`.
-5. Archive with `tw_archive_effort`. The tool deprecates the finished items,
+5. Propose the changesets with `tw_write_changesets` and `dry_run: true`,
+   show the proposal, and write the entries only after the human confirms.
+6. Archive with `tw_archive_effort`. The tool deprecates the finished items,
    moves `docs/tasks/<effort>/` to `docs/tasks/archive/<effort>/` as a unit,
    updates the root index, and clears the state file's `map` pointer when it
    named the archived effort. Commit the move, because the tool writes the
    tree and git makes it history:
    `git add docs/tasks/ && git commit -m "chore: archive <effort>"`. A close
    that leaves the archive uncommitted hands the next phase a dirty tree.
-6. Close the phase with `tw_close finalize-effort` and write the report.
+7. Close the phase with `tw_close finalize-effort` and write the report.
 
 ## Report
 

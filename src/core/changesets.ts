@@ -15,7 +15,7 @@
  * found it.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { getPackages, type Packages } from "@manypkg/get-packages";
@@ -87,9 +87,9 @@ interface ResolvedProposal extends Proposal {
 }
 
 /**
- * Resolve one proposal: the workspace, the config, the validation, the generic
- * fallback, and the dedupe against what is already staged, in that order, so a
- * refusal leaves the proposal empty.
+ * Resolve one proposal: the workspace, the config, the entries themselves, and
+ * the dedupe against what is already staged, in that order, so a refusal
+ * leaves the proposal empty.
  */
 async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<ResolvedProposal> {
   const read = await readWorkspace(cwd);
@@ -97,28 +97,19 @@ async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<
   const workspace = read.workspace;
   const config = await readChangesetConfig(workspace);
   if (config.refusal !== null) return refusedProposal(config.refusal, config.diagnostics);
-  const invalid = validateEntries(changes, workspace);
-  if (invalid !== null) return refusedProposal(invalid, config.diagnostics);
-
-  const generic = changes.length === 0;
-  let requested = changes;
-  if (generic) {
-    if (workspace.root === null) {
-      return refusedProposal(
-        {
-          code: "no-root-package",
-          reason: `the workspace at ${workspace.rootDir} has no root package name, so no generic patch can be proposed`,
-        },
-        config.diagnostics,
-      );
-    }
-    requested = [{ package: workspace.root, level: "patch", summary: GENERIC_SUMMARY }];
-  }
+  const requested = resolveEntries(changes, workspace);
+  if (requested.refusal !== null) return refusedProposal(requested.refusal, config.diagnostics);
 
   const staged = await readStagedEntries(workspace);
+  // A staged set that cannot be read is a refusal, not an empty set: the dedupe
+  // is the only thing standing between the operator and a duplicate entry, and
+  // a blind dedupe writes the second copy of exactly what it could not see.
+  if (staged.refusal !== null) {
+    return refusedProposal(staged.refusal, [...config.diagnostics, ...staged.diagnostics]);
+  }
   const entries: ChangesetEntry[] = [];
   const skipped: ChangesetEntry[] = [];
-  for (const entry of requested) {
+  for (const entry of requested.entries) {
     // Dedupe against what is staged and against what this call already
     // accepted: one change is one entry, however often it is named.
     const duplicate =
@@ -131,9 +122,49 @@ async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<
     workspace,
     entries,
     skipped,
-    generic,
+    generic: requested.generic,
     diagnostics: [...config.diagnostics, ...staged.diagnostics],
   };
+}
+
+/** What a call resolves to before the dedupe: the entries, or the refusal. */
+export interface EntryResolution {
+  refusal: ChangesetsRefusal | null;
+  entries: ChangesetEntry[];
+  /** True when the generic patch answered for an effort with nothing observable. */
+  generic: boolean;
+}
+
+/**
+ * The entries a call would write, before the dedupe: the request as given, or
+ * the generic patch when the effort names nothing observable.
+ *
+ * The generic entry is built here and validated with the same rule as an
+ * explicit one. It used to be built after validation and so was the one entry
+ * exempt from the workspace check; building it first makes the check total.
+ */
+export function resolveEntries(changes: ChangesetEntry[], workspace: Workspace): EntryResolution {
+  if (changes.length > 0) {
+    const invalid = validateEntries(changes, workspace);
+    return invalid === null
+      ? { refusal: null, entries: changes, generic: false }
+      : { refusal: invalid, entries: [], generic: false };
+  }
+  if (workspace.root === null) {
+    return {
+      refusal: {
+        code: "no-root-package",
+        reason: `the workspace at ${workspace.rootDir} has no root package name, so no generic patch can be proposed`,
+      },
+      entries: [],
+      generic: true,
+    };
+  }
+  const generic: ChangesetEntry = { package: workspace.root, level: "patch", summary: GENERIC_SUMMARY };
+  const invalid = validateEntries([generic], workspace);
+  return invalid === null
+    ? { refusal: null, entries: [generic], generic: true }
+    : { refusal: invalid, entries: [], generic: true };
 }
 
 /** A proposal that writes nothing, carrying the refusal and what the reads noted. */
@@ -149,22 +180,45 @@ function identical(a: ChangesetEntry, b: ChangesetEntry): boolean {
 /** What is already staged in `.changeset/`, plus what reading it had to report. */
 export interface StagedRead {
   entries: ChangesetEntry[];
+  /**
+   * The refusal, or null when the read answered. An empty `entries` with a null
+   * refusal means nothing is staged; a refusal means the staged set exists and
+   * could not be read, which is a different thing.
+   */
+  refusal: ChangesetsRefusal | null;
   diagnostics: string[];
 }
 
 /**
  * Read the pending changesets as entries, one per release they name.
  *
- * An unreadable staged entry is a diagnostic, not a refusal: the dedupe can
- * only be as good as the tree it reads, and the release path reports the real
- * problem when it consumes the file.
+ * The two answers are kept apart: a repository with nothing staged returns no
+ * entries and no refusal, while a staged set the library cannot parse is a
+ * named refusal. The library parses every file at once, so one malformed entry
+ * costs the whole set, and a dedupe that read that as "nothing staged" would
+ * write a second copy of an entry the tree already carries.
  */
 export async function readStagedEntries(workspace: Workspace): Promise<StagedRead> {
   let staged: NewChangeset[];
   try {
     staged = await readChangesets(workspace.rootDir);
   } catch (e) {
-    return { entries: [], diagnostics: [`the staged changesets could not be read: ${(e as Error).message}`] };
+    // The library's message quotes the offending content but never names the
+    // file, so the refusal names the directory and the changeset files in it:
+    // the operator has to edit one of them, and this is the shortest honest
+    // path from the message to the file.
+    const dir = join(workspace.rootDir, ".changeset");
+    const detail = (e as Error).message.replace(/\s+/g, " ").trim();
+    return {
+      entries: [],
+      refusal: {
+        code: "unreadable-staged",
+        reason:
+          `the staged changesets in ${dir} could not be read${stagedFiles(dir)}, ` +
+          `so no entry can be checked against what is already staged: ${detail}`,
+      },
+      diagnostics: [],
+    };
   }
   const entries: ChangesetEntry[] = [];
   for (const changeset of staged) {
@@ -175,7 +229,23 @@ export async function readStagedEntries(workspace: Workspace): Promise<StagedRea
       entries.push({ package: release.name, level: release.type as ChangeLevel, summary: changeset.summary });
     }
   }
-  return { entries, diagnostics: [] };
+  return { entries, refusal: null, diagnostics: [] };
+}
+
+/**
+ * The changeset files a directory holds, rendered for a refusal, or the empty
+ * string when the listing cannot be read either. A directory listing is not a
+ * parse: it only gives the operator the set of files to look at.
+ */
+function stagedFiles(dir: string): string {
+  try {
+    const files = readdirSync(dir)
+      .filter((file) => file.endsWith(".md"))
+      .sort();
+    return files.length > 0 ? ` (the changeset files there are ${files.join(", ")})` : "";
+  } catch {
+    return "";
+  }
 }
 
 /** Why a changeset call was refused. Every code is a named outcome. */
@@ -183,6 +253,7 @@ export type ChangesetsRefusalCode =
   | "no-workspace"
   | "no-config"
   | "invalid-config"
+  | "unreadable-staged"
   | "unknown-package"
   | "invalid-level"
   | "no-root-package";
@@ -294,12 +365,18 @@ export async function readWorkspace(cwd: string): Promise<WorkspaceRead> {
       diagnostics: [],
     };
   }
+  const members = packages.packages.map((entry) => entry.packageJson.name);
+  const root = packages.rootPackage?.packageJson.name ?? null;
   return {
     refusal: null,
     workspace: {
       rootDir: packages.rootDir,
-      names: packages.packages.map((entry) => entry.packageJson.name),
-      root: packages.rootPackage?.packageJson.name ?? null,
+      // The reader's `packages` view leaves the root package out of a monorepo,
+      // so a set built from the members alone refuses an entry naming a package
+      // the workspace plainly has. The validation set is every package the
+      // reader knows about: the members plus the root.
+      names: root === null ? members : [...new Set([...members, root])],
+      root,
       reader: packages,
     },
     diagnostics: [],
