@@ -13,7 +13,10 @@ Whether the effort archived, and where it now lives. The review artifact:
 how many findings it recorded and how each disposition class came out
 (implementation tickets in the current effort, accepted follow-ups,
 informational acceptances), with the follow-up effort slugs a follow-up
-produced. The code did not change: the review is read-only toward it.
+produced. The changesets the effort authored: the entries written, each as
+package, level, and summary, or the generic entry that answered for an
+effort with nothing observable. The code did not change: the review is
+read-only toward it.
 
 ## 2. What needs the human
 

@@ -61,6 +61,21 @@ root index, and clears `docs/tasks/state.yaml`'s `map` pointer when it named
 the archived effort. The move is committed with git as the phase's last
 step.
 
+Before the archive, the close authors the effort's changesets. One entry per
+change a user of the package or product can observe, naming the workspace
+package, the bump level, and the summary; an effort with nothing observable
+gets the generic performance and stability patch instead.
+`tw_write_changesets` carries both halves: called with `dry_run: true` it
+proposes, writing nothing and reporting the entries it would write, the
+entries it would skip as already staged, and whether the generic entry
+applies; called without it, after the human confirms, it writes the files
+under `.changeset/`. The proposal is shown first so the human confirms the
+exact entries, and a refusal (no changeset config, a package outside the
+workspace, a level outside the three, or a staged changeset file the reader
+cannot parse) writes nothing and names its reason. The unparseable-file
+refusal is what keeps the duplicate check honest: a reader that treated a
+failed read as an empty staged set would stage a second identical entry.
+
 ## When to reach for it
 
 Reach for it when every implementation ticket in the effort has landed and
@@ -121,6 +136,10 @@ is the only path, and it is what sets the flag the archive reads.
 - The archive happens through `tw_archive_effort`, never the shell, a
   review with a pending finding makes the tool refuse, the state pointer
   stops naming the archived effort, and the move is committed.
+- The changesets were proposed with `tw_write_changesets` and `dry_run:
+  true` before anything was written, the human confirmed the entries, and an
+  unreadable staged changeset refused the write instead of producing a
+  second identical generic entry.
 - The run ends with the completion report from the skill's
   `resources/report.md`: what archived, what needs the human, the next
   command, and one pointer, compact.
