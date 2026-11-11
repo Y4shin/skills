@@ -282,6 +282,12 @@ describe("the chain's step keys", () => {
     }
   });
 
+  test("the chain writes the separator the guard reads", () => {
+    // A workflow script cannot import the extension module, so the character is
+    // written in both places; this is what keeps the two from drifting.
+    expect(chain).toContain(`step + "${KEY_SEPARATOR}" + args.ticket`);
+  });
+
   test("a key built the way the chain builds it carries the ticket the guard reads", async () => {
     const dir = sessionDir();
     const stub = stubPi({ branch: "main" });

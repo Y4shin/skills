@@ -159,9 +159,10 @@ function landTask(tddRef, verifyRef) {
 // `args` never reach a `tool_call` handler, so the key is the only
 // machine-readable ticket identity at the per-child launch, and the spawn
 // guard reads the slug from it. The separator is the extension's
-// `KEY_SEPARATOR` (src/core/spawn-guard.ts): a colon would read better but a
-// key can name an output file, and a colon is not a legal filename character
-// on Windows.
+// KEY_SEPARATOR (src/core/spawn-guard.ts); a workflow script cannot import it,
+// so the character is written here too, and a test pins the two together. A
+// colon would read better, but a key can name an output file, and a colon is
+// not a legal filename character on Windows.
 function stepKey(step) {
   return step + "@" + args.ticket;
 }
