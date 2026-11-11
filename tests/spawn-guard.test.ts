@@ -135,6 +135,76 @@ afterAll(() => {
   else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 });
 
+// ─── The outer call: identity in the args, and the agent name ────────────────
+
+describe("the outer subagent call", () => {
+  const identity = { effort: "an-effort", ticket: "one" };
+
+  test("a dispatch naming tdd-worker is blocked when the checkout is not the resolved ticket branch", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+
+    const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
+
+    expect(result, "the spawn is blocked").toMatchObject({ block: true });
+  });
+
+  test("the chain launch is blocked too: the workflow carries the ticket, not the agent", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "effort/an-effort" });
+
+    const result = await fire(stub, dir, "subagent", chainLaunch(identity));
+
+    expect(result, "the chain launch is blocked off the ticket branch").toMatchObject({ block: true });
+  });
+
+  test("the checkout is read through the session's git seam, against the session directory", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "main" });
+
+    await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
+
+    expect(stub.execCalls).toEqual([
+      { command: "git", args: ["rev-parse", "--abbrev-ref", "HEAD"], options: { cwd: dir } },
+    ]);
+  });
+
+  test("the block names the current and the required branch, and the step that creates it", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "effort/an-effort" });
+
+    const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
+
+    expect(result.block).toBe(true);
+    // The openers' refusal shape: what is checked out, what is required, and
+    // the next legal move, so a model that hits it can perform the step.
+    expect(result.reason).toBe(
+      "Refused: the checkout is on 'effort/an-effort', but 'tdd-worker' requires 'ticket/one'. " +
+        "Legal next: create and check out ticket/one off effort/an-effort, then dispatch again.",
+    );
+  });
+
+  test("the chain launch's block names the chain and the same required branch", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "effort/an-effort" });
+
+    const result = await fire(stub, dir, "subagent", chainLaunch(identity));
+
+    expect(result.reason).toContain("the checkout is on 'effort/an-effort'");
+    expect(result.reason).toContain("requires 'ticket/one'");
+  });
+
+  test("a detached checkout is named as a detached HEAD, not as a wrong branch", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "HEAD" });
+
+    const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
+
+    expect(result.block).toBe(true);
+    expect(result.reason).toContain("the checkout is on no branch (a detached HEAD)");
+  });
+});
+
 // ─── The per-child launch: identity in the step key ──────────────────────────
 
 describe("the per-child subagent_launch call", () => {
@@ -212,76 +282,6 @@ describe("the chain's step keys", () => {
 });
 
 // ─── Pass-through: anything that is not a gated implementation spawn ─────────
-
-// ─── The outer call: identity in the args, and the agent name ────────────────
-
-describe("the outer subagent call", () => {
-  const identity = { effort: "an-effort", ticket: "one" };
-
-  test("a dispatch naming tdd-worker is blocked when the checkout is not the resolved ticket branch", async () => {
-    const dir = sessionDir();
-    const stub = stubPi({ branch: "main" });
-
-    const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
-
-    expect(result, "the spawn is blocked").toMatchObject({ block: true });
-  });
-
-  test("the chain launch is blocked too: the workflow carries the ticket, not the agent", async () => {
-    const dir = sessionDir();
-    const stub = stubPi({ branch: "effort/an-effort" });
-
-    const result = await fire(stub, dir, "subagent", chainLaunch(identity));
-
-    expect(result, "the chain launch is blocked off the ticket branch").toMatchObject({ block: true });
-  });
-
-  test("the checkout is read through the session's git seam, against the session directory", async () => {
-    const dir = sessionDir();
-    const stub = stubPi({ branch: "main" });
-
-    await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
-
-    expect(stub.execCalls).toEqual([
-      { command: "git", args: ["rev-parse", "--abbrev-ref", "HEAD"], options: { cwd: dir } },
-    ]);
-  });
-
-  test("the block names the current and the required branch, and the step that creates it", async () => {
-    const dir = sessionDir();
-    const stub = stubPi({ branch: "effort/an-effort" });
-
-    const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
-
-    expect(result.block).toBe(true);
-    // The openers' refusal shape: what is checked out, what is required, and
-    // the next legal move, so a model that hits it can perform the step.
-    expect(result.reason).toBe(
-      "Refused: the checkout is on 'effort/an-effort', but 'tdd-worker' requires 'ticket/one'. " +
-        "Legal next: create and check out ticket/one off effort/an-effort, then dispatch again.",
-    );
-  });
-
-  test("the chain launch's block names the chain and the same required branch", async () => {
-    const dir = sessionDir();
-    const stub = stubPi({ branch: "effort/an-effort" });
-
-    const result = await fire(stub, dir, "subagent", chainLaunch(identity));
-
-    expect(result.reason).toContain("the checkout is on 'effort/an-effort'");
-    expect(result.reason).toContain("requires 'ticket/one'");
-  });
-
-  test("a detached checkout is named as a detached HEAD, not as a wrong branch", async () => {
-    const dir = sessionDir();
-    const stub = stubPi({ branch: "HEAD" });
-
-    const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
-
-    expect(result.block).toBe(true);
-    expect(result.reason).toContain("the checkout is on no branch (a detached HEAD)");
-  });
-});
 
 describe("calls the guard must leave untouched", () => {
   const identity = { effort: "an-effort", ticket: "one" };
