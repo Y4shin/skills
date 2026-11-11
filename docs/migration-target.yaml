@@ -76,6 +76,8 @@ promoted_skills:
     - resolving-merge-conflicts
     - pr                       # vendored from mattpocock/skills; writes a PR body
     - wizard
+    - release                  # user-invoked: the version bump and the changelog,
+                               # then the repository's own release document
   productivity:
     - wait-what
     - handoff

@@ -143,6 +143,7 @@ const SKILL_FILES = [
   "skills/engineering/skill-review/SKILL.md",
   "skills/engineering/eval-review/SKILL.md",
   "skills/engineering/pr/SKILL.md",
+  "skills/engineering/release/SKILL.md",
 ];
 
 describe("skill files", () => {
@@ -190,7 +191,7 @@ describe("package.json", () => {
 
   test("has skills list", () => {
     expect(Array.isArray(pkg.pi.skills)).toBe(true);
-    expect(pkg.pi.skills.length).toBe(32);
+    expect(pkg.pi.skills.length).toBe(33);
     expect(pkg.pi.skills).toContain("./skills/engineering/codebase-design");
     expect(pkg.pi.skills).toContain("./skills/engineering/domain-modeling");
     expect(pkg.pi.skills).toContain("./skills/engineering/improve-codebase-architecture");
@@ -572,7 +573,7 @@ describe("triage is retired (intake-skill)", () => {
     const pkg = JSON.parse(readFile("package.json"));
     expect(pkg.pi.skills).toContain("./skills/engineering/intake");
     expect(pkg.pi.skills).not.toContain("./skills/engineering/triage");
-    expect(pkg.pi.skills.length).toBe(32);
+    expect(pkg.pi.skills.length).toBe(33);
     expect(pkg.pi.skills.filter((s: string) => s.includes("intake") || s.includes("triage"))).toEqual([
       "./skills/engineering/intake",
     ]);
@@ -3793,6 +3794,63 @@ describe("release skill (release-skill)", () => {
     // the apply's own answer, never a claim that the preview is what landed.
     expect(content).toMatch(/recomputes?/i);
     expectOnlySurvivingTools(content);
+  });
+
+  test("follows the repository's release document afterwards, as the authority for publishing", () => {
+    const applied = content.indexOf("tw_release_apply");
+    const document = content.indexOf("docs/releasing.md");
+    expect(document, "the skill never reads the repository's release document").toBeGreaterThan(applied);
+    // The document is the authority, not an optional suggestion besides the
+    // defaults the skill already ran.
+    expect(content).toMatch(/authority for/i);
+    expect(content).toMatch(/read it and follow it|follow it, step by step/i);
+    // No document is not a failure: the defaults already ran, and that is the
+    // whole release here.
+    expect(content).toMatch(/when the repository has no `docs\/releasing\.md`/i);
+  });
+
+  test("refuses with the reason when the manifest or the changeset config is missing", () => {
+    // A manifest carrying only a name and a version is enough: the defaults
+    // need nothing else from it.
+    expect(content).toContain("package.json");
+    expect(content).toMatch(/a name and a version/i);
+    expect(content).toContain(".changeset/config.json");
+    // It reports the refusal's reason and stops; it does not build the missing
+    // setup itself, because a repository with no changesets setup is not one
+    // this skill versions.
+    expect(content).toMatch(/refus/i);
+    expect(content).toMatch(/reason/i);
+    expect(content).toMatch(/stop/i);
+    expect(content).toMatch(/never create|never runs? `npx changeset init`/i);
+  });
+
+  test("reports nothing to release, without a version bump", () => {
+    expect(content).toMatch(/nothing to release/i);
+    // An empty plan ends the run: no bump, no changelog section, no entry
+    // consumed.
+    expect(content).toMatch(/no version bump|nothing is bumped|does not bump/i);
+    // It never stages an entry to make a release possible: authoring belongs
+    // to the effort close, which owns the proposal.
+    expect(content).toMatch(/finalize-effort/);
+    expect(content).toMatch(/never stages?|does not stage/i);
+    expect(content).toMatch(/and stop/i);
+  });
+
+  test("is wired into the promoted set: the manifest, both READMEs, a docs page", () => {
+    const pkg = JSON.parse(readFile("package.json"));
+    expect(pkg.pi.skills).toContain("./skills/engineering/release");
+    // User-invoked, so both READMEs list it under that heading.
+    expect(readFile("skills/engineering/README.md")).toContain("[release](./release/SKILL.md)");
+    expect(readFile("README.md")).toContain("[release](./skills/engineering/release/SKILL.md)");
+    // A promoted skill's human-facing page, in the one agreed shape.
+    const page = readFile("docs/engineering/release.md");
+    for (const section of DOC_PAGE_SECTIONS) {
+      expect(page, `docs/engineering/release.md is missing ${section}`).toContain(section);
+    }
+    expectOnlySurvivingTools(page);
+    for (const text of [content, page]) {
+      expect(text).not.toContain("\u2014");
+    }
   });
 });
 

@@ -112,7 +112,8 @@
       "./skills/productivity/grill-me",
       "./skills/engineering/to-spec",
       "./skills/engineering/to-tickets",
-      "./skills/engineering/eval-review"
+      "./skills/engineering/eval-review",
+      "./skills/engineering/release"
     ],
     "subagents": {
       "agents": [

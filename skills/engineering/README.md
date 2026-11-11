@@ -23,6 +23,9 @@ Reachable only when you type them (`disable-model-invocation: true`).
 - **[improve-codebase-architecture](./improve-codebase-architecture/SKILL.md)**:
   Survey a repository for high-leverage architecture deepening opportunities
   and hand a selected candidate to Wayfinder.
+- **[release](./release/SKILL.md)**: Prepare a release: bump the versions the
+  pending changesets name, maintain the root `CHANGELOG.md`, then follow the
+  repository's own release document.
 
 ## Model-invoked
 

@@ -133,6 +133,9 @@ Off the main flow entirely.
   conflict hunk by hunk, resolving by intent, never `--abort`.
 - **`/skill:pr`** writes a PR body from a summary visual, before and after
   evidence, and a merge-danger assessment.
+- **`/skill:release`** prepares a release: the version bump the pending
+  changesets name and the root `CHANGELOG.md`, then the repository's own
+  release document as the authority for publishing.
 - **`/skill:prototype`** is a small, throwaway program that answers one
   design question.
 - **`/skill:research`**: delegate reading legwork to a background agent.
@@ -182,6 +185,7 @@ and the call.
 | Review an eval suite or triage a failed run | `/skill:eval-review` |
 | Review an Agent Skill | `/skill:skill-review` |
 | Write a PR body | `/skill:pr` |
+| Prepare a release (version bump and changelog) | `/skill:release` |
 
 ## Report
 
