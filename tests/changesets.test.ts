@@ -239,6 +239,100 @@ describe("the generic patch", () => {
   });
 });
 
+// ─── The pre-write proposal ─────────────────────────────────────────────────
+
+describe("tw_write_changesets with dry_run", () => {
+  test("returns the entries it would write, and touches nothing", async () => {
+    const dir = fixtureRepository();
+
+    const { text, details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        dry_run: true,
+        entries: [{ package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." }],
+      },
+      dir,
+    );
+
+    expect(details.dry_run).toBe(true);
+    expect(details.entries).toEqual([
+      { package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." },
+    ]);
+    expect(details.skipped).toEqual([]);
+    expect(details.generic).toBe(false);
+    expect(details.written).toEqual([]);
+    // Nothing was written: the operator confirms the proposal first.
+    expect(changesetFiles(dir)).toEqual([]);
+    expect(text).toContain("Add the release skill.");
+  });
+
+  test("reports the generic entry as the proposal for an effort with nothing observable", async () => {
+    const dir = fixtureRepository();
+
+    const { text, details } = await writeChangesets({ effort: "configurable-git-workflow", dry_run: true }, dir);
+
+    expect(details.generic).toBe(true);
+    expect(details.entries).toEqual([
+      { package: "@scope/fixture-pkg", level: "patch", summary: GENERIC_SUMMARY },
+    ]);
+    expect(changesetFiles(dir)).toEqual([]);
+    expect(text).toContain(GENERIC_SUMMARY);
+  });
+
+  test("reports an identical staged entry as skipped, so the operator sees it before the write", async () => {
+    const dir = fixtureRepository();
+    writeFileSync(
+      join(dir, ".changeset", "already-staged.md"),
+      `---\n"@scope/fixture-pkg": patch\n---\n\n${GENERIC_SUMMARY}\n`,
+      "utf-8",
+    );
+
+    const { text, details } = await writeChangesets({ effort: "configurable-git-workflow", dry_run: true }, dir);
+
+    expect(details.entries).toEqual([]);
+    expect(details.skipped).toEqual([
+      { package: "@scope/fixture-pkg", level: "patch", summary: GENERIC_SUMMARY },
+    ]);
+    expect(details.generic).toBe(true);
+    expect(changesetFiles(dir)).toEqual(["already-staged.md"]);
+    expect(text).toContain("already staged");
+  });
+
+  test("refuses exactly as the write does, and writes nothing", async () => {
+    const dir = fixtureRepository({ config: null });
+
+    const { text, details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        dry_run: true,
+        entries: [{ package: "@scope/fixture-pkg", level: "patch", summary: "A change." }],
+      },
+      dir,
+    );
+
+    expect(details.refusal.code).toBe("no-config");
+    expect(details.written).toEqual([]);
+    expect(text).toContain("Refused:");
+    expect(existsSync(join(dir, ".changeset"))).toBe(false);
+  });
+
+  test("writes the confirmed entries when the flag is absent", async () => {
+    const dir = fixtureRepository();
+
+    const { details } = await writeChangesets(
+      {
+        effort: "configurable-git-workflow",
+        entries: [{ package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." }],
+      },
+      dir,
+    );
+
+    expect(details.dry_run).toBe(false);
+    expect(details.written).toHaveLength(1);
+    expect(changesetFiles(dir)).toHaveLength(1);
+  });
+});
+
 // ─── Writing an entry ────────────────────────────────────────────────────────
 
 describe("tw_write_changesets", () => {
