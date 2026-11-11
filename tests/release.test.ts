@@ -463,3 +463,81 @@ describe("a repository the release cannot run in", () => {
     expect(JSON.parse(bytes(join(noConfig, "package.json"))!).version).toBe("1.0.0");
   });
 });
+
+// ─── The command line tool as the oracle ────────────────────────────────────
+
+/** The dev tree's own `changeset version`, run over a fixture copy. */
+function runCliVersion(dir: string): string {
+  const cli = join(dirname(require.resolve("@changesets/cli/package.json")), "bin.js");
+  return execFileSync(process.execPath, [cli, "version"], { cwd: dir, encoding: "utf-8" });
+}
+
+describe("the fixture comparison against the command line tool", () => {
+  test("identical manifest bytes, changelog content, and entry removal", async () => {
+    // An existing changelog, so the insertion point is part of the comparison:
+    // the new section belongs above the previous version, under the file's head.
+    const fixture = (): string =>
+      fixtureRepository({
+        changesets: {
+          "small-fix.md": changeset("@scope/fixture-pkg", "patch", "Fix the refusal text."),
+          "new-feature.md": changeset("@scope/fixture-pkg", "minor", "Add the release skill."),
+        },
+        files: {
+          "CHANGELOG.md":
+            "# @scope/fixture-pkg\n\n## 1.0.0\n\n### Minor Changes\n\n- Something older landed.\n",
+        },
+      });
+    const ours = fixture();
+    const theirs = fixture();
+
+    const planned = await plan(ours);
+    await apply(ours);
+    runCliVersion(theirs);
+
+    expect(bytes(join(ours, "package.json"))).toBe(bytes(join(theirs, "package.json")));
+    expect(bytes(join(ours, "CHANGELOG.md"))).toBe(bytes(join(theirs, "CHANGELOG.md")));
+    expect(changesetFiles(ours)).toEqual(changesetFiles(theirs));
+    expect(changesetFiles(ours)).toEqual([]);
+    // And the section the plan reported is the section both runs inserted.
+    expect(bytes(join(ours, "CHANGELOG.md"))).toContain(planned.details.changelog[0].text);
+  });
+
+  test("identical output for a workspace, dependency line included", async () => {
+    // A monorepo whose alpha depends on beta, both bumped: the changelog then
+    // carries the library's "Updated dependencies" line, which the plan
+    // renders too, so this is the comparison that pins the dependency line.
+    const fixture = (): string => {
+      const dir = fixtureWorkspace();
+      writeFileSync(
+        join(dir, "packages", "alpha", "package.json"),
+        `${JSON.stringify({ name: "@scope/alpha", version: "0.1.0", dependencies: { "@scope/beta": "^0.2.0" } }, null, 2)}\n`,
+        "utf-8",
+      );
+      writeFileSync(join(dir, ".changeset", "alpha.md"), changeset("@scope/alpha", "minor", "Add the alpha reader."), "utf-8");
+      writeFileSync(join(dir, ".changeset", "beta.md"), changeset("@scope/beta", "minor", "Add the beta reader."), "utf-8");
+      return dir;
+    };
+    const ours = fixture();
+    const theirs = fixture();
+
+    const planned = await plan(ours);
+    await apply(ours);
+    runCliVersion(theirs);
+
+    for (const path of [
+      ["package.json"],
+      ["packages", "alpha", "package.json"],
+      ["packages", "beta", "package.json"],
+      ["packages", "alpha", "CHANGELOG.md"],
+      ["packages", "beta", "CHANGELOG.md"],
+    ]) {
+      expect(bytes(join(ours, ...path)), path.join("/")).toBe(bytes(join(theirs, ...path)));
+    }
+    expect(changesetFiles(ours)).toEqual([]);
+    expect(changesetFiles(theirs)).toEqual([]);
+    // The plan's alpha section is what both runs wrote, dependency line and all.
+    const alpha = planned.details.changelog.find((section: any) => section.package === "@scope/alpha");
+    expect(alpha.text).toContain("Updated dependencies");
+    expect(bytes(join(ours, "packages", "alpha", "CHANGELOG.md"))).toContain(alpha.text);
+  });
+});
