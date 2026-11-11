@@ -23,10 +23,12 @@ that creates it off the trunk; `tw_open` then refuses any other checkout,
 naming the branch and the step. Per ticket the phase asks the brief again, for
 the worker that will run, and creates and checks out that ticket branch before
 it dispatches the chain. No branch name is written in the skill, and the spawn
-guard blocks an implementation spawn from anywhere else. There is no ticket
-landing branch: the chain merges the finished ticket's branch into the effort
-branch and deletes it. `docs/git-workflows.md` has the profiles and the
-settings keys.
+guard blocks an implementation spawn from anywhere else. The same profile row
+gates the close: `tw_close` takes the effort, and a phase whose row carries a
+closing gate refuses to close from any other checkout, naming the branch to
+check out. There is no ticket landing branch: the chain merges the finished
+ticket's branch into the effort branch and deletes it. `docs/git-workflows.md`
+has the profiles and the settings keys.
 
 **The ticket frontier and the level loop:** the ready edge comes from
 `tw_frontier <effort-slug>` and the waves from
@@ -65,9 +67,10 @@ written through `tw_write_changelog` (the only writer of
 `tw_finalizable <ticket-slug>` (which also surfaces the effort graph's
 anomalies), the state pointer cleared with `tw_state_set task null` and
 committed with the ticket note (a dirty `state.yaml` would otherwise travel
-into the next chain's checkout), and the effort branch pushed per the profile's
-push policy (the chain already merged the ticket's branch into it). A bug
-ticket has no
+into the next chain's checkout), and the effort branch pushed exactly as the
+push step the phase's brief renders from the profile's push policy (the chain
+already merged the ticket's branch into it). A profile whose policy is `never`
+renders no push step, so nothing leaves the machine. A bug ticket has no
 closure step: `docs/bugs/` is a static archive in schema 5, and the
 implementation ticket is the defect's record.
 
@@ -132,7 +135,8 @@ independent of the last one's conversation.
 
 **Where does the close-out end?**
 With the ticket's branch merged into the effort branch, the effort branch
-pushed per the profile's policy, and the ticket done. The effort-level holistic
+pushed exactly as the brief's push step renders it (no step at all under a
+`never` policy), and the ticket done. The effort-level holistic
 review, the archive, and the landing of the effort branch into the trunk are
 `finalize-effort`'s.
 
@@ -145,7 +149,8 @@ review, the archive, and the landing of the effort branch into the trunk are
   unstable architecture document is refused by the opener, never drafted.
 - The close-out runs inline in the same run that lands each ticket: changelog
   through `tw_write_changelog`, done through `tw_mark_done`, the effort branch
-  pushed per the profile's policy.
+  pushed exactly as the brief's push step renders it, and nothing pushed at all
+  under a `never` policy.
 - A `mode: human` ticket produces a refusal and a handback, never an
   autonomous chain.
 - Feature chains verify through read-only agents before anything lands, and
