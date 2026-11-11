@@ -69,7 +69,9 @@ stands.
 agent, no instructions, no gate, no merge flag, no push policy. Phases open on
 whatever checkout they find, no spawn is blocked on a branch, and the effort
 close lands nothing, because no landing step is configured. Choose it to keep
-the branches and habits a repository already has.
+the branches and habits a repository already has, and to run the workflow in a
+directory that is not a git checkout at all, where the guards can read no
+branch.
 
 There are three branch levels in a repository with a develop branch, and two
 without one: the trunk, one **effort branch** per effort, and one **ticket
