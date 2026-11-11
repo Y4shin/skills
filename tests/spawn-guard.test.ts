@@ -163,4 +163,39 @@ describe("the outer subagent call", () => {
       { command: "git", args: ["rev-parse", "--abbrev-ref", "HEAD"], options: { cwd: dir } },
     ]);
   });
+
+  test("the block names the current and the required branch, and the step that creates it", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "effort/an-effort" });
+
+    const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
+
+    expect(result.block).toBe(true);
+    // The openers' refusal shape: what is checked out, what is required, and
+    // the next legal move, so a model that hits it can perform the step.
+    expect(result.reason).toBe(
+      "Refused: the checkout is on 'effort/an-effort', but 'tdd-worker' requires 'ticket/one'. " +
+        "Legal next: create and check out ticket/one off effort/an-effort, then dispatch again.",
+    );
+  });
+
+  test("the chain launch's block names the chain and the same required branch", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "effort/an-effort" });
+
+    const result = await fire(stub, dir, "subagent", chainLaunch(identity));
+
+    expect(result.reason).toContain("the checkout is on 'effort/an-effort'");
+    expect(result.reason).toContain("requires 'ticket/one'");
+  });
+
+  test("a detached checkout is named as a detached HEAD, not as a wrong branch", async () => {
+    const dir = sessionDir();
+    const stub = stubPi({ branch: "HEAD" });
+
+    const result = await fire(stub, dir, "subagent", directSpawn("tdd-worker", identity));
+
+    expect(result.block).toBe(true);
+    expect(result.reason).toContain("the checkout is on no branch (a detached HEAD)");
+  });
 });
