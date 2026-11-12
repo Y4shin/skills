@@ -121,3 +121,36 @@ were standing in for.
   extension", "All file I/O is in this file") were made false by the split.
 - The unused `Bool` argument helper stayed in `support` and was dead before the
   move too; deleting an unused export is not this ticket's scope.
+
+### What landed
+
+The 4501-line entry is now 616 lines of wiring plus eight modules under
+`src/tools/`: artifacts, effort, tickets, gates, release, feedback,
+skill-creator, and one support module. All 136 pre-move declarations still exist
+exactly once, the two pinned writers travel with their callers, and the suite is
+green at 1595 tests with both typechecks clean.
+
+The entry keeps the manifest sanity check, the invocation filter, the
+composition, the write lockdown, the spawn guard, the two registration name
+lists, the notification tool, and the extension entry point.
+
+### Divergence carried to the next ticket
+
+Only the gate family exports a factory. The other six export 34 named tool consts
+and the composition enumerates them by name, so `trim-the-entry` cannot reach its
+"imports the family factories" criterion by deleting the re-exports alone. It must
+convert the six families to factories first.
+
+The phase's decision: convert them. The specification and the architecture both
+say family factories, and a composition that enumerates 34 names is not the
+composition the effort promised. The conversion is mechanical and belongs to the
+trim ticket, because it is the means by which that ticket reaches its criterion,
+not a new behaviour.
+
+### Lessons
+
+- A move that keeps the suite green can still leave the target shape unmet. The
+  extraction was required to keep imports resolving, which invited named exports,
+  and named exports are a legitimate intermediate state rather than the end.
+- The deviation reporter caught the gap before the next ticket was dispatched,
+  which is what that step exists for.
