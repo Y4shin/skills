@@ -3907,25 +3907,47 @@ function languageEntries(content: string): { term: string; body: string }[] {
 
 describe("documentation re-sync (docs-resync)", () => {
   const promoted = promotedWithInvocation();
-  const expected = (bucket: string | null, userInvoked: boolean): string[] =>
-    promoted
-      .filter((s) => s.userInvoked === userInvoked && (bucket === null || s.bucket === bucket))
-      .map((s) => `${s.bucket}/${s.name}`)
-      .sort();
 
-  test("the top-level README lists exactly the promoted set, grouped by invocation", () => {
+  /**
+   * The order the top-level README's lists are held to: bucket first, then the
+   * skill name, both read as dictionary order with the hyphens ignored, so
+   * `codebase-design` sorts before `code-review` the way a reader scanning the
+   * list expects. A raw string sort puts `code-review` first, because `-`
+   * precedes every letter, and that reads as a mistake to anyone checking the
+   * list by eye.
+   */
+  function dictionaryOrder(skills: string[]): string[] {
+    return [...skills].sort((a, b) =>
+      a.replace(/-/g, "").localeCompare(b.replace(/-/g, "")),
+    );
+  }
+
+  const expected = (bucket: string | null, userInvoked: boolean): string[] =>
+    dictionaryOrder(
+      promoted
+        .filter((s) => s.userInvoked === userInvoked && (bucket === null || s.bucket === bucket))
+        .map((s) => `${s.bucket}/${s.name}`),
+    );
+
+  // The top-level README's two lists are ordered, not only complete: each is
+  // grouped by bucket and alphabetical by name inside a bucket. The file's own
+  // side is compared unsorted, so swapping two adjacent entries fails here.
+  test("the top-level README lists exactly the promoted set, ordered by bucket then name", () => {
     const readme = readFile("README.md");
-    expect(linkedSkills(sectionBody(readme, "### User-invoked")).sort()).toEqual(expected(null, true));
-    expect(linkedSkills(sectionBody(readme, "### Model-invoked")).sort()).toEqual(expected(null, false));
+    expect(linkedSkills(sectionBody(readme, "### User-invoked"))).toEqual(expected(null, true));
+    expect(linkedSkills(sectionBody(readme, "### Model-invoked"))).toEqual(expected(null, false));
   });
 
+  // The bucket READMEs keep their authored order (engineering's is phase order
+  // on purpose), so their side is normalized before comparing and the check
+  // stays a membership check.
   for (const bucket of ["engineering", "productivity"]) {
     test(`skills/${bucket}/README.md lists exactly that bucket's promoted set, grouped by invocation`, () => {
       const readme = readFile(`skills/${bucket}/README.md`);
-      expect(linkedSkills(sectionBody(readme, "## User-invoked"), bucket).sort()).toEqual(
+      expect(dictionaryOrder(linkedSkills(sectionBody(readme, "## User-invoked"), bucket))).toEqual(
         expected(bucket, true),
       );
-      expect(linkedSkills(sectionBody(readme, "## Model-invoked"), bucket).sort()).toEqual(
+      expect(dictionaryOrder(linkedSkills(sectionBody(readme, "## Model-invoked"), bucket))).toEqual(
         expected(bucket, false),
       );
     });
