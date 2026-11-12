@@ -20,10 +20,8 @@
 
 import {
   decideFromBrief,
-  isObject,
   phaseBrief,
   readCheckout,
-  text,
   ticketBrief,
   unreadableCheckout,
   type BriefDeps,
@@ -31,6 +29,7 @@ import {
   type GitRun,
   type PhaseBrief,
 } from "./git-profile.js";
+import { isObject, text } from "./shape.js";
 
 /**
  * The separator a workflow step key uses between the step name and the ticket
