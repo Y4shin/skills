@@ -24,7 +24,7 @@ import { isSpawnCall, spawnVerdict } from "./core/spawn-guard.js";
 import { artifactTools } from "./tools/artifacts.js";
 import { effortTools } from "./tools/effort.js";
 import { ticketTools } from "./tools/tickets.js";
-import { skill_validate, skill_scaffold, skill_discover } from "./tools/skill-creator.js";
+import { skillCreatorTools } from "./tools/skill-creator.js";
 import { tw_write_changesets, tw_release_plan, tw_release_apply } from "./tools/release.js";
 import { tw_feedback } from "./tools/feedback.js";
 import { gateTools } from "./tools/gates.js";
@@ -33,7 +33,6 @@ import { Tool, findRoot, readText, readYaml, relPosix, taskRoot } from "./tools/
 // Thin re-exports: a tool definition is reachable from the entry path whatever module holds
 // it, so no import path the suite or the package already uses had to move with the split. The
 // composition below reads the same definitions.
-export { skill_validate, skill_scaffold, skill_discover } from "./tools/skill-creator.js";
 export { tw_write_changesets, tw_release_plan, tw_release_apply } from "./tools/release.js";
 export { tw_feedback } from "./tools/feedback.js";
 
@@ -50,9 +49,7 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
     ...artifactTools(),
     ...effortTools(),
     ...ticketTools(),
-    skill_validate,
-    skill_scaffold,
-    skill_discover,
+    ...skillCreatorTools(),
     tw_write_changesets,
     tw_release_plan,
     tw_release_apply,
