@@ -82,6 +82,21 @@ title: Task Changelog
 
 
 
+## 2026-11-12, Extract the tool families into their own modules (extract-tool-families)
+
+The 40 tools the extension factory returns no longer live in the 4501-line entry
+file. Each definition moved into the family module for its kind under
+`src/tools/`: `artifacts`, `effort`, `tickets`, `gates`, `release`, `feedback`,
+`skill-creator`, plus one `support` module for the types, the definition helpers,
+and the artifact-tree plumbing two or more families read. The entry holds the
+wiring, the guards, the composition, and thin re-exports, so every import path
+still resolves and the tool surface, the argument schemas, the disclosure sets,
+and every refusal text are unchanged. The seven source-text pins that read the
+entry as one string are corpus counts over `src/` now, so a second copy of a
+definition fails wherever it is written, and the two call-site pins still bind
+the effort-root writer to its two writers and the root-index writer to effort
+creation and archiving.
+
 ## 2026-11-12, Order the README's skill lists by a rule the suite enforces (readme-order)
 
 The top-level README's two skill lists are now ordered by a rule the suite
