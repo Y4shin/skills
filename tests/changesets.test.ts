@@ -38,7 +38,10 @@ import {
   readStagedEntries,
   readWorkspace,
   resolveEntries,
+  writeEntries,
+  type Proposal,
   type Workspace,
+  type WriteOutcome,
 } from "../src/core/changesets.js";
 
 const require = createRequire(import.meta.url);
@@ -379,6 +382,42 @@ describe("tw_write_changesets with dry_run", () => {
     expect(details.dry_run).toBe(false);
     expect(details.written).toHaveLength(1);
     expect(changesetFiles(dir)).toHaveLength(1);
+  });
+});
+
+// ─── The outcome discriminant ────────────────────────────────────────────────
+
+// The tool handler is the only caller that tells a proposal from a write, and
+// it used to do so with a type assertion. The two outcomes now name themselves,
+// so the caller narrows and a wrong read is a compile error.
+
+describe("the changeset outcome", () => {
+  test("a proposal names itself and carries no written files to read", async () => {
+    const dir = fixtureRepository();
+
+    const proposal: Proposal | WriteOutcome = await proposeEntries(dir, {
+      changes: [{ package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." }],
+    });
+
+    expect(proposal.kind).toBe("proposal");
+    // A caller that reads the write-only field off a proposal fails to compile,
+    // which is what the assertion at the call site used to stand in for.
+    // @ts-expect-error a proposal carries no written files
+    expect(proposal.written).toBeUndefined();
+  });
+
+  test("a write outcome names itself and reports the files it landed", async () => {
+    const dir = fixtureRepository();
+
+    const outcome: Proposal | WriteOutcome = await writeEntries(dir, {
+      entries: [{ package: "@scope/fixture-pkg", level: "minor", summary: "Add the release skill." }],
+    });
+
+    expect(outcome.kind).toBe("write");
+    // Narrowing on the discriminant is what makes the field readable at all.
+    expect(outcome.kind === "write" ? outcome.written : []).toEqual([
+      join(dir, ".changeset", changesetFiles(dir)[0]),
+    ]);
   });
 });
 

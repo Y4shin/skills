@@ -82,7 +82,6 @@ import {
   type ReleaseRead,
   type ReleaseRefusalCode,
   type ReleaseWrite,
-  type WriteOutcome,
 } from "./core/changesets.js";
 
 // ─── Gated skill manifest sanity (session-start diagnostics) ──────────────────
@@ -3664,7 +3663,9 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
             diagnostics: resolved.diagnostics,
           });
         }
-        const written = dryRun ? [] : (resolved as WriteOutcome).written;
+        // The outcome names which one it is, so the write-only field is read
+        // only after the discriminant narrows to the write outcome.
+        const written = resolved.kind === "write" ? resolved.written : [];
         const lines: string[] = [];
         if (resolved.generic) {
           lines.push(

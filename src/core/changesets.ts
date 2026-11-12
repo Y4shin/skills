@@ -57,6 +57,12 @@ export interface ChangesetEntry {
 
 /** What an effort proposes, once the generic fallback and the dedupe have run. */
 export interface Proposal {
+  /**
+   * The discriminant: this outcome is a proposal, and carries no written files.
+   * A caller tells the two changeset outcomes apart by this field, so reading
+   * `written` off a proposal is a compile error rather than an assertion.
+   */
+  kind: "proposal";
   /** The refusal, or null when the proposal stands. */
   refusal: ChangesetsRefusal | null;
   /** The entries still to write: the proposal minus what is already staged. */
@@ -86,6 +92,7 @@ export async function proposeEntries(
 ): Promise<Proposal> {
   const resolved = await resolveProposal(cwd, request.changes);
   return {
+    kind: "proposal",
     refusal: resolved.refusal,
     entries: resolved.entries,
     skipped: resolved.skipped,
@@ -131,6 +138,7 @@ async function resolveProposal(cwd: string, changes: ChangesetEntry[]): Promise<
     else entries.push(entry);
   }
   return {
+    kind: "proposal",
     refusal: null,
     workspace,
     entries,
@@ -182,7 +190,7 @@ export function resolveEntries(changes: ChangesetEntry[], workspace: Workspace):
 
 /** A proposal that writes nothing, carrying the refusal and what the reads noted. */
 function refusedProposal(refusal: ChangesetsRefusal, diagnostics: string[]): ResolvedProposal {
-  return { refusal, workspace: null, entries: [], skipped: [], generic: false, diagnostics };
+  return { kind: "proposal", refusal, workspace: null, entries: [], skipped: [], generic: false, diagnostics };
 }
 
 /** True when two entries would write the same changeset. */
@@ -294,6 +302,8 @@ export interface ChangesetsRefusal {
 
 /** The result of a write: what landed, what was skipped, and why nothing did. */
 export interface WriteOutcome {
+  /** The discriminant: this outcome wrote, so `written` is part of it. */
+  kind: "write";
   /** The refusal, or null when the call wrote (or correctly wrote nothing). */
   refusal: ChangesetsRefusal | null;
   /** The changeset files written, absolute paths. */
@@ -328,6 +338,7 @@ export async function writeEntries(
   const resolved = await resolveProposal(cwd, request.entries);
   if (resolved.refusal !== null || resolved.workspace === null) {
     return {
+      kind: "write",
       refusal: resolved.refusal,
       written: [],
       entries: [],
@@ -347,6 +358,7 @@ export async function writeEntries(
     written.push(join(workspace.rootDir, ".changeset", `${id}.md`));
   }
   return {
+    kind: "write",
     refusal: null,
     written,
     entries: resolved.entries,
