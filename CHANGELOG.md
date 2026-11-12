@@ -1,5 +1,141 @@
 # task-workflow
 
+## 5.5.0
+
+### Minor Changes
+
+- d0ca584: The phase openers refuse the wrong branch, and the closing gate closes that half
+  of the loop. Under the `default` profile `tw_open` refuses `implement-ticket`
+  unless the checkout is on `effort/{effort}`, and it refuses `finalize-effort` on
+  the trunk, because the effort close is the phase that lands the effort branch.
+  The refusal names the branch the checkout is on, the branch the profile
+  requires, and the step that creates it, and a retry after that step opens
+  normally. Nothing latches.
+  
+  The closing gate is the second half. A phase the profile gates on closing
+  refuses to close from anywhere else, so a run that drifted off its branch after
+  the open (a worker's checkout, a hand-run `git checkout`) cannot release the
+  phase from there. Pass the effort to `tw_close` so the gate can resolve its row;
+  a close that names no effort refuses rather than skipping the gate. Under
+  `default` only `implement-ticket` carries a closing gate, the planning phases
+  carry none, and every phase under `flat` opens and closes wherever it finds
+  itself.
+  
+  The effort close follows the profile's push policy rather than pushing
+  unconditionally, and the four bundled branch steps render from the same
+  resolution, so the instruction a phase reads and the refusal it meets name the
+  same branch.
+- d0ca584: The effort close authors changesets, so a release consumes entries the work
+  already described. `tw_write_changesets` takes the entries as a list of package,
+  level, and summary, reports the proposal, and writes nothing until the human
+  confirms; the close then writes one file per change a user of the package can
+  observe, in the `@changesets/cli` format, under `.changeset/` at the workspace
+  root.
+  
+  The write is validated before anything lands: the package name must exist in the
+  workspace, the level must be `patch`, `minor`, or `major`, and `.changeset/config.json`
+  must be present and parse. A staging directory that cannot be read refuses the
+  write rather than being treated as empty, so a caller cannot produce a duplicate
+  generic entry beside an unreadable one, and duplicate entries in a single call
+  collapse.
+  
+  The seam wraps the changesets library set rather than the command line tool,
+  because importing `@changesets/cli` runs its CLI and exits the process. Every
+  failure is a named refusal with its own legal next call, and a refusal leaves
+  the working tree as it found it.
+- 5154a9c: Split the extension's tool file into one module per tool family, so the entry
+  holds the wiring and a composition of seven spreads instead of 4501 lines and 40
+  tool definitions. No tool, argument schema, refusal text, disclosure set, or
+  bundled profile changed: the suite's surface pins prove it.
+  
+  Alongside the split: the two generic shape guards moved to a module of their own
+  below both the core modules and the tool modules; the changeset writer's proposal
+  and write outcomes carry a `kind` discriminant instead of a type assertion at the
+  call site; and the top-level README's skill lists are ordered by a rule the suite
+  enforces, with a hyphen-insensitive collation so a reader sees the order the
+  documentation states.
+- d0ca584: The workflow's git habits are configuration now, not code. Three keys under
+  `taskWorkflow.git` decide them, read from `.pi/settings.json` with
+  `~/.pi/agent/settings.json` honoured underneath, and the built-in defaults last.
+  
+  - `profile` selects a bundled profile. `default` is what a repository that
+    configures nothing gets; `flat` requires no branch anywhere, blocks no spawn,
+    and lands nothing, for a repository that keeps the habits it already has or for
+    a directory that is not a git checkout at all.
+  - `trunk` names the branch an effort branch is created off and landed into,
+    with `{"develop": false, "main": "main"}` as the default and a develop branch
+    named by setting `develop` to it.
+  - `trunkMerge` is `local` or `handoff`. `local` merges into the trunk on your
+    machine and deletes the effort branch; `handoff` pushes the effort branch and
+    prints the pull request for you to open instead.
+  
+  A profile is a flat JSON file carrying, per phase, an optional branch template,
+  optional opening and closing instructions, and an optional closing gate, plus a
+  merge flag and a push policy of `always` or `never`, and per implementation
+  sub-agent an optional branch template. Templates use `{effort}` and `{ticket}`.
+  
+  `tw_phase_brief` answers what a phase needs before it opens: the resolved
+  branch, the step that creates it, and the instruction text. An unknown profile
+  name, a malformed profile file, or a wrong-typed setting is a diagnostic carried
+  in the brief, never a crash. No profile name appears in a branch of code, so the
+  two bundled profiles are selected by a settings key alone.
+- d0ca584: Add the `release` skill and the two tools it runs on. `/skill:release` is
+  user-invoked, like every deliberate act, and it prepares a release rather than
+  performing one: it reports the pending changesets, the versions they produce,
+  and the changelog section each one adds, then writes the version bump and the
+  root `CHANGELOG.md` only after the operator confirms. It performs no branch
+  operation and publishes nothing, and it follows the repository's own
+  `docs/releasing.md` for whatever comes after.
+  
+  - `tw_release_plan` writes nothing. It reports the pending entries, the versions
+    they produce, and the section text, so a plan can be reviewed before it lands,
+    and a refused plan writes nothing either.
+  - `tw_release_apply` recomputes the plan from the tree it writes, so an entry
+    staged since the preview belongs to the same release. It bumps the manifest,
+    inserts the changelog section, and removes the consumed entries, and it writes
+    nothing at all when it refuses.
+  
+  An empty plan is its own answer: nothing is pending, so nothing moves, and that
+  is reported rather than worked around. The skill never stages a changeset to
+  make a release possible, because authoring belongs to the effort close and a
+  release that staged its own entry would version a change nobody described.
+- a0aff41: Onboarding a fresh repo no longer seeds the project's own documents from
+  templates. `docs/testing.md`, `docs/dev-env.md`, and `CONTEXT.md` are written by a
+  bootstrapping effort instead, because a fresh repository cannot answer what its
+  test commands are, what its development environment needs, or which domain terms
+  its code will speak, and a template is a stub the later skills read as an answer.
+  
+  The onboard branch now asks whether plans, designs, or specifications already
+  exist, tells the operator to place them under `docs/` and states plainly that
+  nothing reads them automatically, then offers the bootstrapping effort through
+  `/skill:intake`, where the operator names the project and points at that material.
+- d0ca584: An implementation sub-agent no longer starts off its ticket branch. A dispatch
+  commits on `ticket/{ticket}`, so the guard fails the step before any worker
+  starts, with a reason naming the branch to create and the base to create it
+  from.
+  
+  Both surfaces a spawn arrives on are covered: the outer `subagent` call, where a
+  direct dispatch names the agent and a workflow launch carries the effort and
+  ticket in its args, and the per-child `subagent_launch` call, where a workflow
+  child's args never reach a handler and the identity is therefore a step key that
+  embeds the ticket slug. The separator in that key is a dot, which the workflow
+  runtime accepts and every platform allows in a filename.
+  
+  The pass-or-refuse rule is the phase brief's own, so a spawn refusal and a phase
+  refusal cannot disagree. An agent row with no branch, an agent the profile does
+  not name, and a call carrying no ticket identity all pass untouched, and a guard
+  that cannot run reports what it could not read instead of passing silently.
+
+### Patch Changes
+
+- d0ca584: A checkout the guards cannot read refuses instead of passing. The three `git`
+  facts the resolver reads are taken in one call, and a failed read yields one
+  answer rather than a mixture of empty fields, so the openers refuse the phase,
+  the spawn block reports the guard it could not run, and the refusal names the
+  option that fits: the `flat` profile, for a directory that is not a git checkout
+  at all. Previously an unreadable checkout could read as "no branch required" and
+  let the phase open on a guess.
+
 ## 5.4.0
 
 ### Minor Changes
