@@ -4517,6 +4517,60 @@ describe("the trimmed entry (trim-the-entry)", () => {
   test("the feedback family is a factory the entry composes", () => {
     assertFamilyFactory("feedback", "feedbackTools");
   });
+
+  test("the entry imports each family's factory and nothing else from it", () => {
+    const entry = readFile("src/pi.ts");
+    for (const family of ["artifacts", "effort", "tickets", "skill-creator", "release", "feedback", "gates"]) {
+      const imports = [...entry.matchAll(new RegExp(`import \\{([^}]*)\\} from "\\./tools/${family}\\.js"`, "g"))];
+      expect(imports, `${family} is not imported once`).toHaveLength(1);
+      const names = imports[0][1].split(",").map((name) => name.trim()).filter((name) => name !== "");
+      // A tool name or a private helper here would mean the entry knows the
+      // family's contents instead of its factory.
+      expect(names, `${family}'s import is not its factory alone`).toHaveLength(1);
+      expect(names[0], family).toMatch(/^\w+Tools$/);
+    }
+  });
+
+  test("the composition is one record of spreads and nothing else", () => {
+    const entry = readFile("src/pi.ts");
+    const composition = entry.match(/export function createTools\([\s\S]*?return \{([\s\S]*?)\n  \};/);
+    expect(composition, "createTools does not return one object literal").not.toBeNull();
+    const spreads = composition![1]
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line !== "");
+    // Seven families, one spread each: a bare tool name would mean the entry
+    // enumerates a definition again.
+    expect(spreads).toHaveLength(7);
+    for (const spread of spreads) expect(spread, "the entry enumerates a tool").toMatch(/^\.\.\.\w+\([^)]*\),$/);
+  });
+
+  test("no re-export shim survives anywhere for a tool definition", () => {
+    const shims = SOURCE_CORPUS.filter((file) =>
+      /export \{[^}]*\b(?:tw_|skill_)\w*[^}]*\} from/.test(file.text),
+    ).map((file) => file.rel);
+    expect(shims).toEqual([]);
+    // The entry's own exports are the three names the manifest and the suite
+    // reach for, at the path the manifest names.
+    const entry = readFile("src/pi.ts");
+    expect([...entry.matchAll(/^export /gm)]).toHaveLength(3);
+    expect(entry).toMatch(/^export default function \(pi: ExtensionAPI\)/m);
+    expect(entry).toMatch(/^export function createTools\(/m);
+    expect(entry).toMatch(/^export function notifyConfigPath\(/m);
+  });
+
+  test("the entry still holds the entry point, the handlers, the notification tool, and the name lists", () => {
+    const entry = readFile("src/pi.ts");
+    // The two tool_call handlers, composed into the one registered hook.
+    for (const handler of ["guardTaskTreeWrites", "guardSpawn", "guardToolCall"]) {
+      expect(entry, handler).toMatch(new RegExp(`function ${handler}\\(`));
+    }
+    expect([...entry.matchAll(/pi\.on\("tool_call"/g)]).toHaveLength(1);
+    // The notification tool and the two registration name lists stay here.
+    expect(entry).toMatch(/name: "notify_user"/);
+    expect(entry).toMatch(/const GATED_REGISTERED_TOOLS = \[/);
+    expect(entry).toMatch(/const SKILL_CREATOR_TOOL_NAMES = \[/);
+  });
 });
 
 // ─── Retired vocabulary across the live language (end-of-effort-reconciliation) ──
