@@ -81,6 +81,16 @@ title: Task Changelog
 
 
 
+
+## 2026-11-12, Order the README's skill lists by a rule the suite enforces (readme-order)
+
+The top-level README's two skill lists are now ordered by a rule the suite
+enforces: grouped by bucket, then dictionary order with hyphens ignored, stated in
+the README where the lists live. The one misplaced entry moved, and the test that
+guards the lists compares the file's order unsorted, so a swapped pair fails.
+Membership checks for the top-level README and both bucket READMEs are unchanged,
+and the engineering bucket keeps its phase order.
+
 ## 2026-11-12, Give the changeset outcome a discriminant instead of an assertion (changeset-discriminant)
 
 The changeset writer's proposal outcome and write outcome are now told apart by a
