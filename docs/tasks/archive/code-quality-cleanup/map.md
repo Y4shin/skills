@@ -1,7 +1,7 @@
 ---
 type: map
 title: "Code-quality cleanup: the extension's tool file, shared helpers, and documentation ordering"
-status: stable
+status: deprecated
 origin_effort: configurable-git-workflow
 ready_for_spec: true
 ---

@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Trim the entry to the wiring and the composition
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - extract-tool-families

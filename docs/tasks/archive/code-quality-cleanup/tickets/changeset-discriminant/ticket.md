@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Give the changeset outcome a discriminant instead of an assertion
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 size: s

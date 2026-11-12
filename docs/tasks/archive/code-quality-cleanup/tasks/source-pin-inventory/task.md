@@ -2,7 +2,7 @@
 type: task
 subtype: research
 title: Inventory the suite's coupling to the extension's tool file and the shared helpers
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 ---

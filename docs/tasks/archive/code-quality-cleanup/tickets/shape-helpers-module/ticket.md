@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Move the two generic shape guards into a module about shapes
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 size: s

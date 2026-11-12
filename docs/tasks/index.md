@@ -11,7 +11,6 @@ title: docs/tasks
 - architecture-tracking
 - bash-tail-preview-fix
 - build-eval-creator-skill
-- code-quality-cleanup
 - coding-taste
 - conventions-and-writer-cleanups
 - eval-scorer-feedback
@@ -36,6 +35,7 @@ title: docs/tasks
 - build-skill-creator-skill
 - build-task-workflow-doctor-skill
 - build-tdd-reference-skill
+- code-quality-cleanup
 - compare-to-mp-skills
 - configurable-git-workflow
 - enforced-workflow-v5

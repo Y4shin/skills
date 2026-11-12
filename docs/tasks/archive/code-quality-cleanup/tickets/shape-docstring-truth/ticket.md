@@ -2,7 +2,7 @@
 type: ticket
 subtype: bug
 title: Correct the shape module's docstring to state its real consumers
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 size: s

@@ -2,7 +2,7 @@
 type: task
 subtype: grilling
 title: The split seam for the extension's tool file, and this effort's ticket shape
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 ---

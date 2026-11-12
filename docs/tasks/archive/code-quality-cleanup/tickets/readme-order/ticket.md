@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Order the README's skill lists by a rule the suite enforces
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 size: s

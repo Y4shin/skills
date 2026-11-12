@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Extract the tool families into their own modules, entry still re-exporting
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - shape-helpers-module
