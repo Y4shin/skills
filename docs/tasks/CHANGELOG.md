@@ -80,6 +80,16 @@ title: Task Changelog
 
 
 
+
+## 2026-11-12, Give the changeset outcome a discriminant instead of an assertion (changeset-discriminant)
+
+The changeset writer's proposal outcome and write outcome are now told apart by a
+`kind` field instead of a type assertion at the tool handler. Every constructor
+sets its literal, so the compiler refuses a caller that reads the write-only
+fields from a proposal, and every existing field and printed line is unchanged.
+The internal resolved proposal inherits the literal, so the refusal path needed no
+second constructor change.
+
 ## 2026-11-12, Move the two generic shape guards into a module about shapes (shape-helpers-module)
 
 The two generic shape guards (`text` and `isObject`) move out of the git resolver

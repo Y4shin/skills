@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Give the changeset outcome a discriminant instead of an assertion
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: s
 ---
@@ -35,3 +35,26 @@ unchanged.
 ## Blocked by
 
 None (can start immediately).
+
+## Implementation notes
+
+### What landed
+
+`Proposal` carries `kind: "proposal"` and `WriteOutcome` carries `kind: "write"`,
+and every constructor of the two sets its literal: the proposal entry point, the
+resolver's success return, the refusal builder, and both write returns. The tool
+handler reads `resolved.kind === "write"` instead of asserting a type, and the
+now-unused type import is gone.
+
+The spelling follows what the codebase already does: `art.ts`, `git-profile.ts`,
+and `migrate.ts` all name their discriminants `kind`, so the changeset outcome
+does not introduce a second convention.
+
+### Lessons
+
+- The internal `ResolvedProposal` needed no field of its own: it extends
+  `Proposal`, so it inherits the literal and the refusal path was covered
+  without a second constructor change.
+- Adding a required literal to a type with several constructors is safe only
+  because the compiler points at each one. A default or an optional field would
+  have left one constructor silently wrong.
