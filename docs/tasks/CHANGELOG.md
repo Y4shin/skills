@@ -79,6 +79,16 @@ title: Task Changelog
 
 
 
+
+## 2026-11-12, Move the two generic shape guards into a module about shapes (shape-helpers-module)
+
+The two generic shape guards (`text` and `isObject`) move out of the git resolver
+into a module about shapes that imports nothing. The resolver and the spawn guard
+both import them from there, and the resolver no longer exports them, so a future
+module cannot reach for a branch module to find a type guard. The profile reader's
+local `text` was renamed because the file now imports the helper, which removes a
+shadowing hazard that would have typechecked silently.
+
 ## 2026-11-11, Make the close-out push follow the policy and enforce the closing gate (close-out-fidelity)
 
 The effort close's push step now follows the profile's policy instead of an

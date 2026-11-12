@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Move the two generic shape guards into a module about shapes
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: s
 ---
@@ -41,3 +41,26 @@ the helper.
 ## Blocked by
 
 None (can start immediately).
+
+## Implementation notes
+
+### What landed
+
+The two shape guards live in `src/core/shape.ts`, a module that imports nothing.
+The git resolver and the spawn guard both import them from there and define
+neither, so the resolver no longer exports a generic type guard.
+
+The shadow hazard the ticket named was real and was fixed at its one site: the
+profile reader's local `let text` became `let body`, because that file now
+imports the helper. The remaining `text` locals are in the tool handlers, which
+the later extraction tickets will keep out of files that import the helper.
+
+### Lessons
+
+- The structural criteria were verified with a throwaway check outside the repo
+  rather than a committed test, and the ticket's own "no test file changes"
+  criterion required that. A criterion that forbids a test cannot also be proven
+  by a test; it is proven by reading the tree.
+- The removed exports were inert because the resolver's only other importer was
+  the spawn guard. A later module that reaches for a guard from the resolver now
+  fails to compile, which is the point.
