@@ -24,6 +24,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readGitSettings, trunkName, type GitSettings, type ReadGateConfigDeps, type TrunkMergeMode } from "./repo-gate.js";
+import { isObject, text } from "./shape.js";
 
 /** The profiles the package ships, selected by `taskWorkflow.git.profile`. */
 export const BUNDLED_PROFILES = ["default", "flat"] as const;
@@ -128,16 +129,16 @@ function readProfile(
 ): GitProfile | null {
   const read = deps.readFileSync ?? readFileSync;
   const path = join(dir, `${name}.json`);
-  let text: string;
+  let body: string;
   try {
-    text = read(path, "utf-8");
+    body = read(path, "utf-8");
   } catch (e) {
     diagnostics.push(`git profile '${name}' is not installed at ${path}: ${(e as Error).message}`);
     return null;
   }
   let raw: unknown;
   try {
-    raw = JSON.parse(text);
+    raw = JSON.parse(body);
   } catch (e) {
     diagnostics.push(`git profile '${name}' at ${path} is not valid JSON: ${(e as Error).message}`);
     return null;
@@ -220,20 +221,6 @@ function stringField(
   if (typeof value === "string") return value;
   diagnostics.push(`git profile '${name}': '${where === "" ? key : `${where}.${key}`}' is not a string, ignored`);
   return undefined;
-}
-
-/**
- * The two shape guards this module and the spawn guard both read arguments
- * with, exported so a value is read the same way by the brief, the gate, and
- * the block: the guard asks the resolver what a spawn requires, and both must
- * agree on what a string and an object are.
- */
-export function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-export function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 // ─── The resolver ───────────────────────────────────────────────────────────
