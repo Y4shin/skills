@@ -3,7 +3,7 @@ type: ticket
 subtype: bug
 title: Correct the shape module's docstring to state its real consumers
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: s
 ---
@@ -38,3 +38,28 @@ own risk, and this ticket exists so the record does not lie about it.
 ## Blocked by
 
 None (can start immediately).
+
+## Implementation notes
+
+### What landed
+
+The shape module's docstring now says what is true: its two consumers are the git
+resolver, which reads a profile from a config file, and the spawn guard, which
+reads a tool call's arguments. It names the families' hand-rolled trims as a known
+gap and calls consolidating them a change of its own, so the next reader is not
+told the module serves the tool families when it does not.
+
+Three pins hold the claim: the module's importers, read out of the source corpus,
+are exactly those two files with no tool module among them; the docstring does not
+present the families as readers; and the docstring names the gap. A family that
+later imports the guards fails the first pin and is forced to rewrite the
+docstring.
+
+### Lessons
+
+- A docstring is a claim, and a claim about who calls a module is testable from the
+  corpus. This effort made three such claims and the review caught one that was
+  false; pinning the importer list turns the next one into a failing test.
+- The finding arrived through the advisory review after the effort's tickets were
+  closed, which is the review doing its job on the effort's own output rather than
+  on the code it inherited.

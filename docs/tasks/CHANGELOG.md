@@ -83,6 +83,16 @@ title: Task Changelog
 
 
 
+
+## 2026-11-12, Correct the shape module's docstring to state its real consumers (shape-docstring-truth)
+
+The shape module's docstring now names its real consumers, the git resolver and
+the spawn guard, instead of claiming the tool families read values through it. It
+also records the families' hand-rolled trims as a known gap. Three pins hold the
+claim: the module's importers read out of the source corpus are exactly those two
+files, the docstring does not present the families as readers, and the gap is
+named.
+
 ## 2026-11-12, Trim the entry to the wiring and the composition (trim-the-entry)
 
 The extension entry is now the wiring and the composition alone: the extension
