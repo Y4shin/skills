@@ -4509,6 +4509,10 @@ describe("the trimmed entry (trim-the-entry)", () => {
   test("the skill-creator family is a factory the entry composes", () => {
     assertFamilyFactory("skill-creator", "skillCreatorTools");
   });
+
+  test("the release family is a factory the entry composes", () => {
+    assertFamilyFactory("release", "releaseTools");
+  });
 });
 
 // ─── Retired vocabulary across the live language (end-of-effort-reconciliation) ──

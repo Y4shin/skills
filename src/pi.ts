@@ -25,7 +25,7 @@ import { artifactTools } from "./tools/artifacts.js";
 import { effortTools } from "./tools/effort.js";
 import { ticketTools } from "./tools/tickets.js";
 import { skillCreatorTools } from "./tools/skill-creator.js";
-import { tw_write_changesets, tw_release_plan, tw_release_apply } from "./tools/release.js";
+import { releaseTools } from "./tools/release.js";
 import { tw_feedback } from "./tools/feedback.js";
 import { gateTools } from "./tools/gates.js";
 import { Tool, findRoot, readText, readYaml, relPosix, taskRoot } from "./tools/support.js";
@@ -33,7 +33,6 @@ import { Tool, findRoot, readText, readYaml, relPosix, taskRoot } from "./tools/
 // Thin re-exports: a tool definition is reachable from the entry path whatever module holds
 // it, so no import path the suite or the package already uses had to move with the split. The
 // composition below reads the same definitions.
-export { tw_write_changesets, tw_release_plan, tw_release_apply } from "./tools/release.js";
 export { tw_feedback } from "./tools/feedback.js";
 
 // ─── The tool record ──────────────────────────────────────────────────────────
@@ -50,9 +49,7 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
     ...effortTools(),
     ...ticketTools(),
     ...skillCreatorTools(),
-    tw_write_changesets,
-    tw_release_plan,
-    tw_release_apply,
+    ...releaseTools(),
     ...gateTools(gated),
     tw_feedback,
   };
