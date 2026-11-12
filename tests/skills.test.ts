@@ -11,7 +11,7 @@ import { parse as parseYaml } from "yaml";
 import { repoRel } from "./lib/repo-paths.js";
 import { parse } from "../src/core/frontmatter.js";
 import { findAnomalies, fromFrontmatter, validateArtifact, type Artifact } from "../src/core/art.js";
-import { createTools } from "../src/pi.js";
+import factory, { createTools, notifyConfigPath } from "../src/pi.js";
 import { GATED_SKILL_NAMES, SKILL_REGISTRY } from "../src/disclosure.js";
 
 const PROJECT = process.cwd();
@@ -4316,15 +4316,47 @@ describe("the retired bug substrate (end-of-effort-reconciliation)", () => {
   });
 });
 
+// ─── The source corpus (extract-tool-families) ──────────────────────────────
+//
+// A definition's home is a module, not a file path a pin can name. These three
+// helpers read every source file through the walk the corpus checks already
+// use, so a pin that guards against a second copy covers the whole source tree
+// instead of the one file that happened to hold it.
+const SOURCE_CORPUS = corpusFiles(join(PROJECT, "src")).map((file) => ({
+  rel: repoRel(file),
+  text: readFileSync(file, "utf-8"),
+}));
+
+/** How many times a pattern occurs in a text. */
+function countIn(text: string, pattern: RegExp): number {
+  return [...text.matchAll(new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`))]
+    .length;
+}
+
+/** How many times a pattern occurs across every file under src/. */
+function countInSource(pattern: RegExp): number {
+  return SOURCE_CORPUS.reduce((total, file) => total + countIn(file.text, pattern), 0);
+}
+
+/** The source files a pattern occurs in, with the count in each. */
+function sourceFilesWith(pattern: RegExp): Array<{ rel: string; count: number }> {
+  return SOURCE_CORPUS.map((file) => ({ rel: file.rel, count: countIn(file.text, pattern) })).filter(
+    (file) => file.count > 0,
+  );
+}
+
 // ─── The mechanical single homes (end-of-effort-reconciliation) ──────────────
 //
 // The review found three duplications that had already drifted: the two
 // effort-root writers, the two root-index rewrites, and the triplicated
 // per-ticket close-out. Each now has one implementation, and these pins keep
 // the copies from coming back.
+//
+// The two writer pins count over the whole source corpus: the tool families are
+// modules of their own now, so a pin follows a definition to its module instead
+// of naming the one file that held every definition.
 
 describe("mechanical single homes (end-of-effort-reconciliation)", () => {
-  const source = readFile("src/pi.ts");
   const skill = readFile("skills/engineering/implement-ticket/SKILL.md");
   const feature = readFile("skills/engineering/implement-ticket/resources/feature/autonomous.md");
   const bug = readFile("skills/engineering/implement-ticket/resources/bug/autonomous.md");
@@ -4338,19 +4370,28 @@ describe("mechanical single homes (end-of-effort-reconciliation)", () => {
   test("one effort-root writer: the create path's title fallback exists once", () => {
     // tw_write_spec and tw_write_architecture shared the empty-body guard, the
     // create-or-refuse message, and this fallback before the extraction.
-    expect(count(source, /readArtifactTitle\(join\(effortDir, "map\.md"\)\) \?\? basename\(effortDir\)/)).toBe(1);
-    expect(count(source, /no live effort '\$\{o\.selector\}': create the effort/)).toBe(1);
-    expect(count(source, /function writeEffortRootArtifact/)).toBe(1);
-    // Both writers go through it.
-    expect(count(source, /writeEffortRootArtifact\(/)).toBeGreaterThanOrEqual(3);
+    expect(countInSource(/readArtifactTitle\(join\(effortDir, "map\.md"\)\) \?\? basename\(effortDir\)/)).toBe(1);
+    expect(countInSource(/no live effort '\$\{o\.selector\}': create the effort/)).toBe(1);
+    expect(countInSource(/function writeEffortRootArtifact/)).toBe(1);
+    // Both writers call it, and they call it from the writer's own module: the
+    // pin that counts call sites is what keeps the three in one file.
+    const rootWriters = sourceFilesWith(/function writeEffortRootArtifact/);
+    expect(rootWriters).toHaveLength(1);
+    const rootWriterModule = SOURCE_CORPUS.find((file) => file.rel === rootWriters[0].rel)!;
+    expect(count(rootWriterModule.text, /writeEffortRootArtifact\(/)).toBeGreaterThanOrEqual(3);
   });
 
   test("one root-index writer: the Live/Archived rewrite exists once", () => {
-    expect(count(source, /function writeTasksIndex/)).toBe(1);
+    expect(countInSource(/function writeTasksIndex/)).toBe(1);
+    // Effort creation and the archive move call it from the writer's module.
+    const indexWriters = sourceFilesWith(/function writeTasksIndex/);
+    expect(indexWriters).toHaveLength(1);
+    const indexWriterModule = SOURCE_CORPUS.find((file) => file.rel === indexWriters[0].rel)!;
+    expect(count(indexWriterModule.text, /writeTasksIndex\(/)).toBeGreaterThanOrEqual(3);
     // The section rewrite itself lives only inside the helper: no caller
     // builds the index body by hand.
-    expect(count(source, /writeMapSection\([^)]*, "Archived"/)).toBe(1);
-    expect(count(source, /writeMapSection\([^)]*, "Live"/)).toBe(1);
+    expect(countInSource(/writeMapSection\([^)]*, "Archived"/)).toBe(1);
+    expect(countInSource(/writeMapSection\([^)]*, "Live"/)).toBe(1);
   });
 
   test("one close-out: the numbered sequence appears once, the resources point at it", () => {
@@ -4367,6 +4408,65 @@ describe("mechanical single homes (end-of-effort-reconciliation)", () => {
     // The details the feature copy had dropped live in the canonical sequence.
     expect(skill).toMatch(/all deviation reports/);
     expect(skill).toMatch(/combined diff/);
+  });
+});
+
+// ─── The tool families (extract-tool-families) ──────────────────────────────
+//
+// The tools the factory returns used to be defined in the entry file, one 4500
+// line module. Each tool belongs to the family module for its kind now, the
+// entry holds the wiring and the composition, and these pins keep a definition
+// from being copied: a tool has one home in the source tree, and the entry is
+// never it.
+
+describe("the tool families (extract-tool-families)", () => {
+  const FAMILY_MODULES = [
+    "artifacts",
+    "effort",
+    "tickets",
+    "gates",
+    "release",
+    "feedback",
+    "skill-creator",
+    "support",
+  ];
+
+  test("each tool family is a module of its own", () => {
+    for (const family of FAMILY_MODULES) {
+      expect(existsSync(join(PROJECT, "src", "tools", `${family}.ts`)), `src/tools/${family}.ts`).toBe(true);
+    }
+  });
+
+  test("the entry defines no tool: it holds the wiring and the composition", () => {
+    const entry = readFile("src/pi.ts");
+    // A definition is a `def` or `defStructured` call. The registration loop
+    // reads `const def = tools[name]`, which is a record read, not a definition.
+    expect(entry).not.toMatch(/\bdef(?:Structured)?\(/);
+  });
+
+  test("every tool has exactly one definition in the source tree, and it is not the entry", () => {
+    const names = Object.keys(createTools());
+    expect(names).toHaveLength(40);
+    for (const name of names) {
+      const holders = SOURCE_CORPUS.filter(
+        (file) =>
+          new RegExp(`\\bexport const ${name}\\b`).test(file.text) ||
+          new RegExp(`^\\s*${name}: def(?:Structured)?\\(`, "m").test(file.text),
+      ).map((file) => file.rel);
+      expect(holders, name).toHaveLength(1);
+      expect(holders, `${name} is defined in the entry`).not.toContain("src/pi.ts");
+    }
+  });
+
+  test("the entry still exports the entry point, the tool factory, and the config-path helper", () => {
+    // The manifest names the entry, the entry names the factories, and the
+    // configuration path stays reachable from the entry the manifest names.
+    expect(JSON.parse(readFile("package.json")).pi.extensions).toContain("./src/pi.ts");
+    expect(typeof factory).toBe("function");
+    expect(typeof createTools).toBe("function");
+    expect(notifyConfigPath("/home/operator")).toBe(
+      join("/home/operator", ".unipi", "config", "notify", "config.json"),
+    );
   });
 });
 
