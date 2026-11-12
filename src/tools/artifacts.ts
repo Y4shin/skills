@@ -171,197 +171,199 @@ function artifactSchemaRef(): string {
   ].join("\n");
 }
 
-export const tw_show: Tool = def(
-  "Show artifact frontmatter (map, planning task, or ticket).",
-  { selector: Str("Slug or path"), json: OptBool },
-  async (p, ctx) => {
-    const root = findRoot(ctx.directory);
-    const { art, doc } = resolveArt(root, p.selector);
-    if (p.json) return JSON.stringify(art, null, 2);
-    return Object.entries(doc.data).map(([k, v]) => {
-      if (Array.isArray(v)) return `${k}: ${JSON.stringify(v)}`;
-      return `${k}: ${String(v)}`;
-    }).join("\n");
-  },
-);
-
-export const tw_get: Tool = def(
-  "Print a single frontmatter field of an artifact.",
-  { selector: Str("Slug or path"), field: Str("Field name") },
-  async (p, ctx) => {
-    const root = findRoot(ctx.directory);
-    const { doc } = resolveArt(root, p.selector);
-    return doc.data[p.field] === undefined ? "" : String(doc.data[p.field]);
-  },
-);
-
-export const tw_list: Tool = def(
-  "List artifacts (maps, specs, tasks, tickets). Excludes archived by default.",
-  {
-    kind: { type: "string" as const, optional: true, enum: ["map", "task", "ticket", "spec"] },
-    status: OptStr("Status filter"),
-    workflow_state: OptStr("Workflow state filter"),
-    effort: OptStr("Effort slug filter"),
-    json: OptBool,
-  },
-  async (p, ctx) => {
-    const root = findRoot(ctx.directory);
-    if (!isInitialized(root)) return "(no docs/tasks directory)";
-    // The scan layer reads both shapes; the archived subtree is the only
-    // location tw_list hides.
-    let hits = scanMemo(root)().hits.filter(
-      (h) => !h.path.split(/[\\/]/).includes("archive"),
-    );
-    if (p.kind) hits = hits.filter((h) => h.art.type === p.kind);
-    if (p.status) hits = hits.filter((h) => h.art.status === p.status);
-    if (p.workflow_state) hits = hits.filter((h) => h.art.workflow_state === p.workflow_state);
-    if (p.effort) hits = hits.filter((h) => effortGroupOf(h.art) === p.effort);
-
-    if (p.json) {
-      return JSON.stringify(
-        hits.map((h) => ({
-          slug: h.art.slug,
-          type: h.art.type,
-          subtype: h.art.subtype,
-          status: h.art.status,
-          workflow_state: h.art.workflow_state,
-          effort: effortGroupOf(h.art),
-          path: h.path,
-        })),
-        null, 2,
-      );
-    }
-    const rows = hits.map((h) => {
-      const kind = h.art.subtype ? `${h.art.type}/${h.art.subtype}` : h.art.type;
-      const state = h.art.workflow_state ?? h.art.status;
-      return `${h.art.slug} (${kind})${state ? ` [${state}]` : ""}`;
-    });
-    return rows.join("\n") || "(empty)";
-  },
-);
-
-export const tw_finalizable: Tool = def(
-  "Check an artifact is ready to finalize (workflow_state done).",
-  { selector: Str("Task or ticket slug or path") },
-  async (p, ctx) => {
-    const root = findRoot(ctx.directory);
-    const { art } = resolveArt(root, p.selector);
-    const reason = itemFinalizable(art);
-    if (reason !== null) throw new Error(reason);
-    const index = scanMemo(root)();
-    const graph = graphForPath(effortGraphs(index), art.path ?? "");
-    return withAnomalies("ready to finalize", graph?.anomalies ?? []);
-  },
-);
-
-export const tw_dependency_levels: Tool = def(
-  "Compute BFS dependency levels from an effort map's scan.",
-  { selector: Str("Map slug") },
-  async (p, ctx) => {
-    const root = findRoot(ctx.directory);
-    const resolved = resolveArt(root, p.selector);
-    if (resolved.art.type !== "map") throw new ResolutionError(`'${p.selector}' must resolve to a map`);
-    const index = scanMemo(root)();
-    const graph = graphForPath(effortGraphs(index), resolved.path);
-    if (hasScanChildren(graph)) {
-      const levels = effortLevels(graph!);
-      const deprecated = graph!.deprecated.map((a) => ({ slug: a.slug, type: a.type }));
-      return JSON.stringify({ ...levels, deprecated, anomalies: graph!.anomalies }, null, 2);
-    }
-    // v3 fallback: the map's own array is the graph.
-    const children = mapChildInfos(root, resolved.path);
-    const remaining = children.filter((item) => item.status !== "done");
-    const levels = dependencyLevels(remaining);
-    return JSON.stringify({ levels, remaining_count: remaining.length, done_count: children.length - remaining.length }, null, 2);
-  },
-);
-
-export const tw_frontier: Tool = def(
-  "List the ready edge of an effort's graph: unfinished tasks and tickets whose blockers are done.",
-  { selector: Str("Map slug or path, or the tasks root for the effort frontier"), json: OptBool },
-  async (p, ctx) => {
-    const root = findRoot(ctx.directory);
-    const index = scanMemo(root)();
-    const graphs = effortGraphs(index);
-    // The maps scope: the cross-effort frontier.
-    if (isMapsScope(root, p.selector)) {
-      const efforts = liveFrontier(index);
-      if (p.json) {
-        return JSON.stringify(
-          efforts.map((g) => ({
-            slug: g.slug,
-            frontier: effortFrontier(g).map((a) => ({ slug: a.slug, type: a.type })),
-            deprecated: g.deprecated.map((a) => ({ slug: a.slug, type: a.type })),
-            anomalies: g.anomalies,
-          })),
-          null, 2,
+/**
+ * The artifact family's tool record: the read-only inspectors (show, get, list),
+ * the two finalizable checks, the dependency-level and frontier readers, and the
+ * context reader.
+ */
+export function artifactTools(): Record<string, Tool> {
+  return {
+    tw_show: def(
+      "Show artifact frontmatter (map, planning task, or ticket).",
+      { selector: Str("Slug or path"), json: OptBool },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const { art, doc } = resolveArt(root, p.selector);
+        if (p.json) return JSON.stringify(art, null, 2);
+        return Object.entries(doc.data).map(([k, v]) => {
+          if (Array.isArray(v)) return `${k}: ${JSON.stringify(v)}`;
+          return `${k}: ${String(v)}`;
+        }).join("\n");
+      },
+    ),
+    tw_get: def(
+      "Print a single frontmatter field of an artifact.",
+      { selector: Str("Slug or path"), field: Str("Field name") },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const { doc } = resolveArt(root, p.selector);
+        return doc.data[p.field] === undefined ? "" : String(doc.data[p.field]);
+      },
+    ),
+    tw_list: def(
+      "List artifacts (maps, specs, tasks, tickets). Excludes archived by default.",
+      {
+        kind: { type: "string" as const, optional: true, enum: ["map", "task", "ticket", "spec"] },
+        status: OptStr("Status filter"),
+        workflow_state: OptStr("Workflow state filter"),
+        effort: OptStr("Effort slug filter"),
+        json: OptBool,
+      },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        if (!isInitialized(root)) return "(no docs/tasks directory)";
+        // The scan layer reads both shapes; the archived subtree is the only
+        // location tw_list hides.
+        let hits = scanMemo(root)().hits.filter(
+          (h) => !h.path.split(/[\\/]/).includes("archive"),
         );
-      }
-      const text = efforts.length === 0
-        ? "(empty frontier)"
-        : efforts.map((g) => {
-            const items = effortFrontier(g);
-            const lines = items.length === 0
-              ? [`${g.slug}: (empty frontier)`]
-              : [`${g.slug}:`, ...items.map((a) => `  ${a.slug} (${a.type})`)];
-            return withDeprecated(withAnomalies(lines.join("\n"), g.anomalies), g.deprecated);
-          }).join("\n");
-      return text;
-    }
+        if (p.kind) hits = hits.filter((h) => h.art.type === p.kind);
+        if (p.status) hits = hits.filter((h) => h.art.status === p.status);
+        if (p.workflow_state) hits = hits.filter((h) => h.art.workflow_state === p.workflow_state);
+        if (p.effort) hits = hits.filter((h) => effortGroupOf(h.art) === p.effort);
 
-    const resolved = resolveArt(root, p.selector, "map");
-    const graph = graphForPath(graphs, resolved.path);
-    if (hasScanChildren(graph)) {
-      const frontier = effortFrontier(graph!);
-      if (p.json) {
-        return JSON.stringify({ frontier, deprecated: graph!.deprecated, anomalies: graph!.anomalies }, null, 2);
-      }
-      const text = frontier.length === 0
-        ? "(empty frontier)"
-        : frontier.map((a) => `${a.slug} (${a.type})`).join("\n");
-      return withDeprecated(withAnomalies(text, graph!.anomalies), graph!.deprecated);
-    }
+        if (p.json) {
+          return JSON.stringify(
+            hits.map((h) => ({
+              slug: h.art.slug,
+              type: h.art.type,
+              subtype: h.art.subtype,
+              status: h.art.status,
+              workflow_state: h.art.workflow_state,
+              effort: effortGroupOf(h.art),
+              path: h.path,
+            })),
+            null, 2,
+          );
+        }
+        const rows = hits.map((h) => {
+          const kind = h.art.subtype ? `${h.art.type}/${h.art.subtype}` : h.art.type;
+          const state = h.art.workflow_state ?? h.art.status;
+          return `${h.art.slug} (${kind})${state ? ` [${state}]` : ""}`;
+        });
+        return rows.join("\n") || "(empty)";
+      },
+    ),
+    tw_finalizable: def(
+      "Check an artifact is ready to finalize (workflow_state done).",
+      { selector: Str("Task or ticket slug or path") },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const { art } = resolveArt(root, p.selector);
+        const reason = itemFinalizable(art);
+        if (reason !== null) throw new Error(reason);
+        const index = scanMemo(root)();
+        const graph = graphForPath(effortGraphs(index), art.path ?? "");
+        return withAnomalies("ready to finalize", graph?.anomalies ?? []);
+      },
+    ),
+    tw_dependency_levels: def(
+      "Compute BFS dependency levels from an effort map's scan.",
+      { selector: Str("Map slug") },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const resolved = resolveArt(root, p.selector);
+        if (resolved.art.type !== "map") throw new ResolutionError(`'${p.selector}' must resolve to a map`);
+        const index = scanMemo(root)();
+        const graph = graphForPath(effortGraphs(index), resolved.path);
+        if (hasScanChildren(graph)) {
+          const levels = effortLevels(graph!);
+          const deprecated = graph!.deprecated.map((a) => ({ slug: a.slug, type: a.type }));
+          return JSON.stringify({ ...levels, deprecated, anomalies: graph!.anomalies }, null, 2);
+        }
+        // v3 fallback: the map's own array is the graph.
+        const children = mapChildInfos(root, resolved.path);
+        const remaining = children.filter((item) => item.status !== "done");
+        const levels = dependencyLevels(remaining);
+        return JSON.stringify({ levels, remaining_count: remaining.length, done_count: children.length - remaining.length }, null, 2);
+      },
+    ),
+    tw_frontier: def(
+      "List the ready edge of an effort's graph: unfinished tasks and tickets whose blockers are done.",
+      { selector: Str("Map slug or path, or the tasks root for the effort frontier"), json: OptBool },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const index = scanMemo(root)();
+        const graphs = effortGraphs(index);
+        // The maps scope: the cross-effort frontier.
+        if (isMapsScope(root, p.selector)) {
+          const efforts = liveFrontier(index);
+          if (p.json) {
+            return JSON.stringify(
+              efforts.map((g) => ({
+                slug: g.slug,
+                frontier: effortFrontier(g).map((a) => ({ slug: a.slug, type: a.type })),
+                deprecated: g.deprecated.map((a) => ({ slug: a.slug, type: a.type })),
+                anomalies: g.anomalies,
+              })),
+              null, 2,
+            );
+          }
+          const text = efforts.length === 0
+            ? "(empty frontier)"
+            : efforts.map((g) => {
+                const items = effortFrontier(g);
+                const lines = items.length === 0
+                  ? [`${g.slug}: (empty frontier)`]
+                  : [`${g.slug}:`, ...items.map((a) => `  ${a.slug} (${a.type})`)];
+                return withDeprecated(withAnomalies(lines.join("\n"), g.anomalies), g.deprecated);
+              }).join("\n");
+          return text;
+        }
 
-    // v3 fallback: the map's own array, resolved through the legacy path.
-    const children = mapChildInfos(root, resolved.path);
-    const done = new Set(children.filter((item) => item.status === "done").map((item) => item.slug));
-    const frontier = children.filter((item) => item.status !== "done" && item.blocked_by.every((blocker) => done.has(blocker)));
-    if (p.json) return JSON.stringify(frontier, null, 2);
-    return frontier.length === 0 ? "(empty frontier)" : frontier.map((item) => `${item.slug}${item.type ? ` (${item.type})` : ""}`).join("\n");
-  },
-);
+        const resolved = resolveArt(root, p.selector, "map");
+        const graph = graphForPath(graphs, resolved.path);
+        if (hasScanChildren(graph)) {
+          const frontier = effortFrontier(graph!);
+          if (p.json) {
+            return JSON.stringify({ frontier, deprecated: graph!.deprecated, anomalies: graph!.anomalies }, null, 2);
+          }
+          const text = frontier.length === 0
+            ? "(empty frontier)"
+            : frontier.map((a) => `${a.slug} (${a.type})`).join("\n");
+          return withDeprecated(withAnomalies(text, graph!.anomalies), graph!.deprecated);
+        }
 
-export const tw_map_finalizable: Tool = def(
-  "Check every task and ticket of an effort is done (and, with a spec, that tickets exist).",
-  { selector: Str("Map slug or path") },
-  async (p, ctx) => {
-    const root = findRoot(ctx.directory);
-    const resolved = resolveArt(root, p.selector, "map");
-    const index = scanMemo(root)();
-    const graph = graphForPath(effortGraphs(index), resolved.path);
-    if (hasScanChildren(graph)) {
-      const reason = effortFinalizable(graph!);
-      if (reason !== null) throw new Error(reason);
-      return withDeprecated(
-        withAnomalies("ready to finalize: all children done", graph!.anomalies),
-        graph!.deprecated,
-      );
-    }
-    // v3 fallback: the map's own array is the source of truth.
-    const tasks = Array.isArray(resolved.doc.data["tasks"]) ? resolved.doc.data["tasks"] : [];
-    const undone = tasks.filter((t: any) => !t.done).map((t: any) => t.slug || "?");
-    if (undone.length === 0) return "ready to finalize: all children done";
-    throw new Error(`unfinished children: ${undone.join(", ")}`);
-  },
-);
-
-export const tw_context: Tool = def(
-  "Return project context: artifact schema + optional profile.",
-  {},
-  async (_p, ctx) => {
-    const root = findRoot(ctx.directory);
-    const profile = profileText(root);
-    const schema = artifactSchemaRef();
-    return profile ? `${schema}\n\n---\n\n## Project profile\n\n${profile}` : schema;
-  },
-);
+        // v3 fallback: the map's own array, resolved through the legacy path.
+        const children = mapChildInfos(root, resolved.path);
+        const done = new Set(children.filter((item) => item.status === "done").map((item) => item.slug));
+        const frontier = children.filter((item) => item.status !== "done" && item.blocked_by.every((blocker) => done.has(blocker)));
+        if (p.json) return JSON.stringify(frontier, null, 2);
+        return frontier.length === 0 ? "(empty frontier)" : frontier.map((item) => `${item.slug}${item.type ? ` (${item.type})` : ""}`).join("\n");
+      },
+    ),
+    tw_map_finalizable: def(
+      "Check every task and ticket of an effort is done (and, with a spec, that tickets exist).",
+      { selector: Str("Map slug or path") },
+      async (p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const resolved = resolveArt(root, p.selector, "map");
+        const index = scanMemo(root)();
+        const graph = graphForPath(effortGraphs(index), resolved.path);
+        if (hasScanChildren(graph)) {
+          const reason = effortFinalizable(graph!);
+          if (reason !== null) throw new Error(reason);
+          return withDeprecated(
+            withAnomalies("ready to finalize: all children done", graph!.anomalies),
+            graph!.deprecated,
+          );
+        }
+        // v3 fallback: the map's own array is the source of truth.
+        const tasks = Array.isArray(resolved.doc.data["tasks"]) ? resolved.doc.data["tasks"] : [];
+        const undone = tasks.filter((t: any) => !t.done).map((t: any) => t.slug || "?");
+        if (undone.length === 0) return "ready to finalize: all children done";
+        throw new Error(`unfinished children: ${undone.join(", ")}`);
+      },
+    ),
+    tw_context: def(
+      "Return project context: artifact schema + optional profile.",
+      {},
+      async (_p, ctx) => {
+        const root = findRoot(ctx.directory);
+        const profile = profileText(root);
+        const schema = artifactSchemaRef();
+        return profile ? `${schema}\n\n---\n\n## Project profile\n\n${profile}` : schema;
+      },
+    ),
+  };
+}

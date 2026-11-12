@@ -21,70 +21,32 @@ import { Type } from "typebox";
 import { GATED_SKILL_NAMES } from "./disclosure.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 import { isSpawnCall, spawnVerdict } from "./core/spawn-guard.js";
-import { tw_show, tw_get, tw_list, tw_finalizable, tw_dependency_levels, tw_frontier, tw_map_finalizable, tw_context } from "./tools/artifacts.js";
-import { tw_write_section, tw_finalize_map, tw_write_spec, tw_write_architecture, tw_write_review, tw_create_effort, tw_add_task, tw_archive_effort } from "./tools/effort.js";
-import { tw_add_ticket, tw_split_ticket, tw_mark_done, tw_mark_blocked, tw_resolve_uncertainty, tw_write_changelog, tw_write_task_note, tw_write_ticket_note, tw_record_out_of_scope, tw_state, tw_state_set } from "./tools/tickets.js";
-import { skill_validate, skill_scaffold, skill_discover } from "./tools/skill-creator.js";
-import { tw_write_changesets, tw_release_plan, tw_release_apply } from "./tools/release.js";
-import { tw_feedback } from "./tools/feedback.js";
+import { artifactTools } from "./tools/artifacts.js";
+import { effortTools } from "./tools/effort.js";
+import { ticketTools } from "./tools/tickets.js";
+import { skillCreatorTools } from "./tools/skill-creator.js";
+import { releaseTools } from "./tools/release.js";
+import { feedbackTools } from "./tools/feedback.js";
 import { gateTools } from "./tools/gates.js";
 import { Tool, findRoot, readText, readYaml, relPosix, taskRoot } from "./tools/support.js";
-
-// Thin re-exports: a tool definition is reachable from the entry path whatever module holds
-// it, so no import path the suite or the package already uses had to move with the split. The
-// composition below reads the same definitions.
-export { tw_show, tw_get, tw_list, tw_finalizable, tw_dependency_levels, tw_frontier, tw_map_finalizable, tw_context } from "./tools/artifacts.js";
-export { tw_write_section, tw_finalize_map, tw_write_spec, tw_write_architecture, tw_write_review, tw_create_effort, tw_add_task, tw_archive_effort } from "./tools/effort.js";
-export { tw_add_ticket, tw_split_ticket, tw_mark_done, tw_mark_blocked, tw_resolve_uncertainty, tw_write_changelog, tw_write_task_note, tw_write_ticket_note, tw_record_out_of_scope, tw_state, tw_state_set } from "./tools/tickets.js";
-export { skill_validate, skill_scaffold, skill_discover } from "./tools/skill-creator.js";
-export { tw_write_changesets, tw_release_plan, tw_release_apply } from "./tools/release.js";
-export { tw_feedback } from "./tools/feedback.js";
 
 // ─── The tool record ──────────────────────────────────────────────────────────
 
 /**
- * The tool record the extension registers: every family's tools in one object.
- * tw_open's parameter schema depends on the gate state, so the gate family is
- * built here rather than exported as a constant; every other family contributes
- * a definition this file re-exports.
+ * The tool record the extension registers: one object, one spread per family
+ * factory. Each family builds its own record, so this function is the only place
+ * the surfaces meet. tw_open's parameter schema depends on the gate state, so the
+ * gate family is the one factory that takes an argument.
  */
 export function createTools(gated: boolean = false): Record<string, Tool> {
   return {
-    tw_show,
-    tw_get,
-    tw_list,
-    tw_finalizable,
-    tw_dependency_levels,
-    tw_frontier,
-    tw_map_finalizable,
-    tw_write_section,
-    tw_finalize_map,
-    tw_write_spec,
-    tw_write_architecture,
-    tw_write_review,
-    tw_add_ticket,
-    tw_create_effort,
-    tw_add_task,
-    tw_split_ticket,
-    tw_mark_done,
-    tw_mark_blocked,
-    tw_archive_effort,
-    tw_resolve_uncertainty,
-    tw_write_changelog,
-    tw_write_task_note,
-    tw_write_ticket_note,
-    tw_record_out_of_scope,
-    tw_state,
-    tw_state_set,
-    tw_context,
-    skill_validate,
-    skill_scaffold,
-    skill_discover,
-    tw_write_changesets,
-    tw_release_plan,
-    tw_release_apply,
+    ...artifactTools(),
+    ...effortTools(),
+    ...ticketTools(),
+    ...skillCreatorTools(),
+    ...releaseTools(),
     ...gateTools(gated),
-    tw_feedback,
+    ...feedbackTools(),
   };
 }
 
