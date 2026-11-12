@@ -3938,6 +3938,15 @@ describe("documentation re-sync (docs-resync)", () => {
     expect(linkedSkills(sectionBody(readme, "### Model-invoked"))).toEqual(expected(null, false));
   });
 
+  test("the top-level README states the order rule where the lists live", () => {
+    // The assertion above holds the two lists to the rule, so the rule is
+    // written where a contributor reads the lists instead of having to be
+    // inferred from the data.
+    const intro = sectionBody(readFile("README.md"), "## Skills");
+    expect(intro).toMatch(/grouped by bucket/i);
+    expect(intro).toMatch(/alphabetical/i);
+  });
+
   // The bucket READMEs keep their authored order (engineering's is phase order
   // on purpose), so their side is normalized before comparing and the check
   // stays a membership check.
