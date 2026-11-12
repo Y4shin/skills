@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Trim the entry to the wiring and the composition
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - extract-tool-families
 size: m
@@ -41,3 +41,37 @@ the same schemas, refusal texts, and disclosure sets.
 
 - `extract-tool-families`: the families must exist as modules before the entry
   can compose them.
+
+## Implementation notes
+
+### What landed
+
+The entry is 578 lines: the extension entry point, the two `tool_call` handlers,
+the transcript and skill handlers, the notification tool, the two registration
+name lists, and one composition. The six remaining families became factories, so
+`createTools()` is seven spreads and nothing else, and the 34 re-exports are gone.
+The entry exports exactly the three names it exported before the effort.
+
+The tool surface is the same 40 keys plus the notification tool. Registration
+order is now family-grouped, which differs from the old interleaved order in 18 of
+40 positions; nothing pins order, every surface assertion sorts, and tools resolve
+by name.
+
+### Divergences carried into the record
+
+1. The six families were named constants at the end of the previous ticket and are
+   factories now. The conversion was the ticket's means of reaching its criterion,
+   and the previous ticket's deviation report had already flagged that its wording
+   did not cover it.
+2. The family modules carry a whitespace-only diff from the conversion.
+3. `src/tools/gates.ts` still imports the entry. That cycle predates this effort
+   and is unchanged.
+
+### Lessons
+
+- Keeping every import resolving during a move creates named exports; reaching the
+  promised shape then costs a second pass. Splitting the move from the trim was
+  the right call, and the second pass was still smaller than doing both at once
+  would have been.
+- A composition made of spreads makes the entry's size a function of the family
+  count, which is the property the effort wanted.

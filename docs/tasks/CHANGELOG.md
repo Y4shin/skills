@@ -82,6 +82,18 @@ title: Task Changelog
 
 
 
+
+## 2026-11-12, Trim the entry to the wiring and the composition (trim-the-entry)
+
+The extension entry is now the wiring and the composition alone: the extension
+entry point, the two tool-call handlers, the notification tool, the two
+registration name lists, and a `createTools()` that is seven family spreads. The
+six families still exporting named tool constants became factories returning their
+records, the 34 re-exports and the name enumeration are gone, and the entry
+exports exactly the three names it exported before the effort. The entry file is
+578 lines, down from 4501 at the start of the effort, with the tool surface,
+schemas, refusal texts, and disclosure sets unchanged.
+
 ## 2026-11-12, Extract the tool families into their own modules (extract-tool-families)
 
 The 40 tools the extension factory returns no longer live in the 4501-line entry
