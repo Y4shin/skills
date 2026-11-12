@@ -4470,6 +4470,35 @@ describe("the tool families (extract-tool-families)", () => {
   });
 });
 
+// ─── The trimmed entry (trim-the-entry) ─────────────────────────────────────
+//
+// The entry composes the families; it neither holds nor re-exports them. A
+// family builds its own record behind a factory, and the entry spreads that
+// call into the one record `createTools()` returns, so a family's tools are
+// reachable through the factory seam and nowhere else.
+describe("the trimmed entry (trim-the-entry)", () => {
+  /**
+   * One family's half of the composition: the family exports a factory that
+   * returns its record and nothing else, and the entry spreads that call.
+   */
+  function assertFamilyFactory(family: string, factory: string): void {
+    const module = readFile(`src/tools/${family}.ts`);
+    expect(module, `${family} exports no factory`).toMatch(
+      new RegExp(`export function ${factory}\\([^)]*\\): Record<string, Tool> \\{`),
+    );
+    expect(module, `${family} still exports a tool const`).not.toMatch(/^export const \w+: Tool = def(?:Structured)?\(/m);
+    const entry = readFile("src/pi.ts");
+    expect(entry, `the entry does not compose ${factory}`).toMatch(new RegExp(`\\.{3}${factory}\\(`));
+    expect(entry, `the entry still re-exports ${family}`).not.toMatch(
+      new RegExp(`export \\{[^}]*\\} from "\\./tools/${family}\\.js"`),
+    );
+  }
+
+  test("the artifacts family is a factory the entry composes", () => {
+    assertFamilyFactory("artifacts", "artifactTools");
+  });
+});
+
 // ─── Retired vocabulary across the live language (end-of-effort-reconciliation) ──
 //
 // The docs-resync pin checked CONTEXT.md only, so the retired terms survived in
