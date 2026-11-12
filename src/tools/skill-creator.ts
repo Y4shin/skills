@@ -4,11 +4,10 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { dirname, join, relative } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Type } from "typebox";
 import { OptStr, OptStrArray, Str, Tool, def, defStructured, outcome } from "./support.js";
-
 
 // ─── skill-creator's bundled scripts (the disclosed nested toolset) ────────
 
@@ -26,7 +25,6 @@ const SKILL_SCRIPTS_DIR = join(
   "skill-creator",
   "scripts",
 );
-
 
 /**
  * Run one of skill-creator's bundled scripts directly (no shell): the script
@@ -52,7 +50,6 @@ function runSkillScript(script: string, args: string[], cwd: string): string {
   return out;
 }
 
-
 // ── skill-creator's disclosed nested toolset ────────────────────────
 //
 // The skill-authoring discipline is the one tool-owning discipline: its
@@ -70,7 +67,6 @@ export const skill_validate: Tool = def(
   async (p, ctx) => runSkillScript("validate_skill.mjs", [String(p.skillDir ?? "")], ctx.directory),
 );
 
-
 export const skill_scaffold: Tool = def(
   "Scaffold a new skill: runs the bundled scaffold_skill.mjs. Normalizes the name, creates the folder " +
     "plus a SKILL.md template, and optionally the resource subdirectories. Refuses to overwrite an " +
@@ -87,7 +83,6 @@ export const skill_scaffold: Tool = def(
     return runSkillScript("scaffold_skill.mjs", args, ctx.directory);
   },
 );
-
 
 export const skill_discover: Tool = defStructured(
   "Discover existing skills matching an intent: runs the bundled discover_skill.mjs. Ranks the skills " +

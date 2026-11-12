@@ -18,7 +18,6 @@ import { effortGraphs, effortFrontier, effortFinalizable } from "../core/graph.j
 import { OKF_VERSION } from "../core/migrate.js";
 import { OptBool, OptStr, ScanHit, ScanIndex, Str, Tool, clearReadyForSpec, def, defStructured, findRoot, graphForPath, isDir, isFile, isInside, liveEffortDir, loadState, normalizedBody, outcome, parseArtifactFile, readArtifactTitle, readText, relPosix, requireV4Shape, resolveArt, saveState, scanMemo, taskRoot } from "./support.js";
 
-
 /**
  * The archival note the architecture writer leaves in the effort's spec: the
  * specification's architecture content is archival once the living
@@ -27,7 +26,6 @@ import { OptBool, OptStr, ScanHit, ScanIndex, Str, Tool, clearReadyForSpec, def,
  * Returns whether the spec was written.
  */
 const ARCHIVAL_NOTE_MARKER = "The architecture content in this specification is archival";
-
 
 function ensureArchivalNote(specPath: string): boolean {
   const doc = parseArtifactFile(specPath).doc;
@@ -39,7 +37,6 @@ function ensureArchivalNote(specPath: string): boolean {
   writeFileSync(specPath, dump(doc), "utf-8");
   return true;
 }
-
 
 /**
  * The one effort-root artifact writer behind `tw_write_spec` and
@@ -73,7 +70,6 @@ interface EffortRootWriteOptions {
    */
   section?: string;
 }
-
 
 function writeEffortRootArtifact(o: EffortRootWriteOptions): string {
   const { root, kind } = o;
@@ -127,7 +123,6 @@ function writeEffortRootArtifact(o: EffortRootWriteOptions): string {
   return `wrote ${relPosix(root, path)} (created, status: ${publish ? "stable" : "draft"})${suffix}`;
 }
 
-
 /**
  * The two review passes and the file each writes. The finalize pass owns
  * review.md and the archive flag; the end-of-effort pass is advisory and
@@ -142,18 +137,15 @@ function reviewPathFor(effortDir: string, pass: ReviewPass): string {
   return join(effortDir, pass === "end-of-effort" ? "end-of-effort-review.md" : "review.md");
 }
 
-
 // ─── Review artifact helpers (finalize-effort) ─────────────────────────────
 
 /** The tool-owned body section the review writer replaces on every pass. */
 const REVIEW_DISPOSITIONS_SECTION = "Dispositions";
 
-
 /** The three dispositions a finding can carry; absent means untriaged. */
 const REVIEW_DISPOSITIONS = ["ticket", "follow-up", "informational"] as const;
 
 type ReviewDisposition = (typeof REVIEW_DISPOSITIONS)[number];
-
 
 /**
  * The close reconcile record's legal shapes. The reconcile step is prose
@@ -162,7 +154,6 @@ type ReviewDisposition = (typeof REVIEW_DISPOSITIONS)[number];
  * the v5 writer cannot touch (the schema-4 legacy leaf).
  */
 const RECONCILE_PREFIXES = ["done", "none", "unavailable"] as const;
-
 
 function normalizeReconcile(raw: unknown): string | undefined {
   if (typeof raw !== "string" || raw.trim() === "") return undefined;
@@ -180,13 +171,11 @@ function normalizeReconcile(raw: unknown): string | undefined {
   return value;
 }
 
-
 interface ReviewFinding {
   finding: string;
   disposition?: ReviewDisposition;
   target?: string;
 }
-
 
 /**
  * Validate the writer's structured finding list. Runtime validation backs the
@@ -218,7 +207,6 @@ function parseReviewFindings(raw: unknown): ReviewFinding[] | undefined {
     return { finding, disposition: disposition as ReviewDisposition | undefined, target };
   });
 }
-
 
 /**
  * Validate every disposition target a review write supplies against the tree.
@@ -259,7 +247,6 @@ function validateReviewTargets(
   }
 }
 
-
 /** One finding's line in the tool-owned `## Dispositions` record. */
 function reviewDispositionLine(finding: ReviewFinding): string {
   switch (finding.disposition) {
@@ -273,7 +260,6 @@ function reviewDispositionLine(finding: ReviewFinding): string {
       return `- ${finding.finding}: not yet triaged`;
   }
 }
-
 
 /**
  * The live effort directory a selector names, accepting the effort's existing
@@ -296,7 +282,6 @@ function liveEffortDirOfArtifact(root: string, selector: string, want: string): 
   if (rel.split(/[\\/]/)[0] === "archive") return null;
   return isDir(candidate) ? candidate : null;
 }
-
 
 /**
  * Require that a named follow-up effort exists and is linked to the origin by
@@ -326,7 +311,6 @@ function requireLinkedFollowUp(root: string, origin: string, target: string, sub
   }
 }
 
-
 /**
  * The intake creation helpers: the front door needs the same safe-slug and
  * effort-anchoring checks the other creators carry. A created map seeds the
@@ -349,7 +333,6 @@ function createEffortDocument(title: string, originEffort?: string): Document {
   return { data, body };
 }
 
-
 /**
  * Register an effort in the root index's `## Live` list, sorted, creating
  * the index with the landed index shape when the tree has none yet.
@@ -362,7 +345,6 @@ function registerLiveEffort(root: string, effort: string): void {
     archived: indexNames(body, "Archived"),
   });
 }
-
 
 /** True when a path sits strictly inside a directory. */
 /**
@@ -381,7 +363,6 @@ function refuseArchivedArtifact(root: string, path: string): void {
   );
 }
 
-
 /**
  * Render one root-index section the way the migration renders it: one bullet
  * per effort, or the '(none)' placeholder when the list is empty.
@@ -390,14 +371,12 @@ function indexSection(names: string[]): string {
   return names.length === 0 ? "(none)" : names.map((n) => `- ${n}`).join("\n");
 }
 
-
 /** The effort names one root-index section lists (bullets only). */
 function indexNames(body: string, section: string): string[] {
   return (readMapSection(body, section) ?? [])
     .filter((line) => /^- /.test(line.trim()))
     .map((line) => line.trim().replace(/^- /, ""));
 }
-
 
 /**
  * The one writer of `docs/tasks/index.md`: both lists are rewritten from the
@@ -418,7 +397,6 @@ function writeTasksIndex(root: string, lists: { live: string[]; archived: string
   writeFileSync(indexPath, dump(doc), "utf-8");
   return indexPath;
 }
-
 
 export const tw_write_section: Tool = def(
   "Write a '##' body section of an effort map: the only writer of the map body. " +
@@ -446,7 +424,6 @@ export const tw_write_section: Tool = def(
     return `wrote '## ${section}' in ${relPosix(root, path)}${cleared ? "; ready_for_spec cleared" : ""}`;
   },
 );
-
 
 export const tw_finalize_map: Tool = def(
   "Check an effort map is ready for the spec phase and set ready_for_spec: true: the only setter of the " +
@@ -511,7 +488,6 @@ export const tw_finalize_map: Tool = def(
   },
 );
 
-
 export const tw_write_spec: Tool = def(
   "Write an effort's specification (spec.md): the only writer of the spec body, through the " +
     "frontmatter seam. Creates the spec when the effort has none (title from the argument, else the " +
@@ -537,7 +513,6 @@ export const tw_write_spec: Tool = def(
       validateExisting: requireV4Shape,
     }),
 );
-
 
 export const tw_write_architecture: Tool = def(
   "Write an effort's architecture document (architecture.md): the only writer of the living " +
@@ -631,7 +606,6 @@ export const tw_write_architecture: Tool = def(
     });
   },
 );
-
 
 export const tw_write_review: Tool = defStructured(
   "Write an effort's review artifact (review.md at the effort root): the only writer of the whole-effort " +
@@ -845,7 +819,6 @@ export const tw_write_review: Tool = defStructured(
   },
 );
 
-
 export const tw_create_effort: Tool = def(
   "Create an effort: the named effort/map creation tool. Writes docs/tasks/<effort>/map.md through " +
     "the frontmatter seam (type: map, status: stable) with '## Non-goals' and '## Non-negotiable facts' " +
@@ -903,7 +876,6 @@ export const tw_create_effort: Tool = def(
     return `created ${relPosix(root, mapPath)} (both canonical sections seeded empty); registered '${effort}' in the root index${linkNote}`;
   },
 );
-
 
 export const tw_add_task: Tool = def(
   "Create a planning task at docs/tasks/<effort>/tasks/<slug>/task.md: the named task creator, writing " +
@@ -1004,7 +976,6 @@ export const tw_add_task: Tool = def(
     return `created ${relPosix(root, taskPath)} (${subtype})${cleared ? "; ready_for_spec cleared" : ""}`;
   },
 );
-
 
 export const tw_archive_effort: Tool = def(
   "Archive a finished effort: the named archive move, so no archive step needs git mv or the shell. " +

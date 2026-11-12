@@ -6,12 +6,10 @@
 
 import { existsSync, statSync } from "node:fs";
 import { join, resolve as resolvePath } from "node:path";
-import YAML from "yaml";
 import { dependencyLevels, type Artifact, type WorkItemInfo, type Anomaly } from "../core/art.js";
 import { effortGraphs, effortFrontier, effortLevels, effortFinalizable, effortGroupOf, liveFrontier, itemFinalizable, type EffortGraph } from "../core/graph.js";
 import { ResolutionError } from "../core/err.js";
 import { OptBool, OptStr, Str, Tool, def, findRoot, graphForPath, isDir, isFile, isInitialized, listSubdirs, parseArtifactFile, readText, resolveArt, scanMemo, taskRoot } from "./support.js";
-
 
 function taskInfoFromPath(path: string): WorkItemInfo | null {
   try {
@@ -29,7 +27,6 @@ function taskInfoFromPath(path: string): WorkItemInfo | null {
   }
 }
 
-
 function taskPathForSlug(root: string, slug: string): string | null {
   const base = taskRoot(root);
   const candidates = [join(base, slug, "task.md")];
@@ -42,7 +39,6 @@ function taskPathForSlug(root: string, slug: string): string | null {
   }
   return null;
 }
-
 
 function mapChildInfos(root: string, mapPath: string): WorkItemInfo[] {
   const { doc } = parseArtifactFile(mapPath);
@@ -70,7 +66,6 @@ function mapChildInfos(root: string, mapPath: string): WorkItemInfo[] {
   return out;
 }
 
-
 /**
  * True when the effort has scanned tasks or tickets, so the scan is the
  * source of truth. A v3 map whose children live in flat task dirs has none,
@@ -80,7 +75,6 @@ function hasScanChildren(graph: EffortGraph | null): boolean {
   if (graph === null) return false;
   return graph.tasks.length + graph.tickets.length + graph.deprecated.length > 0;
 }
-
 
 /** True when the selector names the maps scope: the tasks root or `maps/`. */
 function isMapsScope(root: string, selector: string): boolean {
@@ -93,13 +87,11 @@ function isMapsScope(root: string, selector: string): boolean {
   return false;
 }
 
-
 /** Append the formatted anomaly block, or return the text unchanged. */
 function withAnomalies(text: string, anomalies: Anomaly[]): string {
   if (anomalies.length === 0) return text;
   return `${text}\n\n## Anomalies\n\n${anomalies.map((a) => `- [${a.kind}] ${a.detail}`).join("\n")}`;
 }
-
 
 /**
  * Append the deprecated block. Deprecated artifacts count as done and sit out
@@ -112,7 +104,6 @@ function withDeprecated(text: string, deprecated: Artifact[]): string {
   return `${text}\n\n## Deprecated (out of the graph)\n\n${lines.join("\n")}`;
 }
 
-
 // ─── Context helpers ───────────────────────────────────────────────────────────
 
 function profileText(root: string): string {
@@ -120,7 +111,6 @@ function profileText(root: string): string {
   if (existsSync(p) && statSync(p).isFile()) return readText(p);
   return "";
 }
-
 
 function artifactSchemaRef(): string {
   return [
@@ -195,7 +185,6 @@ export const tw_show: Tool = def(
   },
 );
 
-
 export const tw_get: Tool = def(
   "Print a single frontmatter field of an artifact.",
   { selector: Str("Slug or path"), field: Str("Field name") },
@@ -205,7 +194,6 @@ export const tw_get: Tool = def(
     return doc.data[p.field] === undefined ? "" : String(doc.data[p.field]);
   },
 );
-
 
 export const tw_list: Tool = def(
   "List artifacts (maps, specs, tasks, tickets). Excludes archived by default.",
@@ -252,7 +240,6 @@ export const tw_list: Tool = def(
   },
 );
 
-
 export const tw_finalizable: Tool = def(
   "Check an artifact is ready to finalize (workflow_state done).",
   { selector: Str("Task or ticket slug or path") },
@@ -266,7 +253,6 @@ export const tw_finalizable: Tool = def(
     return withAnomalies("ready to finalize", graph?.anomalies ?? []);
   },
 );
-
 
 export const tw_dependency_levels: Tool = def(
   "Compute BFS dependency levels from an effort map's scan.",
@@ -289,7 +275,6 @@ export const tw_dependency_levels: Tool = def(
     return JSON.stringify({ levels, remaining_count: remaining.length, done_count: children.length - remaining.length }, null, 2);
   },
 );
-
 
 export const tw_frontier: Tool = def(
   "List the ready edge of an effort's graph: unfinished tasks and tickets whose blockers are done.",
@@ -346,7 +331,6 @@ export const tw_frontier: Tool = def(
   },
 );
 
-
 export const tw_map_finalizable: Tool = def(
   "Check every task and ticket of an effort is done (and, with a spec, that tickets exist).",
   { selector: Str("Map slug or path") },
@@ -370,7 +354,6 @@ export const tw_map_finalizable: Tool = def(
     throw new Error(`unfinished children: ${undone.join(", ")}`);
   },
 );
-
 
 export const tw_context: Tool = def(
   "Return project context: artifact schema + optional profile.",

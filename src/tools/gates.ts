@@ -14,8 +14,10 @@ import { FsPort } from "../core/fs-port.js";
 import { renderMigrationReport } from "../migrate-report.js";
 import { closeBrief, decideFromBrief, decideFromClose, phaseBrief, phaseText, readCheckout, unreadableCheckout, type CloseBrief, type PhaseBrief } from "../core/git-profile.js";
 import { Tool, ToolContext, defStructured, directoryLeaf, findRoot, isDir, isFile, isInside, listSubdirs, liveEffortDir, outcome, parseArtifactFile, refusedOuttext, relPosix, resolveArt, scanMemo, sendWorkflowFeedback, taskRoot } from "./support.js";
+// The one import that points back at the entry: tw_request_tool refuses a tool this package
+// does not register, so the gate family reads the factory's own record. The binding is a
+// function declaration and it is only read when a tool runs, so the cycle is bound by then.
 import { createTools } from "../pi.js";
-
 
 // ─── Open, close, next ────────────────────────────────────────────────────
 
@@ -28,14 +30,12 @@ function currentOpenSkills(ctx: ToolContext): Set<string> {
   return openSkillsIn(ctx.getActiveTools?.() ?? []);
 }
 
-
 function requireActiveSet(ctx: ToolContext): { get: () => string[]; set: (names: string[]) => void } {
   if (!ctx.getActiveTools || !ctx.setActiveTools) {
     throw new Error("tw_open and tw_close need a session-bound active tool set");
   }
   return { get: () => ctx.getActiveTools!(), set: (names) => ctx.setActiveTools!(names) };
 }
-
 
 /**
  * Compute the active set after closing one open skill: every workflow tool
@@ -53,7 +53,6 @@ function activeAfterClose(active: string[], closing: SkillEntry, remaining: Set<
   const workflow = new Set(SKILL_REGISTRY.flatMap((entry) => entry.toolset));
   return active.filter((tool) => (workflow.has(tool) ? stillNeeded.has(tool) : true));
 }
-
 
 /**
  * Record the skill invocation telemetry the per-skill prose used to ask the
@@ -78,7 +77,6 @@ async function recordSkillTelemetry(
   }
 }
 
-
 // ─── Opener gate: the phase preconditions ────────────────────────────────────────
 
 /** Why an open is refused, and the calls that are legal next. */
@@ -86,7 +84,6 @@ interface GateRefusal {
   reason: string;
   legalNext: string[];
 }
-
 
 /**
  * The live effort slugs, for the refusal hint list: directories under the
@@ -105,7 +102,6 @@ function liveEffortSlugs(root: string): string[] {
   }
   return slugs.sort();
 }
-
 
 /**
  * The phase precondition behind tw_open: the gate and the disclosure are the
@@ -248,7 +244,6 @@ function phaseGate(
   }
 }
 
-
 /**
  * The branch gate behind tw_open: the profile gives some phases a branch, and
  * such a phase refuses to open unless the checkout is on it. The gate and the
@@ -289,7 +284,6 @@ async function branchGate(
   // performs it and retries lands on the same open.
   return { brief, refusal: { reason: decision.reason, legalNext: decision.step === null ? [] : [decision.step] } };
 }
-
 
 /**
  * The closing gate behind tw_close: a profile row may carry the branch its
@@ -344,7 +338,6 @@ async function closeBranchGate(
   return { gate, refusal: { reason: decision.reason, legalNext: decision.step === null ? [] : [decision.step] } };
 }
 
-
 /**
  * The push step a profile's push policy renders: the command for the branch the
  * phase is on when the policy allows a push, and no command at all when it does
@@ -365,7 +358,6 @@ function pushStepLine(brief: PhaseBrief, skill: string): string {
   return `Push step: git push origin ${brief.branch}.`;
 }
 
-
 /** The shared unknown-effort refusal every effort-taking phase starts with. */
 function requireLiveEffort(root: string, effort: string): GateRefusal | null {
   if (liveEffortDir(root, effort) !== null) return null;
@@ -377,7 +369,6 @@ function requireLiveEffort(root: string, effort: string): GateRefusal | null {
   };
 }
 
-
 /** The effort graph a live effort directory belongs to, or null. */
 function graphForEffortDir(graphs: Map<string, EffortGraph>, dir: string): EffortGraph | null {
   for (const g of graphs.values()) {
@@ -387,7 +378,6 @@ function graphForEffortDir(graphs: Map<string, EffortGraph>, dir: string): Effor
   }
   return null;
 }
-
 
 /**
  * The effort's architecture document, preferring the schema-5 name
@@ -403,12 +393,10 @@ function architectureDocIn(
   return hits.find((h) => h.art.type === "architecture") ?? hits[0] ?? null;
 }
 
-
 /** Bug-only efforts have no architecture document by design. */
 function isBugOnly(graph: EffortGraph): boolean {
   return graph.tickets.length > 0 && graph.tickets.every((t) => t.subtype === "bug");
 }
-
 
 /**
  * The target ticket's unfinished same-kind blockers, by slug. Done-ness is
@@ -421,7 +409,6 @@ function unfinishedBlockers(graph: EffortGraph, target: Artifact): string[] {
     .filter((a): a is Artifact => a !== undefined && itemFinalizable(a) !== null)
     .map((a) => a.slug);
 }
-
 
 /**
  * Resolve the target as a ticket OF THIS EFFORT. Slugs are effort-scoped (the
@@ -450,14 +437,12 @@ function resolveTicketInEffort(
   }
 }
 
-
 /** The ready frontier of the graph's ticket kind, by slug. */
 function readyTicketSlugs(graph: EffortGraph): string[] {
   return effortFrontier(graph)
     .filter((a) => a.type === "ticket")
     .map((a) => a.slug);
 }
-
 
 /**
  * The target-ticket half of the implementation gate: the target must be a
@@ -512,7 +497,6 @@ function requireTicketTarget(
   return null;
 }
 
-
 /**
  * The legal next for a target that cannot be worked: the ready tickets of the
  * effort, or the retry hint when the frontier is empty.
@@ -522,7 +506,6 @@ function readyTicketsOrRetry(graph: EffortGraph | null): string[] {
   const ready = readyTicketSlugs(graph);
   return ready.length > 0 ? ready.map((slug) => `implement-ticket: ${slug}`) : ["retry tw_open with the target ticket slug"];
 }
-
 
 /**
  * Every tool definition the factory owns, by name: the requestable surface,
@@ -536,7 +519,6 @@ function workflowToolNames(): Set<string> {
   workflowToolNamesCache ??= new Set(Object.keys(createTools()));
   return workflowToolNamesCache;
 }
-
 
 /**
  * Record a request outcome through `sendWorkflowFeedback` without ever
@@ -664,7 +646,6 @@ export function gateTools(gated: boolean): Record<string, Tool> {
       { activeByDefault: true, executionMode: "sequential" },
     ),
 
-
     tw_close: defStructured(
       "Close a named open workflow skill, removing the tools no other open skill still needs. " +
         "Declared in every state, including idle: closing a skill that is not open is refused with the " +
@@ -751,7 +732,6 @@ export function gateTools(gated: boolean): Record<string, Tool> {
       { activeByDefault: true, executionMode: "sequential" },
     ),
 
-
     tw_next: defStructured(
       "Ask what to do next in the task workflow. Always declared, never errors: outside a skill it " +
         "answers in short prose; inside a skill it says to finish the current work first.",
@@ -773,7 +753,6 @@ export function gateTools(gated: boolean): Record<string, Tool> {
       },
       { activeByDefault: true },
     ),
-
 
     // ── the phase brief: what a phase needs before it opens ──
 
@@ -871,7 +850,6 @@ export function gateTools(gated: boolean): Record<string, Tool> {
       { activeByDefault: true },
     ),
 
-
     tw_migrate: defStructured(
       "Migrate this repo's task-workflow bundle to schema 5, in-process: the whole any-vintage-to-5 " +
         "transformation (the effort-grouped layout reorganization, the frontmatter unification, the aux " +
@@ -902,7 +880,6 @@ export function gateTools(gated: boolean): Record<string, Tool> {
         }
       },
     ),
-
 
     tw_request_tool: defStructured(
       "Ask the operator for access to one workflow tool the open phase does not disclose. The request is " +

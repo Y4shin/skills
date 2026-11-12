@@ -18,9 +18,7 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionContext, InputEvent, InputEventResult, ToolCallEvent, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
 import { getCurrentTools } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-import { parse } from "./core/frontmatter.js";
-import { TYPE_LEAVES } from "./core/art.js";
-import { ALWAYS_DECLARED, GATED_SKILL_NAMES } from "./disclosure.js";
+import { GATED_SKILL_NAMES } from "./disclosure.js";
 import { resolveGate, type ResolveGateResult } from "./core/repo-gate.js";
 import { isSpawnCall, spawnVerdict } from "./core/spawn-guard.js";
 import { tw_show, tw_get, tw_list, tw_finalizable, tw_dependency_levels, tw_frontier, tw_map_finalizable, tw_context } from "./tools/artifacts.js";
@@ -30,7 +28,7 @@ import { skill_validate, skill_scaffold, skill_discover } from "./tools/skill-cr
 import { tw_write_changesets, tw_release_plan, tw_release_apply } from "./tools/release.js";
 import { tw_feedback } from "./tools/feedback.js";
 import { gateTools } from "./tools/gates.js";
-import { Tool, def, findRoot, readText, readYaml, relPosix, taskRoot } from "./tools/support.js";
+import { Tool, findRoot, readText, readYaml, relPosix, taskRoot } from "./tools/support.js";
 
 export { tw_show, tw_get, tw_list, tw_finalizable, tw_dependency_levels, tw_frontier, tw_map_finalizable, tw_context } from "./tools/artifacts.js";
 export { tw_write_section, tw_finalize_map, tw_write_spec, tw_write_architecture, tw_write_review, tw_create_effort, tw_add_task, tw_archive_effort } from "./tools/effort.js";
@@ -38,7 +36,6 @@ export { tw_add_ticket, tw_split_ticket, tw_mark_done, tw_mark_blocked, tw_resol
 export { skill_validate, skill_scaffold, skill_discover } from "./tools/skill-creator.js";
 export { tw_write_changesets, tw_release_plan, tw_release_apply } from "./tools/release.js";
 export { tw_feedback } from "./tools/feedback.js";
-
 
 // ─── Gated skill manifest sanity (session-start diagnostics) ──────────────────
 
@@ -73,9 +70,7 @@ function loadSkillNameDiagnostics(): string[] {
   }
 }
 
-
 const SKILL_NAME_DIAGNOSTICS = loadSkillNameDiagnostics();
-
 
 /**
  * Block explicit `/skill:<gated-name>` invocations in a work repo. The input
@@ -105,7 +100,6 @@ async function gateSkillInvocation(
   }
   return { action: "continue" };
 }
-
 
 /**
  * Strip the gated workflow skills from the system prompt's `<available_skills>`
@@ -183,7 +177,6 @@ async function stripSkills(
   };
 }
 
-
 // ─── Write lockdown guard ──────────────────────────────────────────────────
 
 /**
@@ -203,7 +196,6 @@ function lockdownReason(toolName: string, path: string): string {
   );
 }
 
-
 /**
  * The two path segments the lockdown exempts: `.work/` and
  * `deviation-reports/`. Both sit beside an artifact rather than being
@@ -213,7 +205,6 @@ function lockdownReason(toolName: string, path: string): string {
  * working wherever an artifact keeps its scratch.
  */
 const LOCKDOWN_EXEMPT_SEGMENTS = new Set([".work", "deviation-reports"]);
-
 
 /**
  * True when the target path sits inside the session repo's docs/tasks tree and
@@ -238,7 +229,6 @@ function stateIsStamped(root: string): boolean {
   }
 }
 
-
 function isTaskTreePath(path: string, cwd: string): boolean {
   const resolved = resolvePath(cwd, path);
   const root = findRoot(cwd);
@@ -250,7 +240,6 @@ function isTaskTreePath(path: string, cwd: string): boolean {
   if (!stateIsStamped(root)) return false;
   return true;
 }
-
 
 /**
  * The tool_call guard: refuses the built-in write and edit on docs/tasks/**,
@@ -272,7 +261,6 @@ async function guardTaskTreeWrites(
   if (!isTaskTreePath(path, ctx.cwd)) return undefined;
   return { block: true, reason: lockdownReason(event.toolName, path) };
 }
-
 
 /**
  * The spawn guard: refuses a dispatch of an implementation sub-agent when the
@@ -315,7 +303,6 @@ async function guardSpawn(
   return { block: true, reason: verdict.reason };
 }
 
-
 /**
  * The whole `tool_call` hook: the write lockdown first (it answers from the
  * path alone), then the spawn guard. One handler keeps the registered hook
@@ -328,7 +315,6 @@ async function guardToolCall(
 ): Promise<ToolCallEventResult | undefined> {
   return (await guardTaskTreeWrites(event, ctx)) ?? guardSpawn(pi, event, ctx);
 }
-
 
 /**
  * Re-assert the declared tool set the session transcript records, so the open
@@ -350,7 +336,6 @@ async function restoreDeclaredSetFromTranscript(
   pi.setActiveTools(names);
 }
 
-
 /**
  * The notify config path.
  *
@@ -362,7 +347,6 @@ async function restoreDeclaredSetFromTranscript(
 export function notifyConfigPath(home: string = homedir()): string {
   return join(home, ".unipi", "config", "notify", "config.json");
 }
-
 
 // ─── Gate-state registration sets and the workflow-enabled condition ──────
 
@@ -382,7 +366,6 @@ export function notifyConfigPath(home: string = homedir()): string {
  */
 const GATED_REGISTERED_TOOLS = ["tw_open", "tw_close", "tw_feedback"] as const;
 
-
 /**
  * skill-creator's bundled script tools register in gated repos too, inactive
  * exactly as in an ungated repo: the restricted tw_open discloses them there,
@@ -390,7 +373,6 @@ const GATED_REGISTERED_TOOLS = ["tw_open", "tw_close", "tw_feedback"] as const;
  * the "kept in name only" failure.
  */
 const SKILL_CREATOR_TOOL_NAMES = ["skill_validate", "skill_scaffold", "skill_discover"] as const;
-
 
 /**
  * True when the task workflow is enabled in this repo. Today this coincides

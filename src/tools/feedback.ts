@@ -7,7 +7,6 @@ import { Type } from "typebox";
 import { FEEDBACK_KINDS, WORKFLOW_SOURCE } from "../core/feedback.js";
 import { Tool, defStructured, outcome, sendWorkflowFeedback } from "./support.js";
 
-
 // ── workflow feedback: the labelled route into the telemetry store ──
 
 export const tw_feedback: Tool = defStructured(

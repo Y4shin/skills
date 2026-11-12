@@ -14,7 +14,6 @@ import { effortGraphs } from "../core/graph.js";
 import { isPointerName, POINTER_NAMES } from "../core/state.js";
 import { OptBool, OptStr, ScanHit, Str, Tool, clearReadyForSpec, def, defStructured, directoryLeaf, findRoot, graphForPath, isDir, isFile, isInitialized, isInside, liveEffortDir, loadState, normalizedBody, outcome, parseArtifactFile, readText, relPosix, requireV4Shape, resolveArt, saveState, scanMemo, taskRoot } from "./support.js";
 
-
 /**
  * The ticket half of the done-marking: the changelog entry lands before the
  * done-marking (the per-ticket close-out order), so the changelog must
@@ -43,7 +42,6 @@ function markTicketDone(root: string, path: string, art: Artifact, doc: Document
   return `marked '${art.slug}' done (workflow_state: done)`;
 }
 
-
 /**
  * True when a body references the slug as a stand-alone token: the write-back
  * pointer convention (a short statement plus the task slug). A longer
@@ -54,17 +52,13 @@ function referencesSlug(body: string, slug: string): boolean {
   return new RegExp(`(?:^|[^\\w-])${escaped}(?![\\w-])`).test(body);
 }
 
-
 /** The ticket-doc section the implementation-notes writer owns. */
 const IMPLEMENTATION_NOTES_SECTION = "Implementation notes";
-
 
 /** The planning-task section the task-notes writer owns. */
 const PLANNING_NOTES_SECTION = "Notes";
 
-
 const TICKET_SIZES = ["s", "m", "l", "xl"] as const;
-
 
 /**
  * The ticket frontmatter the v5 ticket writers agree on: stable and ready,
@@ -82,7 +76,6 @@ interface TicketSeed {
   content?: string;
 }
 
-
 function ticketDocument(seed: TicketSeed): Document {
   const data: FrontmatterData = {
     type: "ticket",
@@ -96,7 +89,6 @@ function ticketDocument(seed: TicketSeed): Document {
   if (seed.mode !== undefined) data.mode = seed.mode;
   return { data, body: seed.content !== undefined ? normalizedBody(seed.content) : "\n" };
 }
-
 
 /**
  * Validate one created ticket's shape: slug, title, subtype, size, and mode.
@@ -121,7 +113,6 @@ function validateTicketSeed(seed: TicketSeed): void {
     throw new Error(`invalid mode '${seed.mode}': the only mode value is 'human'; omit it otherwise`);
   }
 }
-
 
 export const tw_add_ticket: Tool = def(
   "Create an implementation ticket at docs/tasks/<effort>/tickets/<slug>/ticket.md: the only ticket " +
@@ -198,7 +189,6 @@ export const tw_add_ticket: Tool = def(
     return `created ${relPosix(root, ticketPath)} (${seed.subtype}${sizeNote})`;
   },
 );
-
 
 export const tw_split_ticket: Tool = defStructured(
   "Split a ticket into sub-tickets: the escape hatch that decomposes a failed or oversized ticket " +
@@ -321,7 +311,6 @@ export const tw_split_ticket: Tool = defStructured(
   },
 );
 
-
 export const tw_mark_done: Tool = def(
   "Mark a planning task or an implementation ticket done (workflow_state: done). Both refuse items that " +
     "are already done or deprecated (deprecated counts as done). A planning task refuses when its recorded " +
@@ -377,7 +366,6 @@ export const tw_mark_done: Tool = def(
   },
 );
 
-
 export const tw_mark_blocked: Tool = def(
   "Mark a planning task blocked (workflow_state: blocked) and record the reason in the task body: the " +
     "named write for a task that cannot complete yet (missing evidence, a pending human or environment " +
@@ -413,7 +401,6 @@ export const tw_mark_blocked: Tool = def(
   },
 );
 
-
 export const tw_resolve_uncertainty: Tool = def(
   "Record a ticket's uncertainty resolution: writes the resolution next to the ticket's .work/uncertainty.md, deletes the uncertainty file, and returns the resolution path for the re-run pointer. Refuses when the ticket has no uncertainty file, so it can never serve as a generic writer.",
   { selector: Str("Ticket slug or path"), resolution: Str("The resolution text to record") },
@@ -432,7 +419,6 @@ export const tw_resolve_uncertainty: Tool = def(
     return relPosix(root, resolutionPath);
   },
 );
-
 
 export const tw_write_changelog: Tool = def(
   "Append a changelog entry to docs/tasks/CHANGELOG.md: the only writer of the changelog. The entry " +
@@ -490,7 +476,6 @@ export const tw_write_changelog: Tool = def(
   },
 );
 
-
 export const tw_write_task_note: Tool = def(
   "Write the '## Notes' section of a planning task doc: the named writer for the record a planning " +
     "task leaves behind (a grilling's settled answers and rejected options, a research task's findings). " +
@@ -527,7 +512,6 @@ export const tw_write_task_note: Tool = def(
   },
 );
 
-
 export const tw_write_ticket_note: Tool = def(
   "Write the '## Implementation notes' section of a ticket doc: the only writer of that section, and " +
     "the named writer that replaces the built-in edit on a ticket path. Appends the note to the " +
@@ -563,7 +547,6 @@ export const tw_write_ticket_note: Tool = def(
     return `wrote '## ${IMPLEMENTATION_NOTES_SECTION}' in ${relPosix(root, path)}`;
   },
 );
-
 
 export const tw_record_out_of_scope: Tool = def(
   "Record a consciously ruled-out request in the global out-of-scope knowledge base " +
@@ -618,7 +601,6 @@ export const tw_record_out_of_scope: Tool = def(
   },
 );
 
-
 export const tw_state: Tool = def(
   "Show the current workflow state (map and task pointers) from state.yaml.",
   {},
@@ -631,7 +613,6 @@ export const tw_state: Tool = def(
     ].join("\n");
   },
 );
-
 
 export const tw_state_set: Tool = def(
   `Set a workflow state field (${POINTER_NAMES.join(" or ")}). Use 'null' to clear.`,

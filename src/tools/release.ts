@@ -3,11 +3,9 @@
  * the text builders their results are reported through.
  */
 
-import { join } from "node:path";
 import { Type } from "typebox";
 import { applyRelease, planRelease, proposeEntries, writeEntries, type ChangeLevel, type ChangesetEntry, type ChangesetsRefusalCode, type ReleaseRead, type ReleaseRefusalCode, type ReleaseWrite } from "../core/changesets.js";
 import { Tool, defStructured, outcome, refusedOuttext } from "./support.js";
-
 
 /**
  * The one legal next call for a refused changeset write, per named outcome.
@@ -32,7 +30,6 @@ function changesetLegalNext(code: ChangesetsRefusalCode): string {
       return "retry tw_write_changesets naming a workspace package explicitly";
   }
 }
-
 
 /**
  * The one legal next call for a refused release, per named outcome. Each
@@ -61,7 +58,6 @@ function releaseLegalNext(code: ReleaseRefusalCode): string {
   }
 }
 
-
 /** The structured half of a release result: the plan, and what a write touched. */
 function releaseDetails(
   release: ReleaseRead,
@@ -78,7 +74,6 @@ function releaseDetails(
   };
 }
 
-
 /** The versions, then each section, in the shape both release tools report. */
 function releaseVersionLines(release: ReleaseRead): string[] {
   const lines = release.versions.map(
@@ -86,7 +81,6 @@ function releaseVersionLines(release: ReleaseRead): string[] {
   );
   return lines.length > 0 ? lines : ["- nothing: no package would move"];
 }
-
 
 /** The plan's text: what would be versioned, and the sections it would write. */
 function releasePlanText(plan: ReleaseRead): string {
@@ -104,7 +98,6 @@ function releasePlanText(plan: ReleaseRead): string {
   return lines.join("\n");
 }
 
-
 /** The apply's text: what moved, what it wrote, what it consumed. */
 function releaseApplyText(applied: ReleaseWrite): string {
   const lines: string[] = ["Released:", ...releaseVersionLines(applied)];
@@ -116,7 +109,6 @@ function releaseApplyText(applied: ReleaseWrite): string {
   if (applied.diagnostics.length > 0) lines.push(`Diagnostics: ${applied.diagnostics.join("; ")}`);
   return lines.join("\n");
 }
-
 
 // ── the changeset writer: the effort close's named writer ──
 
@@ -223,7 +215,6 @@ export const tw_write_changesets: Tool = defStructured(
   },
 );
 
-
 // ── the release: the plan, then the write ──
 
 export const tw_release_plan: Tool = defStructured(
@@ -248,7 +239,6 @@ export const tw_release_plan: Tool = defStructured(
   },
   { activeByDefault: true },
 );
-
 
 export const tw_release_apply: Tool = defStructured(
   "Apply the release: bump every manifest the plan names, insert each changelog section, and remove the " +

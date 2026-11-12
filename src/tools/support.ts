@@ -14,13 +14,11 @@ import YAML from "yaml";
 import { parse, type Document } from "../core/frontmatter.js";
 import { decodeText } from "../core/encoding.js";
 import { fromFrontmatter, findAnomalies, TYPE_LEAF, TYPE_LEAVES, type Artifact, type Anomaly } from "../core/art.js";
-import { ALWAYS_DECLARED } from "../disclosure.js";
 import { type EffortGraph } from "../core/graph.js";
 import { toObject, fromObject, freshState, type WorkflowState } from "../core/state.js";
 import { FrontmatterError, ResolutionError } from "../core/err.js";
 import { feedbackCall } from "../core/feedback.js";
 import { type GitRun } from "../core/git-profile.js";
-
 
 // ─── File system helpers ──────────────────────────────────────────────────────
 
@@ -35,21 +33,17 @@ export function findRoot(start: string): string {
   return resolvePath(start);
 }
 
-
 export function taskRoot(root: string): string {
   return join(root, "docs", "tasks");
 }
-
 
 export function isDir(p: string): boolean {
   try { return statSync(p).isDirectory(); } catch { return false; }
 }
 
-
 export function isFile(p: string): boolean {
   try { return statSync(p).isFile(); } catch { return false; }
 }
-
 
 /**
  * Read a text file through the encoding seam.
@@ -63,11 +57,9 @@ export function readText(p: string): string {
   return decodeText(readFileSync(p));
 }
 
-
 export function readYaml(p: string): unknown {
   return YAML.parse(readText(p));
 }
-
 
 /** The frontmatter title of an artifact file, or null when it has none. */
 export function readArtifactTitle(path: string): string | null {
@@ -80,12 +72,10 @@ export function readArtifactTitle(path: string): string | null {
   }
 }
 
-
 function writeYaml(p: string, data: unknown): void {
   mkdirSync(dirname(p), { recursive: true });
   writeFileSync(p, YAML.stringify(data, { sortMapEntries: false, indentSeq: false, lineWidth: 0 }), "utf-8");
 }
-
 
 // ─── Artifact resolution ──────────────────────────────────────────────────────
 
@@ -93,12 +83,10 @@ export function isInitialized(root: string): boolean {
   return isDir(taskRoot(root));
 }
 
-
 export function listSubdirs(base: string, skip: Set<string> = new Set()): string[] {
   if (!isDir(base)) return [];
   return readdirSync(base).sort().filter((n) => isDir(join(base, n)) && !skip.has(n));
 }
-
 
 export function parseArtifactFile(path: string): { art: Artifact; doc: Document } {
   const text = readText(path);
@@ -108,14 +96,12 @@ export function parseArtifactFile(path: string): { art: Artifact; doc: Document 
   return { art, doc };
 }
 
-
 /**
  * The slug a file's location implies: its directory name, except under a
  * container directory (tasks/, tickets/, slices/, ...) where the file's own
  * name carries the slug.
  */
 const CONTAINER_DIRS = new Set(["tasks", "tickets", "slices", "deviation-reports", "archive", "maps"]);
-
 
 function slugDirFor(path: string): string {
   const parent = basename(dirname(path));
@@ -124,7 +110,6 @@ function slugDirFor(path: string): string {
   // `<n>-` ordering prefix the slice convention uses.
   return basename(path).replace(/\.md$/, "").replace(/^\d+-/, "");
 }
-
 
 function walkMarkdown(dir: string, out: string[]): void {
   if (!isDir(dir)) return;
@@ -136,9 +121,7 @@ function walkMarkdown(dir: string, out: string[]): void {
   }
 }
 
-
 export interface ScanHit { path: string; art: Artifact; doc: Document }
-
 
 /** Every artifact on disk, live and archived, in both shapes. */
 function scanArtifacts(root: string): ScanHit[] {
@@ -154,20 +137,16 @@ function scanArtifacts(root: string): ScanHit[] {
   return hits;
 }
 
-
 /** Preference order when one slug matches several artifact types. */
 const TYPE_PRIORITY = TYPE_LEAVES.map(([type]) => type);
-
 
 function typeRank(type: string): number {
   const i = TYPE_PRIORITY.indexOf(type);
   return i === -1 ? TYPE_PRIORITY.length : i;
 }
 
-
 /** The files a directory selector may stand for, in preference order. */
 const DIRECTORY_LEAVES = TYPE_LEAVES.map(([, file]) => file);
-
 
 /**
  * Pick the file a directory selector stands for. When a wanted type is given,
@@ -178,7 +157,6 @@ export function directoryLeaf(dir: string, want?: string): string | null {
   const leaves = want && TYPE_LEAF[want] ? [TYPE_LEAF[want]] : DIRECTORY_LEAVES;
   return leaves.map((leaf) => join(dir, leaf)).find(isFile) ?? null;
 }
-
 
 /** Resolve a slug or path to an artifact file path and its frontmatter document. */
 export function resolveArt(root: string, selector: string, want?: string): ScanHit {
@@ -243,18 +221,15 @@ export function resolveArt(root: string, selector: string, want?: string): ScanH
   return [...candidates].sort((a, b) => typeRank(a.art.type) - typeRank(b.art.type))[0];
 }
 
-
 // ─── Scan layer ────────────────────────────────────────────────────────────────
 
 export interface ScanIndex { hits: ScanHit[]; anomalies: Anomaly[] }
-
 
 /** One scan of the tree plus one anomaly pass over everything it found. */
 function scanIndex(root: string): ScanIndex {
   const hits = scanArtifacts(root);
   return { hits, anomalies: findAnomalies(hits.map((h) => h.art)) };
 }
-
 
 /**
  * A per-invocation memo: each tool invocation scans once and every graph
@@ -266,7 +241,6 @@ export function scanMemo(root: string): () => ScanIndex {
   return () => (cached ??= scanIndex(root));
 }
 
-
 /** The effort graph a resolved artifact path belongs to, or null. */
 export function graphForPath(graphs: Map<string, EffortGraph>, path: string): EffortGraph | null {
   for (const g of graphs.values()) {
@@ -277,7 +251,6 @@ export function graphForPath(graphs: Map<string, EffortGraph>, path: string): Ef
   return null;
 }
 
-
 // ─── State helpers ─────────────────────────────────────────────────────────────
 
 export function loadState(root: string): WorkflowState {
@@ -286,16 +259,13 @@ export function loadState(root: string): WorkflowState {
   try { return fromObject(readYaml(sp)); } catch { return freshState(); }
 }
 
-
 export function saveState(root: string, state: WorkflowState): void {
   writeYaml(join(taskRoot(root), "state.yaml"), toObject(state));
 }
 
-
 export function outcome(text: string, details: Record<string, unknown>): ToolOutcome {
   return { text, details };
 }
-
 
 // ─── Planning transition helpers ────────────────────────────────────────────
 
@@ -310,7 +280,6 @@ export function requireV4Shape(art: Artifact): void {
   }
 }
 
-
 /**
  * Clear the map's ready_for_spec flag on a planning write. Only a present
  * `true` is rewritten: absent and explicit false already read false, so the
@@ -321,7 +290,6 @@ export function clearReadyForSpec(doc: Document): boolean {
   doc.data.ready_for_spec = false;
   return true;
 }
-
 
 /**
  * The live effort directory a selector names, or null. The selector may be
@@ -345,7 +313,6 @@ export function liveEffortDir(root: string, selector: string): string | null {
   return null;
 }
 
-
 /**
  * Normalize a whole-body write: trimmed content wrapped in single blank
  * margins, so a dumped document reads with one blank line after the opening
@@ -354,7 +321,6 @@ export function liveEffortDir(root: string, selector: string): string | null {
 export function normalizedBody(content: string): string {
   return `\n${content.trim()}\n`;
 }
-
 
 /**
  * The POSIX form of `relative(from, to)`.
@@ -370,12 +336,10 @@ export function relPosix(from: string, to: string): string {
   return relative(from, to).split("\\").join("/");
 }
 
-
 export function isInside(dir: string, path: string): boolean {
   const rel = relPosix(dir, path);
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
-
 
 // ─── Tool factory ──────────────────────────────────────────────────────────────
 
@@ -402,13 +366,11 @@ export interface Tool {
   execute(args: Record<string, any>, ctx: ToolContext): Promise<string> | Promise<ToolOutcome>;
 }
 
-
 /** A tool result: text for the model plus structured details. */
 interface ToolOutcome {
   text: string;
   details: Record<string, unknown>;
 }
-
 
 /** What a tool execute gets: the directory plus, when a session is bound, the active tool set. */
 export interface ToolContext {
@@ -441,17 +403,14 @@ export interface ToolContext {
   notify?(message: string, level: "info" | "warning" | "error"): void;
 }
 
-
 interface ToolInfo {
   name: string;
   parameters?: unknown;
 }
 
-
 export function def(description: string, args: Record<string, unknown>, exec: (args: any, ctx: any) => Promise<string>): Tool {
   return { description, args, execute: exec };
 }
-
 
 /** Like def, for tools with an explicit TypeBox parameter schema and structured results. */
 export function defStructured(
@@ -470,7 +429,6 @@ export function defStructured(
   };
 }
 
-
 export const Str = (d: string) => ({ type: "string" as const, description: d });
 
 export const OptStr = (d: string) => ({ type: "string" as const, optional: true as const, description: d });
@@ -485,7 +443,6 @@ export const OptStrArray = (d: string) => ({
   items: { type: "string" as const, description: d },
 });
 
-
 /**
  * Render a refusal the way every tw_open refusal reads: the reason, then the
  * legal next calls. A refusal with no legal next (a duplicate open: the work
@@ -497,14 +454,12 @@ export function refusedOuttext(reason: string, legalNext: string[]): string {
     : `Refused: ${reason}.`;
 }
 
-
 /**
  * The pi-telemetry tool `tw_feedback` routes to. Named once: the adaptation to
  * its parameter schema (with or without `source`) is what the wrapper exists
  * for, so the name is not spelled out at the call site too.
  */
 const FEEDBACK_TOOL = "submit_feedback";
-
 
 /**
  * Send one workflow-feedback row through the pi-telemetry `submit_feedback`
