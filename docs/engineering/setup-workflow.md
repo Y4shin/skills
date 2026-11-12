@@ -8,13 +8,18 @@ One skill, two lifecycle events, chosen by reading
 is **5**.
 
 - **Fresh repo** (no `state.yaml`, or no `schema_version`): the **onboard**
-  branch scaffolds the whole tree at the v5 shape: the `docs/tasks/` tree,
-  the `docs/adr/` and `docs/agents/` directories; a `state.yaml` carrying
-  `schema_version: 5` with two real-null
+  branch scaffolds the tree the workflow reads at the v5 shape: the
+  `docs/tasks/` tree, the `docs/adr/` and `docs/agents/` directories; a
+  `state.yaml` carrying `schema_version: 5` with two real-null
   pointers; `docs/tasks/index.md` (`okf_version: "0.2"`); a frontmattered
-  `docs/tasks/CHANGELOG.md`; templates for `docs/testing.md` and
-  `docs/dev-env.md` (an existing `dev-env.md` is never clobbered); and the
-  repo-root `CONTEXT.md` and `AGENTS.md`.
+  `docs/tasks/CHANGELOG.md`; the repo-root `AGENTS.md`; and the per-repo
+  agent config and out-of-scope index. It then asks whether the project
+  already has plans, designs, or specifications, tells the operator where to
+  place them, and offers the bootstrapping effort (`/skill:intake`) that
+  writes the project's own documents. It does not seed `docs/testing.md`,
+  `docs/dev-env.md`, or `CONTEXT.md` from templates: a fresh repo cannot
+  answer those questions, and the skills that read those files treat a stub
+  as an answer.
 - **Old repo** (`schema_version` less than 5): the **migrate** branch. It
   records the integration branch (the branch the repo was on when the skill
   was invoked), creates the migration branch `migrate/schema-<from>-to-5`
@@ -66,6 +71,20 @@ protect, so the guard exempts it and setup writes the scaffold directly. Once
 the stamp lands, the same session's later writes are refused unless they use
 a `tw_*` tool.
 
+**Why does onboarding not write `docs/testing.md`, `docs/dev-env.md`, or
+`CONTEXT.md`?**
+Because a fresh repo cannot answer what is in them. The commands, the
+development environment, and the project's first domain terms are outputs of
+doing the work, so the bootstrapping effort writes them. A template would be a
+stub the later skills read as an answer, which is worse than a missing file
+that visibly needs writing.
+
+**What happens to the plans or specs I already have?**
+Onboarding asks whether they exist and tells you where to put them under
+`docs/`. Nothing reads them automatically: when you start the bootstrapping
+effort with `/skill:intake`, you point at them, and the effort reads them
+because you named them. Later efforts reach them the same way.
+
 **Is the migration destructive?**
 It reorganizes the tree, but the migration branch
 (`migrate/schema-<from>-to-5`) is created from the integration branch first,
@@ -98,13 +117,14 @@ again after a partial migration resumes from the last completed step.
 ## It's working if
 
 - After onboarding, `docs/tasks/state.yaml` carries `schema_version: 5`,
-  the directories exist, and the repo-root `CONTEXT.md` and `AGENTS.md` are
-  in place.
+  the directories exist, and the repo-root `AGENTS.md` is in place.
+- Onboarding asked about existing plans or designs, told the operator where
+  to put them, and left the project's own documents to the bootstrapping
+  effort instead of writing them from templates.
 - After migrating, the MigrateReport's needs-human items were surfaced, the
   full test suite is green, and the migration commit exists on the migration
   branch; the integration branch was fast-forwarded to it, the migration
   branch is gone, and the run ended on the integration branch.
 - A second run on a current repo is a no-op.
-- An existing `docs/dev-env.md` survived onboarding untouched.
 - The run ends with the completion report from the skill's
   `resources/report.md`; a failed migration reports the untouched tree.

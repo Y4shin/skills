@@ -1082,14 +1082,30 @@ describe("skill cross-references", () => {
     expect(content).toMatch(/docs\/bugs\/` is a static archive/);
   });
 
-  test("setup-workflow writes docs/dev-env.md template", () => {
-    const content = readFile("skills/engineering/setup-workflow/SKILL.md");
-    expect(content).toContain("docs/dev-env.md");
+  test("setup-workflow defers the project's own documents to a bootstrapping effort", () => {
+    // The onboard branch used to seed docs/testing.md and docs/dev-env.md from
+    // templates, and CONTEXT.md from the workflow's own glossary. A fresh repo
+    // cannot answer those questions, so the templates were replaced by an
+    // effort that does the work. The pins keep the templates from coming back.
+    const skill = readFile("skills/engineering/setup-workflow/SKILL.md");
+    const onboard = skill.slice(
+      skill.indexOf("## Onboard (fresh repo)"),
+      skill.indexOf("## Migrate (old repo)"),
+    );
+    expect(onboard).toContain("/skill:intake");
+    expect(onboard).toMatch(/bootstrapping effort/i);
+    // The old branch seeded these from templates; no template seeding survives.
+    expect(onboard).not.toMatch(/with a template/);
+    expect(onboard).not.toMatch(/Write `CONTEXT\.md`/);
+    expect(onboard).toMatch(/Do not write those three files here/);
   });
 
-  test("setup-workflow does not clobber existing docs/dev-env.md", () => {
+  test("setup-workflow asks about existing material and says nothing reads it automatically", () => {
     const content = readFile("skills/engineering/setup-workflow/SKILL.md");
-    expect(content).toMatch(/do not clobber|already exists|skip.*docs\/dev-env\.md|preserve.*docs\/dev-env\.md/i);
+    expect(content).toMatch(/plans, designs,\s+specifications/i);
+    expect(content).toMatch(/under `docs\/`/);
+    expect(content).toMatch(/nothing reads them\s+automatically/i);
+    expect(content).toMatch(/points at them/);
   });
 
   test("task-overview routes planning to wayfinder", () => {
@@ -1287,13 +1303,11 @@ describe("setup-workflow v5", () => {
       "mkdir -p docs/tasks/archive",
       "schema_version: 5",
       "docs/tasks/index.md",
-      "docs/testing.md",
-      "docs/dev-env.md",
-      "CONTEXT.md",
       "AGENTS.md",
       "docs/agents/README.md",
       "out-of-scope/index.md",
       "chore: initialize task-workflow (schema_version 5)",
+      "/skill:intake",
       "/skill:task-workflow-overview",
     ]) {
       expect(onboard, marker).toContain(marker);

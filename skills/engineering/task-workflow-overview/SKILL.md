@@ -97,7 +97,11 @@ A starting situation that generates work, then merges onto the main flow.
 
 - **A repo that is not set up yet, or is on an older schema** to
   **`/skill:setup-workflow`**. It detects fresh, behind, or current from
-  `docs/tasks/state.yaml` and runs the onboard or migrate branch.
+  `docs/tasks/state.yaml` and runs the onboard or migrate branch. A fresh repo
+  finishes onboarding by offering the bootstrapping effort, because the
+  project's own documents are written by work rather than by a template:
+  `/skill:intake` names what the project will be and points at any plans the
+  operator placed under `docs/`.
 
 ## References underneath
 

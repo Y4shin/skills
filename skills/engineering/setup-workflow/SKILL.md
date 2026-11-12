@@ -34,7 +34,10 @@ The current schema version is **5**.
 
 ## Onboard (fresh repo)
 
-Scaffold everything a repo needs to use the task-workflow:
+Scaffold the tree the workflow needs, then hand the project's own documents to
+a bootstrapping effort. The tree here is what the workflow reads to run; the
+documents that describe the project are written by an effort that has done the
+work, never by a template that guesses at it.
 
 1. Create directory structure:
    ```
@@ -74,33 +77,40 @@ Scaffold everything a repo needs to use the task-workflow:
    # Task Changelog
    ```
 
-5. Write `docs/testing.md` with a template (framework, run commands, mock
-   conventions).
+5. Write the project conventions at repo root and the per-repo config:
+   `AGENTS.md` with the agent conventions (bucket layout, promotion rules,
+   invocation split, no-em-dashes rule, skill-tool invocation convention),
+   `docs/agents/README.md` (per-repo config the skills read, seeded minimal;
+   the skills populate it over time), and `docs/tasks/out-of-scope/index.md`
+   (the rejected-requests KB; explains its purpose).
 
-6. Write `docs/dev-env.md` with a template describing how to start the dev
-   environment, how reproduction should work, or an explicit "do not attempt
-   AI reproduction" placeholder. If `docs/dev-env.md` already exists, do not
-   clobber it; leave the existing file in place.
+6. Commit: `chore: initialize task-workflow (schema_version 5)`.
 
-7. Write `CONTEXT.md` at repo root (the project's domain glossary; see the
-   domain-modeling skill for the format). For repos that ARE the workflow
-   package itself (like this one), the glossary holds the workflow's
-   ubiquitous language. For downstream repos, it holds the project's domain
-   terms.
+7. **Ask about existing material, before offering the bootstrapping
+   effort.** One question: does the project already have plans, designs,
+   specifications, or notes that describe what it is meant to become? If the
+   answer is yes, tell the operator to place them anywhere under `docs/`, in
+   whatever form they exist, and say plainly that nothing reads them
+   automatically: the bootstrapping effort reads them because the operator
+   points at them when starting it.
 
-8. Write `AGENTS.md` at repo root with the agent conventions (bucket layout,
-   promotion rules, invocation split, no-em-dashes rule, skill-tool
-   invocation convention).
+8. **Offer the bootstrapping effort.** This step replaces the project-shaped
+   templates the onboard branch used to write. A fresh repo cannot answer what
+   its test commands are, what its dev environment needs, or which domain
+   terms its code will speak, so those documents are written by an effort that
+   does the work rather than by a template that guesses. Tell the operator to
+   run `/skill:intake`, name what the project is going to be, and point at any
+   material they placed in step 7. That effort's tickets write
+   `docs/testing.md` with the repo's real commands, `docs/dev-env.md` with a
+   real environment or an explicit do-not-attempt note, and `CONTEXT.md` with
+   the project's first terms.
 
-9. Write `docs/agents/README.md` (per-repo config the skills read, seeded
-   minimal; the skills populate it over time).
-10. Write `docs/tasks/out-of-scope/index.md` (the rejected-requests KB;
-    explains its purpose).
+   Do not write those three files here, and do not seed them from a template.
+   The skills that read them treat a template as an answer, so an empty
+   template is worse than a missing file.
 
-11. Commit: `chore: initialize task-workflow (schema_version 5)`.
-
-12. Report: "Ready. Run `/skill:task-workflow-overview` to see the full flow,
-    or `/skill:wayfinder` to start planning."
+9. Report: "Ready. Run `/skill:task-workflow-overview` to see the full flow,
+   or start the bootstrapping effort with `/skill:intake`."
 
 ## Migrate (old repo)
 
