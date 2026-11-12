@@ -4573,6 +4573,56 @@ describe("the trimmed entry (trim-the-entry)", () => {
   });
 });
 
+// ─── The shape module's docstring (shape-docstring-truth) ───────────────────
+//
+// The docstring told a false story: it named the tool families as readers of the
+// guards beside the resolver and the spawn guard, and no family imports this
+// module. Each family trims an untrusted value by hand instead, which is the gap
+// the docstring now names. These pins read the module's importers out of the
+// tree, so the docstring's claim about its consumers can be checked against the
+// only evidence there is.
+
+describe("the shape module's docstring (shape-docstring-truth)", () => {
+  const SHAPE_MODULE = "src/core/shape.ts";
+  const shape = readFile(SHAPE_MODULE);
+  // The module docstring: the first block comment in the file.
+  const doc = (/^\/\*\*([\s\S]*?)\*\//.exec(shape) ?? ["", ""])[1];
+
+  /** The source files that import a module of this name, wherever it sits. */
+  function importersOf(moduleName: string): string[] {
+    const pattern = new RegExp(`from "[^"]*${moduleName.replace(/\./g, "\\.")}"`);
+    return SOURCE_CORPUS.filter((file) => file.rel !== SHAPE_MODULE && pattern.test(file.text))
+      .map((file) => file.rel)
+      .sort();
+  }
+
+  test("its consumers are the two core modules that import it, and no tool family", () => {
+    expect(shape, "the shape module imports something").not.toMatch(/^import /m);
+    const importers = importersOf("shape.js");
+    expect(importers).toEqual(["src/core/git-profile.ts", "src/core/spawn-guard.ts"]);
+    // The families read a tool call's arguments too, but they trim them in
+    // place. If one ever imports the guards, this pin fails and the docstring's
+    // account of its consumers has to be written again.
+    expect(importers.filter((rel) => rel.startsWith("src/tools/")), "a tool family imports the guards").toEqual(
+      [],
+    );
+  });
+
+  test("the docstring names the consumers that import it and no others", () => {
+    for (const consumer of [/git resolver/, /spawn guard/]) expect(doc).toMatch(consumer);
+    // The false claim: the families reading a value the same way through this
+    // module, listed beside the two modules that do import it.
+    expect(doc).not.toMatch(/(?:resolver|guard)[^.]*tool famil(?:y|ies)\s+(?:all\s+)?read/);
+  });
+
+  test("the docstring names the families' hand-rolled trims as a known gap", () => {
+    expect(doc, "the docstring never mentions the tool families").toMatch(/tool famil/i);
+    expect(doc, "the hand-rolled trims go unnamed").toMatch(/hand-roll/i);
+    expect(doc, "the duplication is not called a trim").toMatch(/trim/i);
+    expect(doc, "the gap is not named as one").toMatch(/known gap/i);
+  });
+});
+
 // ─── Retired vocabulary across the live language (end-of-effort-reconciliation) ──
 //
 // The docs-resync pin checked CONTEXT.md only, so the retired terms survived in
