@@ -117,6 +117,12 @@ for those ten are blocked.
 only when you type `/skill:<name>`. A model-invoked skill runs on a model
 decision, or when you type it.
 
+Both lists are grouped by bucket (engineering first, then productivity) and
+alphabetical by name inside a bucket, and the suite holds them to that order.
+Put a new skill where the rule puts it. The two bucket READMEs are the one
+exception: they keep their authored order, because the engineering list follows
+the phases a request walks.
+
 ### User-invoked
 
 - [improve-codebase-architecture](./skills/engineering/improve-codebase-architecture/SKILL.md)
@@ -152,9 +158,9 @@ decision, or when you type it.
 - [tdd](./skills/engineering/tdd/SKILL.md)
 - [wizard](./skills/engineering/wizard/SKILL.md)
 - [workflow-failure](./skills/engineering/workflow-failure/SKILL.md)
+- [operator-communication](./skills/productivity/operator-communication/SKILL.md)
 - [to-questionnaire](./skills/productivity/to-questionnaire/SKILL.md)
 - [writing-for-agents](./skills/productivity/writing-for-agents/SKILL.md)
-- [operator-communication](./skills/productivity/operator-communication/SKILL.md)
 
 ## Where to read next
 
