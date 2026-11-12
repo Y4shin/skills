@@ -3,6 +3,7 @@ type: map
 title: "Code-quality cleanup: the extension's tool file, shared helpers, and documentation ordering"
 status: stable
 origin_effort: configurable-git-workflow
+ready_for_spec: true
 ---
 # Code-quality cleanup: the extension's tool file, shared helpers, and documentation ordering
 
@@ -51,28 +52,39 @@ the suite is green with the public surface identical: the same 37 `tw_*` tools,
 the same argument schemas, and the same refusal texts.
 
 - `src/pi.ts` is 4501 lines. `createTools()` runs from line 2003 to 4116 and
-  defines all 37 tools as one object literal, with the planning, ticket,
-  gate, changeset, and release families interleaved by history rather than by
-  concern.
+  defines all 37 `tw_*` tools as one object literal, beside the three `skill_*`
+  tools, with the planning, ticket, gate, changeset, and release families
+  interleaved by history rather than by concern.
+- The suite's whole ungated surface is 41 names: the 37 `tw_*` tools, the three
+  `skill_*` tools, and `notify_user`, which the extension entry defines outside
+  `createTools()`. An existing test pins that surface by name and by count, so a
+  split that changes it fails without any new gate.
 - `package.json` declares the extension entry as `./src/pi.ts`, so the file's
-  path is part of the package's published shape.
+  path is part of the package's published shape, and sixteen test files import
+  `default`, `createTools`, or `notifyConfigPath` from `../src/pi.js`.
 - The git resolver exports `text()` and `isObject()` (`src/core/git-profile.ts`
-  lines 231 and 235) and `src/core/spawn-guard.ts` imports them, so the two
-  modules already share one implementation. What remains is that two generic
-  shape guards live in a module about branches.
+  lines 231 and 235), and the only other importer is
+  `src/core/spawn-guard.ts`. No test imports them and no module keeps a copy, so
+  what remains is that two generic shape guards live in a module about branches.
+- Five local variables in the tool handlers are named `text` (`src/pi.ts` lines
+  133, 297, 2131, 2150, 3926). A group module that imports the helper would
+  shadow it inside those handlers, and a local `const text` is a string, so the
+  mistake typechecks.
 - `src/pi.ts` line 3667 tells the changeset proposal and write outcomes apart
   with `(resolved as WriteOutcome).written`, a type assertion standing in for a
   discriminant field.
-- `tests/skills.test.ts` reads `src/pi.ts` as one text and asserts counts
-  inside it ("mechanical single homes"), `tests/platform-compat.test.ts` names
-  it in an eol attribute check, and `tests/gate-factory.test.ts` names it in a
-  comment that points at the passive tool set.
+- `tests/skills.test.ts` reads `src/pi.ts` as one text and asserts seven pattern
+  counts inside it ("mechanical single homes"), and
+  `tests/platform-compat.test.ts` names it in an eol attribute check. The seven
+  counts are the only assertions in the suite that break when a definition
+  changes file.
 - The top-level README lists the promoted set under `### User-invoked` and
   `### Model-invoked`, and the test that guards those lists sorts both sides
-  before comparing, so any ordering passes. The lists are bucket-grouped today
-  by hand, and the last productivity entry sits out of alphabetical order.
-- Baseline at `ef6d365`: 1588 tests pass, both typechecks are clean, the tree is
-  clean.
+  before comparing, so any ordering passes. Both lists are bucket-grouped by
+  hand; the model-invoked group ends with `operator-communication` out of
+  alphabetical order.
+- Baseline at `ef6d365`: 1588 tests pass, both typechecks are clean, and the
+  tree is clean at `6cdfd79`.
 
 ## Fog
 
