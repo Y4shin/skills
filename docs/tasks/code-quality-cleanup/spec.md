@@ -222,3 +222,5 @@ rather than reordering the two bucket READMEs whose order is deliberate.
 The effort's review artifact still carries the two findings it inherited as
 undispositioned. They become the implementation tickets of this effort, and the
 finalize pass will record that.
+
+> The architecture content in this specification is archival: the living architecture document is [architecture.md](architecture.md); update it there, not here.
