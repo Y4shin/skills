@@ -3,7 +3,7 @@ type: task
 subtype: grilling
 title: The split seam for the extension's tool file, and this effort's ticket shape
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 ---
 

@@ -76,15 +76,33 @@ the same argument schemas, and the same refusal texts.
 
 ## Fog
 
-- Where the two shape helpers live once the split lands, and whether the spawn
-  guard and the git resolver both import them from there.
-- The shape of the discriminant that separates the changeset proposal from the
-  write outcome: one field on one type, or two types the caller narrows.
-- The README ordering rule: by bucket and then alphabetically inside each
-  invocation group, or alphabetical across the whole group, and whether the two
-  bucket READMEs follow the same rule.
-
 ## Decisions so far
 
 - `split-seam` (grilling, settled): the split goes by family with a thin entry,
   and the four findings ship as one ticket each. Recorded in the task's Notes.
+- `source-pin-inventory` (research): the suite's coupling is seven pattern
+  counts in `tests/skills.test.ts` read from `src/pi.ts` as one string, sixteen
+  files importing `../src/pi.js` for `default`, `createTools`, and
+  `notifyConfigPath`, and nothing else. The tool surface is gated behaviourally,
+  so a split needs no new gate. Recorded in the task's Notes.
+- The family boundary is constrained by two of those counts. A `>= 3` call-site
+  count keeps its number only if a definition and both its callers share a file,
+  so `writeEffortRootArtifact` and its two writers stay together, and
+  `writeTasksIndex` and both its callers (effort creation, effort archive) stay
+  together. The split follows the pins rather than the pins being loosened.
+- The two shape helpers move to `src/core/shape.ts`, and `git-profile.ts` and
+  `spawn-guard.ts` import them from there. The inventory settled the argument:
+  both importers are in `src/core`, so a helper module under `src/tools/` would
+  invert the dependency. `src/pi.ts` never imports them.
+- The changeset discriminant is a field on the outcome type that tells the
+  proposal from the write, replacing the `resolved as WriteOutcome` assertion,
+  so a caller narrows instead of asserting. The exact spelling belongs to the
+  ticket.
+- The README rule: the top-level list is bucket-grouped and alphabetical inside
+  each invocation group, which is what it nearly does today and the one stray
+  entry (`operator-communication` last in the model-invoked group) is fixed to
+  match. The bucket READMEs keep their authored flow order, because the
+  engineering list is deliberately phase-ordered, and they stay
+  membership-checked. The test that pins the top-level order compares an
+  unsorted list against a sorted expectation, following the pattern already in
+  the suite at `tests/skills.test.ts` line 3264.
