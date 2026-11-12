@@ -4497,6 +4497,10 @@ describe("the trimmed entry (trim-the-entry)", () => {
   test("the artifacts family is a factory the entry composes", () => {
     assertFamilyFactory("artifacts", "artifactTools");
   });
+
+  test("the effort family is a factory the entry composes", () => {
+    assertFamilyFactory("effort", "effortTools");
+  });
 });
 
 // ─── Retired vocabulary across the live language (end-of-effort-reconciliation) ──
