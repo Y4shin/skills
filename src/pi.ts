@@ -26,22 +26,17 @@ import { effortTools } from "./tools/effort.js";
 import { ticketTools } from "./tools/tickets.js";
 import { skillCreatorTools } from "./tools/skill-creator.js";
 import { releaseTools } from "./tools/release.js";
-import { tw_feedback } from "./tools/feedback.js";
+import { feedbackTools } from "./tools/feedback.js";
 import { gateTools } from "./tools/gates.js";
 import { Tool, findRoot, readText, readYaml, relPosix, taskRoot } from "./tools/support.js";
-
-// Thin re-exports: a tool definition is reachable from the entry path whatever module holds
-// it, so no import path the suite or the package already uses had to move with the split. The
-// composition below reads the same definitions.
-export { tw_feedback } from "./tools/feedback.js";
 
 // ─── The tool record ──────────────────────────────────────────────────────────
 
 /**
- * The tool record the extension registers: every family's tools in one object.
- * tw_open's parameter schema depends on the gate state, so the gate family is
- * built here rather than exported as a constant; every other family contributes
- * a definition this file re-exports.
+ * The tool record the extension registers: one object, one spread per family
+ * factory. Each family builds its own record, so this function is the only place
+ * the surfaces meet. tw_open's parameter schema depends on the gate state, so the
+ * gate family is the one factory that takes an argument.
  */
 export function createTools(gated: boolean = false): Record<string, Tool> {
   return {
@@ -51,7 +46,7 @@ export function createTools(gated: boolean = false): Record<string, Tool> {
     ...skillCreatorTools(),
     ...releaseTools(),
     ...gateTools(gated),
-    tw_feedback,
+    ...feedbackTools(),
   };
 }
 
