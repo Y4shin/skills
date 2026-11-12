@@ -1,65 +1,69 @@
 ---
 type: review
-title: Whole-effort review of configurable-git-workflow
-dispositioned: false
+title: Whole-effort review of code-quality-cleanup
+dispositioned: true
+reconcile: "done: the architecture was reconciled at the end-of-effort pass and re-recorded through the architecture writer, correcting the ordering-comparator rule, describing the support module by its rule rather than a short list, and stating the gates-to-entry cycle once; the per-ticket contracts now record what each ticket actually delivered, including the factory conversion the trim performed."
 ---
 
-> Moved from the effort `configurable-git-workflow`: these findings are the follow-up's work.
+## What the effort set out to do, and what shipped
 
-## The effort's claim, checked against what shipped
+The effort inherited four findings from the archived `configurable-git-workflow`
+effort and set out to close them without changing behaviour.
 
-The map's success test asks that a repo selecting a profile gets the workflow
-enforced end to end: every guarded phase opens on the required branch or is
-refused, no implementation sub-agent spawns on the wrong branch, and close-out
-plus the release skill turn the effort's changesets into a version bump and a
-root changelog.
+It closed all four. The extension's 4501-line file became an entry of 578 lines
+plus seven family modules under `src/tools/` and one support module; the two
+generic shape guards moved to `src/core/shape.ts`, below both the core modules and
+the tool modules; the changeset writer's two outcomes carry a `kind`
+discriminant; and the top-level README's skill lists are ordered by a rule the
+suite now enforces.
 
-Delivered: settings and two profiles as data, one resolver behind both the brief
-and the refusal, a generic branch gate on the openers, a profile-driven spawn
-block on both dispatch surfaces and the per-child launch, changeset authoring
-with a dry-run proposal and an honest dedupe, release planning and applying
-behind two tools with the library set as runtime dependencies, the phase prose
-and worker agents rewired with a prose guard that bans branch literals, and the
-promoted user-invoked release skill. The success test holds except in one case:
-when the git seam cannot read the checkout, both guards pass with a diagnostic
-instead of refusing.
+The tool surface is identical: the same 41 registered names, the same argument
+schemas, the same refusal texts, the same disclosure sets, the same bundled
+profiles. The suite proves that rather than asserting it, at 1608 tests with both
+typechecks clean.
 
-The map's non-goals all held: no worktree isolation, no custom profile authoring
-or settings overrides, no change to the package's own release pipeline, no rebase
-or cherry-pick strategies, no repo-gate redesign, no gating of the planning
-phases, no branch migration, no machine-readable release recipe, no
-auto-publishing. One unrequested addition was defended and recorded: the brief
-tool answers for an implementation agent, which the specification did not name.
+## What it did beyond the four findings
 
-## The delivered code
+Two things, both recorded rather than smuggled in.
 
-Coherent and tested. 1561 tests pass and both typechecks are clean. The gates,
-the resolver, and the changeset seam each sit behind a single module with an
-injected dependency, so every one of them is tested without a real repository.
-Two defects were found and fixed while the effort ran: a step-key separator the
-workflow runtime rejects, and a bundled merge flag without its dashes.
+The README ordering rule needed a collation, because plain string order sorts
+`code-review` above `codebase-design` and would have moved a second entry. The
+effort chose dictionary order with hyphens ignored, stated it in the README, and
+holds it in one named comparator in the suite.
+
+The advisory review found that this effort had written a docstring claiming the
+tool families read values through the shape module, which no family does. A sixth
+ticket corrected the docstring and pinned its importers, so the claim is now
+testable instead of aspirational.
+
+## What was deliberately left alone
+
+The advisory review also found pre-existing duplication and dead scaffolding: the
+shipped shape module's neighbours hand-roll the same trim about thirty-five times,
+the gates family repeats a graph idiom, the git resolver repeats a settings
+preamble four times, a close helper takes an unused parameter, a module-private
+helper is dead, and one module exports internals only a test reads. All of it was
+present before this effort, the specification's no-churn rule puts it out of
+scope, and the effort moved it without editing it. Those findings are recorded
+here so the next person does not have to rediscover them.
+
+One seam is recorded but not collapsed: the changeset handler reads `dryRun` for
+its printed branches and `kind` for its narrowing, so one question has two
+sources. They cannot disagree under the current call shape.
 
 ## Findings
 
-1. **The guards fail open when the checkout cannot be read.** Both the phase gate
-   and the spawn guard pass with a diagnostic or a notification when the git seam
-   is missing or git fails, which contradicts the map's non-negotiable that guards
-   block rather than warn. Disposition: ticket `guard-fail-closed`.
-2. **The effort close's push block contradicts its own policy sentence.** The
-   prose states that a push policy of never means the phase pushes nothing, and
-   the block that follows pushes unconditionally. Disposition: ticket
-   `close-out-fidelity`.
-3. **`closeGate` is authored data with no behaviour.** Both branch-bearing profile
-   rows carry it, the brief reports it, and nothing enforces it. Disposition:
-   ticket `close-out-fidelity`.
-4. **The changeset writer does not resolve its effort argument.** A typo'd slug
-   still writes, and the report names the effort it was given rather than the one
-   that exists. Disposition: informational, accepted, because the changeset files
-   carry no effort field and the risk is a wrong label rather than wrong data.
-5. **The extension's tool file absorbed five features**, the spawn guard repeats
-   two small helpers from the resolver, and one type assertion stands in for a
-   discriminant in the changeset writer. Disposition: follow-up effort
-   `code-quality-cleanup`, accepted by the operator.
-6. **The README places the engineering `release` entry among productivity
-   entries**, which the membership-only test does not catch. Disposition:
-   follow-up effort `code-quality-cleanup`, accepted by the operator.
+Every finding from the two reviews is recorded with where it went. Nothing is
+open.
+
+## Dispositions
+
+- The extension's tool file had absorbed five features and grew past 4300 lines; closed by the extraction and the trim tickets.: ticket `extract-tool-families`
+- The six families were left as named constants by the extraction and the entry enumerated them; closed by the trim converting them to factories.: ticket `trim-the-entry`
+- The two generic shape guards lived in a module about git branches; closed by moving them to src/core/shape.ts.: ticket `shape-helpers-module`
+- The changeset writer told its proposal and write outcomes apart with a type assertion; closed by the kind discriminant.: ticket `changeset-discriminant`
+- The README placed the skill lists in an order nothing enforced; closed by the ordering rule and its assertion.: ticket `readme-order`
+- This effort's own shape module docstring claimed consumers it did not have; closed by correcting it and pinning its importers.: ticket `shape-docstring-truth`
+- Pre-existing duplication and dead scaffolding: the hand-rolled trims in the tool families, the repeated graph and containment idioms, the four-times settings preamble in the git resolver, the unused close parameter, the dead module-private helper, and the test-only exports. Accepted as informational because all of it predates the effort and the specification's no-churn rule puts it out of scope; the advisory review keeps the detail.: informational (accepted)
+- The gates family imports the entry, so the two form an import cycle. Accepted as informational: it is safe because the binding is a hoisted declaration read at call time, it is now stated once in the architecture document, and moving the composition out of the entry would cost more than the cycle.: informational (accepted)
+- Registration order changed to family-grouped in 18 of 40 positions. Accepted as informational: no test pins order, every surface assertion sorts, and tools resolve by name.: informational (accepted)
