@@ -1,0 +1,10 @@
+porcelain before:
+M src/cli/main.ts
+?? src/db/scratch.ts
+
+porcelain after:
+M src/cli/main.ts
+?? src/db/scratch.ts
+
+detached worktree at HEAD: true (e6b9141b5a672b003cb429496eb6e69f47df1327)
+identical diff output: true

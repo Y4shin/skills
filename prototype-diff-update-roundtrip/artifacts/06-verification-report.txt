@@ -1,0 +1,16 @@
+PASS  G1 update refuses a diff with open proposals
+PASS  V1 authored prose preserved (database, core, util, core/model exactly; cli gains only the reviewed relationship section)
+PASS  V1b authored prose in clean equals the reviewed diff's authored prose (update altered nothing)
+PASS  V2 fitted assignments (selectors) unchanged for pre-existing units
+PASS  V3 observed sections in clean == analysis of HEAD over the reviewed unit set (edges, owned files, tiling)
+PASS  V4 no review markup remains in the clean architecture
+PASS  V5 update consumed only the reviewed diff (original architecture was moved away during update)
+PASS  V6 core/parsers removed, database/schema present with the reviewed Go selector, database/store present, util byte-identical
+PASS  V7 root provenance (described_commit = HEAD, base_commit gone, replacement entry recorded)
+PASS  V8 clean keeps the reviewed declared relationships (cli: core and database; database unchanged; schema's drafted util rejected)
+PASS  V9 dirty run: detached worktree at HEAD, original tree and index unchanged, identical diff output
+PASS  V10 diff is complete (all base units present; util unchanged without a change block, database changed)
+PASS  V11 strict partitioning holds in base, reviewed, and clean (no gaps, full root coverage, subdivided units own nothing directly)
+PASS  V12 negative control: without core/model the gap is visible (1 gap, core's Observed names src/core/model.ts)
+PASS  V13 diagram conventions: spacing, few-word edge labels, [U]/[ND] prefixed descriptions, tier second lines in diff only
+PASS  V14 no duplicated section headings in any architecture file (base, diff, reviewed, clean)

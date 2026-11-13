@@ -1,0 +1,88 @@
+diff --git a/internal/db/legacy.go b/internal/db/legacy.go
+deleted file mode 100644
+index be98a8d..0000000
+--- a/internal/db/legacy.go
++++ /dev/null
+@@ -1,3 +0,0 @@
+-package db
+-
+-func LegacyLookup(id string) string { return id }
+diff --git a/internal/db/schema/schema.go b/internal/db/schema/schema.go
+new file mode 100644
+index 0000000..396435b
+--- /dev/null
++++ b/internal/db/schema/schema.go
+@@ -0,0 +1,3 @@
++package schema
++
++type Mapping struct{ Table string }
+diff --git a/src/cli/main.ts b/src/cli/main.ts
+index 2573b71..a2ec417 100644
+--- a/src/cli/main.ts
++++ b/src/cli/main.ts
+@@ -1,5 +1,5 @@
+-import { findRecords } from "../db/store";
++import { buildModel } from "../core/model";
+ 
+ export function main(args: string[]) {
+-  return findRecords(args[0]);
++  return buildModel([args[0]]);
+ }
+diff --git a/src/core/parsers/index.ts b/src/core/parsers/index.ts
+deleted file mode 100644
+index f0489a6..0000000
+--- a/src/core/parsers/index.ts
++++ /dev/null
+@@ -1,5 +0,0 @@
+-import { findRecords } from "../../db/store";
+-
+-export function parse(input: string) {
+-  return findRecords(input);
+-}
+diff --git a/src/core/parsers/legacy.ts b/src/core/parsers/legacy.ts
+deleted file mode 100644
+index dba82ec..0000000
+--- a/src/core/parsers/legacy.ts
++++ /dev/null
+@@ -1 +0,0 @@
+-export function legacyParse(s: string) { return s; }
+diff --git a/src/db/legacy.ts b/src/db/legacy.ts
+deleted file mode 100644
+index 5d91d9d..0000000
+--- a/src/db/legacy.ts
++++ /dev/null
+@@ -1 +0,0 @@
+-export function legacyQuery(q: string) { return q; }
+diff --git a/src/db/replication/config.ts b/src/db/replication/config.ts
+new file mode 100644
+index 0000000..c800e30
+--- /dev/null
++++ b/src/db/replication/config.ts
+@@ -0,0 +1 @@
++export const replConfig = { intervalMs: 1000 };
+diff --git a/src/db/replication/replicator.ts b/src/db/replication/replicator.ts
+new file mode 100644
+index 0000000..0293862
+--- /dev/null
++++ b/src/db/replication/replicator.ts
+@@ -0,0 +1,3 @@
++import type { RecordRow } from "../records";
++
++export function replicate(rows: RecordRow[]) { return rows; }
+diff --git a/src/db/schema/mapping.ts b/src/db/schema/mapping.ts
+new file mode 100644
+index 0000000..cc26ea4
+--- /dev/null
++++ b/src/db/schema/mapping.ts
+@@ -0,0 +1,4 @@
++import { fmt } from "../../util/format";
++import { mapTable } from "./types";
++
++export const mapping = mapTable(fmt("records"));
+diff --git a/src/db/schema/types.ts b/src/db/schema/types.ts
+new file mode 100644
+index 0000000..45ebf2d
+--- /dev/null
++++ b/src/db/schema/types.ts
+@@ -0,0 +1 @@
++export function mapTable(name: string) { return { name }; }
